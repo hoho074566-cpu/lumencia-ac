@@ -1,6 +1,6 @@
 import { ASSETS } from './assets.js';
 
-const APP_VERSION = '0.4.1';
+const APP_VERSION = '0.4.3';
 const SAVE_KEY = 'lumensia.save.v1';
 const SETTINGS_KEY = 'lumensia.settings.v1';
 
@@ -403,12 +403,37 @@ function addTimeline(turn) {
 
 function rebuildRollingSummary() {
   const rows = save.timeline || [];
+  const MAX_CHARS = 5000;
   const recent = rows.slice(-6);
-  const important = rows.filter(x => x.importance !== 'routine').slice(-8);
-  const merged = [...important, ...recent]
-    .sort((a,b) => a.turn - b.turn)
-    .filter((x,i,a) => i === 0 || x.turn !== a[i-1].turn);
-  save.rollingSummary = merged.map(x => `[T${x.turn} ${x.date} ${x.time} ${x.location} ${x.importance}] ${x.summary}`).join('\n').slice(-5000);
+  const recentTurns = new Set(recent.map(x => x.turn));
+  const olderPriority = rows
+    .filter(x => !recentTurns.has(x.turn) && x.importance !== 'routine')
+    .sort((a,b) => (b.importance === 'critical' ? 2 : 1) - (a.importance === 'critical' ? 2 : 1) || b.turn - a.turn);
+
+  const picked = new Map();
+  const lineFor = (x, summaryMax) => {
+    const summary = String(x.summary || '');
+    const trimmed = summary.length > summaryMax ? `${summary.slice(0, summaryMax)}…` : summary;
+    return `[T${x.turn} ${x.date} ${x.time} ${x.location} ${x.importance}] ${trimmed}`;
+  };
+
+  // 최근 6턴은 모두 보존하되 각 요약만 압축한다.
+  for (const row of recent) picked.set(row.turn, lineFor(row, 430));
+  let used = [...picked.values()].reduce((sum, line) => sum + line.length + 1, 0);
+
+  // 남은 예산에는 오래된 critical/important 사건을 통째로 넣는다. 문자열 중간 절단은 하지 않는다.
+  for (const row of olderPriority) {
+    const line = lineFor(row, row.importance === 'critical' ? 520 : 380);
+    if (used + line.length + 1 > MAX_CHARS) continue;
+    picked.set(row.turn, line);
+    used += line.length + 1;
+    if (picked.size >= 14) break;
+  }
+
+  save.rollingSummary = [...picked.entries()]
+    .sort((a,b) => a[0] - b[0])
+    .map(([, line]) => line)
+    .join('\n');
 }
 
 function compactState() {
@@ -505,10 +530,10 @@ function updateForceTerraButton() {
 function scrollBottom(smooth = true) { requestAnimationFrame(() => window.scrollTo({top: document.body.scrollHeight, behavior: smooth ? 'smooth':'auto'})); }
 
 function ensureV12Ui() {
-  document.title = '루멘시아 모바일 V1.3.2';
+  document.title = '루멘시아 모바일 V1.3.3';
   const h1 = document.querySelector('h1');
   if (h1 && !h1.querySelector('.version-tag')) {
-    const small = document.createElement('small'); small.className='version-tag'; small.textContent='V1.3.2'; h1.append(' ', small);
+    const small = document.createElement('small'); small.className='version-tag'; small.textContent='V1.3.3'; h1.append(' ', small);
   }
   if (!$('showEmotionDebug')) {
     const demo = $('demoMode')?.closest('label');
