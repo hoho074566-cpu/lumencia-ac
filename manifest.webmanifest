@@ -1,0 +1,17 @@
+{
+  "name": "루멘시아 아카데미 모바일",
+  "short_name": "루멘시아",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080b12",
+  "theme_color": "#111827",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

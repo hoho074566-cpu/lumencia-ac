@@ -1,0 +1,25 @@
+루멘시아 모바일 V1.1 — 빌드 전 검사 기록
+
+통과:
+- app.js / assets.js / sw.js JavaScript 구문 검사
+- api/chat.js / health.js / api/lib/*.js JavaScript 구문 검사
+- package.json / vercel.json / manifest.webmanifest JSON 검사
+- HTML에서 app.js가 참조하는 DOM ID 24개 존재 확인
+- 등록 캐릭터 32명 DEFAULT URL 존재 확인(assets.js 데이터 기준)
+- 11명 표정 6종 라우팅 데이터 존재 확인
+- Luna/Terra 자동 라우터 단위 테스트
+- Pro 모드 요청 시 Terra 강제 및 high 기본 추론 확인
+- 관련 NPC 기억 선별 단위 테스트
+- 알 수 없는 speaker_key와 CG ID 제거, 변화량 상한 적용 단위 테스트
+- 데모 응답 스키마에 npc_state_updates 포함
+
+이 환경에서 수행하지 못한 것:
+- 실제 OPENAI_API_KEY를 사용한 유료 API 호출
+- Vercel 실배포 빌드
+- npm registry 접속이 느려 로컬 npm install 완료 확인
+
+따라서 첫 배포 후 권장 확인:
+1. 데모 모드에서 화면/초상화 확인
+2. /api/health에서 API configured 확인
+3. 실제 API로 첫 장면 1턴 호출
+4. 자동 라우팅과 세이브 내보내기 확인

@@ -1,0 +1,31 @@
+루멘시아 모바일 V1.1 — 시작 순서
+
+1) ZIP을 푼다.
+2) GitHub 새 저장소에 ZIP 내부 내용물을 전부 올린다.
+   - index.html / app.js / package.json / api 폴더가 저장소 최상단에 보여야 한다.
+3) Vercel → Add New → Project → 그 저장소 Import → Deploy.
+4) Vercel 프로젝트 Settings → Environment Variables:
+   OPENAI_API_KEY = 본인의 API 키
+   LUMENSIA_ACCESS_TOKEN = 본인만 아는 긴 암호 (권장)
+5) Redeploy.
+6) 폰에서 Vercel 주소를 열고 ⚙ 설정:
+   - 접속 토큰을 설정했다면 같은 암호 입력
+   - 먼저 데모 모드 ON → 이미지 점검 / 첫 장면 시작
+   - 정상 확인 후 데모 모드 OFF
+7) 브라우저 메뉴 → 홈 화면에 추가.
+
+절대 금지:
+- API 키를 GitHub 파일, app.js, 휴대폰 설정창에 직접 넣지 않는다.
+- OPENAI_API_KEY는 Vercel 서버 환경변수에만 둔다.
+
+기본 추천:
+- 모델: 자동 (일상 Luna / 중요 Terra)
+- 추론: 자동
+- Pro 추론: 평소 OFF, 정말 중요한 장면만 ON
+- 서술: 중간
+
+문제 발생 시:
+- API 키 없음: Vercel 환경변수 등록 후 Redeploy
+- 401 접속 토큰 오류: Vercel 값과 앱 설정 값을 동일하게 입력
+- 이미지 실패: ⚙ → 등록 이미지 빠른 점검
+- 업데이트가 안 보임: 브라우저 새로고침 또는 홈 화면 앱 완전 종료 후 재실행

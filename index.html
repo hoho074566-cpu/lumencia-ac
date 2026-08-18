@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111827" />
+  <meta name="description" content="루멘시아 아카데미 모바일 AI RPG 플레이어" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/styles.css" />
+  <title>루멘시아 모바일 V1.1</title>
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">LUMENSIA ACADEMY</div>
+        <h1>루멘시아 모바일</h1>
+      </div>
+      <div class="top-actions">
+        <button id="infoBtn" class="icon-btn" aria-label="상태창">INFO</button>
+        <button id="settingsBtn" class="icon-btn" aria-label="설정">⚙</button>
+      </div>
+    </header>
+
+    <section id="statusStrip" class="status-strip">
+      <span id="timeStatus">D+0 · 1285/03/01 08:40</span>
+      <span id="locationStatus">대강당 앞</span>
+      <span id="routeStatus" class="route-badge">준비</span>
+    </section>
+
+    <main id="story" class="story" aria-live="polite"></main>
+
+    <section id="choices" class="choices hidden"></section>
+
+    <form id="actionForm" class="composer">
+      <textarea id="actionInput" rows="2" maxlength="5000" placeholder="카일의 행동이나 대사를 직접 입력…"></textarea>
+      <button id="sendBtn" type="submit">진행</button>
+    </form>
+
+    <footer class="footer-row">
+      <button id="newGameBtn" class="text-btn">새 게임</button>
+      <button id="saveBtn" class="text-btn">저장</button>
+      <button id="forceTerraBtn" class="text-btn terra-btn">TERRA 1턴</button>
+      <button id="exportBtn" class="text-btn">내보내기</button>
+      <label class="text-btn file-label">불러오기<input id="importInput" type="file" accept="application/json" /></label>
+      <span id="costStatus">$0.0000</span>
+    </footer>
+  </div>
+
+  <div id="overlay" class="overlay hidden"></div>
+
+  <dialog id="settingsDialog" class="panel-dialog">
+    <form method="dialog">
+      <header><h2>게임 설정</h2><button value="cancel" class="close-btn">✕</button></header>
+      <label>개인 접속 토큰
+        <input id="accessToken" type="password" autocomplete="off" placeholder="Vercel의 LUMENSIA_ACCESS_TOKEN과 같은 값" />
+      </label>
+      <label>모델 라우팅
+        <select id="modelMode">
+          <option value="auto">자동: 일상 Luna / 중요 Terra</option>
+          <option value="luna">Luna 고정</option>
+          <option value="terra">Terra 고정</option>
+        </select>
+      </label>
+      <label>추론 강도
+        <select id="reasoningEffort">
+          <option value="auto">자동</option>
+          <option value="none">none</option>
+          <option value="low">low</option>
+          <option value="medium">medium</option>
+          <option value="high">high</option>
+          <option value="xhigh">xhigh</option>
+          <option value="max">max</option>
+        </select>
+      </label>
+      <label>서술 길이
+        <select id="proseLength">
+          <option value="short">짧게</option>
+          <option value="medium">중간</option>
+          <option value="long">길게</option>
+        </select>
+      </label>
+      <label class="toggle-row"><input id="proReasoning" type="checkbox" /><span>GPT-5.6 Pro 추론 모드 (Terra 사용 · 느림/비용 증가)</span></label>
+      <label class="toggle-row"><input id="adultMode" type="checkbox" /><span>성인 친밀도 확장 사용</span></label>
+      <label class="toggle-row"><input id="demoMode" type="checkbox" /><span>데모 모드(API 호출 안 함)</span></label>
+      <div id="apiHealth" class="health-box">API 상태 확인 중…</div>
+      <button id="assetTestBtn" type="button" class="secondary-btn">등록 이미지 빠른 점검</button>
+      <button value="default" class="primary-btn">저장하고 닫기</button>
+    </form>
+  </dialog>
+
+  <dialog id="infoDialog" class="panel-dialog">
+    <form method="dialog">
+      <header><h2>INFO</h2><button value="cancel" class="close-btn">✕</button></header>
+      <pre id="infoContent" class="info-content"></pre>
+    </form>
+  </dialog>
+
+  <dialog id="assetDialog" class="panel-dialog wide-dialog">
+    <form method="dialog">
+      <header><h2>이미지 점검</h2><button value="cancel" class="close-btn">✕</button></header>
+      <div id="assetResults" class="asset-results"></div>
+    </form>
+  </dialog>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

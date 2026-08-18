@@ -1,0 +1,436 @@
+import { ASSETS } from './assets.js';
+
+const APP_VERSION = '0.2.0';
+const SAVE_KEY = 'lumensia.save.v1';
+const SETTINGS_KEY = 'lumensia.settings.v1';
+
+const $ = (id) => document.getElementById(id);
+const story = $('story');
+const choicesEl = $('choices');
+const actionForm = $('actionForm');
+const actionInput = $('actionInput');
+const sendBtn = $('sendBtn');
+
+const defaultSettings = {
+  modelMode: 'auto',
+  reasoningEffort: 'auto',
+  proseLength: 'medium',
+  adultMode: false,
+  proReasoning: false,
+  demoMode: false,
+  accessToken: '',
+};
+
+const defaultSave = () => ({
+  version: 2,
+  appVersion: APP_VERSION,
+  id: crypto.randomUUID?.() || String(Date.now()),
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  turnNumber: 0,
+  world: {
+    dayElapsed: 0,
+    date: '1285-03-01',
+    weekday: '월요일',
+    time: '08:40',
+    location: '루멘시아 아카데미 대강당 앞',
+  },
+  pc: {
+    name: '카일', age: 20, gender: '남성', department: '기사과 1학년',
+    realm: '익스퍼트 상급', status: '안정', fatigue: 0, gold: 18,
+    talents: { magic: 2, martial: 9, soul: 7, knowledge: 5 },
+    stats: {
+      '신체': { grade: 'A-', progress: 36 },
+      '마나': { grade: 'B+', progress: 41 },
+      '지능': { grade: 'C', progress: 28 },
+      '신성': { grade: 'F', progress: 0 },
+    },
+    skills: {
+      '대검술': { grade: 'A++', hiddenXp: 0 }, '오러 운용': { grade: 'A', hiddenXp: 0 },
+      '검기': { grade: 'A-', hiddenXp: 0 }, '실전 전투': { grade: 'S', hiddenXp: 0 },
+      '위험 감지': { grade: 'A++', hiddenXp: 0 }, '전장 판단': { grade: 'A+', hiddenXp: 0 },
+      '회피': { grade: 'A+', hiddenXp: 0 }, '체력 관리': { grade: 'A', hiddenXp: 0 },
+      '응급처치': { grade: 'B+', hiddenXp: 0 }, '야전 생존': { grade: 'A', hiddenXp: 0 },
+      '투척': { grade: 'C+', hiddenXp: 0 }, '승마': { grade: 'B', hiddenXp: 0 },
+    },
+    inventory: ['강철 양손대검', '예비 단검 2자루', '가죽 장갑', '야전 치료도구', '숫돌', '용병단 인식표'],
+  },
+  relationships: {},
+  npcStates: {},
+  activeEvents: ['입학식/학과 오리엔테이션', '신입생 기량평가', '회색 늑대의 숲', '황위 경쟁'],
+  completedEvents: [],
+  pcKnowledge: [],
+  memories: { global: [], npc: {} },
+  flags: { majorScene: false, forceTerraNextTurn: true },
+  rollingSummary: '입학식 당일 08:40. 카일은 루멘시아 아카데미 대강당 앞에 도착했으며 입학식 개막 전이다.',
+  recentTurns: [],
+  renderedTurns: [],
+  usage: { inputTokens: 0, outputTokens: 0, cachedTokens: 0, cacheWriteTokens: 0, estimatedUsd: 0 },
+});
+
+let save = normalizeSave(loadJson(SAVE_KEY) || defaultSave());
+let settings = { ...defaultSettings, ...(loadJson(SETTINGS_KEY) || {}) };
+let busy = false;
+let forceTerraOnce = false;
+
+function loadJson(key) { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } }
+function persist() { save.updatedAt = new Date().toISOString(); localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }
+function persistSettings() { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
+function uniq(arr) { return [...new Set((arr || []).filter(Boolean))]; }
+function clamp(n, min, max) { return Math.min(max, Math.max(min, Number(n) || 0)); }
+
+function normalizeSave(raw) {
+  const base = defaultSave();
+  const next = raw && typeof raw === 'object' ? raw : base;
+  next.version = 2;
+  next.appVersion = APP_VERSION;
+  next.world = { ...base.world, ...(next.world || {}) };
+  next.pc = { ...base.pc, ...(next.pc || {}) };
+  next.pc.stats = { ...base.pc.stats, ...(next.pc.stats || {}) };
+  next.pc.skills = { ...base.pc.skills, ...(next.pc.skills || {}) };
+  next.pc.inventory = Array.isArray(next.pc.inventory) ? next.pc.inventory : [...base.pc.inventory];
+  next.relationships = next.relationships || {};
+  next.npcStates = next.npcStates || {};
+  next.activeEvents = Array.isArray(next.activeEvents) ? next.activeEvents : [];
+  next.completedEvents = Array.isArray(next.completedEvents) ? next.completedEvents : [];
+  next.pcKnowledge = Array.isArray(next.pcKnowledge) ? next.pcKnowledge : [];
+  next.memories = next.memories || { global: [], npc: {} };
+  next.memories.global = Array.isArray(next.memories.global) ? next.memories.global : [];
+  next.memories.npc = next.memories.npc || {};
+  next.flags = { ...base.flags, ...(next.flags || {}) };
+  next.recentTurns = Array.isArray(next.recentTurns) ? next.recentTurns : [];
+  next.renderedTurns = Array.isArray(next.renderedTurns) ? next.renderedTurns : [];
+  next.usage = { ...base.usage, ...(next.usage || {}) };
+  return next;
+}
+
+const WEEKDAYS = ['월요일','화요일','수요일','목요일','금요일','토요일','일요일'];
+const GRADE_LADDER = ['F','F+','E-','E','E+','D-','D','D+','C-','C','C+','B-','B','B+','A-','A','A+','A++','S-','S','S+','S++','SS-','SS','SS+','SSS-','SSS','SSS+'];
+function minutesFromTime(t) { const [h,m] = String(t || '00:00').split(':').map(Number); return h*60+m; }
+function timeFromMinutes(total) { total = ((total % 1440) + 1440) % 1440; return `${String(Math.floor(total/60)).padStart(2,'0')}:${String(total%60).padStart(2,'0')}`; }
+function daysInMonth(year, month) { if (month === 2) return year % 4 === 0 ? 29 : 28; return [4,6,9,11].includes(month) ? 30 : 31; }
+function advanceCalendarDays(days) {
+  let [year, month, day] = String(save.world.date || '1285-03-01').split('-').map(Number);
+  let weekdayIndex = Math.max(0, WEEKDAYS.indexOf(save.world.weekday));
+  for (let i=0; i<days; i++) {
+    day += 1; weekdayIndex = (weekdayIndex + 1) % 7;
+    if (day > daysInMonth(year, month)) { day = 1; month += 1; }
+    if (month > 12) { month = 1; year += 1; }
+  }
+  save.world.date = `${String(year).padStart(4,'0')}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+  save.world.weekday = WEEKDAYS[weekdayIndex];
+  save.world.dayElapsed += days;
+}
+function advanceTime(minutes) {
+  const before = minutesFromTime(save.world.time);
+  const total = before + Math.max(0, Number(minutes) || 0);
+  const dayAdd = Math.floor(total / 1440);
+  save.world.time = timeFromMinutes(total);
+  if (dayAdd > 0) advanceCalendarDays(dayAdd);
+}
+function nextGrade(grade) { const i = GRADE_LADDER.indexOf(grade); return i >= 0 && i < GRADE_LADDER.length - 1 ? GRADE_LADDER[i+1] : grade; }
+function addMemoryUnique(list, memory, max = 250) {
+  if (!memory?.fact) return list || [];
+  const rows = Array.isArray(list) ? list : [];
+  const signature = `${memory.fact}|${memory.secret_level || 0}`;
+  const filtered = rows.filter((x) => `${x?.fact}|${x?.secret_level || 0}` !== signature);
+  return [...filtered, memory].slice(-max);
+}
+
+function assetUrl(key, expression = 'default') {
+  const char = ASSETS.characters[key];
+  if (!char) return null;
+  return char.expressions?.[expression] || char.default || null;
+}
+
+function createPortrait(key, expression, alt) {
+  const wrap = document.createElement('div');
+  wrap.className = 'portrait-wrap';
+  const placeholder = document.createElement('div');
+  placeholder.className = 'portrait-placeholder';
+  placeholder.textContent = `${alt || key || 'NPC'} 초상화`;
+  wrap.append(placeholder);
+  const img = document.createElement('img');
+  let triedDefault = false;
+  img.alt = alt || key || 'NPC';
+  img.loading = 'lazy';
+  img.src = assetUrl(key, expression) || '';
+  img.addEventListener('load', () => placeholder.remove());
+  img.addEventListener('error', () => {
+    const fallback = ASSETS.characters[key]?.default;
+    if (!triedDefault && fallback && img.src !== fallback) { triedDefault = true; img.src = fallback; }
+    else img.remove();
+  });
+  if (img.src) wrap.append(img);
+  return wrap;
+}
+
+function appendWelcome() {
+  story.innerHTML = '';
+  const box = document.createElement('section');
+  box.className = 'welcome';
+  box.innerHTML = `<h2>입학식 당일</h2><p>제국력 1285년 3월 1일, 오전 8시 40분. 대강당 앞은 신입생과 귀족 자제, 교수와 상급생들로 붐빈다. 카일의 행동은 전적으로 네가 정한다.</p>`;
+  const btn = document.createElement('button');
+  btn.className = 'start-btn';
+  btn.textContent = '첫 장면 시작';
+  btn.addEventListener('click', () => sendAction('게임을 시작한다. 입학식 당일 오전 8시 40분, 대강당 앞의 현재 장면을 열어라. 카일의 행동이나 대사는 대신 정하지 마라.'));
+  box.append(btn);
+  story.append(box);
+}
+
+function renderAll() {
+  story.innerHTML = '';
+  if (!save.renderedTurns?.length) appendWelcome();
+  else save.renderedTurns.forEach(renderTurnRecord);
+  updateStatus();
+  renderInfo();
+  scrollBottom(false);
+}
+
+function renderTurnRecord(record) {
+  if (record.action) {
+    const user = document.createElement('div');
+    user.className = 'user-action';
+    user.textContent = record.action;
+    story.append(user);
+  }
+  const turn = record.turn;
+  if (!turn) return;
+  const card = document.createElement('section');
+  card.className = 'turn-card';
+  const head = document.createElement('div');
+  head.className = 'turn-head';
+  head.innerHTML = `<span>${escapeHtml(turn.scene_title || '장면')}</span><span>${escapeHtml(record.route?.tier || 'demo')}</span>`;
+  card.append(head);
+
+  if (turn.cg_id && ASSETS.cg[turn.cg_id]) {
+    const cg = document.createElement('div'); cg.className = 'cg-card';
+    const img = document.createElement('img'); img.src = ASSETS.cg[turn.cg_id]; img.alt = turn.cg_id; cg.append(img); card.append(cg);
+  }
+  for (const item of turn.scene || []) {
+    if (item.kind === 'dialogue') {
+      const d = document.createElement('div'); d.className = 'dialogue';
+      if (item.speaker_key) d.append(createPortrait(item.speaker_key, item.expression || 'default', item.speaker_name));
+      const s = document.createElement('div'); s.className = 'speaker'; s.textContent = `💬 ${item.speaker_name || item.speaker_key || 'NPC'}`;
+      const t = document.createElement('div'); t.className = 'dialogue-text'; t.textContent = `“${item.text}”`;
+      d.append(s,t); card.append(d);
+    } else {
+      const n = document.createElement('div'); n.className = 'narration'; n.textContent = item.text; card.append(n);
+    }
+  }
+  for (const notice of record.notices || []) {
+    const n = document.createElement('div'); n.className = 'progress-notice'; n.textContent = `✦ ${notice}`; card.append(n);
+  }
+  story.append(card);
+  renderChoices(turn.choices || []);
+}
+
+function escapeHtml(s='') { return String(s).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+
+function renderChoices(choices) {
+  choicesEl.innerHTML = '';
+  if (!choices.length) { choicesEl.classList.add('hidden'); return; }
+  choices.forEach((choice, idx) => {
+    const b = document.createElement('button'); b.className = 'choice-btn'; b.textContent = `${idx+1}. ${choice}`;
+    b.addEventListener('click', () => { actionInput.value = choice; actionInput.focus(); choicesEl.classList.add('hidden'); });
+    choicesEl.append(b);
+  });
+  choicesEl.classList.remove('hidden');
+}
+
+function updateStatus(route) {
+  $('timeStatus').textContent = `D+${save.world.dayElapsed} · ${save.world.date} ${save.world.weekday} ${save.world.time}`;
+  $('locationStatus').textContent = save.world.location;
+  if (route) $('routeStatus').textContent = `${route.tier.toUpperCase()} · ${route.reasoning_effort}${route.reasoning_mode === 'pro' ? ' · PRO' : ''}`;
+  $('costStatus').textContent = `$${Number(save.usage.estimatedUsd || 0).toFixed(4)}`;
+}
+
+function renderInfo() {
+  const rel = Object.entries(save.relationships || {}).map(([key,v]) => `${ASSETS.characters[key]?.name || key}[호감 ${v.affinity||0} / 신뢰 ${v.trust||0}${v.status ? ` / ${v.status}`:''}]`).join(', ') || '-';
+  const skills = Object.entries(save.pc.skills || {}).map(([k,v]) => `${k} ${v.grade}`).join(' | ');
+  const stats = Object.entries(save.pc.stats || {}).map(([k,v]) => `- ${k}: ${v.grade} [${v.progress}/100]`).join('\n');
+  $('infoContent').textContent = `경지: ${save.pc.realm} | 소속: 루멘시아 아카데미\n---------\n직위: ${save.pc.department} | 상황: 🟢\n---------\n스킬: ${skills}\n---------\n스탯:\n${stats}\n---------\n🔮[魔] ${save.pc.talents.magic} | ⚔️[武] ${save.pc.talents.martial} | 🌟[魂] ${save.pc.talents.soul} | 📘[智] ${save.pc.talents.knowledge}\n---------\n상태: ${save.pc.status} | 피로 ${save.pc.fatigue}/100\n💼: ${save.pc.inventory.join(', ')}, 금화 ${save.pc.gold}G\n관계: ${rel}\n---------\n진행 사건: ${save.activeEvents.join(', ') || '-'}\n토큰: 입력 ${save.usage.inputTokens || 0} / 캐시 ${save.usage.cachedTokens || 0} / 출력 ${save.usage.outputTokens || 0}\n누적 API 비용(추정): $${Number(save.usage.estimatedUsd || 0).toFixed(4)}`;
+}
+
+function applyDelta(delta = {}) {
+  const notices = [];
+  advanceTime(clamp(delta.advance_minutes, 0, 1440));
+  if (delta.new_location) save.world.location = delta.new_location;
+  if (delta.pc_status) save.pc.status = delta.pc_status;
+  save.pc.fatigue = clamp(save.pc.fatigue + clamp(delta.fatigue_delta, -10, 10), 0, 100);
+  save.pc.gold = Math.max(0, save.pc.gold + clamp(delta.gold_delta, -10000, 10000));
+
+  for (const row of delta.stat_progress || []) {
+    const stat = save.pc.stats[row.stat]; if (!stat) continue;
+    let progress = Math.max(0, Number(stat.progress || 0) + clamp(row.amount, -5, 5));
+    while (progress >= 100) {
+      progress -= 100;
+      const before = stat.grade;
+      stat.grade = nextGrade(stat.grade);
+      if (stat.grade !== before) notices.push(`스탯 상승: ${row.stat} ${before} → ${stat.grade}`);
+      else { progress = 99; break; }
+    }
+    stat.progress = clamp(progress, 0, 99);
+  }
+
+  for (const row of delta.skill_experience || []) {
+    if (!save.pc.skills[row.skill]) save.pc.skills[row.skill] = { grade: 'F', hiddenXp: 0 };
+    const skill = save.pc.skills[row.skill];
+    let xp = Math.max(0, Number(skill.hiddenXp || 0) + clamp(row.amount, 0, 5));
+    while (xp >= 100) {
+      xp -= 100;
+      const before = skill.grade;
+      skill.grade = nextGrade(skill.grade);
+      if (skill.grade !== before) notices.push(`스킬 상승: ${row.skill} ${before} → ${skill.grade}`);
+      else { xp = 99; break; }
+    }
+    skill.hiddenXp = clamp(xp, 0, 99);
+  }
+
+  for (const row of delta.relationship_changes || []) {
+    const r = save.relationships[row.npc_key] || { affinity: 0, trust: 0, status: '중립', history: [] };
+    r.affinity = clamp(r.affinity + row.affinity_delta, -100, 100);
+    r.trust = clamp(r.trust + row.trust_delta, -100, 100);
+    if (row.status) r.status = row.status;
+    r.history = [...(r.history || []), row.reason].filter(Boolean).slice(-30);
+    save.relationships[row.npc_key] = r;
+  }
+
+  for (const row of delta.npc_state_updates || []) {
+    const old = save.npcStates[row.npc_key] || {};
+    save.npcStates[row.npc_key] = {
+      ...old,
+      ...(row.location ? { location: row.location } : {}),
+      ...(row.status ? { status: row.status } : {}),
+      ...(row.current_goal ? { current_goal: row.current_goal } : {}),
+      ...(row.last_seen ? { last_seen: row.last_seen } : {}),
+      updatedAtTurn: save.turnNumber + 1,
+    };
+  }
+
+  save.pc.inventory = uniq([...save.pc.inventory, ...(delta.items_add || [])]).filter(x => !(delta.items_remove || []).includes(x));
+  save.activeEvents = uniq([...save.activeEvents, ...(delta.active_events_add || [])]).filter(x => !(delta.active_events_remove || []).includes(x));
+  save.completedEvents = uniq([...save.completedEvents, ...(delta.completed_events_add || [])]);
+  save.pcKnowledge = uniq([...save.pcKnowledge, ...(delta.pc_knowledge_add || [])]).slice(-300);
+
+  for (const m of delta.memories_add || []) {
+    if (m.owner === 'world' || m.owner === 'global') save.memories.global = addMemoryUnique(save.memories.global, m, 300);
+    else {
+      const key = m.owner.replace(/^npc:/, '');
+      save.memories.npc[key] = addMemoryUnique(save.memories.npc[key], m, 120);
+    }
+  }
+  return notices;
+}
+
+function compactState() {
+  return {
+    version: save.version, turnNumber: save.turnNumber, world: save.world, pc: save.pc, relationships: save.relationships, npcStates: save.npcStates,
+    activeEvents: save.activeEvents, completedEvents: save.completedEvents,
+    pcKnowledge: save.pcKnowledge, memories: save.memories, flags: save.flags,
+  };
+}
+
+async function sendAction(action) {
+  action = String(action || '').trim();
+  if (!action || busy) return;
+  busy = true; sendBtn.disabled = true; actionInput.disabled = true; choicesEl.classList.add('hidden');
+  const loader = document.createElement('div'); loader.className = 'turn-card'; loader.innerHTML = '<div class="loading-dots"><i></i><i></i><i></i></div>'; story.append(loader); scrollBottom();
+  try {
+    const { accessToken, ...apiSettings } = settings;
+    const payload = { action, saveState: compactState(), recentTurns: save.recentTurns, rollingSummary: save.rollingSummary, availableCgIds: Object.keys(ASSETS.cg || {}), forceTerra: forceTerraOnce, ...apiSettings };
+    let data;
+    if (settings.demoMode) data = demoResponse(action);
+    else {
+      const res = await fetch('/api/chat', { method: 'POST', headers: {'Content-Type':'application/json', 'X-Lumensia-Token': accessToken || ''}, body: JSON.stringify(payload) });
+      data = await res.json();
+      if (!res.ok) throw new Error(`${data.error || 'API 오류'}${data.request_id ? `\nRequest ID: ${data.request_id}` : ''}`);
+    }
+    loader.remove();
+    const notices = applyDelta(data.turn.state_delta);
+    const record = { action, turn: data.turn, route: data.route, usage: data.usage, notices, at: new Date().toISOString() };
+    save.turnNumber += 1;
+    save.rollingSummary = [save.rollingSummary, data.turn.scene_summary].filter(Boolean).join('\n').slice(-12000);
+    save.recentTurns.push({ action, summary: data.turn.scene_summary, scene: data.turn.scene.slice(0,10) });
+    save.recentTurns = save.recentTurns.slice(-20);
+    save.renderedTurns.push(record); save.renderedTurns = save.renderedTurns.slice(-80);
+    if (data.usage) {
+      save.usage.inputTokens += data.usage.input_tokens || 0;
+      save.usage.outputTokens += data.usage.output_tokens || 0;
+      save.usage.cachedTokens += data.usage.cached_tokens || 0;
+      save.usage.cacheWriteTokens += data.usage.cache_write_tokens || 0;
+      save.usage.estimatedUsd += data.usage.estimated_usd || 0;
+    }
+    forceTerraOnce = false; updateForceTerraButton();
+    save.flags.forceTerraNextTurn = false;
+    save.flags.majorScene = data.turn.importance === 'critical';
+    persist();
+    renderTurnRecord(record); updateStatus(data.route); renderInfo(); actionInput.value = ''; scrollBottom();
+  } catch (err) {
+    loader.remove();
+    const e = document.createElement('div'); e.className = 'error-card'; e.textContent = err.message || String(err); story.append(e); scrollBottom();
+  } finally { busy = false; sendBtn.disabled = false; actionInput.disabled = false; actionInput.focus(); }
+}
+
+function demoResponse(action) {
+  const first = save.turnNumber === 0;
+  const turn = first ? {
+    scene_title: '입학식 전, 대강당 앞', importance: 'routine', cg_id: null,
+    scene: [
+      {kind:'narration', text:'대강당을 둘러싼 흰 석조 회랑에 아침 햇살이 비친다. 신입생들의 목소리 사이로 검집이 부딪히는 소리와 마법 도구의 미세한 진동음이 섞인다.', speaker_key:null, speaker_name:null, expression:null},
+      {kind:'dialogue', text:'너도 기사과야? 그 대검, 꽤 오래 쓴 것 같은데!', speaker_key:'lilia', speaker_name:'릴리아', expression:'smile'},
+      {kind:'narration', text:'붉은 머리의 소녀가 거리낌 없이 다가오며 카일의 대검을 흥미롭게 살핀다.', speaker_key:null, speaker_name:null, expression:null}
+    ],
+    choices:['소녀에게 이름과 소속을 묻는다.','대검을 살피는 이유를 묻는다.','입학식 전에 가볍게 검을 맞춰보자고 제안한다.'],
+    state_delta:{advance_minutes:3,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0,relationship_changes:[],stat_progress:[],skill_experience:[],items_add:[],items_remove:[],active_events_add:[],active_events_remove:[],completed_events_add:[],pc_knowledge_add:[],memories_add:[{owner:'npc:lilia',fact:'입학식 전 대강당 앞에서 카일의 오래된 대검에 먼저 관심을 보였다.',importance:'minor',secret_level:0}],npc_state_updates:[{npc_key:'lilia',location:'루멘시아 아카데미 대강당 앞',status:'카일에게 먼저 말을 건 상태',current_goal:'신입생 입학식 참가',last_seen:'1285-03-01 08:43'}]},
+    scene_summary:'입학식 전 대강당 앞에서 릴리아가 카일의 대검에 관심을 보이며 먼저 말을 걸었다.'
+  } : {
+    scene_title:'데모 응답',importance:'routine',cg_id:null,
+    scene:[{kind:'narration',text:`카일의 행동 「${action}」에 주변 상황이 반응한다. 데모 모드라 실제 AI 판정은 생략된다.`,speaker_key:null,speaker_name:null,expression:null}],choices:[],
+    state_delta:{advance_minutes:1,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0,relationship_changes:[],stat_progress:[],skill_experience:[],items_add:[],items_remove:[],active_events_add:[],active_events_remove:[],completed_events_add:[],pc_knowledge_add:[],memories_add:[],npc_state_updates:[]},scene_summary:'데모 모드로 UI 동작을 확인했다.'
+  };
+  return { turn, route:{model:'demo',tier:'demo',reasoning_effort:'none',reasoning_mode:'standard',reason:'demo'}, usage:{input_tokens:0,output_tokens:0,cached_tokens:0,estimated_usd:0} };
+}
+
+function updateForceTerraButton() {
+  const btn = $('forceTerraBtn');
+  if (!btn) return;
+  btn.textContent = forceTerraOnce ? 'TERRA 예약됨' : 'TERRA 1턴';
+  btn.classList.toggle('active', forceTerraOnce);
+}
+
+function scrollBottom(smooth = true) { requestAnimationFrame(() => window.scrollTo({top: document.body.scrollHeight, behavior: smooth ? 'smooth':'auto'})); }
+
+actionForm.addEventListener('submit', e => { e.preventDefault(); sendAction(actionInput.value); });
+actionInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); actionForm.requestSubmit(); } });
+$('infoBtn').addEventListener('click', () => { renderInfo(); $('infoDialog').showModal(); });
+$('settingsBtn').addEventListener('click', () => $('settingsDialog').showModal());
+$('newGameBtn').addEventListener('click', () => { if (confirm('현재 세이브를 지우고 새 게임을 시작할까?')) { save = defaultSave(); persist(); renderAll(); } });
+$('saveBtn').addEventListener('click', () => { persist(); toast('폰에 저장됨'); });
+$('forceTerraBtn').addEventListener('click', () => { forceTerraOnce = !forceTerraOnce; updateForceTerraButton(); toast(forceTerraOnce ? '다음 1턴 Terra 사용' : 'Terra 예약 취소'); });
+$('exportBtn').addEventListener('click', exportSave);
+$('importInput').addEventListener('change', importSave);
+
+for (const key of ['modelMode','reasoningEffort','proseLength']) { $(key).value = settings[key]; $(key).addEventListener('change', e => { settings[key] = e.target.value; persistSettings(); }); }
+$('accessToken').value = settings.accessToken || ''; $('accessToken').addEventListener('change', e => { settings.accessToken = e.target.value.trim(); persistSettings(); });
+for (const key of ['adultMode','proReasoning','demoMode']) { $(key).checked = Boolean(settings[key]); $(key).addEventListener('change', e => { settings[key] = e.target.checked; persistSettings(); }); }
+$('assetTestBtn').addEventListener('click', testAssets);
+
+function exportSave() {
+  persist(); const blob = new Blob([JSON.stringify(save,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`lumensia-save-${save.world.date}-${save.world.time.replace(':','')}.json`; a.click(); URL.revokeObjectURL(a.href);
+}
+async function importSave(e) { const file=e.target.files?.[0]; if(!file)return; try { const parsed=JSON.parse(await file.text()); if(!parsed.pc||!parsed.world)throw new Error('세이브 형식이 아님'); save=normalizeSave(parsed); persist(); renderAll(); toast('세이브 불러옴'); } catch(err){alert(`불러오기 실패: ${err.message}`);} e.target.value=''; }
+function toast(text) { const d=document.createElement('div'); d.textContent=text; d.style.cssText='position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:99;background:#263449;padding:9px 14px;border-radius:999px'; document.body.append(d); setTimeout(()=>d.remove(),1300); }
+
+async function checkHealth() { try { const r=await fetch('/api/health'); const h=await r.json(); $('apiHealth').textContent=h.apiConfigured?`API 연결 준비됨 · ${h.luna} / ${h.terra}${h.accessTokenRequired ? ' · 접속 토큰 필요' : ''}`:'API 키 미설정. Vercel 환경변수 OPENAI_API_KEY를 추가하거나 데모 모드를 켜세요.'; } catch { $('apiHealth').textContent='API 상태를 확인할 수 없음.'; } }
+
+async function testAssets() {
+  const results=$('assetResults'); results.innerHTML=''; $('assetDialog').showModal();
+  const keys=['lilia','anastasia','laris','aria','isabel','chloe','lena','veradin','bellian','aris','mirabelle'];
+  for (const key of keys) {
+    const char=ASSETS.characters[key]; const url=char?.expressions?.smile||char?.default; const item=document.createElement('div'); item.className='asset-item'; const img=document.createElement('img'); img.src=url; const label=document.createElement('div'); label.textContent=`${char?.name||key}: 로딩 중`; img.onload=()=>label.textContent=`${char.name}: OK`; img.onerror=()=>label.textContent=`${char?.name||key}: 실패`; item.append(img,label); results.append(item);
+  }
+}
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+updateForceTerraButton(); checkHealth(); renderAll();
