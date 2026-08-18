@@ -103,6 +103,17 @@ const GM_RULES = `너는 판타지 아카데미 장기 RPG 「루멘시아 아�
 - 경험치가 발생하면 reason에 '무슨 행동/상황 때문에 무엇을 배우거나 단련했는지'를 플레이어가 이해할 수 있게 한 문장으로 적는다. 결과 성공 여부와 경험 획득은 별개다. 실패했어도 분석·교정·통찰이 있으면 경험을 얻을 수 있다.
 
 
+[판정 로그 — 플레이어에게 보이는 기술 로그]
+- resolution_log는 이번 USER ACTION에서 PC의 스킬/스탯이 실제 결과 판정에 영향을 준 경우에만 기록한다. 단순 대화·이동·정보 확인처럼 능력 판정이 필요 없으면 triggered=false, outcome='none', summary=null, abilities=[]로 둔다.
+- abilities에는 실제로 반영한 핵심 능력만 1~5개 기록한다. kind='skill'이면 SAVE_STATE.pc.skills에 존재하는 정확한 이름, kind='stat'이면 신체/마나/지능/신성 중 하나만 사용한다. 새 이름·동의어·오타를 만들지 않는다.
+- role은 primary=판정의 핵심 능력, support=보조 능력, passive=사용자 선언 없이 조건이 맞아 자동으로 작동한 패시브다. 일반적으로 primary 1개, support/passive 합계 0~3개면 충분하다.
+- reason에는 그 능력이 '무엇을 가능하게 했는지/어떤 불리함을 줄였는지'를 짧고 구체적으로 적는다. 단순히 '대검술을 사용했다' 같은 tautology는 금지한다.
+- outcome은 success=의도한 핵심 목표 달성, partial=일부 달성/대가/불리한 부수결과, failure=핵심 목표 실패다. 능력 판정 자체가 없으면 none이다.
+- summary는 최종 판정 이유를 1문장으로 요약한다. 능력 외에도 상대 수준, 피로, 지형, 거리, 정보, 상성처럼 이번 결과에 실제로 중요한 요인이 있으면 함께 언급한다.
+- 판정 로그는 GM의 숨은 비밀, 아직 발견하지 못한 함정의 정체, NPC의 비공개 수치나 메타 정보를 누설하지 않는다. 플레이어가 장면에서 알 수 있는 범위의 판정 근거만 표시한다.
+- resolution_log와 경험치는 별개다. 능력이 판정에 쓰였어도 학습 자극이 없으면 XP는 0이며 state_delta에서 생략한다. 반대로 실패 판정에서도 교정/통찰이 있으면 경험치를 받을 수 있다.
+
+
 [사건 버킷]
 - SAVE_STATE.activeEvents는 PC의 현재 장면과 직접 맞물려 실제 진행 중인 사건만 둔다. 미래 일정이나 멀리서 진행 중인 세계 사건을 미리 넣지 않는다.
 - scheduledEvents는 날짜/조건이 아직 오지 않은 미래 예정 사건이다. 실제로 시작되면 scheduled_events_remove와 active_events_add를 함께 사용한다.
@@ -448,6 +459,7 @@ function serializeCompactSaveForPrompt(compactSave = {}, maxChars = 38000) {
 // ===== END memory.js =====
 
 // ===== BEGIN prompt.js =====
+
 const cut = (value, max = 9000) => {
   const text = typeof value === 'string' ? value : JSON.stringify(value ?? null);
   return text.length > max ? `${text.slice(0, max)}\n...[잘림]` : text;
@@ -563,7 +575,7 @@ function buildTurnInput({ action, saveState, recentTurns, rollingSummary, availa
   const pcReference = defaultPcProfileReference(saveState);
   const abilityReference = currentPcAbilityReference(saveState);
 
-  return `===== PC PROFILE REFERENCE =====\n${pcReference}\n\n===== ACTIVE EVENT CANON =====\n${eventReferences.active}\n\n===== RELEVANT SCHEDULED EVENT CANON =====\n${eventReferences.scheduled}\n\n===== RELEVANT WORLD ARC CANON =====\n${eventReferences.world}\n\n===== INITIAL SCENARIO SEED =====\n${initialSeed}\n\n[현재성 우선순위]\n현재 날짜·시간·장소·PC/NPC 상태·완료 여부는 반드시 AUTHORITATIVE SAVE_STATE가 최우선이다. 위 시나리오/이벤트 참고문에 과거 시점 표현이 남아 있어도 SAVE_STATE와 충돌하면 폐기한다. activeEvents는 현재 PC 주변에서 실제 진행 중인 사건, scheduledEvents는 미래 예정, worldArcs는 세계 배경에서 독립 진행되는 장기 사건이다. RELEVANT WORLD ARC CANON이 '없음'이면 해당 장기 사건을 현재 장면으로 억지로 끌어오지 않는다. INITIAL SCENARIO SEED는 0턴에서만 유효하다.\n\n===== TURN OPTIONS =====\n서술 길이: ${lengthRule}\nADULT_MODE: ${adultMode && adultEligible ? 'ON' : 'OFF'}\n성인 조건 충족: ${adultEligible ? 'YES' : 'NO'}\n\n===== AUTHORITATIVE SAVE_STATE =====\n${serializedSave}\n\n===== ROLLING SUMMARY =====\n${cut(rollingSummary || '아직 없음', 5000)}\n\n===== RECENT TURNS =====\n${cut(turns, 9000)}\n\n===== AVAILABLE_CG_IDS =====\n${cgIds.length ? cgIds.join(', ') : '없음'}\n\n===== CURRENT PC ABILITIES — ACTION RESOLUTION =====\n${abilityReference}\n\n===== USER ACTION =====\n${cut(action, 5000)}\n\nUSER ACTION을 처리하기 직전에 CURRENT PC ABILITIES를 확인하고, 관련 스킬/스탯/패시브가 결과에 미치는 영향을 먼저 반영하라. 스킬명을 사용자가 직접 지정하지 않았다는 이유로 관련 능력을 무시하지 마라. 경험치는 단순 사용 보상이 아니라 실제 학습·훈련·실전 자극이 있을 때만 state_delta에 기록하라. 경험치 reason은 원인이 된 행동/상황을 구체적으로 적어라. 사용자가 선언한 행동과 그 판정·직접 결과, NPC/세계의 자연스러운 연쇄 반응까지 이번 턴에 충분히 진행하라. 이동·수업·훈련 같은 전환 행동은 특별한 방해가 없으면 의미 있는 다음 장면까지 넘겨도 된다. 직전 턴 내용을 불필요하게 반복하지 마라. PC에게 새로운 선택이 필요한 순간에 멈추고 PC의 다음 행동·대사·감정·결정은 대신 정하지 마라. 각 주요 NPC 대사에는 실제 감정 태그/강도/근거를 함께 반환하라.`;
+  return `===== PC PROFILE REFERENCE =====\n${pcReference}\n\n===== ACTIVE EVENT CANON =====\n${eventReferences.active}\n\n===== RELEVANT SCHEDULED EVENT CANON =====\n${eventReferences.scheduled}\n\n===== RELEVANT WORLD ARC CANON =====\n${eventReferences.world}\n\n===== INITIAL SCENARIO SEED =====\n${initialSeed}\n\n[현재성 우선순위]\n현재 날짜·시간·장소·PC/NPC 상태·완료 여부는 반드시 AUTHORITATIVE SAVE_STATE가 최우선이다. 위 시나리오/이벤트 참고문에 과거 시점 표현이 남아 있어도 SAVE_STATE와 충돌하면 폐기한다. activeEvents는 현재 PC 주변에서 실제 진행 중인 사건, scheduledEvents는 미래 예정, worldArcs는 세계 배경에서 독립 진행되는 장기 사건이다. RELEVANT WORLD ARC CANON이 '없음'이면 해당 장기 사건을 현재 장면으로 억지로 끌어오지 않는다. INITIAL SCENARIO SEED는 0턴에서만 유효하다.\n\n===== TURN OPTIONS =====\n서술 길이: ${lengthRule}\nADULT_MODE: ${adultMode && adultEligible ? 'ON' : 'OFF'}\n성인 조건 충족: ${adultEligible ? 'YES' : 'NO'}\n\n===== AUTHORITATIVE SAVE_STATE =====\n${serializedSave}\n\n===== ROLLING SUMMARY =====\n${cut(rollingSummary || '아직 없음', 5000)}\n\n===== RECENT TURNS =====\n${cut(turns, 9000)}\n\n===== AVAILABLE_CG_IDS =====\n${cgIds.length ? cgIds.join(', ') : '없음'}\n\n===== CURRENT PC ABILITIES — ACTION RESOLUTION =====\n${abilityReference}\n\n===== USER ACTION =====\n${cut(action, 5000)}\n\nUSER ACTION을 처리하기 직전에 CURRENT PC ABILITIES를 확인하고, 관련 스킬/스탯/패시브가 결과에 미치는 영향을 먼저 반영하라. 스킬명을 사용자가 직접 지정하지 않았다는 이유로 관련 능력을 무시하지 마라. 이번 행동에 실제 능력 판정이 있었다면 resolution_log에 실제 반영한 능력과 역할(primary/support/passive), 판정 결과와 근거를 기록하라. 능력 판정이 필요 없는 턴이면 resolution_log는 triggered=false로 비워라. 판정 로그에 숨은 비밀이나 NPC 비공개 수치를 누설하지 마라. 경험치는 단순 사용 보상이 아니라 실제 학습·훈련·실전 자극이 있을 때만 state_delta에 기록하라. 경험치 reason은 원인이 된 행동/상황을 구체적으로 적어라. 사용자가 선언한 행동과 그 판정·직접 결과, NPC/세계의 자연스러운 연쇄 반응까지 이번 턴에 충분히 진행하라. 이동·수업·훈련 같은 전환 행동은 특별한 방해가 없으면 의미 있는 다음 장면까지 넘겨도 된다. 직전 턴 내용을 불필요하게 반복하지 마라. PC에게 새로운 선택이 필요한 순간에 멈추고 PC의 다음 행동·대사·감정·결정은 대신 정하지 마라. 각 주요 NPC 대사에는 실제 감정 태그/강도/근거를 함께 반환하라.`;
 }
 // ===== END prompt.js =====
 
@@ -600,6 +612,7 @@ function reasoningFor(tier, requested = 'auto', proReasoning = false) {
 // ===== END router.js =====
 
 // ===== BEGIN schema.js =====
+
 const Expression = z.enum(['default', 'smile', 'blush', 'serious', 'angry', 'sad', 'shock']);
 const Importance = z.enum(['routine', 'important', 'critical']);
 
@@ -642,6 +655,20 @@ const SkillExperience = z.object({
   reason: z.string().min(1).max(240),
 });
 
+const AbilityUse = z.object({
+  kind: z.enum(['skill', 'stat']),
+  name: z.string().min(1).max(80),
+  role: z.enum(['primary', 'support', 'passive']),
+  reason: z.string().min(1).max(240),
+});
+
+const ResolutionLog = z.object({
+  triggered: z.boolean(),
+  outcome: z.enum(['none', 'success', 'partial', 'failure']),
+  summary: z.string().max(320).nullable(),
+  abilities: z.array(AbilityUse).max(5),
+});
+
 const MemoryAdd = z.object({
   owner: z.string().min(1).max(80),
   fact: z.string().min(1).max(500),
@@ -663,6 +690,7 @@ const TurnSchema = z.object({
   scene: z.array(SceneItem).min(1).max(24),
   cg_id: z.string().max(120).nullable(),
   choices: z.array(z.string().min(1).max(240)).max(3),
+  resolution_log: ResolutionLog,
   state_delta: z.object({
     advance_minutes: z.number().int().min(0).max(1440),
     new_location: z.string().max(160).nullable(),
@@ -691,6 +719,7 @@ const TurnSchema = z.object({
 // ===== END schema.js =====
 
 // ===== BEGIN utils.js =====
+
 const PRICES = {
   'gpt-5.6-luna': { input: 1, cached: 0.10, output: 6 },
   'gpt-5.6-terra': { input: 2.5, cached: 0.25, output: 15 },
@@ -724,7 +753,7 @@ const mergeProgressRows = (rows, keyName, maxRows = 4) => {
   return out;
 };
 
-function sanitizeTurn(turn, { allowedCgIds = [], allowedSkills = [] } = {}) {
+function sanitizeTurn(turn, { allowedCgIds = [], allowedSkills = [], skillGrades = {}, statGrades = {} } = {}) {
   if (!turn || typeof turn !== 'object') throw new Error('모델 응답이 비어 있습니다.');
   turn.choices = arrays(turn.choices, 3);
   turn.scene = arrays(turn.scene, 24).map((item) => {
@@ -746,6 +775,40 @@ function sanitizeTurn(turn, { allowedCgIds = [], allowedSkills = [] } = {}) {
   const allowedCg = new Set(Array.isArray(allowedCgIds) ? allowedCgIds : []);
   if (!turn.cg_id || !allowedCg.has(turn.cg_id)) turn.cg_id = null;
 
+  const allowedSkillSet = new Set((allowedSkills || []).map((x) => String(x).trim()).filter(Boolean));
+  const allowedStats = new Set(['신체', '마나', '지능', '신성']);
+  const rawResolution = turn.resolution_log && typeof turn.resolution_log === 'object' ? turn.resolution_log : {};
+  const validRoles = new Set(['primary', 'support', 'passive']);
+  const seenAbilities = new Set();
+  const resolutionAbilities = [];
+  for (const raw of arrays(rawResolution.abilities, 5)) {
+    const kind = raw?.kind === 'stat' ? 'stat' : raw?.kind === 'skill' ? 'skill' : null;
+    const name = String(raw?.name || '').trim();
+    if (!kind || !name) continue;
+    if (kind === 'skill' && !allowedSkillSet.has(name)) continue;
+    if (kind === 'stat' && !allowedStats.has(name)) continue;
+    const dedupeKey = `${kind}:${name}`;
+    if (seenAbilities.has(dedupeKey)) continue;
+    const reason = String(raw?.reason || '').trim().slice(0, 240);
+    if (!reason) continue;
+    seenAbilities.add(dedupeKey);
+    resolutionAbilities.push({
+      kind,
+      name,
+      role: validRoles.has(raw?.role) ? raw.role : 'support',
+      reason,
+      grade: String(kind === 'skill' ? (skillGrades?.[name] || '') : (statGrades?.[name] || '')).slice(0, 24) || null,
+    });
+  }
+  const validOutcomes = new Set(['success', 'partial', 'failure']);
+  const resolutionTriggered = Boolean(rawResolution.triggered) && resolutionAbilities.length > 0;
+  turn.resolution_log = {
+    triggered: resolutionTriggered,
+    outcome: resolutionTriggered && validOutcomes.has(rawResolution.outcome) ? rawResolution.outcome : 'none',
+    summary: resolutionTriggered ? (String(rawResolution.summary || '').trim().slice(0, 320) || null) : null,
+    abilities: resolutionTriggered ? resolutionAbilities : [],
+  };
+
   const d = turn.state_delta || {};
   d.advance_minutes = clamp(d.advance_minutes, 0, 1440);
   d.fatigue_delta = clamp(d.fatigue_delta, -10, 10);
@@ -754,7 +817,6 @@ function sanitizeTurn(turn, { allowedCgIds = [], allowedSkills = [] } = {}) {
   d.intimacy_changes = arrays(d.intimacy_changes, 6).filter((row) => REGISTERED_SPEAKER_KEYS.has(row?.npc_key));
   d.stat_progress = mergeProgressRows(arrays(d.stat_progress, 3), 'stat', 3)
     .filter((row) => ['신체', '마나', '지능', '신성'].includes(row.stat));
-  const allowedSkillSet = new Set((allowedSkills || []).map((x) => String(x).trim()).filter(Boolean));
   d.skill_experience = mergeProgressRows(arrays(d.skill_experience, 4), 'skill', 4)
     .filter((row) => allowedSkillSet.has(row.skill));
   d.items_add = arrays(d.items_add, 12);
@@ -943,11 +1005,11 @@ export default async function handler(req, res) {
       }),
       reasoning,
       max_output_tokens: maxOutput,
-      prompt_cache_key: process.env.OPENAI_PROMPT_CACHE_KEY || 'lumensia-v1.3.5-canon',
+      prompt_cache_key: process.env.OPENAI_PROMPT_CACHE_KEY || 'lumensia-v1.3.6-canon',
       prompt_cache_retention: '24h',
       text: {
         verbosity: proseLength === 'long' ? 'high' : proseLength === 'short' ? 'low' : 'medium',
-        format: zodTextFormat(TurnSchema, 'lumensia_turn_v15'),
+        format: zodTextFormat(TurnSchema, 'lumensia_turn_v16'),
       },
     });
 
@@ -955,9 +1017,13 @@ export default async function handler(req, res) {
       return json(res, 502, { error: '구조화된 게임 응답을 받지 못했습니다.', request_id: response._request_id });
     }
 
+    const skillGrades = Object.fromEntries(Object.entries(saveState?.pc?.skills || {}).map(([name, row]) => [name, row?.grade || row || '']));
+    const statGrades = Object.fromEntries(Object.entries(saveState?.pc?.stats || {}).map(([name, row]) => [name, row?.grade || row || '']));
     let turn = sanitizeTurn(response.output_parsed, {
       allowedCgIds: availableCgIds,
-      allowedSkills: Object.keys(saveState?.pc?.skills || {}),
+      allowedSkills: Object.keys(skillGrades),
+      skillGrades,
+      statGrades,
     });
     if (!adultActive && turn?.state_delta) turn.state_delta.intimacy_changes = [];
     turn = resolveTurnEmotions(turn, saveState);
@@ -974,7 +1040,7 @@ export default async function handler(req, res) {
       },
       usage: usageSummary(route.model, response.usage),
       request_id: response._request_id || null,
-      server_version: '0.4.5',
+      server_version: '0.4.6',
     });
   } catch (error) {
     console.error(error);
