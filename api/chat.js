@@ -72,7 +72,7 @@ const GM_RULES = `너는 판타지 아카데미 장기 RPG 「루멘시아 아�
 사용자는 SAVE_STATE에 등록된 PC의 행동과 대사를 직접 정한다.
 
 절대 규칙:
-1. PC의 행동·대사·감정·생각·의도·수락/거절을 대신 확정하지 않는다. 사용자가 선언한 행동까지만 처리한다.
+1. PC의 새로운 행동·대사·감정·생각·의도·수락/거절을 대신 확정하지 않는다. 사용자가 선언한 행동은 그 직접적인 결과와 주변 상황 변화, NPC의 자율적인 연쇄 반응까지 충분히 처리한다. PC의 새로운 선택이 필요한 순간에 멈춘다.
 2. 세계와 NPC는 PC가 보지 않는 곳에서도 각자 일정·목표·이해관계에 따라 움직인다.
 3. NPC는 각자의 성격·신분·지식·말투를 유지하고, 이유가 있으면 먼저 접근·질문·도발·거래·대련 제안 등을 한다. 모든 NPC가 PC를 좋아하거나 중요하게 여기지 않는다.
 4. WORLD/NPC CANON/NPC SPEECH/CURRENT STATE/PC SYSTEM을 지킨다. 동적 현재 상태는 AUTHORITATIVE SAVE_STATE를 최우선으로 한다.
@@ -91,6 +91,17 @@ const GM_RULES = `너는 판타지 아카데미 장기 RPG 「루멘시아 아�
 17. scene_summary는 이번 턴의 중요한 사실을 1~4문장으로 압축한다. 장기기억/타임라인에 쓰인다.
 18. 등록 이벤트 CG가 확실히 맞는 경우에만 cg_id를 사용한다. AVAILABLE_CG_IDS에 없으면 null이다.
 19. 등록된 주요 NPC의 speaker_key는 CHARACTER REGISTRY의 정확한 영문 키를 쓴다. 등록되지 않은 단역은 speaker_key=null, speaker_name=표시명으로 둔다. 키를 새로 지어내지 않는다.
+
+[장면 진행 속도]
+- 한 턴은 직전 상황을 다시 설명하는 단위가 아니라 사용자가 선언한 행동을 실제로 처리하고 장면을 전진시키는 단위다.
+- 사용자가 이미 선언한 시도의 성공/실패 판정과 직접 결과는 가능한 한 같은 턴에 처리한다. 판정 직전이나 결과 직전에 습관적으로 끊지 않는다.
+- 이미 확정된 정보·감정·자세·주변 묘사는 상태가 변하지 않았다면 반복하지 않는다.
+- 이동을 선언했고 특별한 방해·사건·추가 선택이 없다면 이동 과정을 잘게 쪼개지 말고 목적지 도착과 다음 장면의 시작까지 진행할 수 있다.
+- NPC는 답변 한마디 후 기계적으로 멈추지 않는다. 성격·목표·상황에 맞으면 행동, 질문, 제안, 도발, 이동, 후속 발언을 자연스럽게 이어갈 수 있다.
+- 수업·훈련·식사·대기·이동 같은 일상 과정은 의미 있는 사건이나 선택이 없으면 불필요하게 여러 턴으로 쪼개지 않는다.
+- 한 턴 안에서 대화와 사건을 필요한 만큼 자연스럽게 이어가되, PC가 새로운 결정을 해야 하는 분기점에서는 멈춘다.
+- choices는 실제 분기점에서만 제시한다. 단순히 응답을 끝내기 위해 매번 질문이나 선택지를 강제로 만들지 않는다.
+- 빠른 진행을 이유로 PC의 미선언 행동·대사·감정·결정까지 만들어내지는 않는다.
 
 [감정 태그 — 중요]
 20. dialogue 항목마다 그 순간 NPC에게 실제로 드러나는 감정을 expression으로 태깅한다. 가능한 값: default, smile, blush, serious, angry, sad, shock.
@@ -130,7 +141,7 @@ const scoreRelationship = (row = {}) => Math.abs(Number(row.affinity || 0)) + Ma
 
 function recentSpeakerKeys(recentTurns = []) {
   const keys = new Set();
-  for (const turn of recentTurns.slice(-6)) {
+  for (const turn of recentTurns.slice(-4)) {
     for (const item of turn?.scene || []) if (item?.speaker_key) keys.add(item.speaker_key);
   }
   return keys;
@@ -251,7 +262,7 @@ const cut = (value, max = 9000) => {
   return text.length > max ? `${text.slice(0, max)}\n...[잘림]` : text;
 };
 
-const compactRecentTurns = (recentTurns = []) => recentTurns.slice(-6).map((turn) => ({
+const compactRecentTurns = (recentTurns = []) => recentTurns.slice(-4).map((turn) => ({
   action: cut(turn?.action || '', 700),
   summary: cut(turn?.summary || '', 900),
   scene: (turn?.scene || []).slice(-6).map((item) => ({
@@ -276,7 +287,7 @@ function buildTurnInput({ action, saveState, recentTurns, rollingSummary, availa
     : proseLength === 'long'
       ? '중요 장면은 충분히 묘사하되 반복 금지.'
       : '중간 길이. 몰입감과 진행 속도 균형.';
-  return `===== TURN OPTIONS =====\n서술 길이: ${lengthRule}\nADULT_MODE: ${adultMode && adultEligible ? 'ON' : 'OFF'}\n성인 조건 충족: ${adultEligible ? 'YES' : 'NO'}\n\n===== AUTHORITATIVE SAVE_STATE =====\n${cut(compactSave, 42000)}\n\n===== ROLLING SUMMARY =====\n${cut(rollingSummary || '아직 없음', 6500)}\n\n===== RECENT TURNS =====\n${cut(turns, 12000)}\n\n===== AVAILABLE_CG_IDS =====\n${cgIds.length ? cgIds.join(', ') : '없음'}\n\n===== USER ACTION =====\n${cut(action, 5000)}\n\n위 행동까지만 처리하고 PC의 다음 행동은 정하지 마라. 각 주요 NPC 대사에는 실제 감정 태그/강도/근거를 함께 반환하라.`;
+  return `===== TURN OPTIONS =====\n서술 길이: ${lengthRule}\nADULT_MODE: ${adultMode && adultEligible ? 'ON' : 'OFF'}\n성인 조건 충족: ${adultEligible ? 'YES' : 'NO'}\n\n===== AUTHORITATIVE SAVE_STATE =====\n${cut(compactSave, 42000)}\n\n===== ROLLING SUMMARY =====\n${cut(rollingSummary || '아직 없음', 5000)}\n\n===== RECENT TURNS =====\n${cut(turns, 9000)}\n\n===== AVAILABLE_CG_IDS =====\n${cgIds.length ? cgIds.join(', ') : '없음'}\n\n===== USER ACTION =====\n${cut(action, 5000)}\n\n사용자가 선언한 행동과 그 판정·직접 결과, NPC/세계의 자연스러운 연쇄 반응까지 이번 턴에 충분히 진행하라. 이동·수업·훈련 같은 전환 행동은 특별한 방해가 없으면 의미 있는 다음 장면까지 넘겨도 된다. 직전 턴 내용을 불필요하게 반복하지 마라. PC에게 새로운 선택이 필요한 순간에 멈추고 PC의 다음 행동·대사·감정·결정은 대신 정하지 마라. 각 주요 NPC 대사에는 실제 감정 태그/강도/근거를 함께 반환하라.`;
 }
 // ===== END prompt.js =====
 
@@ -577,7 +588,7 @@ export default async function handler(req, res) {
     if (action.length > 5000) return json(res, 400, { error: '한 번의 입력은 5,000자 이하로 줄여주세요.' });
 
     const saveState = body.saveState && typeof body.saveState === 'object' ? body.saveState : {};
-    const recentTurns = Array.isArray(body.recentTurns) ? body.recentTurns.slice(-8) : [];
+    const recentTurns = Array.isArray(body.recentTurns) ? body.recentTurns.slice(-6) : [];
     const availableCgIds = Array.isArray(body.availableCgIds) ? body.availableCgIds.slice(0, 100) : [];
     const proReasoning = Boolean(body.proReasoning);
     const route = chooseModel({
@@ -619,7 +630,7 @@ export default async function handler(req, res) {
       }),
       reasoning,
       max_output_tokens: maxOutput,
-      prompt_cache_key: process.env.OPENAI_PROMPT_CACHE_KEY || 'lumensia-v1.3.1-canon',
+      prompt_cache_key: process.env.OPENAI_PROMPT_CACHE_KEY || 'lumensia-v1.3.2-canon',
       prompt_cache_retention: '24h',
       text: {
         verbosity: proseLength === 'long' ? 'high' : proseLength === 'short' ? 'low' : 'medium',
@@ -647,7 +658,7 @@ export default async function handler(req, res) {
       },
       usage: usageSummary(route.model, response.usage),
       request_id: response._request_id || null,
-      server_version: '0.4.1',
+      server_version: '0.4.2',
     });
   } catch (error) {
     console.error(error);
