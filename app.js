@@ -1,6 +1,6 @@
 import { ASSETS } from './assets.js';
 
-const APP_VERSION = '0.3.0';
+const APP_VERSION = '0.4.1';
 const SAVE_KEY = 'lumensia.save.v1';
 const SETTINGS_KEY = 'lumensia.settings.v1';
 
@@ -23,7 +23,7 @@ const defaultSettings = {
 };
 
 const defaultSave = () => ({
-  version: 3,
+  version: 4,
   appVersion: APP_VERSION,
   id: crypto.randomUUID?.() || String(Date.now()),
   createdAt: new Date().toISOString(),
@@ -57,6 +57,7 @@ const defaultSave = () => ({
     inventory: ['강철 양손대검', '예비 단검 2자루', '가죽 장갑', '야전 치료도구', '숫돌', '용병단 인식표'],
   },
   relationships: {},
+  intimacyStates: {},
   npcStates: {},
   emotionStates: {},
   timeline: [],
@@ -85,7 +86,7 @@ function clamp(n, min, max) { return Math.min(max, Math.max(min, Number(n) || 0)
 function normalizeSave(raw) {
   const base = defaultSave();
   const next = raw && typeof raw === 'object' ? raw : base;
-  next.version = 3;
+  next.version = 4;
   next.appVersion = APP_VERSION;
   next.world = { ...base.world, ...(next.world || {}) };
   next.pc = { ...base.pc, ...(next.pc || {}) };
@@ -93,6 +94,7 @@ function normalizeSave(raw) {
   next.pc.skills = { ...base.pc.skills, ...(next.pc.skills || {}) };
   next.pc.inventory = Array.isArray(next.pc.inventory) ? next.pc.inventory : [...base.pc.inventory];
   next.relationships = next.relationships || {};
+  next.intimacyStates = next.intimacyStates || {};
   next.npcStates = next.npcStates || {};
   next.emotionStates = next.emotionStates || {};
   next.timeline = Array.isArray(next.timeline) ? next.timeline : [];
@@ -289,9 +291,12 @@ function updateStatus(route) {
 
 function renderInfo() {
   const rel = Object.entries(save.relationships || {}).map(([key,v]) => `${ASSETS.characters[key]?.name || key}[호감 ${v.affinity||0} / 신뢰 ${v.trust||0}${v.status ? ` / ${v.status}`:''}]`).join(', ') || '-';
+  const intimacy = Object.entries(save.intimacyStates || {}).filter(([,v]) => Number(v?.level || 0) > 0)
+    .map(([key,v]) => `${ASSETS.characters[key]?.name || key}[L${Math.min(4, Number(v.level||0))}${Number(v.level||0)>=5 ? '/MAX':''}${v.status ? ` · ${v.status}`:''}]`)
+    .join(', ') || '-';
   const skills = Object.entries(save.pc.skills || {}).map(([k,v]) => `${k} ${v.grade}`).join(' | ');
   const stats = Object.entries(save.pc.stats || {}).map(([k,v]) => `- ${k}: ${v.grade} [${v.progress}/100]`).join('\n');
-  $('infoContent').textContent = `경지: ${save.pc.realm} | 소속: 루멘시아 아카데미\n---------\n직위: ${save.pc.department} | 상황: 🟢\n---------\n스킬: ${skills}\n---------\n스탯:\n${stats}\n---------\n🔮[魔] ${save.pc.talents.magic} | ⚔️[武] ${save.pc.talents.martial} | 🌟[魂] ${save.pc.talents.soul} | 📘[智] ${save.pc.talents.knowledge}\n---------\n상태: ${save.pc.status} | 피로 ${save.pc.fatigue}/100\n💼: ${save.pc.inventory.join(', ')}, 금화 ${save.pc.gold}G\n관계: ${rel}\n---------\n진행 사건: ${save.activeEvents.join(', ') || '-'}\n토큰 누적: 입력 ${save.usage.inputTokens || 0} / 캐시 ${save.usage.cachedTokens || 0} / 출력 ${save.usage.outputTokens || 0} / 추론 ${save.usage.reasoningTokens || 0}\n직전 턴: 입력 ${save.usage.lastInputTokens || 0} / 출력 ${save.usage.lastOutputTokens || 0} / 캐시 적중 ${Math.round(Number(save.usage.lastCacheHitRate || 0)*100)}% / 비용 $${Number(save.usage.lastTurnUsd || 0).toFixed(4)}\n누적 API 비용(추정): $${Number(save.usage.estimatedUsd || 0).toFixed(4)}\n영구 타임라인: ${save.timeline?.length || 0}건 | NPC 감정상태: ${Object.keys(save.emotionStates || {}).length}명`;
+  $('infoContent').textContent = `경지: ${save.pc.realm} | 소속: 루멘시아 아카데미\n---------\n직위: ${save.pc.department} | 상황: 🟢\n---------\n스킬: ${skills}\n---------\n스탯:\n${stats}\n---------\n🔮[魔] ${save.pc.talents.magic} | ⚔️[武] ${save.pc.talents.martial} | 🌟[魂] ${save.pc.talents.soul} | 📘[智] ${save.pc.talents.knowledge}\n---------\n상태: ${save.pc.status} | 피로 ${save.pc.fatigue}/100\n💼: ${save.pc.inventory.join(', ')}, 금화 ${save.pc.gold}G\n관계: ${rel}\n친밀도(성인모드): ${intimacy}\n---------\n진행 사건: ${save.activeEvents.join(', ') || '-'}\n토큰 누적: 입력 ${save.usage.inputTokens || 0} / 캐시 ${save.usage.cachedTokens || 0} / 출력 ${save.usage.outputTokens || 0} / 추론 ${save.usage.reasoningTokens || 0}\n직전 턴: 입력 ${save.usage.lastInputTokens || 0} / 출력 ${save.usage.lastOutputTokens || 0} / 캐시 적중 ${Math.round(Number(save.usage.lastCacheHitRate || 0)*100)}% / 비용 $${Number(save.usage.lastTurnUsd || 0).toFixed(4)}\n누적 API 비용(추정): $${Number(save.usage.estimatedUsd || 0).toFixed(4)}\n영구 타임라인: ${save.timeline?.length || 0}건 | NPC 감정상태: ${Object.keys(save.emotionStates || {}).length}명`;
 }
 
 function applyDelta(delta = {}) {
@@ -336,6 +341,17 @@ function applyDelta(delta = {}) {
     if (row.status) r.status = row.status;
     r.history = [...(r.history || []), row.reason].filter(Boolean).slice(-30);
     save.relationships[row.npc_key] = r;
+  }
+
+  for (const row of delta.intimacy_changes || []) {
+    // 성인 친밀도는 한 턴에 최대 1단계만 움직인다. 모델이 과하게 점프시켜도 앱이 막는다.
+    if (Number(save.pc?.age || 0) < 18) continue;
+    const r = save.intimacyStates[row.npc_key] || { level: 0, status: '없음', history: [] };
+    const step = clamp(row.level_delta, -1, 1);
+    r.level = clamp(Number(r.level || 0) + step, 0, 5);
+    if (row.status) r.status = row.status;
+    r.history = [...(r.history || []), row.reason].filter(Boolean).slice(-30);
+    save.intimacyStates[row.npc_key] = r;
   }
 
   for (const row of delta.npc_state_updates || []) {
@@ -397,7 +413,7 @@ function rebuildRollingSummary() {
 
 function compactState() {
   return {
-    version: save.version, turnNumber: save.turnNumber, world: save.world, pc: save.pc, relationships: save.relationships, npcStates: save.npcStates,
+    version: save.version, turnNumber: save.turnNumber, world: save.world, pc: save.pc, relationships: save.relationships, intimacyStates: save.intimacyStates, npcStates: save.npcStates,
     emotionStates: save.emotionStates, activeEvents: save.activeEvents, completedEvents: save.completedEvents,
     pcKnowledge: save.pcKnowledge, memories: save.memories, flags: save.flags,
   };
