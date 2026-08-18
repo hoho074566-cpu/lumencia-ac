@@ -481,8 +481,87 @@ function usageSummary(model, usage = {}) {
 }
 // ===== END utils.js =====
 
+// ===== BEGIN emotion.js =====
+const EMOTION_EXPRESSIONS = new Set(['default','smile','blush','serious','angry','sad','shock']);
+const THRESHOLD = { default:0.48, smile:0.42, blush:0.58, serious:0.38, angry:0.56, sad:0.52, shock:0.68 };
+const clamp01 = (n) => Math.max(0, Math.min(1, Number(n) || 0));
+
+function normalizePrev(row = {}) {
+  return {
+    current: EMOTION_EXPRESSIONS.has(row.current) ? row.current : 'default',
+    intensity: clamp01(row.intensity),
+    turnsHeld: Math.max(0, Number(row.turnsHeld || 0)),
+    lastChangedTurn: Number.isFinite(Number(row.lastChangedTurn)) ? Number(row.lastChangedTurn) : -99,
+    reason: String(row.reason || ''),
+  };
+}
+
+function resolveOne(prev, detected, intensity, confidence, currentTurn) {
+  detected = EMOTION_EXPRESSIONS.has(detected) ? detected : 'default';
+  intensity = clamp01(intensity);
+  confidence = clamp01(confidence || 0.65);
+  const same = detected === prev.current;
+  if (same) return { final: prev.current, changed:false, why:'same-tag' };
+  if (confidence < 0.42) return { final: prev.current, changed:false, why:'low-confidence' };
+
+  let need = THRESHOLD[detected] ?? 0.5;
+  const gap = currentTurn - prev.lastChangedTurn;
+  if (gap <= 1) need += 0.12; // 직전 턴에 바뀌었다면 쉽게 출렁이지 않음
+  if (prev.current === 'serious' && detected === 'smile') need += 0.04;
+  if (prev.current === 'angry' && detected === 'blush') need += 0.10;
+  if (prev.current === 'sad' && detected === 'smile') need += 0.06;
+  if (detected === 'shock' && intensity >= 0.82) need = Math.min(need, 0.72);
+  if (intensity < need) return { final: prev.current, changed:false, why:`below-threshold:${need.toFixed(2)}` };
+  return { final: detected, changed:true, why:'accepted' };
+}
+
+function resolveTurnEmotions(turn, saveState = {}) {
+  const states = Object.fromEntries(Object.entries(saveState?.emotionStates || {}).map(([k,v]) => [k, normalizePrev(v)]));
+  const currentTurn = Number(saveState?.turnNumber || 0) + 1;
+  const updates = {};
+  const changedThisTurn = new Set();
+
+  turn.scene = (turn.scene || []).map((item) => {
+    if (item?.kind !== 'dialogue' || !item?.speaker_key || !REGISTERED_SPEAKER_KEYS.has(item.speaker_key)) return item;
+    const key = item.speaker_key;
+    const prev = states[key] || normalizePrev();
+    const detected = EMOTION_EXPRESSIONS.has(item.expression) ? item.expression : prev.current;
+    const intensity = clamp01(item.emotion_intensity ?? (detected === 'default' ? 0.25 : 0.55));
+    const confidence = clamp01(item.emotion_confidence ?? 0.65);
+    let result = resolveOne(prev, detected, intensity, confidence, currentTurn);
+
+    // 한 응답 안에서 같은 NPC가 여러 번 표정이 마구 바뀌는 현상 억제. 아주 강한 shock/angry만 예외.
+    if (changedThisTurn.has(key) && result.changed && !(intensity >= 0.88 && ['shock','angry'].includes(detected))) {
+      result = { final: prev.current, changed:false, why:'one-change-per-turn' };
+    }
+
+    const final = result.final;
+    const next = {
+      current: final,
+      intensity: final === detected ? intensity : Math.max(0.25, prev.intensity * 0.85),
+      turnsHeld: result.changed ? 0 : prev.turnsHeld + 1,
+      lastChangedTurn: result.changed ? currentTurn : prev.lastChangedTurn,
+      reason: String(item.emotion_reason || prev.reason || '').slice(0,220),
+      detected,
+      confidence,
+      lastSeenTurn: currentTurn,
+    };
+    states[key] = next;
+    updates[key] = { npc_key:key, previous:prev.current, detected, final, intensity, confidence, changed:result.changed, transition_reason:result.why, reason:next.reason, state:next };
+    if (result.changed) changedThisTurn.add(key);
+    return { ...item, display_expression: final, detected_expression: detected, emotion_transition: result.why };
+  });
+
+  turn.emotion_updates = Object.values(updates);
+  return turn;
+}
+// ===== END emotion.js =====
+
 
 // ===== VERCEL HANDLER =====
+export const config = { maxDuration: 300 };
+
+const json = (res, status, payload) => res.status(status).json(payload);
 export default async function handler(req, res) {
   if (req.method !== 'POST') return json(res, 405, { error: 'POST만 지원합니다.' });
   if (!process.env.OPENAI_API_KEY) return json(res, 503, { error: 'Vercel 환경변수 OPENAI_API_KEY가 없습니다.', code: 'NO_API_KEY' });
