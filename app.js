@@ -1,6 +1,6 @@
 import { ASSETS } from './assets.js';
 
-const APP_VERSION = '0.4.4';
+const APP_VERSION = '0.4.5';
 const SAVE_SCHEMA_VERSION = 5;
 const SAVE_KEY = 'lumensia.save.v1';
 const SETTINGS_KEY = 'lumensia.settings.v1';
@@ -242,6 +242,19 @@ function advanceTime(minutes) {
   if (dayAdd > 0) advanceCalendarDays(dayAdd);
 }
 function nextGrade(grade) { const i = GRADE_LADDER.indexOf(grade); return i >= 0 && i < GRADE_LADDER.length - 1 ? GRADE_LADDER[i+1] : grade; }
+function progressionGainCap(grade) {
+  const g = String(grade || 'F');
+  if (g.startsWith('SSS')) return 1;
+  if (g.startsWith('SS')) return 1;
+  if (g.startsWith('S')) return 2;
+  if (g.startsWith('A')) return 3;
+  if (g.startsWith('B')) return 4;
+  return 5;
+}
+function progressionReason(reason) {
+  const text = String(reason || '').replace(/\s+/g, ' ').trim();
+  return text ? ` — ${text.slice(0, 220)}` : '';
+}
 function addMemoryUnique(list, memory, max = 250) {
   if (!memory?.fact) return list || [];
   const rows = Array.isArray(list) ? list : [];
@@ -415,7 +428,10 @@ function applyDelta(delta = {}) {
 
   for (const row of delta.stat_progress || []) {
     const stat = save.pc.stats[row.stat]; if (!stat) continue;
-    let progress = Math.max(0, Number(stat.progress || 0) + clamp(row.amount, -5, 5));
+    const gained = clamp(row.amount, 0, progressionGainCap(stat.grade));
+    if (gained <= 0) continue;
+    notices.push(`스탯 경험: ${row.stat} +${gained}${progressionReason(row.reason)}`);
+    let progress = Math.max(0, Number(stat.progress || 0) + gained);
     while (progress >= 100) {
       progress -= 100;
       const before = stat.grade;
@@ -427,9 +443,12 @@ function applyDelta(delta = {}) {
   }
 
   for (const row of delta.skill_experience || []) {
-    if (!save.pc.skills[row.skill]) save.pc.skills[row.skill] = { grade: 'F', hiddenXp: 0 };
     const skill = save.pc.skills[row.skill];
-    let xp = Math.max(0, Number(skill.hiddenXp || 0) + clamp(row.amount, 0, 5));
+    if (!skill) continue; // V1.3.5: 경험치 응답만으로 유령 스킬을 자동 생성하지 않는다.
+    const gained = clamp(row.amount, 0, progressionGainCap(skill.grade));
+    if (gained <= 0) continue;
+    notices.push(`스킬 경험: ${row.skill} +${gained}${progressionReason(row.reason)}`);
+    let xp = Math.max(0, Number(skill.hiddenXp || 0) + gained);
     while (xp >= 100) {
       xp -= 100;
       const before = skill.grade;
@@ -659,10 +678,10 @@ function updateForceTerraButton() {
 function scrollBottom(smooth = true) { requestAnimationFrame(() => window.scrollTo({top: document.body.scrollHeight, behavior: smooth ? 'smooth':'auto'})); }
 
 function ensureV12Ui() {
-  document.title = '루멘시아 모바일 V1.3.4';
+  document.title = '루멘시아 모바일 V1.3.5';
   const h1 = document.querySelector('h1');
   if (h1 && !h1.querySelector('.version-tag')) {
-    const small = document.createElement('small'); small.className='version-tag'; small.textContent='V1.3.4'; h1.append(' ', small);
+    const small = document.createElement('small'); small.className='version-tag'; small.textContent='V1.3.5'; h1.append(' ', small);
   }
   if (!$('showEmotionDebug')) {
     const demo = $('demoMode')?.closest('label');

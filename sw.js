@@ -1,4 +1,4 @@
-const CACHE='lumensia-shell-v5-v134';
+const CACHE='lumensia-shell-v6-v135';
 const SHELL=['/','/index.html','/styles.css','/app.js','/assets.js','/manifest.webmanifest','/icons/icon.svg'];
 self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)));});
 self.addEventListener('activate',e=>{self.clients.claim();e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));});
