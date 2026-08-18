@@ -1,8 +1,12 @@
 import { ASSETS } from './assets.js';
 
-const APP_VERSION = '0.4.3';
+const APP_VERSION = '0.4.4';
+const SAVE_SCHEMA_VERSION = 5;
 const SAVE_KEY = 'lumensia.save.v1';
 const SETTINGS_KEY = 'lumensia.settings.v1';
+const BACKUP_HISTORY_KEY = 'lumensia.backups.v1';
+const BACKUP_STEP_TURNS = 10;
+const BACKUP_MAX_SNAPSHOTS = 8;
 
 const $ = (id) => document.getElementById(id);
 const story = $('story');
@@ -23,7 +27,7 @@ const defaultSettings = {
 };
 
 const defaultSave = () => ({
-  version: 4,
+  version: SAVE_SCHEMA_VERSION,
   appVersion: APP_VERSION,
   id: crypto.randomUUID?.() || String(Date.now()),
   createdAt: new Date().toISOString(),
@@ -61,7 +65,9 @@ const defaultSave = () => ({
   npcStates: {},
   emotionStates: {},
   timeline: [],
-  activeEvents: ['입학식/학과 오리엔테이션', '신입생 기량평가', '회색 늑대의 숲', '황위 경쟁'],
+  activeEvents: ['입학식/학과 오리엔테이션'],
+  scheduledEvents: ['신입생 기량평가'],
+  worldArcs: ['회색 늑대의 숲', '황위 경쟁'],
   completedEvents: [],
   pcKnowledge: [],
   memories: { global: [], npc: {} },
@@ -82,28 +88,79 @@ function persist() { save.updatedAt = new Date().toISOString(); localStorage.set
 function persistSettings() { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
 function uniq(arr) { return [...new Set((arr || []).filter(Boolean))]; }
 function clamp(n, min, max) { return Math.min(max, Math.max(min, Number(n) || 0)); }
+function isRegisteredNpcKey(key) { return Boolean(key && ASSETS.characters?.[key]); }
+function pruneNpcMap(obj = {}) { return Object.fromEntries(Object.entries(obj || {}).filter(([key]) => isRegisteredNpcKey(key))); }
+
+function migrationContext(state = {}) {
+  const recent = (state.recentTurns || []).slice(-4).flatMap((x) => [x?.action || '', x?.summary || '']);
+  return [state.world?.location || '', ...recent].join('\n');
+}
+
+function migrateEventBuckets(state, sourceVersion, raw = {}) {
+  let active = Array.isArray(state.activeEvents) ? [...state.activeEvents] : [];
+  let scheduled = Array.isArray(raw?.scheduledEvents) ? [...raw.scheduledEvents] : [];
+  let worldArcs = Array.isArray(raw?.worldArcs) ? [...raw.worldArcs] : [];
+
+  // V1.3.3 이하의 기본 세이브는 미래 일정/세계 장기 사건까지 activeEvents에 섞여 있었다.
+  // 진행 중인 실제 장면을 최대한 보존하면서 명백한 기본 항목만 새 버킷으로 옮긴다.
+  if (Number(sourceVersion || 0) < SAVE_SCHEMA_VERSION && !Array.isArray(raw?.scheduledEvents) && !Array.isArray(raw?.worldArcs)) {
+    const context = migrationContext(state);
+    const dayElapsed = Number(state.world?.dayElapsed || 0);
+    const keep = [];
+    for (const name of active) {
+      if (name === '신입생 기량평가') {
+        if (dayElapsed >= 6) keep.push(name);
+        else scheduled.push(name);
+        continue;
+      }
+      if (name === '회색 늑대의 숲') {
+        if (/(회색 늑대의 숲|트윈헤드 울프|늑대 토벌|토벌 의뢰)/.test(context)) keep.push(name);
+        else worldArcs.push(name);
+        continue;
+      }
+      if (name === '황위 경쟁') {
+        if (/(황위 경쟁|황위 계승|계승 경쟁|황권|황제 계승|파벌 정치)/.test(context)) keep.push(name);
+        else worldArcs.push(name);
+        continue;
+      }
+      keep.push(name);
+    }
+    active = keep;
+  }
+
+  const completed = new Set(Array.isArray(state.completedEvents) ? state.completedEvents : []);
+  active = uniq(active).filter((x) => !completed.has(x));
+  scheduled = uniq(scheduled).filter((x) => !completed.has(x) && !active.includes(x));
+  worldArcs = uniq(worldArcs).filter((x) => !completed.has(x) && !active.includes(x) && !scheduled.includes(x));
+  state.activeEvents = active;
+  state.scheduledEvents = scheduled;
+  state.worldArcs = worldArcs;
+}
 
 function normalizeSave(raw) {
   const base = defaultSave();
-  const next = raw && typeof raw === 'object' ? raw : base;
-  next.version = 4;
+  const source = raw && typeof raw === 'object' ? raw : base;
+  const sourceVersion = Number(source.version || 0);
+  const next = source;
+  next.version = SAVE_SCHEMA_VERSION;
   next.appVersion = APP_VERSION;
   next.world = { ...base.world, ...(next.world || {}) };
   next.pc = { ...base.pc, ...(next.pc || {}) };
   next.pc.stats = { ...base.pc.stats, ...(next.pc.stats || {}) };
   next.pc.skills = { ...base.pc.skills, ...(next.pc.skills || {}) };
   next.pc.inventory = Array.isArray(next.pc.inventory) ? next.pc.inventory : [...base.pc.inventory];
-  next.relationships = next.relationships || {};
-  next.intimacyStates = next.intimacyStates || {};
-  next.npcStates = next.npcStates || {};
-  next.emotionStates = next.emotionStates || {};
+  next.relationships = pruneNpcMap(next.relationships || {});
+  next.intimacyStates = pruneNpcMap(next.intimacyStates || {});
+  next.npcStates = pruneNpcMap(next.npcStates || {});
+  next.emotionStates = pruneNpcMap(next.emotionStates || {});
   next.timeline = Array.isArray(next.timeline) ? next.timeline : [];
   next.activeEvents = Array.isArray(next.activeEvents) ? next.activeEvents : [];
   next.completedEvents = Array.isArray(next.completedEvents) ? next.completedEvents : [];
+  migrateEventBuckets(next, sourceVersion, raw || {});
   next.pcKnowledge = Array.isArray(next.pcKnowledge) ? next.pcKnowledge : [];
   next.memories = next.memories || { global: [], npc: {} };
   next.memories.global = Array.isArray(next.memories.global) ? next.memories.global : [];
-  next.memories.npc = next.memories.npc || {};
+  next.memories.npc = pruneNpcMap(next.memories.npc || {});
   next.flags = { ...base.flags, ...(next.flags || {}) };
   next.recentTurns = Array.isArray(next.recentTurns) ? next.recentTurns : [];
   next.renderedTurns = Array.isArray(next.renderedTurns) ? next.renderedTurns : [];
@@ -111,6 +168,55 @@ function normalizeSave(raw) {
   return next;
 }
 
+function backupSnapshot() {
+  const snap = JSON.parse(JSON.stringify(save));
+  // 복구에 필요한 상태는 보존하되 브라우저 저장공간 폭증 방지를 위해 오래된 화면 기록만 제한한다.
+  snap.renderedTurns = (snap.renderedTurns || []).slice(-16);
+  snap.timeline = (snap.timeline || []).slice(-220);
+  snap.recentTurns = (snap.recentTurns || []).slice(-8);
+  return snap;
+}
+function allBackupRows() {
+  const rows = loadJson(BACKUP_HISTORY_KEY);
+  return Array.isArray(rows) ? rows : [];
+}
+function backupRowsForCurrentSave() {
+  return allBackupRows().filter((row) => row?.saveId === save.id && row?.save && Number.isFinite(Number(row.turnNumber)));
+}
+function writeBackupSnapshot(reason = 'checkpoint', force = false) {
+  const turnNumber = Number(save.turnNumber || 0);
+  if (!force && turnNumber % BACKUP_STEP_TURNS !== 0) return;
+  let rows = allBackupRows().filter((row) => row?.saveId === save.id);
+  rows = rows.filter((row) => Number(row.turnNumber) !== turnNumber);
+  rows.push({ saveId: save.id, turnNumber, createdAt: new Date().toISOString(), reason, save: backupSnapshot() });
+  rows.sort((a,b) => Number(a.turnNumber) - Number(b.turnNumber));
+  rows = rows.slice(-BACKUP_MAX_SNAPSHOTS);
+  try { localStorage.setItem(BACKUP_HISTORY_KEY, JSON.stringify(rows)); } catch (err) { console.warn('backup write failed', err); }
+}
+function ensureBackupBaseline() {
+  if (!backupRowsForCurrentSave().length) writeBackupSnapshot('baseline', true);
+}
+function clearBackupHistory() { try { localStorage.removeItem(BACKUP_HISTORY_KEY); } catch {} }
+function findBackupTurnsAgo(distance) {
+  const target = Number(save.turnNumber || 0) - Math.max(0, Number(distance || 0));
+  return backupRowsForCurrentSave().filter((row) => Number(row.turnNumber) <= target).sort((a,b) => Number(b.turnNumber) - Number(a.turnNumber))[0] || null;
+}
+function updateBackupControls() {
+  const b10 = findBackupTurnsAgo(10);
+  const b50 = findBackupTurnsAgo(50);
+  const btn10 = $('restore10Btn'); const btn50 = $('restore50Btn'); const status = $('backupStatus');
+  if (btn10) { btn10.disabled = !b10; btn10.textContent = b10 ? `10턴 전 복구 (T${b10.turnNumber})` : '10턴 전 복구 (아직 없음)'; }
+  if (btn50) { btn50.disabled = !b50; btn50.textContent = b50 ? `50턴 전 복구 (T${b50.turnNumber})` : '50턴 전 복구 (아직 없음)'; }
+  if (status) status.textContent = `자동 백업: 10턴 간격 · 보관 ${backupRowsForCurrentSave().length}/${BACKUP_MAX_SNAPSHOTS}`;
+}
+function restoreBackup(distance) {
+  const row = findBackupTurnsAgo(distance);
+  if (!row) return toast(`${distance}턴 전 백업이 아직 없음`);
+  if (!confirm(`현재 T${save.turnNumber} 상태를 T${row.turnNumber} 백업으로 되돌릴까?`)) return;
+  writeBackupSnapshot('before-restore', true);
+  save = normalizeSave(JSON.parse(JSON.stringify(row.save)));
+  persist(); renderAll(); updateBackupControls(); toast(`T${row.turnNumber} 백업으로 복구됨`);
+}
 const WEEKDAYS = ['월요일','화요일','수요일','목요일','금요일','토요일','일요일'];
 const GRADE_LADDER = ['F','F+','E-','E','E+','D-','D','D+','C-','C','C+','B-','B','B+','A-','A','A+','A++','S-','S','S+','S++','SS-','SS','SS+','SSS-','SSS','SSS+'];
 function minutesFromTime(t) { const [h,m] = String(t || '00:00').split(':').map(Number); return h*60+m; }
@@ -296,7 +402,7 @@ function renderInfo() {
     .join(', ') || '-';
   const skills = Object.entries(save.pc.skills || {}).map(([k,v]) => `${k} ${v.grade}`).join(' | ');
   const stats = Object.entries(save.pc.stats || {}).map(([k,v]) => `- ${k}: ${v.grade} [${v.progress}/100]`).join('\n');
-  $('infoContent').textContent = `경지: ${save.pc.realm} | 소속: 루멘시아 아카데미\n---------\n직위: ${save.pc.department} | 상황: 🟢\n---------\n스킬: ${skills}\n---------\n스탯:\n${stats}\n---------\n🔮[魔] ${save.pc.talents.magic} | ⚔️[武] ${save.pc.talents.martial} | 🌟[魂] ${save.pc.talents.soul} | 📘[智] ${save.pc.talents.knowledge}\n---------\n상태: ${save.pc.status} | 피로 ${save.pc.fatigue}/100\n💼: ${save.pc.inventory.join(', ')}, 금화 ${save.pc.gold}G\n관계: ${rel}\n친밀도(성인모드): ${intimacy}\n---------\n진행 사건: ${save.activeEvents.join(', ') || '-'}\n토큰 누적: 입력 ${save.usage.inputTokens || 0} / 캐시 ${save.usage.cachedTokens || 0} / 출력 ${save.usage.outputTokens || 0} / 추론 ${save.usage.reasoningTokens || 0}\n직전 턴: 입력 ${save.usage.lastInputTokens || 0} / 출력 ${save.usage.lastOutputTokens || 0} / 캐시 적중 ${Math.round(Number(save.usage.lastCacheHitRate || 0)*100)}% / 비용 $${Number(save.usage.lastTurnUsd || 0).toFixed(4)}\n누적 API 비용(추정): $${Number(save.usage.estimatedUsd || 0).toFixed(4)}\n영구 타임라인: ${save.timeline?.length || 0}건 | NPC 감정상태: ${Object.keys(save.emotionStates || {}).length}명`;
+  $('infoContent').textContent = `경지: ${save.pc.realm} | 소속: 루멘시아 아카데미\n---------\n직위: ${save.pc.department} | 상황: 🟢\n---------\n스킬: ${skills}\n---------\n스탯:\n${stats}\n---------\n🔮[魔] ${save.pc.talents.magic} | ⚔️[武] ${save.pc.talents.martial} | 🌟[魂] ${save.pc.talents.soul} | 📘[智] ${save.pc.talents.knowledge}\n---------\n상태: ${save.pc.status} | 피로 ${save.pc.fatigue}/100\n💼: ${save.pc.inventory.join(', ')}, 금화 ${save.pc.gold}G\n관계: ${rel}\n친밀도(성인모드): ${intimacy}\n---------\n진행 사건: ${save.activeEvents.join(', ') || '-'}\n예정 사건: ${save.scheduledEvents.join(', ') || '-'}\n세계 장기 사건: ${save.worldArcs.join(', ') || '-'}\n토큰 누적: 입력 ${save.usage.inputTokens || 0} / 캐시 ${save.usage.cachedTokens || 0} / 출력 ${save.usage.outputTokens || 0} / 추론 ${save.usage.reasoningTokens || 0}\n직전 턴: 입력 ${save.usage.lastInputTokens || 0} / 출력 ${save.usage.lastOutputTokens || 0} / 캐시 적중 ${Math.round(Number(save.usage.lastCacheHitRate || 0)*100)}% / 비용 $${Number(save.usage.lastTurnUsd || 0).toFixed(4)}\n누적 API 비용(추정): $${Number(save.usage.estimatedUsd || 0).toFixed(4)}\n영구 타임라인: ${save.timeline?.length || 0}건 | NPC 감정상태: ${Object.keys(save.emotionStates || {}).length}명`;
 }
 
 function applyDelta(delta = {}) {
@@ -335,6 +441,7 @@ function applyDelta(delta = {}) {
   }
 
   for (const row of delta.relationship_changes || []) {
+    if (!isRegisteredNpcKey(row?.npc_key)) continue;
     const r = save.relationships[row.npc_key] || { affinity: 0, trust: 0, status: '중립', history: [] };
     r.affinity = clamp(r.affinity + row.affinity_delta, -100, 100);
     r.trust = clamp(r.trust + row.trust_delta, -100, 100);
@@ -344,6 +451,7 @@ function applyDelta(delta = {}) {
   }
 
   for (const row of delta.intimacy_changes || []) {
+    if (!isRegisteredNpcKey(row?.npc_key)) continue;
     // 성인 친밀도는 한 턴에 최대 1단계만 움직인다. 모델이 과하게 점프시켜도 앱이 막는다.
     if (Number(save.pc?.age || 0) < 18) continue;
     const r = save.intimacyStates[row.npc_key] || { level: 0, status: '없음', history: [] };
@@ -355,6 +463,7 @@ function applyDelta(delta = {}) {
   }
 
   for (const row of delta.npc_state_updates || []) {
+    if (!isRegisteredNpcKey(row?.npc_key)) continue;
     const old = save.npcStates[row.npc_key] || {};
     save.npcStates[row.npc_key] = {
       ...old,
@@ -367,14 +476,33 @@ function applyDelta(delta = {}) {
   }
 
   save.pc.inventory = uniq([...save.pc.inventory, ...(delta.items_add || [])]).filter(x => !(delta.items_remove || []).includes(x));
-  save.activeEvents = uniq([...save.activeEvents, ...(delta.active_events_add || [])]).filter(x => !(delta.active_events_remove || []).includes(x));
-  save.completedEvents = uniq([...save.completedEvents, ...(delta.completed_events_add || [])]);
+
+  // 사건은 현재 진행 / 미래 예정 / 세계 장기 사건으로 분리한다. 같은 이름은 한 버킷에만 둔다.
+  const activeRemove = new Set(delta.active_events_remove || []);
+  const scheduledRemove = new Set(delta.scheduled_events_remove || []);
+  const worldRemove = new Set(delta.world_arcs_remove || []);
+  let active = uniq([...(save.activeEvents || []), ...(delta.active_events_add || [])]).filter((x) => !activeRemove.has(x));
+  let scheduled = uniq([...(save.scheduledEvents || []), ...(delta.scheduled_events_add || [])]).filter((x) => !scheduledRemove.has(x));
+  let worldArcs = uniq([...(save.worldArcs || []), ...(delta.world_arcs_add || [])]).filter((x) => !worldRemove.has(x));
+  const completedAdd = uniq(delta.completed_events_add || []);
+  save.completedEvents = uniq([...(save.completedEvents || []), ...completedAdd]);
+  const completed = new Set(save.completedEvents);
+
+  active = active.filter((x) => !completed.has(x));
+  const activeSet = new Set(active);
+  scheduled = scheduled.filter((x) => !completed.has(x) && !activeSet.has(x));
+  const scheduledSet = new Set(scheduled);
+  worldArcs = worldArcs.filter((x) => !completed.has(x) && !activeSet.has(x) && !scheduledSet.has(x));
+  save.activeEvents = active;
+  save.scheduledEvents = scheduled;
+  save.worldArcs = worldArcs;
   save.pcKnowledge = uniq([...save.pcKnowledge, ...(delta.pc_knowledge_add || [])]).slice(-300);
 
   for (const m of delta.memories_add || []) {
     if (m.owner === 'world' || m.owner === 'global') save.memories.global = addMemoryUnique(save.memories.global, m, 300);
     else {
-      const key = m.owner.replace(/^npc:/, '');
+      const key = String(m.owner || '').replace(/^npc:/, '');
+      if (!isRegisteredNpcKey(key)) continue;
       save.memories.npc[key] = addMemoryUnique(save.memories.npc[key], m, 120);
     }
   }
@@ -383,7 +511,7 @@ function applyDelta(delta = {}) {
 
 function applyEmotionUpdates(updates = []) {
   for (const row of updates || []) {
-    if (!row?.npc_key || !row?.state) continue;
+    if (!row?.npc_key || !row?.state || !isRegisteredNpcKey(row.npc_key)) continue;
     save.emotionStates[row.npc_key] = { ...row.state };
   }
 }
@@ -439,7 +567,7 @@ function rebuildRollingSummary() {
 function compactState() {
   return {
     version: save.version, turnNumber: save.turnNumber, world: save.world, pc: save.pc, relationships: save.relationships, intimacyStates: save.intimacyStates, npcStates: save.npcStates,
-    emotionStates: save.emotionStates, activeEvents: save.activeEvents, completedEvents: save.completedEvents,
+    emotionStates: save.emotionStates, activeEvents: save.activeEvents, scheduledEvents: save.scheduledEvents, worldArcs: save.worldArcs, completedEvents: save.completedEvents,
     pcKnowledge: save.pcKnowledge, memories: save.memories, flags: save.flags,
   };
 }
@@ -493,6 +621,7 @@ async function sendAction(action) {
     save.flags.forceTerraNextTurn = false;
     save.flags.majorScene = data.turn.importance === 'critical';
     persist();
+    writeBackupSnapshot('checkpoint');
     renderTurnRecord(record); updateStatus(data.route); renderInfo(); actionInput.value = ''; scrollBottom();
   } catch (err) {
     loader.remove();
@@ -510,12 +639,12 @@ function demoResponse(action) {
       {kind:'narration', text:'붉은 머리의 소녀가 거리낌 없이 다가오며 카일의 대검을 흥미롭게 살핀다.', speaker_key:null, speaker_name:null, expression:null}
     ],
     choices:['소녀에게 이름과 소속을 묻는다.','대검을 살피는 이유를 묻는다.','입학식 전에 가볍게 검을 맞춰보자고 제안한다.'],
-    state_delta:{advance_minutes:3,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0,relationship_changes:[],stat_progress:[],skill_experience:[],items_add:[],items_remove:[],active_events_add:[],active_events_remove:[],completed_events_add:[],pc_knowledge_add:[],memories_add:[{owner:'npc:lilia',fact:'입학식 전 대강당 앞에서 카일의 오래된 대검에 먼저 관심을 보였다.',importance:'minor',secret_level:0}],npc_state_updates:[{npc_key:'lilia',location:'루멘시아 아카데미 대강당 앞',status:'카일에게 먼저 말을 건 상태',current_goal:'신입생 입학식 참가',last_seen:'1285-03-01 08:43'}]},
+    state_delta:{advance_minutes:3,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0,relationship_changes:[],stat_progress:[],skill_experience:[],items_add:[],items_remove:[],active_events_add:[],active_events_remove:[],scheduled_events_add:[],scheduled_events_remove:[],world_arcs_add:[],world_arcs_remove:[],completed_events_add:[],pc_knowledge_add:[],memories_add:[{owner:'npc:lilia',fact:'입학식 전 대강당 앞에서 카일의 오래된 대검에 먼저 관심을 보였다.',importance:'minor',secret_level:0}],npc_state_updates:[{npc_key:'lilia',location:'루멘시아 아카데미 대강당 앞',status:'카일에게 먼저 말을 건 상태',current_goal:'신입생 입학식 참가',last_seen:'1285-03-01 08:43'}]},
     scene_summary:'입학식 전 대강당 앞에서 릴리아가 카일의 대검에 관심을 보이며 먼저 말을 걸었다.'
   } : {
     scene_title:'데모 응답',importance:'routine',cg_id:null,
     scene:[{kind:'narration',text:`카일의 행동 「${action}」에 주변 상황이 반응한다. 데모 모드라 실제 AI 판정은 생략된다.`,speaker_key:null,speaker_name:null,expression:null}],choices:[],
-    state_delta:{advance_minutes:1,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0,relationship_changes:[],stat_progress:[],skill_experience:[],items_add:[],items_remove:[],active_events_add:[],active_events_remove:[],completed_events_add:[],pc_knowledge_add:[],memories_add:[],npc_state_updates:[]},scene_summary:'데모 모드로 UI 동작을 확인했다.'
+    state_delta:{advance_minutes:1,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0,relationship_changes:[],stat_progress:[],skill_experience:[],items_add:[],items_remove:[],active_events_add:[],active_events_remove:[],scheduled_events_add:[],scheduled_events_remove:[],world_arcs_add:[],world_arcs_remove:[],completed_events_add:[],pc_knowledge_add:[],memories_add:[],npc_state_updates:[]},scene_summary:'데모 모드로 UI 동작을 확인했다.'
   };
   return { turn, route:{model:'demo',tier:'demo',reasoning_effort:'none',reasoning_mode:'standard',reason:'demo'}, usage:{input_tokens:0,output_tokens:0,cached_tokens:0,estimated_usd:0} };
 }
@@ -530,10 +659,10 @@ function updateForceTerraButton() {
 function scrollBottom(smooth = true) { requestAnimationFrame(() => window.scrollTo({top: document.body.scrollHeight, behavior: smooth ? 'smooth':'auto'})); }
 
 function ensureV12Ui() {
-  document.title = '루멘시아 모바일 V1.3.3';
+  document.title = '루멘시아 모바일 V1.3.4';
   const h1 = document.querySelector('h1');
   if (h1 && !h1.querySelector('.version-tag')) {
-    const small = document.createElement('small'); small.className='version-tag'; small.textContent='V1.3.3'; h1.append(' ', small);
+    const small = document.createElement('small'); small.className='version-tag'; small.textContent='V1.3.4'; h1.append(' ', small);
   }
   if (!$('showEmotionDebug')) {
     const demo = $('demoMode')?.closest('label');
@@ -545,7 +674,7 @@ function ensureV12Ui() {
   }
   if (!$('v12DynamicStyle')) {
     const style=document.createElement('style'); style.id='v12DynamicStyle';
-    style.textContent='.version-tag{font-size:10px;color:#d9b86c;font-weight:800;vertical-align:middle}.emotion-debug{margin:0 14px 12px;padding:6px 8px;border-radius:8px;background:rgba(99,102,241,.10);color:#b8c0ff;font-size:10px;line-height:1.4}.cache-notice{margin:8px 12px 14px;padding:8px 10px;border-radius:10px;background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.25);color:#bfdbfe;font-size:10px;line-height:1.5}.asset-item.asset-warn{border-color:rgba(245,158,11,.65)}.asset-item.asset-warn div{color:#fcd34d}.asset-item.asset-fail{border-color:rgba(239,68,68,.65)}.asset-item.asset-fail div{color:#fecaca}';
+    style.textContent='.version-tag{font-size:10px;color:#d9b86c;font-weight:800;vertical-align:middle}.emotion-debug{margin:0 14px 12px;padding:6px 8px;border-radius:8px;background:rgba(99,102,241,.10);color:#b8c0ff;font-size:10px;line-height:1.4}.cache-notice{margin:8px 12px 14px;padding:8px 10px;border-radius:10px;background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.25);color:#bfdbfe;font-size:10px;line-height:1.5}.asset-item.asset-warn{border-color:rgba(245,158,11,.65)}.asset-item.asset-warn div{color:#fcd34d}.asset-item.asset-fail{border-color:rgba(239,68,68,.65)}.asset-item.asset-fail div{color:#fecaca}.backup-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.backup-actions .secondary-btn{flex:1;min-width:130px}.backup-status{display:block;width:100%;font-size:10px;color:#94a3b8;margin-top:2px}';
     document.head.append(style);
   }
 }
@@ -554,13 +683,15 @@ ensureV12Ui();
 
 actionForm.addEventListener('submit', e => { e.preventDefault(); sendAction(actionInput.value); });
 actionInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); actionForm.requestSubmit(); } });
-$('infoBtn').addEventListener('click', () => { renderInfo(); $('infoDialog').showModal(); });
+$('infoBtn').addEventListener('click', () => { renderInfo(); updateBackupControls(); $('infoDialog').showModal(); });
 $('settingsBtn').addEventListener('click', () => $('settingsDialog').showModal());
-$('newGameBtn').addEventListener('click', () => { if (confirm('현재 세이브를 지우고 새 게임을 시작할까?')) { save = defaultSave(); persist(); renderAll(); } });
+$('newGameBtn').addEventListener('click', () => { if (confirm('현재 세이브를 지우고 새 게임을 시작할까?')) { clearBackupHistory(); save = defaultSave(); persist(); ensureBackupBaseline(); renderAll(); updateBackupControls(); } });
 $('saveBtn').addEventListener('click', () => { persist(); toast('폰에 저장됨'); });
 $('forceTerraBtn').addEventListener('click', () => { forceTerraOnce = !forceTerraOnce; updateForceTerraButton(); toast(forceTerraOnce ? '다음 1턴 Terra 사용' : 'Terra 예약 취소'); });
 $('exportBtn').addEventListener('click', exportSave);
 $('importInput').addEventListener('change', importSave);
+$('restore10Btn')?.addEventListener('click', () => restoreBackup(10));
+$('restore50Btn')?.addEventListener('click', () => restoreBackup(50));
 
 for (const key of ['modelMode','reasoningEffort','proseLength']) { $(key).value = settings[key]; $(key).addEventListener('change', e => { settings[key] = e.target.value; persistSettings(); }); }
 $('accessToken').value = settings.accessToken || ''; $('accessToken').addEventListener('change', e => { settings.accessToken = e.target.value.trim(); persistSettings(); });
@@ -570,7 +701,7 @@ $('assetTestBtn').addEventListener('click', testAssets);
 function exportSave() {
   persist(); const blob = new Blob([JSON.stringify(save,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`lumensia-save-${save.world.date}-${save.world.time.replace(':','')}.json`; a.click(); URL.revokeObjectURL(a.href);
 }
-async function importSave(e) { const file=e.target.files?.[0]; if(!file)return; try { const parsed=JSON.parse(await file.text()); if(!parsed.pc||!parsed.world)throw new Error('세이브 형식이 아님'); save=normalizeSave(parsed); persist(); renderAll(); toast('세이브 불러옴'); } catch(err){alert(`불러오기 실패: ${err.message}`);} e.target.value=''; }
+async function importSave(e) { const file=e.target.files?.[0]; if(!file)return; try { const parsed=JSON.parse(await file.text()); if(!parsed.pc||!parsed.world)throw new Error('세이브 형식이 아님'); clearBackupHistory(); save=normalizeSave(parsed); persist(); ensureBackupBaseline(); renderAll(); updateBackupControls(); toast('세이브 불러옴'); } catch(err){alert(`불러오기 실패: ${err.message}`);} e.target.value=''; }
 function toast(text) { const d=document.createElement('div'); d.textContent=text; d.style.cssText='position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:99;background:#263449;padding:9px 14px;border-radius:999px'; document.body.append(d); setTimeout(()=>d.remove(),1300); }
 
 async function checkHealth() { try { const r=await fetch('/api/health'); const h=await r.json(); $('apiHealth').textContent=h.apiConfigured?`API 연결 준비됨 · ${h.luna} / ${h.terra}${h.accessTokenRequired ? ' · 접속 토큰 필요' : ''}`:'API 키 미설정. Vercel 환경변수 OPENAI_API_KEY를 추가하거나 데모 모드를 켜세요.'; } catch { $('apiHealth').textContent='API 상태를 확인할 수 없음.'; } }
@@ -617,4 +748,4 @@ async function testAssets() {
 }
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
-updateForceTerraButton(); checkHealth(); renderAll();
+persist(); ensureBackupBaseline(); updateForceTerraButton(); checkHealth(); renderAll(); updateBackupControls();

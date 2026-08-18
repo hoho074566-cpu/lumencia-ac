@@ -8,14 +8,14 @@
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/styles.css" />
-  <title>루멘시아 모바일 V1.3.3</title>
+  <title>루멘시아 모바일 V1.3.4</title>
 </head>
 <body>
   <div id="app">
     <header class="topbar">
       <div>
         <div class="eyebrow">LUMENSIA ACADEMY</div>
-        <h1>루멘시아 모바일 <small class="version-tag">V1.3.3</small></h1>
+        <h1>루멘시아 모바일 <small class="version-tag">V1.3.4</small></h1>
       </div>
       <div class="top-actions">
         <button id="infoBtn" class="icon-btn" aria-label="상태창">INFO</button>
@@ -95,6 +95,11 @@
     <form method="dialog">
       <header><h2>INFO</h2><button value="cancel" class="close-btn">✕</button></header>
       <pre id="infoContent" class="info-content"></pre>
+      <div class="backup-actions">
+        <button id="restore10Btn" type="button" class="secondary-btn">10턴 전 복구</button>
+        <button id="restore50Btn" type="button" class="secondary-btn">50턴 전 복구</button>
+        <small id="backupStatus" class="backup-status">자동 백업 준비 중…</small>
+      </div>
     </form>
   </dialog>
 
