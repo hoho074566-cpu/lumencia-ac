@@ -1,6 +1,6 @@
 import { ASSETS } from './assets.js';
 
-const APP_VERSION = '0.4.5';
+const APP_VERSION = '0.4.6';
 const SAVE_SCHEMA_VERSION = 5;
 const SAVE_KEY = 'lumensia.save.v1';
 const SETTINGS_KEY = 'lumensia.settings.v1';
@@ -24,6 +24,7 @@ const defaultSettings = {
   demoMode: false,
   accessToken: '',
   showEmotionDebug: false,
+  showResolutionLog: true,
 };
 
 const defaultSave = () => ({
@@ -361,6 +362,24 @@ function renderTurnRecord(record) {
       const n = document.createElement('div'); n.className = 'narration'; n.textContent = item.text; card.append(n);
     }
   }
+  if (settings.showResolutionLog && turn.resolution_log?.triggered && Array.isArray(turn.resolution_log.abilities) && turn.resolution_log.abilities.length) {
+    const log = document.createElement('details'); log.className = 'resolution-log'; log.open = true;
+    const outcomeLabels = { success: '성공', partial: '부분 성공', failure: '실패' };
+    const roleLabels = { primary: '핵심', support: '보조', passive: '패시브' };
+    const summary = document.createElement('summary');
+    const abilityHeadline = turn.resolution_log.abilities.map((row) => `${row.name}${row.grade ? ` ${row.grade}` : ''}`).join(' · ');
+    summary.textContent = `⚔ 판정 로그 · ${outcomeLabels[turn.resolution_log.outcome] || '판정'} · ${abilityHeadline}`;
+    log.append(summary);
+    for (const row of turn.resolution_log.abilities) {
+      const line = document.createElement('div'); line.className = 'resolution-line';
+      line.textContent = `${row.kind === 'stat' ? '◆' : '▸'} ${row.name}${row.grade ? ` ${row.grade}` : ''} [${roleLabels[row.role] || '보조'}] — ${row.reason}`;
+      log.append(line);
+    }
+    if (turn.resolution_log.summary) {
+      const verdict = document.createElement('div'); verdict.className = 'resolution-summary'; verdict.textContent = `→ ${turn.resolution_log.summary}`; log.append(verdict);
+    }
+    card.append(log);
+  }
   for (const notice of record.notices || []) {
     const n = document.createElement('div'); n.className = 'progress-notice'; n.textContent = `✦ ${notice}`; card.append(n);
   }
@@ -444,7 +463,7 @@ function applyDelta(delta = {}) {
 
   for (const row of delta.skill_experience || []) {
     const skill = save.pc.skills[row.skill];
-    if (!skill) continue; // V1.3.5: 경험치 응답만으로 유령 스킬을 자동 생성하지 않는다.
+    if (!skill) continue; // V1.3.6: 경험치 응답만으로 유령 스킬을 자동 생성하지 않는다.
     const gained = clamp(row.amount, 0, progressionGainCap(skill.grade));
     if (gained <= 0) continue;
     notices.push(`스킬 경험: ${row.skill} +${gained}${progressionReason(row.reason)}`);
@@ -652,6 +671,7 @@ function demoResponse(action) {
   const first = save.turnNumber === 0;
   const turn = first ? {
     scene_title: '입학식 전, 대강당 앞', importance: 'routine', cg_id: null,
+    resolution_log: { triggered:false, outcome:'none', summary:null, abilities:[] },
     scene: [
       {kind:'narration', text:'대강당을 둘러싼 흰 석조 회랑에 아침 햇살이 비친다. 신입생들의 목소리 사이로 검집이 부딪히는 소리와 마법 도구의 미세한 진동음이 섞인다.', speaker_key:null, speaker_name:null, expression:null},
       {kind:'dialogue', text:'너도 기사과야? 그 대검, 꽤 오래 쓴 것 같은데!', speaker_key:'lilia', speaker_name:'릴리아', expression:'smile'},
@@ -661,7 +681,7 @@ function demoResponse(action) {
     state_delta:{advance_minutes:3,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0,relationship_changes:[],stat_progress:[],skill_experience:[],items_add:[],items_remove:[],active_events_add:[],active_events_remove:[],scheduled_events_add:[],scheduled_events_remove:[],world_arcs_add:[],world_arcs_remove:[],completed_events_add:[],pc_knowledge_add:[],memories_add:[{owner:'npc:lilia',fact:'입학식 전 대강당 앞에서 카일의 오래된 대검에 먼저 관심을 보였다.',importance:'minor',secret_level:0}],npc_state_updates:[{npc_key:'lilia',location:'루멘시아 아카데미 대강당 앞',status:'카일에게 먼저 말을 건 상태',current_goal:'신입생 입학식 참가',last_seen:'1285-03-01 08:43'}]},
     scene_summary:'입학식 전 대강당 앞에서 릴리아가 카일의 대검에 관심을 보이며 먼저 말을 걸었다.'
   } : {
-    scene_title:'데모 응답',importance:'routine',cg_id:null,
+    scene_title:'데모 응답',importance:'routine',cg_id:null,resolution_log:{triggered:false,outcome:'none',summary:null,abilities:[]},
     scene:[{kind:'narration',text:`카일의 행동 「${action}」에 주변 상황이 반응한다. 데모 모드라 실제 AI 판정은 생략된다.`,speaker_key:null,speaker_name:null,expression:null}],choices:[],
     state_delta:{advance_minutes:1,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0,relationship_changes:[],stat_progress:[],skill_experience:[],items_add:[],items_remove:[],active_events_add:[],active_events_remove:[],scheduled_events_add:[],scheduled_events_remove:[],world_arcs_add:[],world_arcs_remove:[],completed_events_add:[],pc_knowledge_add:[],memories_add:[],npc_state_updates:[]},scene_summary:'데모 모드로 UI 동작을 확인했다.'
   };
@@ -678,10 +698,10 @@ function updateForceTerraButton() {
 function scrollBottom(smooth = true) { requestAnimationFrame(() => window.scrollTo({top: document.body.scrollHeight, behavior: smooth ? 'smooth':'auto'})); }
 
 function ensureV12Ui() {
-  document.title = '루멘시아 모바일 V1.3.5';
+  document.title = '루멘시아 모바일 V1.3.6';
   const h1 = document.querySelector('h1');
   if (h1 && !h1.querySelector('.version-tag')) {
-    const small = document.createElement('small'); small.className='version-tag'; small.textContent='V1.3.5'; h1.append(' ', small);
+    const small = document.createElement('small'); small.className='version-tag'; small.textContent='V1.3.6'; h1.append(' ', small);
   }
   if (!$('showEmotionDebug')) {
     const demo = $('demoMode')?.closest('label');
@@ -691,9 +711,17 @@ function ensureV12Ui() {
       demo.after(label);
     }
   }
+  if (!$('showResolutionLog')) {
+    const emotion = $('showEmotionDebug')?.closest('label') || $('demoMode')?.closest('label');
+    if (emotion) {
+      const label=document.createElement('label'); label.className='toggle-row';
+      label.innerHTML='<input id="showResolutionLog" type="checkbox" /><span>판정 로그 표시 (사용 스킬/스탯 · 결과 근거)</span>';
+      emotion.after(label);
+    }
+  }
   if (!$('v12DynamicStyle')) {
     const style=document.createElement('style'); style.id='v12DynamicStyle';
-    style.textContent='.version-tag{font-size:10px;color:#d9b86c;font-weight:800;vertical-align:middle}.emotion-debug{margin:0 14px 12px;padding:6px 8px;border-radius:8px;background:rgba(99,102,241,.10);color:#b8c0ff;font-size:10px;line-height:1.4}.cache-notice{margin:8px 12px 14px;padding:8px 10px;border-radius:10px;background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.25);color:#bfdbfe;font-size:10px;line-height:1.5}.asset-item.asset-warn{border-color:rgba(245,158,11,.65)}.asset-item.asset-warn div{color:#fcd34d}.asset-item.asset-fail{border-color:rgba(239,68,68,.65)}.asset-item.asset-fail div{color:#fecaca}.backup-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.backup-actions .secondary-btn{flex:1;min-width:130px}.backup-status{display:block;width:100%;font-size:10px;color:#94a3b8;margin-top:2px}';
+    style.textContent='.version-tag{font-size:10px;color:#d9b86c;font-weight:800;vertical-align:middle}.emotion-debug{margin:0 14px 12px;padding:6px 8px;border-radius:8px;background:rgba(99,102,241,.10);color:#b8c0ff;font-size:10px;line-height:1.4}.cache-notice{margin:8px 12px 14px;padding:8px 10px;border-radius:10px;background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.25);color:#bfdbfe;font-size:10px;line-height:1.5}.asset-item.asset-warn{border-color:rgba(245,158,11,.65)}.asset-item.asset-warn div{color:#fcd34d}.asset-item.asset-fail{border-color:rgba(239,68,68,.65)}.asset-item.asset-fail div{color:#fecaca}.backup-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.backup-actions .secondary-btn{flex:1;min-width:130px}.backup-status{display:block;width:100%;font-size:10px;color:#94a3b8;margin-top:2px}.resolution-log{margin:10px 12px 12px;padding:9px 10px;border-radius:10px;background:rgba(217,184,108,.08);border:1px solid rgba(217,184,108,.28);font-size:11px;line-height:1.55}.resolution-log summary{cursor:pointer;color:#f5d990;font-weight:800;list-style:none}.resolution-log summary::-webkit-details-marker{display:none}.resolution-line{margin-top:6px;color:#d8dee9}.resolution-summary{margin-top:7px;padding-top:6px;border-top:1px solid rgba(217,184,108,.18);color:#f0e6c8}';
     document.head.append(style);
   }
 }
@@ -714,7 +742,7 @@ $('restore50Btn')?.addEventListener('click', () => restoreBackup(50));
 
 for (const key of ['modelMode','reasoningEffort','proseLength']) { $(key).value = settings[key]; $(key).addEventListener('change', e => { settings[key] = e.target.value; persistSettings(); }); }
 $('accessToken').value = settings.accessToken || ''; $('accessToken').addEventListener('change', e => { settings.accessToken = e.target.value.trim(); persistSettings(); });
-for (const key of ['adultMode','proReasoning','demoMode','showEmotionDebug']) { const el=$(key); if (!el) continue; el.checked = Boolean(settings[key]); el.addEventListener('change', e => { settings[key] = e.target.checked; persistSettings(); }); }
+for (const key of ['adultMode','proReasoning','demoMode','showEmotionDebug','showResolutionLog']) { const el=$(key); if (!el) continue; el.checked = Boolean(settings[key]); el.addEventListener('change', e => { settings[key] = e.target.checked; persistSettings(); }); }
 $('assetTestBtn').addEventListener('click', testAssets);
 
 function exportSave() {
