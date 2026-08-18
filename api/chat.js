@@ -88,6 +88,13 @@ const GM_RULES = `너는 판타지 아카데미 장기 RPG 「루멘시아 아�
 18. 등록 이벤트 CG가 확실히 맞는 경우에만 cg_id를 사용한다. AVAILABLE_CG_IDS에 없으면 null이다.
 19. 등록된 주요 NPC의 speaker_key는 CHARACTER REGISTRY의 정확한 영문 키를 쓴다. 등록되지 않은 단역은 speaker_key=null, speaker_name=표시명으로 둔다. 키를 새로 지어내지 않는다.
 
+
+[사건 버킷]
+- SAVE_STATE.activeEvents는 PC의 현재 장면과 직접 맞물려 실제 진행 중인 사건만 둔다. 미래 일정이나 멀리서 진행 중인 세계 사건을 미리 넣지 않는다.
+- scheduledEvents는 날짜/조건이 아직 오지 않은 미래 예정 사건이다. 실제로 시작되면 scheduled_events_remove와 active_events_add를 함께 사용한다.
+- worldArcs는 PC가 개입하지 않아도 세계에서 진행되는 장기 사건이다. 현재 장면과 관련성이 없으면 서술에 억지로 끌어오지 않는다. PC가 직접 휘말려 같은 사건이 현재 중심 사건이 되면 world_arcs_remove와 active_events_add를 사용할 수 있다.
+- 사건이 끝나면 해당 버킷 remove와 completed_events_add를 함께 사용한다. 동일 사건 이름을 여러 버킷에 중복시키지 않는다.
+
 [장면 진행 속도]
 - 한 턴은 직전 상황을 다시 설명하는 단위가 아니라 사용자가 선언한 행동을 실제로 처리하고 장면을 전진시키는 단위다.
 - 사용자가 이미 선언한 시도의 성공/실패 판정과 직접 결과는 가능한 한 같은 턴에 처리한다. 판정 직전이나 결과 직전에 습관적으로 끊지 않는다.
@@ -279,7 +286,7 @@ function compactSaveForModel(saveState = {}, { action = '', recentTurns = [] } =
   const recentMinorGlobal = globalMemory.filter((x) => x.importance === 'minor').slice(-8);
 
   return {
-    version: saveState?.version || 4,
+    version: saveState?.version || 5,
     turnNumber: Number(saveState?.turnNumber || 0),
     world: saveState?.world || {},
     pc: saveState?.pc || {},
@@ -287,7 +294,9 @@ function compactSaveForModel(saveState = {}, { action = '', recentTurns = [] } =
     intimacyStates: compactIntimacyStates(saveState?.intimacyStates || {}, relevantKeys),
     npcStates: compactNpcStates(saveState?.npcStates || {}, saveState, relevantKeys),
     emotionStates: compactEmotionStates(saveState?.emotionStates || {}, relevantKeys),
-    activeEvents: (saveState?.activeEvents || []).slice(-30).map((x) => trimText(x, 180)),
+    activeEvents: (saveState?.activeEvents || []).slice(-20).map((x) => trimText(x, 180)),
+    scheduledEvents: (saveState?.scheduledEvents || []).slice(-16).map((x) => trimText(x, 180)),
+    worldArcs: (saveState?.worldArcs || []).slice(-16).map((x) => trimText(x, 180)),
     completedEvents: (saveState?.completedEvents || []).slice(-30).map((x) => trimText(x, 180)),
     pcKnowledge: (saveState?.pcKnowledge || []).slice(-50).map((x) => trimText(x, 320)),
     memories: {
@@ -329,7 +338,9 @@ function serializeCompactSaveForPrompt(compactSave = {}, maxChars = 38000) {
   if (text.length <= maxChars) return text;
 
   // 두 번째 단계: 현재 장면에 덜 중요한 부가 정보 축약.
-  if (state.activeEvents) state.activeEvents = state.activeEvents.slice(-20);
+  if (state.activeEvents) state.activeEvents = state.activeEvents.slice(-16);
+  if (state.scheduledEvents) state.scheduledEvents = state.scheduledEvents.slice(-12);
+  if (state.worldArcs) state.worldArcs = state.worldArcs.slice(-12);
   if (state.completedEvents) state.completedEvents = state.completedEvents.slice(-12);
   if (state.pcKnowledge) state.pcKnowledge = state.pcKnowledge.slice(-20);
   const npcKeys = state.relevantNpcKeys || [];
@@ -348,7 +359,9 @@ function serializeCompactSaveForPrompt(compactSave = {}, maxChars = 38000) {
     intimacyStates: Object.fromEntries(Object.entries(state.intimacyStates || {}).slice(0, 8).map(([k, v]) => [k, { ...v, history: [] }])),
     npcStates: trimStringsDeep(state.npcStates || {}, 180),
     emotionStates: trimStringsDeep(state.emotionStates || {}, 120),
-    activeEvents: (state.activeEvents || []).slice(-16),
+    activeEvents: (state.activeEvents || []).slice(-12),
+    scheduledEvents: (state.scheduledEvents || []).slice(-10),
+    worldArcs: (state.worldArcs || []).slice(-10),
     completedEvents: (state.completedEvents || []).slice(-8),
     pcKnowledge: (state.pcKnowledge || []).slice(-12),
     memories: {
@@ -389,7 +402,9 @@ function serializeCompactSaveForPrompt(compactSave = {}, maxChars = 38000) {
     intimacyStates: Object.fromEntries(Object.entries(state.intimacyStates || {}).slice(0, 6).map(([k, v]) => [k, { level:Number(v?.level||0), status:trimText(v?.status||'',60), history:[] }])),
     npcStates: Object.fromEntries(Object.entries(state.npcStates || {}).slice(0, 6).map(([k,v]) => [k, trimStringsDeep(v,120)])),
     emotionStates: Object.fromEntries(Object.entries(state.emotionStates || {}).slice(0, 6).map(([k,v]) => [k, trimStringsDeep(v,100)])),
-    activeEvents: (state.activeEvents || []).slice(-12).map((x) => trimText(x,120)),
+    activeEvents: (state.activeEvents || []).slice(-10).map((x) => trimText(x,120)),
+    scheduledEvents: (state.scheduledEvents || []).slice(-8).map((x) => trimText(x,120)),
+    worldArcs: (state.worldArcs || []).slice(-8).map((x) => trimText(x,120)),
     completedEvents: (state.completedEvents || []).slice(-6).map((x) => trimText(x,120)),
     pcKnowledge: (state.pcKnowledge || []).slice(-8).map((x) => trimText(x,180)),
     memories: { global: pickMemories(state.memories?.global || [], 8), npc: { relevant:{}, critical_elsewhere:[] } },
@@ -409,6 +424,8 @@ function serializeCompactSaveForPrompt(compactSave = {}, maxChars = 38000) {
     relationships: Object.fromEntries(Object.entries(essential.relationships).slice(0, 5)),
     npcStates: Object.fromEntries(Object.entries(essential.npcStates).slice(0, 5)),
     activeEvents: essential.activeEvents.slice(-8),
+    scheduledEvents: (essential.scheduledEvents || []).slice(-6),
+    worldArcs: (essential.worldArcs || []).slice(-6),
     pcKnowledge: essential.pcKnowledge.slice(-5),
     relevantNpcKeys: essential.relevantNpcKeys.slice(0, 5),
     context_compacted: true,
@@ -453,11 +470,49 @@ const EVENT_BLOCKS = (() => {
   return blocks;
 })();
 
-function activeEventReference(saveState = {}) {
-  const active = (saveState?.activeEvents || []).map((x) => String(x).trim()).filter(Boolean);
-  if (!active.length) return '없음';
-  const picked = EVENT_BLOCKS.filter((block) => active.some((name) => name.includes(block.title) || block.title.includes(name)));
-  return picked.length ? picked.map((x) => x.text).join('\n\n') : active.join(', ');
+const EVENT_KEYWORDS = Object.freeze({
+  '입학식/학과 오리엔테이션': ['입학식','오리엔테이션','대강당','학과 좌석'],
+  '신입생 기량평가': ['기량평가','기량 평가','분반 평가','교수평가'],
+  '회색 늑대의 숲': ['회색 늑대의 숲','트윈헤드 울프','늑대 토벌','토벌 의뢰'],
+  '황위 경쟁': ['황위 경쟁','황위 계승','황권','계승 경쟁','황제 계승','파벌 정치'],
+});
+
+function eventBlockForName(name) {
+  const clean = String(name || '').trim();
+  return EVENT_BLOCKS.find((block) => clean.includes(block.title) || block.title.includes(clean)) || null;
+}
+function eventContext(saveState = {}, action = '', recentTurns = [], rollingSummary = '') {
+  const recent = recentTurns.slice(-4).flatMap((turn) => [turn?.action || '', turn?.summary || '']);
+  return [action, saveState?.world?.location || '', ...recent].filter(Boolean).join('\n');
+}
+function eventIsRelevant(name, context) {
+  const keywords = EVENT_KEYWORDS[name] || [String(name || '')];
+  return keywords.filter(Boolean).some((word) => context.includes(word));
+}
+function eventReferenceBundle(saveState = {}, { action = '', recentTurns = [], rollingSummary = '' } = {}) {
+  const completed = new Set((saveState?.completedEvents || []).map((x) => String(x).trim()));
+  const active = (saveState?.activeEvents || []).map((x) => String(x).trim()).filter((x) => x && !completed.has(x));
+  const scheduled = (saveState?.scheduledEvents || []).map((x) => String(x).trim()).filter((x) => x && !completed.has(x));
+  const worldArcs = (saveState?.worldArcs || []).map((x) => String(x).trim()).filter((x) => x && !completed.has(x));
+  const context = eventContext(saveState, action, recentTurns, rollingSummary);
+  const dayElapsed = Number(saveState?.world?.dayElapsed || 0);
+
+  const activeBlocks = active.map(eventBlockForName).filter(Boolean);
+  const unknownActive = active.filter((name) => !eventBlockForName(name));
+
+  const scheduledRelevant = scheduled.filter((name) => eventIsRelevant(name, context) || (name === '신입생 기량평가' && dayElapsed >= 5));
+  const scheduledBlocks = scheduledRelevant.map(eventBlockForName).filter(Boolean);
+
+  // 세계 장기 사건은 단순히 worldArcs에 있다는 이유만으로 전문을 넣지 않는다.
+  // 현재 행동/최근 장면/현재 장소에 실제 관련 키워드가 있을 때만 canon 블록을 주입한다.
+  const worldRelevant = worldArcs.filter((name) => eventIsRelevant(name, context));
+  const worldBlocks = worldRelevant.map(eventBlockForName).filter(Boolean);
+
+  return {
+    active: activeBlocks.length ? activeBlocks.map((x) => x.text).join('\n\n') : (unknownActive.length ? unknownActive.join(', ') : '없음'),
+    scheduled: scheduledBlocks.length ? scheduledBlocks.map((x) => x.text).join('\n\n') : '없음',
+    world: worldBlocks.length ? worldBlocks.map((x) => x.text).join('\n\n') : '없음',
+  };
 }
 
 function defaultPcProfileReference(saveState = {}) {
@@ -483,10 +538,10 @@ function buildTurnInput({ action, saveState, recentTurns, rollingSummary, availa
       ? '중요 장면은 충분히 묘사하되 반복 금지.'
       : '중간 길이. 몰입감과 진행 속도 균형.';
   const initialSeed = Number(saveState?.turnNumber || 0) === 0 ? CANON.current : '사용하지 않음 — 현재 상태는 SAVE_STATE가 기준';
-  const eventReference = activeEventReference(saveState);
+  const eventReferences = eventReferenceBundle(saveState, { action, recentTurns, rollingSummary });
   const pcReference = defaultPcProfileReference(saveState);
 
-  return `===== PC PROFILE REFERENCE =====\n${pcReference}\n\n===== ACTIVE EVENT CANON =====\n${eventReference}\n\n===== INITIAL SCENARIO SEED =====\n${initialSeed}\n\n[현재성 우선순위]\n현재 날짜·시간·장소·PC/NPC 상태·완료 여부는 반드시 AUTHORITATIVE SAVE_STATE가 최우선이다. 위 시나리오/이벤트 참고문에 과거 시점 표현이 남아 있어도 SAVE_STATE와 충돌하면 폐기한다. INITIAL SCENARIO SEED는 0턴에서만 유효하다.\n\n===== TURN OPTIONS =====\n서술 길이: ${lengthRule}\nADULT_MODE: ${adultMode && adultEligible ? 'ON' : 'OFF'}\n성인 조건 충족: ${adultEligible ? 'YES' : 'NO'}\n\n===== AUTHORITATIVE SAVE_STATE =====\n${serializedSave}\n\n===== ROLLING SUMMARY =====\n${cut(rollingSummary || '아직 없음', 5000)}\n\n===== RECENT TURNS =====\n${cut(turns, 9000)}\n\n===== AVAILABLE_CG_IDS =====\n${cgIds.length ? cgIds.join(', ') : '없음'}\n\n===== USER ACTION =====\n${cut(action, 5000)}\n\n사용자가 선언한 행동과 그 판정·직접 결과, NPC/세계의 자연스러운 연쇄 반응까지 이번 턴에 충분히 진행하라. 이동·수업·훈련 같은 전환 행동은 특별한 방해가 없으면 의미 있는 다음 장면까지 넘겨도 된다. 직전 턴 내용을 불필요하게 반복하지 마라. PC에게 새로운 선택이 필요한 순간에 멈추고 PC의 다음 행동·대사·감정·결정은 대신 정하지 마라. 각 주요 NPC 대사에는 실제 감정 태그/강도/근거를 함께 반환하라.`;
+  return `===== PC PROFILE REFERENCE =====\n${pcReference}\n\n===== ACTIVE EVENT CANON =====\n${eventReferences.active}\n\n===== RELEVANT SCHEDULED EVENT CANON =====\n${eventReferences.scheduled}\n\n===== RELEVANT WORLD ARC CANON =====\n${eventReferences.world}\n\n===== INITIAL SCENARIO SEED =====\n${initialSeed}\n\n[현재성 우선순위]\n현재 날짜·시간·장소·PC/NPC 상태·완료 여부는 반드시 AUTHORITATIVE SAVE_STATE가 최우선이다. 위 시나리오/이벤트 참고문에 과거 시점 표현이 남아 있어도 SAVE_STATE와 충돌하면 폐기한다. activeEvents는 현재 PC 주변에서 실제 진행 중인 사건, scheduledEvents는 미래 예정, worldArcs는 세계 배경에서 독립 진행되는 장기 사건이다. RELEVANT WORLD ARC CANON이 '없음'이면 해당 장기 사건을 현재 장면으로 억지로 끌어오지 않는다. INITIAL SCENARIO SEED는 0턴에서만 유효하다.\n\n===== TURN OPTIONS =====\n서술 길이: ${lengthRule}\nADULT_MODE: ${adultMode && adultEligible ? 'ON' : 'OFF'}\n성인 조건 충족: ${adultEligible ? 'YES' : 'NO'}\n\n===== AUTHORITATIVE SAVE_STATE =====\n${serializedSave}\n\n===== ROLLING SUMMARY =====\n${cut(rollingSummary || '아직 없음', 5000)}\n\n===== RECENT TURNS =====\n${cut(turns, 9000)}\n\n===== AVAILABLE_CG_IDS =====\n${cgIds.length ? cgIds.join(', ') : '없음'}\n\n===== USER ACTION =====\n${cut(action, 5000)}\n\n사용자가 선언한 행동과 그 판정·직접 결과, NPC/세계의 자연스러운 연쇄 반응까지 이번 턴에 충분히 진행하라. 이동·수업·훈련 같은 전환 행동은 특별한 방해가 없으면 의미 있는 다음 장면까지 넘겨도 된다. 직전 턴 내용을 불필요하게 반복하지 마라. PC에게 새로운 선택이 필요한 순간에 멈추고 PC의 다음 행동·대사·감정·결정은 대신 정하지 마라. 각 주요 NPC 대사에는 실제 감정 태그/강도/근거를 함께 반환하라.`;
 }
 // ===== END prompt.js =====
 
@@ -600,6 +655,10 @@ const TurnSchema = z.object({
     items_remove: z.array(z.string().min(1).max(160)).max(12),
     active_events_add: z.array(z.string().min(1).max(240)).max(8),
     active_events_remove: z.array(z.string().min(1).max(240)).max(8),
+    scheduled_events_add: z.array(z.string().min(1).max(240)).max(8),
+    scheduled_events_remove: z.array(z.string().min(1).max(240)).max(8),
+    world_arcs_add: z.array(z.string().min(1).max(240)).max(8),
+    world_arcs_remove: z.array(z.string().min(1).max(240)).max(8),
     completed_events_add: z.array(z.string().min(1).max(240)).max(8),
     pc_knowledge_add: z.array(z.string().min(1).max(500)).max(10),
     memories_add: z.array(MemoryAdd).max(12),
@@ -647,15 +706,25 @@ function sanitizeTurn(turn, { allowedCgIds = [] } = {}) {
   d.fatigue_delta = clamp(d.fatigue_delta, -10, 10);
   d.gold_delta = clamp(d.gold_delta, -10000, 10000);
   d.relationship_changes = arrays(d.relationship_changes, 10).filter((row) => REGISTERED_SPEAKER_KEYS.has(row?.npc_key));
+  d.intimacy_changes = arrays(d.intimacy_changes, 6).filter((row) => REGISTERED_SPEAKER_KEYS.has(row?.npc_key));
   d.stat_progress = arrays(d.stat_progress, 4);
   d.skill_experience = arrays(d.skill_experience, 12);
   d.items_add = arrays(d.items_add, 12);
   d.items_remove = arrays(d.items_remove, 12);
   d.active_events_add = arrays(d.active_events_add, 8);
   d.active_events_remove = arrays(d.active_events_remove, 8);
+  d.scheduled_events_add = arrays(d.scheduled_events_add, 8);
+  d.scheduled_events_remove = arrays(d.scheduled_events_remove, 8);
+  d.world_arcs_add = arrays(d.world_arcs_add, 8);
+  d.world_arcs_remove = arrays(d.world_arcs_remove, 8);
   d.completed_events_add = arrays(d.completed_events_add, 8);
   d.pc_knowledge_add = arrays(d.pc_knowledge_add, 10);
-  d.memories_add = arrays(d.memories_add, 12);
+  d.memories_add = arrays(d.memories_add, 12).filter((row) => {
+    const owner = String(row?.owner || '');
+    if (owner === 'world' || owner === 'global') return true;
+    const match = owner.match(/^npc:([a-z0-9_]+)$/i);
+    return Boolean(match && REGISTERED_SPEAKER_KEYS.has(match[1]));
+  });
   d.npc_state_updates = arrays(d.npc_state_updates, 12).filter((row) => REGISTERED_SPEAKER_KEYS.has(row?.npc_key));
   turn.state_delta = d;
   turn.scene_summary = String(turn.scene_summary || '').slice(0,1200);
@@ -826,11 +895,11 @@ export default async function handler(req, res) {
       }),
       reasoning,
       max_output_tokens: maxOutput,
-      prompt_cache_key: process.env.OPENAI_PROMPT_CACHE_KEY || 'lumensia-v1.3.3-canon',
+      prompt_cache_key: process.env.OPENAI_PROMPT_CACHE_KEY || 'lumensia-v1.3.4-canon',
       prompt_cache_retention: '24h',
       text: {
         verbosity: proseLength === 'long' ? 'high' : proseLength === 'short' ? 'low' : 'medium',
-        format: zodTextFormat(TurnSchema, 'lumensia_turn_v13'),
+        format: zodTextFormat(TurnSchema, 'lumensia_turn_v14'),
       },
     });
 
@@ -854,7 +923,7 @@ export default async function handler(req, res) {
       },
       usage: usageSummary(route.model, response.usage),
       request_id: response._request_id || null,
-      server_version: '0.4.3',
+      server_version: '0.4.4',
     });
   } catch (error) {
     console.error(error);
