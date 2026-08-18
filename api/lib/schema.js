@@ -42,6 +42,20 @@ const SkillExperience = z.object({
   reason: z.string().min(1).max(240),
 });
 
+const AbilityUse = z.object({
+  kind: z.enum(['skill', 'stat']),
+  name: z.string().min(1).max(80),
+  role: z.enum(['primary', 'support', 'passive']),
+  reason: z.string().min(1).max(240),
+});
+
+const ResolutionLog = z.object({
+  triggered: z.boolean(),
+  outcome: z.enum(['none', 'success', 'partial', 'failure']),
+  summary: z.string().max(320).nullable(),
+  abilities: z.array(AbilityUse).max(5),
+});
+
 const MemoryAdd = z.object({
   owner: z.string().min(1).max(80),
   fact: z.string().min(1).max(500),
@@ -63,6 +77,7 @@ export const TurnSchema = z.object({
   scene: z.array(SceneItem).min(1).max(24),
   cg_id: z.string().max(120).nullable(),
   choices: z.array(z.string().min(1).max(240)).max(3),
+  resolution_log: ResolutionLog,
   state_delta: z.object({
     advance_minutes: z.number().int().min(0).max(1440),
     new_location: z.string().max(160).nullable(),

@@ -33,7 +33,7 @@ const mergeProgressRows = (rows, keyName, maxRows = 4) => {
   return out;
 };
 
-export function sanitizeTurn(turn, { allowedCgIds = [], allowedSkills = [] } = {}) {
+export function sanitizeTurn(turn, { allowedCgIds = [], allowedSkills = [], skillGrades = {}, statGrades = {} } = {}) {
   if (!turn || typeof turn !== 'object') throw new Error('모델 응답이 비어 있습니다.');
   turn.choices = arrays(turn.choices, 3);
   turn.scene = arrays(turn.scene, 24).map((item) => {
@@ -55,6 +55,40 @@ export function sanitizeTurn(turn, { allowedCgIds = [], allowedSkills = [] } = {
   const allowedCg = new Set(Array.isArray(allowedCgIds) ? allowedCgIds : []);
   if (!turn.cg_id || !allowedCg.has(turn.cg_id)) turn.cg_id = null;
 
+  const allowedSkillSet = new Set((allowedSkills || []).map((x) => String(x).trim()).filter(Boolean));
+  const allowedStats = new Set(['신체', '마나', '지능', '신성']);
+  const rawResolution = turn.resolution_log && typeof turn.resolution_log === 'object' ? turn.resolution_log : {};
+  const validRoles = new Set(['primary', 'support', 'passive']);
+  const seenAbilities = new Set();
+  const resolutionAbilities = [];
+  for (const raw of arrays(rawResolution.abilities, 5)) {
+    const kind = raw?.kind === 'stat' ? 'stat' : raw?.kind === 'skill' ? 'skill' : null;
+    const name = String(raw?.name || '').trim();
+    if (!kind || !name) continue;
+    if (kind === 'skill' && !allowedSkillSet.has(name)) continue;
+    if (kind === 'stat' && !allowedStats.has(name)) continue;
+    const dedupeKey = `${kind}:${name}`;
+    if (seenAbilities.has(dedupeKey)) continue;
+    const reason = String(raw?.reason || '').trim().slice(0, 240);
+    if (!reason) continue;
+    seenAbilities.add(dedupeKey);
+    resolutionAbilities.push({
+      kind,
+      name,
+      role: validRoles.has(raw?.role) ? raw.role : 'support',
+      reason,
+      grade: String(kind === 'skill' ? (skillGrades?.[name] || '') : (statGrades?.[name] || '')).slice(0, 24) || null,
+    });
+  }
+  const validOutcomes = new Set(['success', 'partial', 'failure']);
+  const resolutionTriggered = Boolean(rawResolution.triggered) && resolutionAbilities.length > 0;
+  turn.resolution_log = {
+    triggered: resolutionTriggered,
+    outcome: resolutionTriggered && validOutcomes.has(rawResolution.outcome) ? rawResolution.outcome : 'none',
+    summary: resolutionTriggered ? (String(rawResolution.summary || '').trim().slice(0, 320) || null) : null,
+    abilities: resolutionTriggered ? resolutionAbilities : [],
+  };
+
   const d = turn.state_delta || {};
   d.advance_minutes = clamp(d.advance_minutes, 0, 1440);
   d.fatigue_delta = clamp(d.fatigue_delta, -10, 10);
@@ -63,7 +97,6 @@ export function sanitizeTurn(turn, { allowedCgIds = [], allowedSkills = [] } = {
   d.intimacy_changes = arrays(d.intimacy_changes, 6).filter((row) => REGISTERED_SPEAKER_KEYS.has(row?.npc_key));
   d.stat_progress = mergeProgressRows(arrays(d.stat_progress, 3), 'stat', 3)
     .filter((row) => ['신체', '마나', '지능', '신성'].includes(row.stat));
-  const allowedSkillSet = new Set((allowedSkills || []).map((x) => String(x).trim()).filter(Boolean));
   d.skill_experience = mergeProgressRows(arrays(d.skill_experience, 4), 'skill', 4)
     .filter((row) => allowedSkillSet.has(row.skill));
   d.items_add = arrays(d.items_add, 12);
