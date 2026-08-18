@@ -1,6 +1,6 @@
 import { ASSETS } from './assets.js';
 
-const APP_VERSION = '0.2.0';
+const APP_VERSION = '0.3.0';
 const SAVE_KEY = 'lumensia.save.v1';
 const SETTINGS_KEY = 'lumensia.settings.v1';
 
@@ -19,10 +19,11 @@ const defaultSettings = {
   proReasoning: false,
   demoMode: false,
   accessToken: '',
+  showEmotionDebug: false,
 };
 
 const defaultSave = () => ({
-  version: 2,
+  version: 3,
   appVersion: APP_VERSION,
   id: crypto.randomUUID?.() || String(Date.now()),
   createdAt: new Date().toISOString(),
@@ -57,6 +58,8 @@ const defaultSave = () => ({
   },
   relationships: {},
   npcStates: {},
+  emotionStates: {},
+  timeline: [],
   activeEvents: ['입학식/학과 오리엔테이션', '신입생 기량평가', '회색 늑대의 숲', '황위 경쟁'],
   completedEvents: [],
   pcKnowledge: [],
@@ -65,7 +68,7 @@ const defaultSave = () => ({
   rollingSummary: '입학식 당일 08:40. 카일은 루멘시아 아카데미 대강당 앞에 도착했으며 입학식 개막 전이다.',
   recentTurns: [],
   renderedTurns: [],
-  usage: { inputTokens: 0, outputTokens: 0, cachedTokens: 0, cacheWriteTokens: 0, estimatedUsd: 0 },
+  usage: { inputTokens: 0, outputTokens: 0, reasoningTokens: 0, cachedTokens: 0, cacheWriteTokens: 0, estimatedUsd: 0, lastTurnUsd: 0, lastCacheHitRate: 0, lastInputTokens: 0, lastOutputTokens: 0 },
 });
 
 let save = normalizeSave(loadJson(SAVE_KEY) || defaultSave());
@@ -82,7 +85,7 @@ function clamp(n, min, max) { return Math.min(max, Math.max(min, Number(n) || 0)
 function normalizeSave(raw) {
   const base = defaultSave();
   const next = raw && typeof raw === 'object' ? raw : base;
-  next.version = 2;
+  next.version = 3;
   next.appVersion = APP_VERSION;
   next.world = { ...base.world, ...(next.world || {}) };
   next.pc = { ...base.pc, ...(next.pc || {}) };
@@ -91,6 +94,8 @@ function normalizeSave(raw) {
   next.pc.inventory = Array.isArray(next.pc.inventory) ? next.pc.inventory : [...base.pc.inventory];
   next.relationships = next.relationships || {};
   next.npcStates = next.npcStates || {};
+  next.emotionStates = next.emotionStates || {};
+  next.timeline = Array.isArray(next.timeline) ? next.timeline : [];
   next.activeEvents = Array.isArray(next.activeEvents) ? next.activeEvents : [];
   next.completedEvents = Array.isArray(next.completedEvents) ? next.completedEvents : [];
   next.pcKnowledge = Array.isArray(next.pcKnowledge) ? next.pcKnowledge : [];
@@ -200,20 +205,37 @@ function renderTurnRecord(record) {
   card.className = 'turn-card';
   const head = document.createElement('div');
   head.className = 'turn-head';
-  head.innerHTML = `<span>${escapeHtml(turn.scene_title || '장면')}</span><span>${escapeHtml(record.route?.tier || 'demo')}</span>`;
+  const cachePct = Math.round(Number(record.usage?.cache_hit_rate || 0) * 100);
+  const usageTag = record.usage && record.route?.tier !== 'demo' ? ` · $${Number(record.usage.estimated_usd || 0).toFixed(4)} · cache ${cachePct}%` : '';
+  head.innerHTML = `<span>${escapeHtml(turn.scene_title || '장면')}</span><span>${escapeHtml(record.route?.tier || 'demo')}${usageTag}</span>`;
   card.append(head);
 
   if (turn.cg_id && ASSETS.cg[turn.cg_id]) {
     const cg = document.createElement('div'); cg.className = 'cg-card';
     const img = document.createElement('img'); img.src = ASSETS.cg[turn.cg_id]; img.alt = turn.cg_id; cg.append(img); card.append(cg);
   }
+
+  const shown = new Map();
   for (const item of turn.scene || []) {
     if (item.kind === 'dialogue') {
       const d = document.createElement('div'); d.className = 'dialogue';
-      if (item.speaker_key) d.append(createPortrait(item.speaker_key, item.expression || 'default', item.speaker_name));
-      const s = document.createElement('div'); s.className = 'speaker'; s.textContent = `💬 ${item.speaker_name || item.speaker_key || 'NPC'}`;
+      const finalExpression = item.display_expression || item.expression || save.emotionStates?.[item.speaker_key]?.current || 'default';
+      if (item.speaker_key && (!shown.has(item.speaker_key) || shown.get(item.speaker_key) !== finalExpression)) {
+        d.append(createPortrait(item.speaker_key, finalExpression, item.speaker_name));
+        shown.set(item.speaker_key, finalExpression);
+      }
+      const sp = document.createElement('div'); sp.className = 'speaker'; sp.textContent = `💬 ${item.speaker_name || item.speaker_key || 'NPC'}`;
       const t = document.createElement('div'); t.className = 'dialogue-text'; t.textContent = `“${item.text}”`;
-      d.append(s,t); card.append(d);
+      d.append(sp,t);
+      if (settings.showEmotionDebug && item.speaker_key) {
+        const dbg = document.createElement('div'); dbg.className = 'emotion-debug';
+        const detected = item.detected_expression || item.expression || 'default';
+        const intensity = Number(item.emotion_intensity || 0).toFixed(2);
+        const confidence = Number(item.emotion_confidence || 0).toFixed(2);
+        dbg.textContent = `표정 ${finalExpression} ← 감지 ${detected} · 강도 ${intensity} · 확신 ${confidence}${item.emotion_transition ? ` · ${item.emotion_transition}` : ''}`;
+        d.append(dbg);
+      }
+      card.append(d);
     } else {
       const n = document.createElement('div'); n.className = 'narration'; n.textContent = item.text; card.append(n);
     }
@@ -221,10 +243,14 @@ function renderTurnRecord(record) {
   for (const notice of record.notices || []) {
     const n = document.createElement('div'); n.className = 'progress-notice'; n.textContent = `✦ ${notice}`; card.append(n);
   }
+  if (record.usage?.cold_cache) {
+    const n = document.createElement('div'); n.className = 'cache-notice';
+    n.textContent = '첫 호출/캐시 만료 턴: 세계관 프롬프트 캐시를 새로 만드는 턴이라 비용이 평소보다 높을 수 있음.';
+    card.append(n);
+  }
   story.append(card);
   renderChoices(turn.choices || []);
 }
-
 function escapeHtml(s='') { return String(s).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
 
 function renderChoices(choices) {
@@ -242,14 +268,14 @@ function updateStatus(route) {
   $('timeStatus').textContent = `D+${save.world.dayElapsed} · ${save.world.date} ${save.world.weekday} ${save.world.time}`;
   $('locationStatus').textContent = save.world.location;
   if (route) $('routeStatus').textContent = `${route.tier.toUpperCase()} · ${route.reasoning_effort}${route.reasoning_mode === 'pro' ? ' · PRO' : ''}`;
-  $('costStatus').textContent = `$${Number(save.usage.estimatedUsd || 0).toFixed(4)}`;
+  $('costStatus').textContent = `턴 $${Number(save.usage.lastTurnUsd || 0).toFixed(4)} / Σ$${Number(save.usage.estimatedUsd || 0).toFixed(3)}`;
 }
 
 function renderInfo() {
   const rel = Object.entries(save.relationships || {}).map(([key,v]) => `${ASSETS.characters[key]?.name || key}[호감 ${v.affinity||0} / 신뢰 ${v.trust||0}${v.status ? ` / ${v.status}`:''}]`).join(', ') || '-';
   const skills = Object.entries(save.pc.skills || {}).map(([k,v]) => `${k} ${v.grade}`).join(' | ');
   const stats = Object.entries(save.pc.stats || {}).map(([k,v]) => `- ${k}: ${v.grade} [${v.progress}/100]`).join('\n');
-  $('infoContent').textContent = `경지: ${save.pc.realm} | 소속: 루멘시아 아카데미\n---------\n직위: ${save.pc.department} | 상황: 🟢\n---------\n스킬: ${skills}\n---------\n스탯:\n${stats}\n---------\n🔮[魔] ${save.pc.talents.magic} | ⚔️[武] ${save.pc.talents.martial} | 🌟[魂] ${save.pc.talents.soul} | 📘[智] ${save.pc.talents.knowledge}\n---------\n상태: ${save.pc.status} | 피로 ${save.pc.fatigue}/100\n💼: ${save.pc.inventory.join(', ')}, 금화 ${save.pc.gold}G\n관계: ${rel}\n---------\n진행 사건: ${save.activeEvents.join(', ') || '-'}\n토큰: 입력 ${save.usage.inputTokens || 0} / 캐시 ${save.usage.cachedTokens || 0} / 출력 ${save.usage.outputTokens || 0}\n누적 API 비용(추정): $${Number(save.usage.estimatedUsd || 0).toFixed(4)}`;
+  $('infoContent').textContent = `경지: ${save.pc.realm} | 소속: 루멘시아 아카데미\n---------\n직위: ${save.pc.department} | 상황: 🟢\n---------\n스킬: ${skills}\n---------\n스탯:\n${stats}\n---------\n🔮[魔] ${save.pc.talents.magic} | ⚔️[武] ${save.pc.talents.martial} | 🌟[魂] ${save.pc.talents.soul} | 📘[智] ${save.pc.talents.knowledge}\n---------\n상태: ${save.pc.status} | 피로 ${save.pc.fatigue}/100\n💼: ${save.pc.inventory.join(', ')}, 금화 ${save.pc.gold}G\n관계: ${rel}\n---------\n진행 사건: ${save.activeEvents.join(', ') || '-'}\n토큰 누적: 입력 ${save.usage.inputTokens || 0} / 캐시 ${save.usage.cachedTokens || 0} / 출력 ${save.usage.outputTokens || 0} / 추론 ${save.usage.reasoningTokens || 0}\n직전 턴: 입력 ${save.usage.lastInputTokens || 0} / 출력 ${save.usage.lastOutputTokens || 0} / 캐시 적중 ${Math.round(Number(save.usage.lastCacheHitRate || 0)*100)}% / 비용 $${Number(save.usage.lastTurnUsd || 0).toFixed(4)}\n누적 API 비용(추정): $${Number(save.usage.estimatedUsd || 0).toFixed(4)}\n영구 타임라인: ${save.timeline?.length || 0}건 | NPC 감정상태: ${Object.keys(save.emotionStates || {}).length}명`;
 }
 
 function applyDelta(delta = {}) {
@@ -323,10 +349,40 @@ function applyDelta(delta = {}) {
   return notices;
 }
 
+function applyEmotionUpdates(updates = []) {
+  for (const row of updates || []) {
+    if (!row?.npc_key || !row?.state) continue;
+    save.emotionStates[row.npc_key] = { ...row.state };
+  }
+}
+
+function addTimeline(turn) {
+  if (!turn?.scene_summary) return;
+  save.timeline.push({
+    turn: save.turnNumber + 1,
+    date: save.world.date,
+    time: save.world.time,
+    location: save.world.location,
+    importance: turn.importance || 'routine',
+    summary: String(turn.scene_summary).slice(0,1200),
+  });
+  save.timeline = save.timeline.slice(-500);
+}
+
+function rebuildRollingSummary() {
+  const rows = save.timeline || [];
+  const recent = rows.slice(-10);
+  const important = rows.filter(x => x.importance !== 'routine').slice(-12);
+  const merged = [...important, ...recent]
+    .sort((a,b) => a.turn - b.turn)
+    .filter((x,i,a) => i === 0 || x.turn !== a[i-1].turn);
+  save.rollingSummary = merged.map(x => `[T${x.turn} ${x.date} ${x.time} ${x.location} ${x.importance}] ${x.summary}`).join('\n').slice(-6500);
+}
+
 function compactState() {
   return {
     version: save.version, turnNumber: save.turnNumber, world: save.world, pc: save.pc, relationships: save.relationships, npcStates: save.npcStates,
-    activeEvents: save.activeEvents, completedEvents: save.completedEvents,
+    emotionStates: save.emotionStates, activeEvents: save.activeEvents, completedEvents: save.completedEvents,
     pcKnowledge: save.pcKnowledge, memories: save.memories, flags: save.flags,
   };
 }
@@ -348,11 +404,13 @@ async function sendAction(action) {
     }
     loader.remove();
     const notices = applyDelta(data.turn.state_delta);
+    applyEmotionUpdates(data.turn.emotion_updates || []);
+    addTimeline(data.turn);
+    rebuildRollingSummary();
     const record = { action, turn: data.turn, route: data.route, usage: data.usage, notices, at: new Date().toISOString() };
     save.turnNumber += 1;
-    save.rollingSummary = [save.rollingSummary, data.turn.scene_summary].filter(Boolean).join('\n').slice(-12000);
     save.recentTurns.push({ action, summary: data.turn.scene_summary, scene: data.turn.scene.slice(0,10) });
-    save.recentTurns = save.recentTurns.slice(-20);
+    save.recentTurns = save.recentTurns.slice(-12);
     save.renderedTurns.push(record); save.renderedTurns = save.renderedTurns.slice(-80);
     if (data.usage) {
       save.usage.inputTokens += data.usage.input_tokens || 0;
@@ -401,6 +459,29 @@ function updateForceTerraButton() {
 
 function scrollBottom(smooth = true) { requestAnimationFrame(() => window.scrollTo({top: document.body.scrollHeight, behavior: smooth ? 'smooth':'auto'})); }
 
+function ensureV12Ui() {
+  document.title = '루멘시아 모바일 V1.2';
+  const h1 = document.querySelector('h1');
+  if (h1 && !h1.querySelector('.version-tag')) {
+    const small = document.createElement('small'); small.className='version-tag'; small.textContent='V1.2'; h1.append(' ', small);
+  }
+  if (!$('showEmotionDebug')) {
+    const demo = $('demoMode')?.closest('label');
+    if (demo) {
+      const label=document.createElement('label'); label.className='toggle-row';
+      label.innerHTML='<input id="showEmotionDebug" type="checkbox" /><span>감정 태그 디버그 표시 (테스트용)</span>';
+      demo.after(label);
+    }
+  }
+  if (!$('v12DynamicStyle')) {
+    const style=document.createElement('style'); style.id='v12DynamicStyle';
+    style.textContent='.version-tag{font-size:10px;color:#d9b86c;font-weight:800;vertical-align:middle}.emotion-debug{margin:0 14px 12px;padding:6px 8px;border-radius:8px;background:rgba(99,102,241,.10);color:#b8c0ff;font-size:10px;line-height:1.4}.cache-notice{margin:8px 12px 14px;padding:8px 10px;border-radius:10px;background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.25);color:#bfdbfe;font-size:10px;line-height:1.5}.asset-item.asset-warn{border-color:rgba(245,158,11,.65)}.asset-item.asset-warn div{color:#fcd34d}.asset-item.asset-fail{border-color:rgba(239,68,68,.65)}.asset-item.asset-fail div{color:#fecaca}';
+    document.head.append(style);
+  }
+}
+
+ensureV12Ui();
+
 actionForm.addEventListener('submit', e => { e.preventDefault(); sendAction(actionInput.value); });
 actionInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); actionForm.requestSubmit(); } });
 $('infoBtn').addEventListener('click', () => { renderInfo(); $('infoDialog').showModal(); });
@@ -413,7 +494,7 @@ $('importInput').addEventListener('change', importSave);
 
 for (const key of ['modelMode','reasoningEffort','proseLength']) { $(key).value = settings[key]; $(key).addEventListener('change', e => { settings[key] = e.target.value; persistSettings(); }); }
 $('accessToken').value = settings.accessToken || ''; $('accessToken').addEventListener('change', e => { settings.accessToken = e.target.value.trim(); persistSettings(); });
-for (const key of ['adultMode','proReasoning','demoMode']) { $(key).checked = Boolean(settings[key]); $(key).addEventListener('change', e => { settings[key] = e.target.checked; persistSettings(); }); }
+for (const key of ['adultMode','proReasoning','demoMode','showEmotionDebug']) { const el=$(key); if (!el) continue; el.checked = Boolean(settings[key]); el.addEventListener('change', e => { settings[key] = e.target.checked; persistSettings(); }); }
 $('assetTestBtn').addEventListener('click', testAssets);
 
 function exportSave() {
@@ -424,11 +505,44 @@ function toast(text) { const d=document.createElement('div'); d.textContent=text
 
 async function checkHealth() { try { const r=await fetch('/api/health'); const h=await r.json(); $('apiHealth').textContent=h.apiConfigured?`API 연결 준비됨 · ${h.luna} / ${h.terra}${h.accessTokenRequired ? ' · 접속 토큰 필요' : ''}`:'API 키 미설정. Vercel 환경변수 OPENAI_API_KEY를 추가하거나 데모 모드를 켜세요.'; } catch { $('apiHealth').textContent='API 상태를 확인할 수 없음.'; } }
 
+function probeImage(url) {
+  return new Promise((resolve) => {
+    if (!url) return resolve(false);
+    const img = new Image();
+    const done = (ok) => { img.onload = null; img.onerror = null; resolve(ok); };
+    img.onload = () => done(true);
+    img.onerror = () => done(false);
+    img.src = `${url}${url.includes('?') ? '&' : '?'}check=${Date.now()}`;
+  });
+}
+
 async function testAssets() {
   const results=$('assetResults'); results.innerHTML=''; $('assetDialog').showModal();
   const keys=['lilia','anastasia','laris','aria','isabel','chloe','lena','veradin','bellian','aris','mirabelle'];
   for (const key of keys) {
-    const char=ASSETS.characters[key]; const url=char?.expressions?.smile||char?.default; const item=document.createElement('div'); item.className='asset-item'; const img=document.createElement('img'); img.src=url; const label=document.createElement('div'); label.textContent=`${char?.name||key}: 로딩 중`; img.onload=()=>label.textContent=`${char.name}: OK`; img.onerror=()=>label.textContent=`${char?.name||key}: 실패`; item.append(img,label); results.append(item);
+    const char=ASSETS.characters[key];
+    const preferred=char?.expressions?.smile || char?.default;
+    const preferredName=char?.expressions?.smile ? 'SMILE' : 'DEFAULT';
+    const item=document.createElement('div'); item.className='asset-item';
+    const img=document.createElement('img');
+    const label=document.createElement('div'); label.textContent=`${char?.name||key}: ${preferredName} 검사 중`;
+    item.append(img,label); results.append(item);
+    const preferredOk = await probeImage(preferred);
+    if (preferredOk) {
+      img.src=preferred; label.textContent=`${char.name}: ${preferredName} OK`;
+      continue;
+    }
+    const fallback=char?.default;
+    const defaultOk = fallback && fallback !== preferred ? await probeImage(fallback) : false;
+    if (defaultOk) {
+      img.src=fallback;
+      label.textContent=`${char.name}: ${preferredName} 실패 → DEFAULT OK (게임은 자동 폴백)`;
+      item.classList.add('asset-warn');
+    } else {
+      img.remove();
+      label.textContent=`${char?.name||key}: ${preferredName}${fallback!==preferred?' + DEFAULT':''} 실패`;
+      item.classList.add('asset-fail');
+    }
   }
 }
 
