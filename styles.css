@@ -41,8 +41,32 @@ h1 { margin: 2px 0 0; font-size: 20px; }
 .cg-card img { width: 100%; display: block; }
 .user-action { align-self: flex-end; max-width: 88%; padding: 11px 14px; border-radius: 16px 16px 4px 16px; background: #263449; line-height: 1.55; white-space: pre-wrap; }
 .error-card { border: 1px solid rgba(239,68,68,.4); background: rgba(127,29,29,.22); color: #fecaca; padding: 13px; border-radius: 14px; line-height: 1.6; }
-.choices { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(82px + var(--safe-bottom)); z-index: 8; width: min(736px, calc(100% - 20px)); padding: 8px; display: grid; gap: 7px; background: rgba(8,11,18,.92); backdrop-filter: blur(14px); border: 1px solid var(--line); border-radius: 16px; }
-.choice-btn { text-align: left; border: 1px solid var(--line); border-radius: 12px; background: var(--panel2); padding: 10px 12px; cursor: pointer; line-height: 1.45; }
+.choices {
+  position: static;
+  left: auto;
+  bottom: auto;
+  transform: none;
+  z-index: auto;
+  width: 100%;
+  margin: 0;
+  padding: 0 2px 4px;
+  display: grid;
+  gap: 8px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+.choice-btn {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel2);
+  padding: 12px 14px;
+  cursor: pointer;
+  line-height: 1.5;
+  box-shadow: 0 5px 18px rgba(0,0,0,.16);
+}
 .composer { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(34px + var(--safe-bottom)); z-index: 9; width: min(760px, 100%); display: grid; grid-template-columns: 1fr 76px; gap: 8px; padding: 9px 12px; background: rgba(8,11,18,.96); border-top: 1px solid var(--line); }
 .composer textarea { resize: none; border: 1px solid var(--line); border-radius: 14px; background: #111827; color: var(--text); padding: 11px 12px; outline: none; }
 .composer textarea:focus { border-color: rgba(217,184,108,.55); }
@@ -80,3 +104,11 @@ h1 { margin: 2px 0 0; font-size: 20px; }
 
 .progress-notice { margin: 10px 12px 14px; padding: 9px 12px; border: 1px solid rgba(217,184,108,.35); border-radius: 12px; color: #f5d98d; background: rgba(217,184,108,.08); font-size: 12px; font-weight: 800; }
 .terra-btn.active { color: #fff1bb; border-color: rgba(217,184,108,.8); background: rgba(145,86,22,.75); box-shadow: 0 0 14px rgba(217,184,108,.22); }
+
+.version-tag { font-size: 10px; color: var(--gold); font-weight: 800; vertical-align: middle; }
+.emotion-debug { margin: 0 14px 12px; padding: 6px 8px; border-radius: 8px; background: rgba(99,102,241,.10); color: #b8c0ff; font-size: 10px; line-height: 1.4; }
+.cache-notice { margin: 8px 12px 14px; padding: 8px 10px; border-radius: 10px; background: rgba(59,130,246,.10); border: 1px solid rgba(59,130,246,.25); color: #bfdbfe; font-size: 10px; line-height: 1.5; }
+.asset-item.asset-warn { border-color: rgba(245,158,11,.65); }
+.asset-item.asset-warn div { color: #fcd34d; }
+.asset-item.asset-fail { border-color: rgba(239,68,68,.65); }
+.asset-item.asset-fail div { color: #fecaca; }

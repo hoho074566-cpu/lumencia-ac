@@ -255,12 +255,28 @@ function escapeHtml(s='') { return String(s).replace(/[&<>'"]/g, c => ({'&':'&am
 
 function renderChoices(choices) {
   choicesEl.innerHTML = '';
-  if (!choices.length) { choicesEl.classList.add('hidden'); return; }
+
+  // 선택지는 고정 오버레이가 아니라 최신 GM 턴 바로 뒤의 본문 흐름에 둔다.
+  // 기존 위치가 어디든 story의 맨 끝으로 이동한다.
+  story.append(choicesEl);
+
+  if (!choices.length) {
+    choicesEl.classList.add('hidden');
+    return;
+  }
+
   choices.forEach((choice, idx) => {
-    const b = document.createElement('button'); b.className = 'choice-btn'; b.textContent = `${idx+1}. ${choice}`;
-    b.addEventListener('click', () => { actionInput.value = choice; actionInput.focus(); choicesEl.classList.add('hidden'); });
+    const b = document.createElement('button');
+    b.className = 'choice-btn';
+    b.textContent = `${idx+1}. ${choice}`;
+    b.addEventListener('click', () => {
+      actionInput.value = choice;
+      actionInput.focus();
+      choicesEl.classList.add('hidden');
+    });
     choicesEl.append(b);
   });
+
   choicesEl.classList.remove('hidden');
 }
 
@@ -418,6 +434,13 @@ async function sendAction(action) {
       save.usage.cachedTokens += data.usage.cached_tokens || 0;
       save.usage.cacheWriteTokens += data.usage.cache_write_tokens || 0;
       save.usage.estimatedUsd += data.usage.estimated_usd || 0;
+
+      // 직전 턴 사용량/비용 표시용 값.
+      save.usage.lastTurnUsd = data.usage.estimated_usd || 0;
+      save.usage.lastCacheHitRate = data.usage.cache_hit_rate || 0;
+      save.usage.lastInputTokens = data.usage.input_tokens || 0;
+      save.usage.lastOutputTokens = data.usage.output_tokens || 0;
+      save.usage.lastReasoningTokens = data.usage.reasoning_tokens || 0;
     }
     forceTerraOnce = false; updateForceTerraButton();
     save.flags.forceTerraNextTurn = false;
