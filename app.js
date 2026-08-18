@@ -403,12 +403,12 @@ function addTimeline(turn) {
 
 function rebuildRollingSummary() {
   const rows = save.timeline || [];
-  const recent = rows.slice(-10);
-  const important = rows.filter(x => x.importance !== 'routine').slice(-12);
+  const recent = rows.slice(-6);
+  const important = rows.filter(x => x.importance !== 'routine').slice(-8);
   const merged = [...important, ...recent]
     .sort((a,b) => a.turn - b.turn)
     .filter((x,i,a) => i === 0 || x.turn !== a[i-1].turn);
-  save.rollingSummary = merged.map(x => `[T${x.turn} ${x.date} ${x.time} ${x.location} ${x.importance}] ${x.summary}`).join('\n').slice(-6500);
+  save.rollingSummary = merged.map(x => `[T${x.turn} ${x.date} ${x.time} ${x.location} ${x.importance}] ${x.summary}`).join('\n').slice(-5000);
 }
 
 function compactState() {
@@ -431,8 +431,14 @@ async function sendAction(action) {
     if (settings.demoMode) data = demoResponse(action);
     else {
       const res = await fetch('/api/chat', { method: 'POST', headers: {'Content-Type':'application/json', 'X-Lumensia-Token': accessToken || ''}, body: JSON.stringify(payload) });
-      data = await res.json();
-      if (!res.ok) throw new Error(`${data.error || 'API 오류'}${data.request_id ? `\nRequest ID: ${data.request_id}` : ''}`);
+      const raw = await res.text();
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        const preview = raw.replace(/\s+/g, ' ').trim().slice(0, 280);
+        throw new Error(`서버 응답 형식 오류 (HTTP ${res.status})${preview ? `\n${preview}` : ''}`);
+      }
+      if (!res.ok) throw new Error(`${data.error || `API 오류 (HTTP ${res.status})`}${data.request_id ? `\nRequest ID: ${data.request_id}` : ''}`);
     }
     loader.remove();
     const notices = applyDelta(data.turn.state_delta);
@@ -442,7 +448,7 @@ async function sendAction(action) {
     const record = { action, turn: data.turn, route: data.route, usage: data.usage, notices, at: new Date().toISOString() };
     save.turnNumber += 1;
     save.recentTurns.push({ action, summary: data.turn.scene_summary, scene: data.turn.scene.slice(0,10) });
-    save.recentTurns = save.recentTurns.slice(-12);
+    save.recentTurns = save.recentTurns.slice(-8);
     save.renderedTurns.push(record); save.renderedTurns = save.renderedTurns.slice(-80);
     if (data.usage) {
       save.usage.inputTokens += data.usage.input_tokens || 0;
@@ -499,10 +505,10 @@ function updateForceTerraButton() {
 function scrollBottom(smooth = true) { requestAnimationFrame(() => window.scrollTo({top: document.body.scrollHeight, behavior: smooth ? 'smooth':'auto'})); }
 
 function ensureV12Ui() {
-  document.title = '루멘시아 모바일 V1.2';
+  document.title = '루멘시아 모바일 V1.3.2';
   const h1 = document.querySelector('h1');
   if (h1 && !h1.querySelector('.version-tag')) {
-    const small = document.createElement('small'); small.className='version-tag'; small.textContent='V1.2'; h1.append(' ', small);
+    const small = document.createElement('small'); small.className='version-tag'; small.textContent='V1.3.2'; h1.append(' ', small);
   }
   if (!$('showEmotionDebug')) {
     const demo = $('demoMode')?.closest('label');
