@@ -89,6 +89,20 @@ const GM_RULES = `너는 판타지 아카데미 장기 RPG 「루멘시아 아�
 19. 등록된 주요 NPC의 speaker_key는 CHARACTER REGISTRY의 정확한 영문 키를 쓴다. 등록되지 않은 단역은 speaker_key=null, speaker_name=표시명으로 둔다. 키를 새로 지어내지 않는다.
 
 
+[PC 능력 판정 / 성장 — 매 턴 적용]
+- USER ACTION을 판정하기 전에 반드시 AUTHORITATIVE SAVE_STATE.pc.skills와 pc.stats를 확인한다. PC PROFILE REFERENCE에 Trait/Authority가 있으면 그것도 함께 고려한다.
+- 사용자가 스킬명을 직접 외치거나 지정하지 않아도 된다. 현재 상황과 행동에 관련된 패시브/숙련 스킬은 자동으로 판정에 반영한다. 예: 매복·살기·기습 징후에는 위험 감지, 전황·동선·상대 습관 분석에는 전장 판단/실전 전투, 대검 공격·방어에는 대검술, 회피 기동에는 회피, 장시간 전투에는 체력 관리. 단, 실제로 관련 없는 능력을 억지로 끼워 넣지 않는다.
+- 한 판정에서 핵심 스킬 1~3개와 보조 스탯 0~2개 정도를 우선 고려한다. 여러 능력을 전부 동시 적용해 만능 보정을 만들지 않는다.
+- 등급은 판정 근거다. 높은 숙련은 더 빠른 인지, 더 정교한 실행, 실수 감소, 어려운 응용 가능성으로 나타나지만 절대 성공권은 아니다. 상성·정보·거리·피로·부상·상대 수준·환경이 불리하면 실패하거나 부분 성공할 수 있다.
+- 패시브 스킬은 발동 조건이 충족되면 사용자 선언 없이 자연스럽게 작동시킨다. 다만 미래예지처럼 과장하거나 스킬 설명의 한계를 넘지 않는다.
+- skill_experience는 '스킬을 썼다'는 이유만으로 주지 않는다. 실제 학습 자극이 있었을 때만 기록한다: 의미 있는 훈련, 실전 압박, 새로운 응용, 강한 상대, 정확한 교정, 실패 분석, 새로운 통찰. 일상적인 자동 수행이나 현재 숙련보다 너무 쉬운 반복은 0이며 배열에서 생략한다.
+- stat_progress도 단순 행동 횟수가 아니라 해당 능력의 적응/학습 자극이 있을 때만 기록한다. 신체=근력·반응·내구·체력 부담, 마나=감지·제어·순환·출력·회복·오러/마법 운용, 지능=학습·분석·전술·연구, 신성=기도·교리·신성력 운용·종교적 체험. 무관한 스탯을 같이 올리지 않는다.
+- 경험치 권장량: +1 작은 but 유의미한 연습/교정, +2 확실한 훈련·실전 적용, +3 어려운 도전·새 응용·뚜렷한 통찰, +4 매우 드문 고난도 성취/돌파 전조, +5 극히 예외적인 결정적 깨달음. 높은 등급일수록 같은 행동은 경험치가 더 적거나 0이어야 한다.
+- 한 턴에 skill_experience는 보통 0~3개, stat_progress는 보통 0~2개다. 복합적인 중대 장면에서도 관련성이 명확한 것만 기록한다.
+- skill_experience.skill은 SAVE_STATE.pc.skills에 이미 존재하는 정확한 스킬명만 사용한다. 오타·동의어·새 이름을 만들어 경험치를 주지 않는다. 새로운 스킬 습득은 별도 사건/시스템이 생기기 전까지 자동 생성하지 않는다.
+- 경험치가 발생하면 reason에 '무슨 행동/상황 때문에 무엇을 배우거나 단련했는지'를 플레이어가 이해할 수 있게 한 문장으로 적는다. 결과 성공 여부와 경험 획득은 별개다. 실패했어도 분석·교정·통찰이 있으면 경험을 얻을 수 있다.
+
+
 [사건 버킷]
 - SAVE_STATE.activeEvents는 PC의 현재 장면과 직접 맞물려 실제 진행 중인 사건만 둔다. 미래 일정이나 멀리서 진행 중인 세계 사건을 미리 넣지 않는다.
 - scheduledEvents는 날짜/조건이 아직 오지 않은 미래 예정 사건이다. 실제로 시작되면 scheduled_events_remove와 active_events_add를 함께 사용한다.
@@ -515,6 +529,13 @@ function eventReferenceBundle(saveState = {}, { action = '', recentTurns = [], r
   };
 }
 
+function currentPcAbilityReference(saveState = {}) {
+  const pc = saveState?.pc || {};
+  const skills = Object.entries(pc.skills || {}).map(([name, row]) => `${name} ${row?.grade || row}`).join(' | ');
+  const stats = Object.entries(pc.stats || {}).map(([name, row]) => `${name} ${row?.grade || row} [${Number(row?.progress || 0)}/100]`).join(' | ');
+  return `스킬: ${skills || '없음'}\n스탯: ${stats || '없음'}\n판정 전 위 능력 중 현재 행동/상황과 실제 관련된 것만 선별해 반영한다. 패시브 스킬은 사용자가 이름을 선언하지 않아도 조건이 맞으면 자동 적용한다.`;
+}
+
 function defaultPcProfileReference(saveState = {}) {
   const pc = saveState?.pc || {};
   const matchesDefault = String(pc.name || '') === '카일' && Number(pc.age || 0) === 20 && String(pc.department || '').includes('기사과');
@@ -540,8 +561,9 @@ function buildTurnInput({ action, saveState, recentTurns, rollingSummary, availa
   const initialSeed = Number(saveState?.turnNumber || 0) === 0 ? CANON.current : '사용하지 않음 — 현재 상태는 SAVE_STATE가 기준';
   const eventReferences = eventReferenceBundle(saveState, { action, recentTurns, rollingSummary });
   const pcReference = defaultPcProfileReference(saveState);
+  const abilityReference = currentPcAbilityReference(saveState);
 
-  return `===== PC PROFILE REFERENCE =====\n${pcReference}\n\n===== ACTIVE EVENT CANON =====\n${eventReferences.active}\n\n===== RELEVANT SCHEDULED EVENT CANON =====\n${eventReferences.scheduled}\n\n===== RELEVANT WORLD ARC CANON =====\n${eventReferences.world}\n\n===== INITIAL SCENARIO SEED =====\n${initialSeed}\n\n[현재성 우선순위]\n현재 날짜·시간·장소·PC/NPC 상태·완료 여부는 반드시 AUTHORITATIVE SAVE_STATE가 최우선이다. 위 시나리오/이벤트 참고문에 과거 시점 표현이 남아 있어도 SAVE_STATE와 충돌하면 폐기한다. activeEvents는 현재 PC 주변에서 실제 진행 중인 사건, scheduledEvents는 미래 예정, worldArcs는 세계 배경에서 독립 진행되는 장기 사건이다. RELEVANT WORLD ARC CANON이 '없음'이면 해당 장기 사건을 현재 장면으로 억지로 끌어오지 않는다. INITIAL SCENARIO SEED는 0턴에서만 유효하다.\n\n===== TURN OPTIONS =====\n서술 길이: ${lengthRule}\nADULT_MODE: ${adultMode && adultEligible ? 'ON' : 'OFF'}\n성인 조건 충족: ${adultEligible ? 'YES' : 'NO'}\n\n===== AUTHORITATIVE SAVE_STATE =====\n${serializedSave}\n\n===== ROLLING SUMMARY =====\n${cut(rollingSummary || '아직 없음', 5000)}\n\n===== RECENT TURNS =====\n${cut(turns, 9000)}\n\n===== AVAILABLE_CG_IDS =====\n${cgIds.length ? cgIds.join(', ') : '없음'}\n\n===== USER ACTION =====\n${cut(action, 5000)}\n\n사용자가 선언한 행동과 그 판정·직접 결과, NPC/세계의 자연스러운 연쇄 반응까지 이번 턴에 충분히 진행하라. 이동·수업·훈련 같은 전환 행동은 특별한 방해가 없으면 의미 있는 다음 장면까지 넘겨도 된다. 직전 턴 내용을 불필요하게 반복하지 마라. PC에게 새로운 선택이 필요한 순간에 멈추고 PC의 다음 행동·대사·감정·결정은 대신 정하지 마라. 각 주요 NPC 대사에는 실제 감정 태그/강도/근거를 함께 반환하라.`;
+  return `===== PC PROFILE REFERENCE =====\n${pcReference}\n\n===== ACTIVE EVENT CANON =====\n${eventReferences.active}\n\n===== RELEVANT SCHEDULED EVENT CANON =====\n${eventReferences.scheduled}\n\n===== RELEVANT WORLD ARC CANON =====\n${eventReferences.world}\n\n===== INITIAL SCENARIO SEED =====\n${initialSeed}\n\n[현재성 우선순위]\n현재 날짜·시간·장소·PC/NPC 상태·완료 여부는 반드시 AUTHORITATIVE SAVE_STATE가 최우선이다. 위 시나리오/이벤트 참고문에 과거 시점 표현이 남아 있어도 SAVE_STATE와 충돌하면 폐기한다. activeEvents는 현재 PC 주변에서 실제 진행 중인 사건, scheduledEvents는 미래 예정, worldArcs는 세계 배경에서 독립 진행되는 장기 사건이다. RELEVANT WORLD ARC CANON이 '없음'이면 해당 장기 사건을 현재 장면으로 억지로 끌어오지 않는다. INITIAL SCENARIO SEED는 0턴에서만 유효하다.\n\n===== TURN OPTIONS =====\n서술 길이: ${lengthRule}\nADULT_MODE: ${adultMode && adultEligible ? 'ON' : 'OFF'}\n성인 조건 충족: ${adultEligible ? 'YES' : 'NO'}\n\n===== AUTHORITATIVE SAVE_STATE =====\n${serializedSave}\n\n===== ROLLING SUMMARY =====\n${cut(rollingSummary || '아직 없음', 5000)}\n\n===== RECENT TURNS =====\n${cut(turns, 9000)}\n\n===== AVAILABLE_CG_IDS =====\n${cgIds.length ? cgIds.join(', ') : '없음'}\n\n===== CURRENT PC ABILITIES — ACTION RESOLUTION =====\n${abilityReference}\n\n===== USER ACTION =====\n${cut(action, 5000)}\n\nUSER ACTION을 처리하기 직전에 CURRENT PC ABILITIES를 확인하고, 관련 스킬/스탯/패시브가 결과에 미치는 영향을 먼저 반영하라. 스킬명을 사용자가 직접 지정하지 않았다는 이유로 관련 능력을 무시하지 마라. 경험치는 단순 사용 보상이 아니라 실제 학습·훈련·실전 자극이 있을 때만 state_delta에 기록하라. 경험치 reason은 원인이 된 행동/상황을 구체적으로 적어라. 사용자가 선언한 행동과 그 판정·직접 결과, NPC/세계의 자연스러운 연쇄 반응까지 이번 턴에 충분히 진행하라. 이동·수업·훈련 같은 전환 행동은 특별한 방해가 없으면 의미 있는 다음 장면까지 넘겨도 된다. 직전 턴 내용을 불필요하게 반복하지 마라. PC에게 새로운 선택이 필요한 순간에 멈추고 PC의 다음 행동·대사·감정·결정은 대신 정하지 마라. 각 주요 NPC 대사에는 실제 감정 태그/강도/근거를 함께 반환하라.`;
 }
 // ===== END prompt.js =====
 
@@ -610,13 +632,13 @@ const IntimacyChange = z.object({
 
 const StatProgress = z.object({
   stat: z.enum(['신체', '마나', '지능', '신성']),
-  amount: z.number().int().min(-5).max(5),
+  amount: z.number().int().min(1).max(5),
   reason: z.string().min(1).max(240),
 });
 
 const SkillExperience = z.object({
   skill: z.string().min(1).max(80),
-  amount: z.number().int().min(0).max(5),
+  amount: z.number().int().min(1).max(5),
   reason: z.string().min(1).max(240),
 });
 
@@ -649,8 +671,8 @@ const TurnSchema = z.object({
     gold_delta: z.number().int().min(-10000).max(10000),
     relationship_changes: z.array(RelationshipChange).max(10),
     intimacy_changes: z.array(IntimacyChange).max(6),
-    stat_progress: z.array(StatProgress).max(4),
-    skill_experience: z.array(SkillExperience).max(12),
+    stat_progress: z.array(StatProgress).max(3),
+    skill_experience: z.array(SkillExperience).max(4),
     items_add: z.array(z.string().min(1).max(160)).max(12),
     items_remove: z.array(z.string().min(1).max(160)).max(12),
     active_events_add: z.array(z.string().min(1).max(240)).max(8),
@@ -679,7 +701,30 @@ const EXPRESSIONS = new Set(['default', 'smile', 'blush', 'serious', 'angry', 's
 const clamp = (n, min, max) => Math.min(max, Math.max(min, Number(n) || 0));
 const arrays = (value, max) => Array.isArray(value) ? value.slice(0, max) : [];
 
-function sanitizeTurn(turn, { allowedCgIds = [] } = {}) {
+const mergeProgressRows = (rows, keyName, maxRows = 4) => {
+  const out = [];
+  const byKey = new Map();
+  for (const raw of rows || []) {
+    const key = String(raw?.[keyName] || '').trim();
+    const amount = Math.max(0, Math.min(5, Number(raw?.amount || 0)));
+    if (!key || amount <= 0) continue;
+    const reason = String(raw?.reason || '').trim().slice(0, 240);
+    if (!reason) continue;
+    if (byKey.has(key)) {
+      const row = byKey.get(key);
+      row.amount = Math.min(5, row.amount + amount);
+      if (reason && !row.reason.includes(reason)) row.reason = `${row.reason} / ${reason}`.slice(0, 240);
+      continue;
+    }
+    const row = { [keyName]: key, amount, reason };
+    byKey.set(key, row);
+    out.push(row);
+    if (out.length >= maxRows) break;
+  }
+  return out;
+};
+
+function sanitizeTurn(turn, { allowedCgIds = [], allowedSkills = [] } = {}) {
   if (!turn || typeof turn !== 'object') throw new Error('모델 응답이 비어 있습니다.');
   turn.choices = arrays(turn.choices, 3);
   turn.scene = arrays(turn.scene, 24).map((item) => {
@@ -707,8 +752,11 @@ function sanitizeTurn(turn, { allowedCgIds = [] } = {}) {
   d.gold_delta = clamp(d.gold_delta, -10000, 10000);
   d.relationship_changes = arrays(d.relationship_changes, 10).filter((row) => REGISTERED_SPEAKER_KEYS.has(row?.npc_key));
   d.intimacy_changes = arrays(d.intimacy_changes, 6).filter((row) => REGISTERED_SPEAKER_KEYS.has(row?.npc_key));
-  d.stat_progress = arrays(d.stat_progress, 4);
-  d.skill_experience = arrays(d.skill_experience, 12);
+  d.stat_progress = mergeProgressRows(arrays(d.stat_progress, 3), 'stat', 3)
+    .filter((row) => ['신체', '마나', '지능', '신성'].includes(row.stat));
+  const allowedSkillSet = new Set((allowedSkills || []).map((x) => String(x).trim()).filter(Boolean));
+  d.skill_experience = mergeProgressRows(arrays(d.skill_experience, 4), 'skill', 4)
+    .filter((row) => allowedSkillSet.has(row.skill));
   d.items_add = arrays(d.items_add, 12);
   d.items_remove = arrays(d.items_remove, 12);
   d.active_events_add = arrays(d.active_events_add, 8);
@@ -895,11 +943,11 @@ export default async function handler(req, res) {
       }),
       reasoning,
       max_output_tokens: maxOutput,
-      prompt_cache_key: process.env.OPENAI_PROMPT_CACHE_KEY || 'lumensia-v1.3.4-canon',
+      prompt_cache_key: process.env.OPENAI_PROMPT_CACHE_KEY || 'lumensia-v1.3.5-canon',
       prompt_cache_retention: '24h',
       text: {
         verbosity: proseLength === 'long' ? 'high' : proseLength === 'short' ? 'low' : 'medium',
-        format: zodTextFormat(TurnSchema, 'lumensia_turn_v14'),
+        format: zodTextFormat(TurnSchema, 'lumensia_turn_v15'),
       },
     });
 
@@ -907,7 +955,10 @@ export default async function handler(req, res) {
       return json(res, 502, { error: '구조화된 게임 응답을 받지 못했습니다.', request_id: response._request_id });
     }
 
-    let turn = sanitizeTurn(response.output_parsed, { allowedCgIds: availableCgIds });
+    let turn = sanitizeTurn(response.output_parsed, {
+      allowedCgIds: availableCgIds,
+      allowedSkills: Object.keys(saveState?.pc?.skills || {}),
+    });
     if (!adultActive && turn?.state_delta) turn.state_delta.intimacy_changes = [];
     turn = resolveTurnEmotions(turn, saveState);
     return json(res, 200, {
@@ -923,7 +974,7 @@ export default async function handler(req, res) {
       },
       usage: usageSummary(route.model, response.usage),
       request_id: response._request_id || null,
-      server_version: '0.4.4',
+      server_version: '0.4.5',
     });
   } catch (error) {
     console.error(error);
