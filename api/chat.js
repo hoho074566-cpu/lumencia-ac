@@ -83,7 +83,7 @@ const GM_RULES = `너는 판타지 아카데미 장기 RPG 「루멘시아 아�
 13. choices는 PC의 선택이 필요한 자연스러운 지점에서만 정확히 3개를 제시하고, 아니면 빈 배열로 둔다. 추천 외 자유행동도 가능하다는 전제를 유지한다.
 14. state_delta에는 실제로 발생한 변화만 넣는다. 변하지 않은 수치·관계·아이템을 꾸며내지 않는다.
 15. memories_add에는 다음 턴 이후에도 반드시 기억해야 할 구체적 사실만 넣는다. 비밀등급을 지키고 NPC별 기억과 PC 지식을 섞지 않는다.
-16. npc_state_updates에는 이번 장면으로 실제 확인되거나 변화한 주요 NPC의 위치·상태·현재 목표만 넣는다. 전지적 추측으로 채우지 않는다.
+16. npc_state_updates에는 이번 장면에서 실제로 변했거나, 등장 NPC의 자율행동을 위해 유지해야 하는 위치·상태·장기목표·단기목표·진행도·장애물·다음 행동 계획만 넣는다. canon과 기존 SAVE_STATE에 근거하며 임의의 비밀 목표를 남발하지 않는다.
 17. scene_summary는 이번 턴의 중요한 사실을 1~4문장으로 압축한다. 장기기억/타임라인에 쓰인다.
 18. 등록 이벤트 CG가 확실히 맞는 경우에만 cg_id를 사용한다. AVAILABLE_CG_IDS에 없으면 null이다.
 19. 등록된 주요 NPC의 speaker_key는 CHARACTER REGISTRY의 정확한 영문 키를 쓴다. 등록되지 않은 단역은 speaker_key=null, speaker_name=표시명으로 둔다. 키를 새로 지어내지 않는다.
@@ -99,19 +99,67 @@ const GM_RULES = `너는 판타지 아카데미 장기 RPG 「루멘시아 아�
 - stat_progress도 단순 행동 횟수가 아니라 해당 능력의 적응/학습 자극이 있을 때만 기록한다. 신체=근력·반응·내구·체력 부담, 마나=감지·제어·순환·출력·회복·오러/마법 운용, 지능=학습·분석·전술·연구, 신성=기도·교리·신성력 운용·종교적 체험. 무관한 스탯을 같이 올리지 않는다.
 - 경험치 권장량: +1 작은 but 유의미한 연습/교정, +2 확실한 훈련·실전 적용, +3 어려운 도전·새 응용·뚜렷한 통찰, +4 매우 드문 고난도 성취/돌파 전조, +5 극히 예외적인 결정적 깨달음. 높은 등급일수록 같은 행동은 경험치가 더 적거나 0이어야 한다.
 - 한 턴에 skill_experience는 보통 0~3개, stat_progress는 보통 0~2개다. 복합적인 중대 장면에서도 관련성이 명확한 것만 기록한다.
-- skill_experience.skill은 SAVE_STATE.pc.skills에 이미 존재하는 정확한 스킬명만 사용한다. 오타·동의어·새 이름을 만들어 경험치를 주지 않는다. 새로운 스킬 습득은 별도 사건/시스템이 생기기 전까지 자동 생성하지 않는다.
+- skill_experience.skill은 SAVE_STATE.pc.skills에 이미 존재하는 정확한 스킬명만 사용한다. 오타·동의어·새 이름을 만들어 경험치를 주지 않는다. 아직 없는 기술을 실제로 배우는 과정은 skill_learning으로만 기록한다.
 - 경험치가 발생하면 reason에 '무슨 행동/상황 때문에 무엇을 배우거나 단련했는지'를 플레이어가 이해할 수 있게 한 문장으로 적는다. 결과 성공 여부와 경험 획득은 별개다. 실패했어도 분석·교정·통찰이 있으면 경험을 얻을 수 있다.
 
 
 [판정 로그 — 플레이어에게 보이는 기술 로그]
 - resolution_log는 이번 USER ACTION에서 PC의 스킬/스탯이 실제 결과 판정에 영향을 준 경우에만 기록한다. 단순 대화·이동·정보 확인처럼 능력 판정이 필요 없으면 triggered=false, outcome='none', summary=null, abilities=[]로 둔다.
-- abilities에는 실제로 반영한 핵심 능력만 1~5개 기록한다. kind='skill'이면 SAVE_STATE.pc.skills에 존재하는 정확한 이름, kind='stat'이면 신체/마나/지능/신성 중 하나만 사용한다. 새 이름·동의어·오타를 만들지 않는다.
+- abilities에는 실제로 반영한 핵심 능력만 1~5개 기록한다. kind='skill'이면 SAVE_STATE.pc.skills, kind='stat'이면 신체/마나/지능/신성, kind='trait'이면 pc.traits, kind='authority'이면 pc.authorities에 실제 존재하는 정확한 이름만 사용한다. 새 이름·동의어·오타를 만들지 않는다.
 - role은 primary=판정의 핵심 능력, support=보조 능력, passive=사용자 선언 없이 조건이 맞아 자동으로 작동한 패시브다. 일반적으로 primary 1개, support/passive 합계 0~3개면 충분하다.
 - reason에는 그 능력이 '무엇을 가능하게 했는지/어떤 불리함을 줄였는지'를 짧고 구체적으로 적는다. 단순히 '대검술을 사용했다' 같은 tautology는 금지한다.
 - outcome은 success=의도한 핵심 목표 달성, partial=일부 달성/대가/불리한 부수결과, failure=핵심 목표 실패다. 능력 판정 자체가 없으면 none이다.
 - summary는 최종 판정 이유를 1문장으로 요약한다. 능력 외에도 상대 수준, 피로, 지형, 거리, 정보, 상성처럼 이번 결과에 실제로 중요한 요인이 있으면 함께 언급한다.
 - 판정 로그는 GM의 숨은 비밀, 아직 발견하지 못한 함정의 정체, NPC의 비공개 수치나 메타 정보를 누설하지 않는다. 플레이어가 장면에서 알 수 있는 범위의 판정 근거만 표시한다.
 - resolution_log와 경험치는 별개다. 능력이 판정에 쓰였어도 학습 자극이 없으면 XP는 0이며 state_delta에서 생략한다. 반대로 실패 판정에서도 교정/통찰이 있으면 경험치를 받을 수 있다.
+
+
+[NPC 자율성 / 개인 목표]
+- 장면에 등장하거나 현재 행동과 직접 관련된 주요 NPC는 반응하기 전에 자신의 long_term_goal, short_term_goal, goal_progress, obstacle을 확인한다. 값이 없으면 NPC CANON·직책·성격으로부터 보수적으로 추론하고, 실제로 행동에 영향을 주기 시작할 때 npc_state_updates로 저장한다.
+- NPC의 행동은 PC에 대한 반응만으로 결정하지 않는다. 자신의 목표를 진전시키기 위해 먼저 떠나기, 다른 사람에게 접근하기, 정보를 모으기, 회의/수업에 가기, 제안·거절·압박·협상하기 등을 할 수 있다.
+- short_term_goal이 완료/실패/무의미해지면 새 단기 목표로 교체하고 goal_progress를 조정한다. long_term_goal은 중대한 가치관 변화나 사건이 없으면 쉽게 바꾸지 않는다.
+- goal_progress는 장식 수치가 아니다. 이번 턴의 사건이 목표를 실제로 진전/후퇴시킨 경우에만 수정한다. obstacle은 목표를 방해하는 구체 요소가 생기거나 사라질 때만 갱신한다.
+- NPC가 장면을 떠나거나 일정상 나중에 이동해야 한다면 npc_schedule_updates로 미래 위치/활동을 예약할 수 있다. 모든 NPC에 매 턴 일정을 만들지 말고 실제로 의미 있는 이동 계획만 기록한다.
+- SAVE_STATE에 예정된 NPC 일정이 있다면 해당 시각 이후에는 과거 위치에 계속 묶어 두지 않는다. 단, PC가 실제로 붙잡아 두거나 사건으로 일정이 바뀌면 현재 장면이 우선한다.
+
+[관계 변화 / 관계 단계]
+- relationship_changes는 실제로 인상이 변한 사건에서만 사용한다. 평범한 인사·잡담 한 번마다 점수를 주지 않는다.
+- affinity는 호감/반감, trust는 신뢰/불신이다. 둘을 같은 값으로 기계적으로 움직이지 말고 사건 의미에 맞춰 독립적으로 바꾼다.
+- reason에는 플레이어가 이해 가능한 '이번 행동이 왜 관계에 영향을 줬는지'를 적는다. 아직 드러나지 않은 비밀 계획이나 LEVEL 4~5 정보를 관계 이유에서 누설하지 않는다.
+- 같은 이유를 몇 턴 연속 반복해 관계도를 농사짓지 않는다. 이미 익숙해진 평범한 행동은 변화 0이 될 수 있다.
+- 관계의 질적 이정표는 relationship_milestones_add로 기록한다. 공동 위기 극복, 약속 이행, 개인적 비밀 공유, 구조/희생, 화해, 중대한 선택처럼 이후 관계를 실제로 바꿀 사건만 이정표다.
+- 단순 호감 수치만 높다고 '신뢰/가까운 사이'가 되지 않는다. 앱이 affinity/trust와 이정표 수를 함께 보고 관계 단계를 계산한다.
+
+[NPC 지식 / 소문]
+- NPC는 자신의 memories에 있는 direct/hearsay/inference/secret 지식과 공개 canon만 사용한다. 그 자리에 없었고 전달받지도 않은 사실을 갑자기 알지 않는다.
+- knowledge_type=direct는 직접 목격/당사자 경험, hearsay는 전해 들은 소문, inference는 관찰에서 추론, secret은 당사자만 아는 비공개 정보, world는 세계 상태 기록이다.
+- hearsay와 inference는 사실로 단정하지 않는다. credibility가 낮으면 의심·왜곡·과장이 가능하다.
+- memories_add로 NPC 지식을 기록할 때 source를 가능한 한 남긴다. 직접 목격이면 '직접 목격', 대화로 들었으면 화자/경로를 적는다.
+- 소문이 실제로 다른 NPC에게 퍼질 개연성이 있으면 rumors_add를 사용한다. 누가 누구에게도 말하지 않았는데 자동으로 전교에 퍼지게 하지 않는다.
+- 소문은 진실일 수도 거짓/왜곡일 수도 있다. 소문을 들은 NPC는 자신의 성격·관계·credibility에 따라 믿거나 의심한다.
+
+[지연 결과 / 살아 움직이는 세계]
+- USER ACTION의 결과가 즉시가 아니라 나중에 돌아오는 것이 자연스러우면 delayed_consequences_add를 사용한다. 예: 공개 결투의 소문 이후 교수 호출, 귀족 파벌의 보복 준비, 며칠 뒤 행정 처분, 임무 실패 후 외곽 제한.
+- delay_minutes는 결과가 실제 발생하기까지의 세계시간이다. target_bucket='active'는 PC가 직접 마주칠 현재 사건, 'world'는 배경에서 진행되는 세계 사건이다.
+- 미래 결과를 예약했다고 현재 장면에서 미리 발생한 것처럼 서술하지 않는다.
+- 이미 같은 결과가 큐/사건에 있으면 중복 예약하지 않는다. 세계는 PC가 보지 않는 곳에서도 진행되지만, 서술은 PC가 알 수 있는 범위에서만 한다.
+
+[신규 스킬 습득]
+- 기존 스킬의 숙련 상승은 skill_experience, 아직 없는 재현 가능한 별도 기술을 배우는 과정은 skill_learning이다.
+- skill_learning은 기존 스킬의 동의어/세부 동작을 새 스킬로 쪼개는 용도가 아니다. 반복해서 독립적으로 사용할 수 있고 별도 훈련 가치가 있는 기술만 후보가 된다.
+- 후보 스킬명은 짧고 일관된 명칭을 쓴다. 이미 SAVE_STATE.pc.skills에 있는 이름은 skill_learning에 넣지 않는다.
+- 습득 진척 권장량: +1~3 작은 이해/시도, +4~7 확실한 지도·반복 성공, +8~12 어려운 실전 습득, +13~15 극히 드문 결정적 완성. 한 턴에 보통 0~1개, 많아도 2개다.
+- 앱은 후보 진척 100/100에서 신규 스킬을 F등급으로 정식 등록한다. 따라서 단 한 번 본 기술을 즉시 '습득 완료'로 만들지 않는다.
+- 기존 고등급 스킬과 강하게 연관된 기술이라도 신규 스킬은 기본적으로 F에서 시작하며 이후 빠른 초기 성장은 별도 경험으로 표현한다.
+
+[Trait / Authority 각성]
+- awakening_progress는 매우 희귀하다. 단순 훈련, 평범한 승리, 감정 고조만으로 발생시키지 않는다.
+- Trait 각성은 반복되는 특이 현상, 극한 적응, 혈통/영혼의 고유 반응처럼 세계 법칙 안의 새로운 현상이 형성될 때만 후보가 된다.
+- Authority 각성은 세계 법칙에 직접 개입하는 규칙급 힘이며 Trait보다 훨씬 희귀하다. 운명적 전환, 영혼 각인, 초월적 계약/계승 등 canon에 맞는 강한 원인이 필요하다.
+- Trait가 경험치를 쌓아 Authority로 '진화'했다고 처리하지 않는다. Authority는 별도 원인·별도 후보·별도 각성이다.
+- 같은 후보 이름으로 여러 결정적 사건이 누적되어야 한다. milestone=true는 후보 성질을 확정짓는 중대한 장면에서만 사용한다.
+- description에는 실제 현상의 범위, limitation에는 조건·대가·한계를 반드시 적는다. 만능/무조건 성공/무제한 부활 같은 무제약 능력을 만들지 않는다.
+- 앱은 진척도와 milestone 수를 함께 검사해 자동 각성한다. Trait은 최소 3개, Authority는 최소 4개의 결정적 이정표가 필요하므로 모델이 한 턴에 각성을 확정할 수 없다.
 
 
 [사건 버킷]
@@ -160,12 +208,15 @@ const trimText = (value, max = 400) => {
 
 const cleanMemory = (memory) => ({
   fact: trimText(memory?.fact, 360),
-  importance: ['critical', 'important', 'minor'].includes(memory?.importance) ? memory.importance : 'minor',
+  importance: memory?.importance === 'critical' ? 'critical' : (memory?.importance === 'major' || memory?.importance === 'important') ? 'major' : 'minor',
   secret_level: Math.max(0, Math.min(5, Number(memory?.secret_level || 0))),
+  knowledge_type: ['direct','hearsay','inference','secret','world'].includes(memory?.knowledge_type) ? memory.knowledge_type : null,
+  source: trimText(memory?.source || '', 140) || null,
+  credibility: memory?.credibility == null ? null : Math.max(0, Math.min(1, Number(memory.credibility || 0))),
 });
 
 const scoreRelationship = (row = {}) => Math.abs(Number(row.affinity || 0)) + Math.abs(Number(row.trust || 0));
-const importanceScore = (value) => value === 'critical' ? 3 : value === 'important' ? 2 : 1;
+const importanceScore = (value) => value === 'critical' ? 3 : (value === 'major' || value === 'important') ? 2 : 1;
 
 function rankedRelevantNpcKeys(saveState = {}, action = '', recentTurns = [], max = 10) {
   const score = new Map();
@@ -223,6 +274,12 @@ function compactRelationships(relationships = {}, relevantKeys = []) {
     affinity: Number(row?.affinity || 0),
     trust: Number(row?.trust || 0),
     status: trimText(row?.status || '중립', 70),
+    stage: trimText(row?.stage || 'stranger', 24),
+    milestones: (row?.milestones || []).slice(relevant.has(key) ? -4 : -2).map((x) => ({
+      kind: trimText(x?.kind || 'other', 32),
+      description: trimText(x?.description || '', 220),
+      turn: Number(x?.turn || 0),
+    })),
     history: (row?.history || []).slice(relevant.has(key) ? -6 : -2).map((x) => trimText(x, 170)),
   }]));
 }
@@ -299,9 +356,35 @@ function compactNpcStates(states = {}, saveState = {}, relevantKeys = []) {
       location: trimText(row?.location, 110),
       status: trimText(row?.status, 140),
       current_goal: trimText(row?.current_goal, 180),
+      long_term_goal: trimText(row?.long_term_goal, 220),
+      short_term_goal: trimText(row?.short_term_goal || row?.current_goal, 220),
+      goal_progress: Math.max(0, Math.min(100, Number(row?.goal_progress || 0))),
+      obstacle: trimText(row?.obstacle, 180),
+      goal_reason: trimText(row?.goal_reason, 180),
+      next_activity: trimText(row?.next_activity, 180),
+      next_location: trimText(row?.next_location, 110),
+      next_change_minutes: row?.next_change_minutes == null ? null : Math.max(0, Math.min(10080, Number(row.next_change_minutes || 0))),
       last_seen: trimText(row?.last_seen, 110),
       updatedAtTurn: Number(row?.updatedAtTurn ?? -1),
     }]));
+}
+
+
+function compactSystemQueues(saveState = {}, relevantKeys = []) {
+  const relevant = new Set(relevantKeys);
+  return {
+    npcSchedule: (saveState?.npcSchedule || [])
+      .filter((x) => relevant.has(x?.npc_key))
+      .slice(0, 10)
+      .map((x) => ({ npc_key:x.npc_key, remaining_minutes:Math.max(0, Number(x.remaining_minutes ?? 0)), location:trimText(x.location,110), activity:trimText(x.activity,160) })),
+    rumors: (saveState?.rumorQueue || []).slice(0, 8).map((x) => ({
+      remaining_turns:Math.max(0, Number(x.remaining_turns ?? 0)), fact:trimText(x.fact,240), source_npc_key:x.source_npc_key||null,
+      target_npc_keys:(x.target_npc_keys||[]).filter((k)=>relevant.has(k)).slice(0,4), credibility:Number(x.credibility||0),
+    })).filter((x)=>x.target_npc_keys.length),
+    consequences: (saveState?.consequenceQueue || []).slice(0, 8).map((x) => ({
+      remaining_minutes:Math.max(0, Number(x.remaining_minutes ?? 0)), event_name:trimText(x.event_name,160), target_bucket:x.target_bucket, reason:trimText(x.reason,180), secret_level:Number(x.secret_level||0),
+    })),
+  };
 }
 
 function compactSaveForModel(saveState = {}, { action = '', recentTurns = [] } = {}) {
@@ -311,7 +394,7 @@ function compactSaveForModel(saveState = {}, { action = '', recentTurns = [] } =
   const recentMinorGlobal = globalMemory.filter((x) => x.importance === 'minor').slice(-8);
 
   return {
-    version: saveState?.version || 5,
+    version: saveState?.version || 6,
     turnNumber: Number(saveState?.turnNumber || 0),
     world: saveState?.world || {},
     pc: saveState?.pc || {},
@@ -328,6 +411,7 @@ function compactSaveForModel(saveState = {}, { action = '', recentTurns = [] } =
       global: [...majorGlobal, ...recentMinorGlobal].slice(-32),
       npc: compactNpcMemories(saveState?.memories?.npc || {}, relevantKeys),
     },
+    systemQueues: compactSystemQueues(saveState, relevantKeys),
     relevantNpcKeys: relevantKeys,
     flags: saveState?.flags || {},
   };
@@ -352,7 +436,10 @@ function serializeCompactSaveForPrompt(compactSave = {}, maxChars = 38000) {
   let text = render();
   if (text.length <= maxChars) return text;
 
-  for (const row of Object.values(state.relationships || {})) row.history = (row.history || []).slice(-3);
+  for (const row of Object.values(state.relationships || {})) {
+    row.history = (row.history || []).slice(-3);
+    row.milestones = (row.milestones || []).slice(-3);
+  }
   for (const row of Object.values(state.intimacyStates || {})) row.history = (row.history || []).slice(-2);
   if (state.pcKnowledge) state.pcKnowledge = state.pcKnowledge.slice(-30);
   if (state.completedEvents) state.completedEvents = state.completedEvents.slice(-20);
@@ -371,6 +458,11 @@ function serializeCompactSaveForPrompt(compactSave = {}, maxChars = 38000) {
   const npcKeys = state.relevantNpcKeys || [];
   if (state.npcStates) state.npcStates = Object.fromEntries(Object.entries(state.npcStates).filter(([key]) => npcKeys.includes(key)).slice(0, 8));
   if (state.emotionStates) state.emotionStates = Object.fromEntries(Object.entries(state.emotionStates).filter(([key]) => npcKeys.includes(key)).slice(0, 8));
+  if (state.systemQueues) {
+    state.systemQueues.npcSchedule = (state.systemQueues.npcSchedule || []).slice(0, 6);
+    state.systemQueues.rumors = (state.systemQueues.rumors || []).slice(0, 4);
+    state.systemQueues.consequences = (state.systemQueues.consequences || []).slice(0, 4);
+  }
   text = JSON.stringify(trimStringsDeep(state, 260));
   if (text.length <= maxChars) return text;
 
@@ -380,7 +472,7 @@ function serializeCompactSaveForPrompt(compactSave = {}, maxChars = 38000) {
     turnNumber: state.turnNumber,
     world: trimStringsDeep(state.world || {}, 220),
     pc: trimStringsDeep(state.pc || {}, 220),
-    relationships: Object.fromEntries(Object.entries(state.relationships || {}).slice(0, 10).map(([k, v]) => [k, { ...v, history: [] }])),
+    relationships: Object.fromEntries(Object.entries(state.relationships || {}).slice(0, 10).map(([k, v]) => [k, { ...v, history: [], milestones:(v?.milestones||[]).slice(-2) }])),
     intimacyStates: Object.fromEntries(Object.entries(state.intimacyStates || {}).slice(0, 8).map(([k, v]) => [k, { ...v, history: [] }])),
     npcStates: trimStringsDeep(state.npcStates || {}, 180),
     emotionStates: trimStringsDeep(state.emotionStates || {}, 120),
@@ -393,6 +485,7 @@ function serializeCompactSaveForPrompt(compactSave = {}, maxChars = 38000) {
       global: pickMemories(state.memories?.global || [], 12),
       npc: { relevant: {}, critical_elsewhere: (state.memories?.npc?.critical_elsewhere || []).slice(-3) },
     },
+    systemQueues: trimStringsDeep(state.systemQueues || {}, 160),
     relevantNpcKeys: (state.relevantNpcKeys || []).slice(0, 8),
     flags: trimStringsDeep(state.flags || {}, 160),
     context_compacted: true,
@@ -421,9 +514,11 @@ function serializeCompactSaveForPrompt(compactSave = {}, maxChars = 38000) {
       department: trimText(pc.department || '', 100), realm: trimText(pc.realm || '', 100), status: trimText(pc.status || '', 100),
       fatigue: Number(pc.fatigue || 0), gold: Number(pc.gold || 0), talents: trimStringsDeep(pc.talents || {}, 80),
       stats: trimStringsDeep(pc.stats || {}, 100), skills: compactSkills,
+      traits: trimStringsDeep(pc.traits || {}, 140), authorities: trimStringsDeep(pc.authorities || {}, 140),
+      skillCandidates: trimStringsDeep(pc.skillCandidates || {}, 140), awakeningCandidates: trimStringsDeep(pc.awakeningCandidates || {}, 140),
       inventory: (pc.inventory || []).slice(-30).map((x) => trimText(x, 120)),
     },
-    relationships: Object.fromEntries(Object.entries(state.relationships || {}).slice(0, 8).map(([k, v]) => [k, { affinity:Number(v?.affinity||0), trust:Number(v?.trust||0), status:trimText(v?.status||'',60), history:[] }])),
+    relationships: Object.fromEntries(Object.entries(state.relationships || {}).slice(0, 8).map(([k, v]) => [k, { affinity:Number(v?.affinity||0), trust:Number(v?.trust||0), status:trimText(v?.status||'',60), stage:trimText(v?.stage||'stranger',24), milestones:(v?.milestones||[]).slice(-2), history:[] }])),
     intimacyStates: Object.fromEntries(Object.entries(state.intimacyStates || {}).slice(0, 6).map(([k, v]) => [k, { level:Number(v?.level||0), status:trimText(v?.status||'',60), history:[] }])),
     npcStates: Object.fromEntries(Object.entries(state.npcStates || {}).slice(0, 6).map(([k,v]) => [k, trimStringsDeep(v,120)])),
     emotionStates: Object.fromEntries(Object.entries(state.emotionStates || {}).slice(0, 6).map(([k,v]) => [k, trimStringsDeep(v,100)])),
@@ -433,6 +528,7 @@ function serializeCompactSaveForPrompt(compactSave = {}, maxChars = 38000) {
     completedEvents: (state.completedEvents || []).slice(-6).map((x) => trimText(x,120)),
     pcKnowledge: (state.pcKnowledge || []).slice(-8).map((x) => trimText(x,180)),
     memories: { global: pickMemories(state.memories?.global || [], 8), npc: { relevant:{}, critical_elsewhere:[] } },
+    systemQueues: trimStringsDeep(state.systemQueues || {}, 120),
     relevantNpcKeys: (state.relevantNpcKeys || []).slice(0, 6),
     flags: {},
     context_compacted: true,
@@ -452,6 +548,7 @@ function serializeCompactSaveForPrompt(compactSave = {}, maxChars = 38000) {
     scheduledEvents: (essential.scheduledEvents || []).slice(-6),
     worldArcs: (essential.worldArcs || []).slice(-6),
     pcKnowledge: essential.pcKnowledge.slice(-5),
+    systemQueues: essential.systemQueues || {},
     relevantNpcKeys: essential.relevantNpcKeys.slice(0, 5),
     context_compacted: true,
   });
@@ -459,7 +556,6 @@ function serializeCompactSaveForPrompt(compactSave = {}, maxChars = 38000) {
 // ===== END memory.js =====
 
 // ===== BEGIN prompt.js =====
-
 const cut = (value, max = 9000) => {
   const text = typeof value === 'string' ? value : JSON.stringify(value ?? null);
   return text.length > max ? `${text.slice(0, max)}\n...[잘림]` : text;
@@ -543,9 +639,13 @@ function eventReferenceBundle(saveState = {}, { action = '', recentTurns = [], r
 
 function currentPcAbilityReference(saveState = {}) {
   const pc = saveState?.pc || {};
-  const skills = Object.entries(pc.skills || {}).map(([name, row]) => `${name} ${row?.grade || row}`).join(' | ');
+  const skills = Object.entries(pc.skills || {}).map(([name, row]) => `${name} ${row?.grade || row} [${Number(row?.hiddenXp || 0)}/100]`).join(' | ');
   const stats = Object.entries(pc.stats || {}).map(([name, row]) => `${name} ${row?.grade || row} [${Number(row?.progress || 0)}/100]`).join(' | ');
-  return `스킬: ${skills || '없음'}\n스탯: ${stats || '없음'}\n판정 전 위 능력 중 현재 행동/상황과 실제 관련된 것만 선별해 반영한다. 패시브 스킬은 사용자가 이름을 선언하지 않아도 조건이 맞으면 자동 적용한다.`;
+  const traits = Object.entries(pc.traits || {}).map(([name, row]) => `${name}: ${row?.description || '설명 없음'} / 한계: ${row?.limitation || '명시 없음'}`).join(' | ');
+  const authorities = Object.entries(pc.authorities || {}).map(([name, row]) => `${name}: ${row?.description || '설명 없음'} / 한계: ${row?.limitation || '명시 없음'}`).join(' | ');
+  const learning = Object.entries(pc.skillCandidates || {}).map(([name, row]) => `${name} ${Number(row?.progress || 0)}/100`).join(' | ');
+  const awakening = ['trait','authority'].flatMap((kind) => Object.entries(pc.awakeningCandidates?.[kind] || {}).map(([name, row]) => `${kind}:${name} ${Number(row?.progress || 0)}/100 · 이정표 ${Number(row?.milestones || 0)}`)).join(' | ');
+  return `스킬: ${skills || '없음'}\n스탯: ${stats || '없음'}\nTrait: ${traits || '없음'}\nAuthority: ${authorities || '없음'}\n습득 후보: ${learning || '없음'}\n각성 후보: ${awakening || '없음'}\n판정 전 위 능력 중 현재 행동/상황과 실제 관련된 것만 선별해 반영한다. 패시브/Trait/Authority는 사용자가 이름을 선언하지 않아도 조건이 맞으면 자동 적용한다.`;
 }
 
 function defaultPcProfileReference(saveState = {}) {
@@ -575,12 +675,20 @@ function buildTurnInput({ action, saveState, recentTurns, rollingSummary, availa
   const pcReference = defaultPcProfileReference(saveState);
   const abilityReference = currentPcAbilityReference(saveState);
 
-  return `===== PC PROFILE REFERENCE =====\n${pcReference}\n\n===== ACTIVE EVENT CANON =====\n${eventReferences.active}\n\n===== RELEVANT SCHEDULED EVENT CANON =====\n${eventReferences.scheduled}\n\n===== RELEVANT WORLD ARC CANON =====\n${eventReferences.world}\n\n===== INITIAL SCENARIO SEED =====\n${initialSeed}\n\n[현재성 우선순위]\n현재 날짜·시간·장소·PC/NPC 상태·완료 여부는 반드시 AUTHORITATIVE SAVE_STATE가 최우선이다. 위 시나리오/이벤트 참고문에 과거 시점 표현이 남아 있어도 SAVE_STATE와 충돌하면 폐기한다. activeEvents는 현재 PC 주변에서 실제 진행 중인 사건, scheduledEvents는 미래 예정, worldArcs는 세계 배경에서 독립 진행되는 장기 사건이다. RELEVANT WORLD ARC CANON이 '없음'이면 해당 장기 사건을 현재 장면으로 억지로 끌어오지 않는다. INITIAL SCENARIO SEED는 0턴에서만 유효하다.\n\n===== TURN OPTIONS =====\n서술 길이: ${lengthRule}\nADULT_MODE: ${adultMode && adultEligible ? 'ON' : 'OFF'}\n성인 조건 충족: ${adultEligible ? 'YES' : 'NO'}\n\n===== AUTHORITATIVE SAVE_STATE =====\n${serializedSave}\n\n===== ROLLING SUMMARY =====\n${cut(rollingSummary || '아직 없음', 5000)}\n\n===== RECENT TURNS =====\n${cut(turns, 9000)}\n\n===== AVAILABLE_CG_IDS =====\n${cgIds.length ? cgIds.join(', ') : '없음'}\n\n===== CURRENT PC ABILITIES — ACTION RESOLUTION =====\n${abilityReference}\n\n===== USER ACTION =====\n${cut(action, 5000)}\n\nUSER ACTION을 처리하기 직전에 CURRENT PC ABILITIES를 확인하고, 관련 스킬/스탯/패시브가 결과에 미치는 영향을 먼저 반영하라. 스킬명을 사용자가 직접 지정하지 않았다는 이유로 관련 능력을 무시하지 마라. 이번 행동에 실제 능력 판정이 있었다면 resolution_log에 실제 반영한 능력과 역할(primary/support/passive), 판정 결과와 근거를 기록하라. 능력 판정이 필요 없는 턴이면 resolution_log는 triggered=false로 비워라. 판정 로그에 숨은 비밀이나 NPC 비공개 수치를 누설하지 마라. 경험치는 단순 사용 보상이 아니라 실제 학습·훈련·실전 자극이 있을 때만 state_delta에 기록하라. 경험치 reason은 원인이 된 행동/상황을 구체적으로 적어라. 사용자가 선언한 행동과 그 판정·직접 결과, NPC/세계의 자연스러운 연쇄 반응까지 이번 턴에 충분히 진행하라. 이동·수업·훈련 같은 전환 행동은 특별한 방해가 없으면 의미 있는 다음 장면까지 넘겨도 된다. 직전 턴 내용을 불필요하게 반복하지 마라. PC에게 새로운 선택이 필요한 순간에 멈추고 PC의 다음 행동·대사·감정·결정은 대신 정하지 마라. 각 주요 NPC 대사에는 실제 감정 태그/강도/근거를 함께 반환하라.`;
+  return `===== PC PROFILE REFERENCE =====\n${pcReference}\n\n===== ACTIVE EVENT CANON =====\n${eventReferences.active}\n\n===== RELEVANT SCHEDULED EVENT CANON =====\n${eventReferences.scheduled}\n\n===== RELEVANT WORLD ARC CANON =====\n${eventReferences.world}\n\n===== INITIAL SCENARIO SEED =====\n${initialSeed}\n\n[현재성 우선순위]\n현재 날짜·시간·장소·PC/NPC 상태·완료 여부는 반드시 AUTHORITATIVE SAVE_STATE가 최우선이다. 위 시나리오/이벤트 참고문에 과거 시점 표현이 남아 있어도 SAVE_STATE와 충돌하면 폐기한다. activeEvents는 현재 PC 주변에서 실제 진행 중인 사건, scheduledEvents는 미래 예정, worldArcs는 세계 배경에서 독립 진행되는 장기 사건이다. RELEVANT WORLD ARC CANON이 '없음'이면 해당 장기 사건을 현재 장면으로 억지로 끌어오지 않는다. INITIAL SCENARIO SEED는 0턴에서만 유효하다.\n\n===== TURN OPTIONS =====\n서술 길이: ${lengthRule}\nADULT_MODE: ${adultMode && adultEligible ? 'ON' : 'OFF'}\n성인 조건 충족: ${adultEligible ? 'YES' : 'NO'}\n\n===== AUTHORITATIVE SAVE_STATE =====\n${serializedSave}\n\n===== ROLLING SUMMARY =====\n${cut(rollingSummary || '아직 없음', 5000)}\n\n===== RECENT TURNS =====\n${cut(turns, 9000)}\n\n===== AVAILABLE_CG_IDS =====\n${cgIds.length ? cgIds.join(', ') : '없음'}\n\n===== CURRENT PC ABILITIES — ACTION RESOLUTION =====\n${abilityReference}\n\n===== USER ACTION =====\n${cut(action, 5000)}\n\nUSER ACTION을 처리하기 직전에 CURRENT PC ABILITIES를 확인하고, 관련 스킬/스탯/패시브/Trait/Authority가 결과에 미치는 영향을 먼저 반영하라. 스킬명을 사용자가 직접 지정하지 않았다는 이유로 관련 능력을 무시하지 마라. 이번 행동에 실제 능력 판정이 있었다면 resolution_log에 실제 반영한 스킬/스탯/Trait/Authority와 역할(primary/support/passive), 판정 결과와 근거를 기록하라. 능력 판정이 필요 없는 턴이면 resolution_log는 triggered=false로 비워라. 판정 로그에 숨은 비밀이나 NPC 비공개 수치를 누설하지 마라.
+
+등장하거나 직접 관련된 주요 NPC는 반응 전에 AUTHORITATIVE SAVE_STATE의 관계 단계/이정표, 개인 장기·단기 목표, 현재 위치·다음 일정, 자신이 실제로 알고 있는 기억을 확인하라. PC에게만 반응하는 인형처럼 행동시키지 말고, 자신의 목표를 진전시키는 행동이 자연스러우면 능동적으로 실행하라. NPC가 아직 모르는 사실은 사용하지 말고 hearsay/inference는 확정 사실과 구분하라.
+
+관계 변화가 실제로 생겼다면 이유를 relationship_changes.reason에 구체적으로 적고, 질적으로 중요한 공동 사건은 relationship_milestones_add에만 기록하라. 미래에 이동할 NPC는 npc_schedule_updates, 실제로 퍼질 소문은 rumors_add, 시간이 지난 뒤 되돌아올 결과는 delayed_consequences_add를 사용하라. 이미 큐에 있는 같은 일을 중복 예약하지 마라.
+
+경험치는 단순 사용 보상이 아니라 실제 학습·훈련·실전 자극이 있을 때만 기록하라. 기존 기술 숙련은 skill_experience, 아직 없는 독립 기술을 배우는 과정은 skill_learning으로 구분한다. Trait/Authority 각성 진척은 극히 드문 결정적 사건에서만 awakening_progress를 사용하며 한 턴에 각성을 완성시키지 않는다.
+
+사용자가 선언한 행동과 그 판정·직접 결과, NPC/세계의 자연스러운 연쇄 반응까지 이번 턴에 충분히 진행하라. 이동·수업·훈련 같은 전환 행동은 특별한 방해가 없으면 의미 있는 다음 장면까지 넘겨도 된다. 직전 턴 내용을 불필요하게 반복하지 마라. PC에게 새로운 선택이 필요한 순간에 멈추고 PC의 다음 행동·대사·감정·결정은 대신 정하지 마라. 각 주요 NPC 대사에는 실제 감정 태그/강도/근거를 함께 반환하라.`;
 }
 // ===== END prompt.js =====
 
 // ===== BEGIN router.js =====
-const IMPORTANT_RE = /(전투|공격|기습|결투|살해|죽음|도망|추적|구출|협상|정치|황위|비밀|조사|잠입|권능|사도|대죄주교|마신|심연|부상|치료|판정|대련|시험|고백|배신|의식|L4|L5)/i;
+const IMPORTANT_RE = /(전투|공격|기습|결투|살해|죽음|도망|추적|구출|협상|정치|황위|비밀|조사|잠입|권능|사도|대죄주교|마신|심연|부상|치료|판정|대련|시험|고백|배신|의식|각성|깨달음|스킬 습득|L4|L5)/i;
 const REASONING_LEVELS = new Set(['none', 'low', 'medium', 'high', 'xhigh', 'max']);
 
 function chooseModel({ mode = 'auto', action = '', saveState = {}, proReasoning = false, forceTerra = false }) {
@@ -612,7 +720,6 @@ function reasoningFor(tier, requested = 'auto', proReasoning = false) {
 // ===== END router.js =====
 
 // ===== BEGIN schema.js =====
-
 const Expression = z.enum(['default', 'smile', 'blush', 'serious', 'angry', 'sad', 'shock']);
 const Importance = z.enum(['routine', 'important', 'critical']);
 
@@ -621,7 +728,6 @@ const SceneItem = z.object({
   text: z.string().min(1).max(2200),
   speaker_key: z.string().max(64).nullable(),
   speaker_name: z.string().max(80).nullable(),
-  // 모델이 감지한 감정 태그. 최종 표시 표정은 서버의 전환 엔진이 결정한다.
   expression: Expression.nullable(),
   emotion_intensity: z.number().min(0).max(1).nullable(),
   emotion_confidence: z.number().min(0).max(1).nullable(),
@@ -636,6 +742,13 @@ const RelationshipChange = z.object({
   reason: z.string().min(1).max(300),
 });
 
+const RelationshipMilestone = z.object({
+  npc_key: z.string().min(1).max(64),
+  kind: z.enum(['shared_trial', 'promise_kept', 'personal_confidence', 'rescue', 'sacrifice', 'reconciliation', 'major_choice', 'other']),
+  description: z.string().min(1).max(320),
+  reason: z.string().min(1).max(260),
+});
+
 const IntimacyChange = z.object({
   npc_key: z.string().min(1).max(64),
   level_delta: z.number().int().min(-1).max(1),
@@ -643,83 +756,47 @@ const IntimacyChange = z.object({
   reason: z.string().min(1).max(300),
 });
 
-const StatProgress = z.object({
-  stat: z.enum(['신체', '마나', '지능', '신성']),
-  amount: z.number().int().min(1).max(5),
-  reason: z.string().min(1).max(240),
+const StatProgress = z.object({ stat: z.enum(['신체', '마나', '지능', '신성']), amount: z.number().int().min(1).max(5), reason: z.string().min(1).max(240) });
+const SkillExperience = z.object({ skill: z.string().min(1).max(80), amount: z.number().int().min(1).max(5), reason: z.string().min(1).max(240) });
+const SkillLearning = z.object({ skill: z.string().min(2).max(48), amount: z.number().int().min(1).max(15), basis: z.string().max(120).nullable(), reason: z.string().min(1).max(280) });
+const AwakeningProgress = z.object({
+  kind: z.enum(['trait', 'authority']), name: z.string().min(2).max(64), amount: z.number().int().min(1).max(10), milestone: z.boolean(),
+  description: z.string().min(1).max(360), limitation: z.string().min(1).max(360), reason: z.string().min(1).max(300),
 });
 
-const SkillExperience = z.object({
-  skill: z.string().min(1).max(80),
-  amount: z.number().int().min(1).max(5),
-  reason: z.string().min(1).max(240),
-});
-
-const AbilityUse = z.object({
-  kind: z.enum(['skill', 'stat']),
-  name: z.string().min(1).max(80),
-  role: z.enum(['primary', 'support', 'passive']),
-  reason: z.string().min(1).max(240),
-});
-
-const ResolutionLog = z.object({
-  triggered: z.boolean(),
-  outcome: z.enum(['none', 'success', 'partial', 'failure']),
-  summary: z.string().max(320).nullable(),
-  abilities: z.array(AbilityUse).max(5),
-});
+const AbilityUse = z.object({ kind: z.enum(['skill', 'stat', 'trait', 'authority']), name: z.string().min(1).max(80), role: z.enum(['primary', 'support', 'passive']), reason: z.string().min(1).max(240) });
+const ResolutionLog = z.object({ triggered: z.boolean(), outcome: z.enum(['none', 'success', 'partial', 'failure']), summary: z.string().max(320).nullable(), abilities: z.array(AbilityUse).max(5) });
 
 const MemoryAdd = z.object({
-  owner: z.string().min(1).max(80),
-  fact: z.string().min(1).max(500),
-  importance: z.enum(['minor', 'major', 'critical']),
-  secret_level: z.number().int().min(0).max(5),
+  owner: z.string().min(1).max(80), fact: z.string().min(1).max(500), importance: z.enum(['minor', 'major', 'critical']), secret_level: z.number().int().min(0).max(5),
+  knowledge_type: z.enum(['direct', 'hearsay', 'inference', 'secret', 'world']).nullable(), source: z.string().max(160).nullable(), credibility: z.number().min(0).max(1).nullable(),
 });
 
 const NpcStateUpdate = z.object({
-  npc_key: z.string().min(1).max(64),
-  location: z.string().max(160).nullable(),
-  status: z.string().max(240).nullable(),
-  current_goal: z.string().max(300).nullable(),
-  last_seen: z.string().max(160).nullable(),
+  npc_key: z.string().min(1).max(64), location: z.string().max(160).nullable(), status: z.string().max(240).nullable(), current_goal: z.string().max(300).nullable(),
+  long_term_goal: z.string().max(320).nullable(), short_term_goal: z.string().max(320).nullable(), goal_progress: z.number().int().min(0).max(100).nullable(), obstacle: z.string().max(280).nullable(),
+  goal_reason: z.string().max(280).nullable(), next_activity: z.string().max(240).nullable(), next_location: z.string().max(160).nullable(), next_change_minutes: z.number().int().min(0).max(10080).nullable(), last_seen: z.string().max(160).nullable(),
 });
 
+const NpcScheduleUpdate = z.object({ npc_key: z.string().min(1).max(64), delay_minutes: z.number().int().min(1).max(10080), location: z.string().min(1).max(160), activity: z.string().min(1).max(240), reason: z.string().min(1).max(260) });
+const RumorAdd = z.object({ fact: z.string().min(1).max(420), source_npc_key: z.string().max(64).nullable(), target_npc_keys: z.array(z.string().min(1).max(64)).min(1).max(6), credibility: z.number().min(0).max(1), delay_turns: z.number().int().min(0).max(20), reason: z.string().min(1).max(260) });
+const DelayedConsequence = z.object({ event_name: z.string().min(1).max(220), target_bucket: z.enum(['active', 'world']), delay_minutes: z.number().int().min(1).max(43200), reason: z.string().min(1).max(320), secret_level: z.number().int().min(0).max(5) });
+
 const TurnSchema = z.object({
-  scene_title: z.string().min(1).max(120),
-  importance: Importance,
-  scene: z.array(SceneItem).min(1).max(24),
-  cg_id: z.string().max(120).nullable(),
-  choices: z.array(z.string().min(1).max(240)).max(3),
-  resolution_log: ResolutionLog,
+  scene_title: z.string().min(1).max(120), importance: Importance, scene: z.array(SceneItem).min(1).max(24), cg_id: z.string().max(120).nullable(), choices: z.array(z.string().min(1).max(240)).max(3), resolution_log: ResolutionLog,
   state_delta: z.object({
-    advance_minutes: z.number().int().min(0).max(1440),
-    new_location: z.string().max(160).nullable(),
-    pc_status: z.string().max(160).nullable(),
-    fatigue_delta: z.number().int().min(-10).max(10),
-    gold_delta: z.number().int().min(-10000).max(10000),
-    relationship_changes: z.array(RelationshipChange).max(10),
-    intimacy_changes: z.array(IntimacyChange).max(6),
-    stat_progress: z.array(StatProgress).max(3),
-    skill_experience: z.array(SkillExperience).max(4),
-    items_add: z.array(z.string().min(1).max(160)).max(12),
-    items_remove: z.array(z.string().min(1).max(160)).max(12),
-    active_events_add: z.array(z.string().min(1).max(240)).max(8),
-    active_events_remove: z.array(z.string().min(1).max(240)).max(8),
-    scheduled_events_add: z.array(z.string().min(1).max(240)).max(8),
-    scheduled_events_remove: z.array(z.string().min(1).max(240)).max(8),
-    world_arcs_add: z.array(z.string().min(1).max(240)).max(8),
-    world_arcs_remove: z.array(z.string().min(1).max(240)).max(8),
-    completed_events_add: z.array(z.string().min(1).max(240)).max(8),
-    pc_knowledge_add: z.array(z.string().min(1).max(500)).max(10),
-    memories_add: z.array(MemoryAdd).max(12),
-    npc_state_updates: z.array(NpcStateUpdate).max(12),
+    advance_minutes: z.number().int().min(0).max(1440), new_location: z.string().max(160).nullable(), pc_status: z.string().max(160).nullable(), fatigue_delta: z.number().int().min(-10).max(10), gold_delta: z.number().int().min(-10000).max(10000),
+    relationship_changes: z.array(RelationshipChange).max(10), relationship_milestones_add: z.array(RelationshipMilestone).max(6), intimacy_changes: z.array(IntimacyChange).max(6),
+    stat_progress: z.array(StatProgress).max(3), skill_experience: z.array(SkillExperience).max(4), skill_learning: z.array(SkillLearning).max(2), awakening_progress: z.array(AwakeningProgress).max(1),
+    items_add: z.array(z.string().min(1).max(160)).max(12), items_remove: z.array(z.string().min(1).max(160)).max(12),
+    active_events_add: z.array(z.string().min(1).max(240)).max(8), active_events_remove: z.array(z.string().min(1).max(240)).max(8), scheduled_events_add: z.array(z.string().min(1).max(240)).max(8), scheduled_events_remove: z.array(z.string().min(1).max(240)).max(8), world_arcs_add: z.array(z.string().min(1).max(240)).max(8), world_arcs_remove: z.array(z.string().min(1).max(240)).max(8), completed_events_add: z.array(z.string().min(1).max(240)).max(8),
+    pc_knowledge_add: z.array(z.string().min(1).max(500)).max(10), memories_add: z.array(MemoryAdd).max(12), npc_state_updates: z.array(NpcStateUpdate).max(12), npc_schedule_updates: z.array(NpcScheduleUpdate).max(8), rumors_add: z.array(RumorAdd).max(6), delayed_consequences_add: z.array(DelayedConsequence).max(6),
   }),
   scene_summary: z.string().min(1).max(1200),
 });
 // ===== END schema.js =====
 
 // ===== BEGIN utils.js =====
-
 const PRICES = {
   'gpt-5.6-luna': { input: 1, cached: 0.10, output: 6 },
   'gpt-5.6-terra': { input: 2.5, cached: 0.25, output: 15 },
@@ -729,15 +806,16 @@ const PRICES = {
 const EXPRESSIONS = new Set(['default', 'smile', 'blush', 'serious', 'angry', 'sad', 'shock']);
 const clamp = (n, min, max) => Math.min(max, Math.max(min, Number(n) || 0));
 const arrays = (value, max) => Array.isArray(value) ? value.slice(0, max) : [];
+const cleanText = (v, max) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 
 const mergeProgressRows = (rows, keyName, maxRows = 4) => {
   const out = [];
   const byKey = new Map();
   for (const raw of rows || []) {
-    const key = String(raw?.[keyName] || '').trim();
+    const key = cleanText(raw?.[keyName], 80);
     const amount = Math.max(0, Math.min(5, Number(raw?.amount || 0)));
     if (!key || amount <= 0) continue;
-    const reason = String(raw?.reason || '').trim().slice(0, 240);
+    const reason = cleanText(raw?.reason, 240);
     if (!reason) continue;
     if (byKey.has(key)) {
       const row = byKey.get(key);
@@ -753,7 +831,14 @@ const mergeProgressRows = (rows, keyName, maxRows = 4) => {
   return out;
 };
 
-function sanitizeTurn(turn, { allowedCgIds = [], allowedSkills = [], skillGrades = {}, statGrades = {} } = {}) {
+function validCandidateName(name) {
+  const text = cleanText(name, 48);
+  if (text.length < 2 || /[\n\r{}<>]/.test(text)) return false;
+  if (['신체','마나','지능','신성'].includes(text)) return false;
+  return true;
+}
+
+function sanitizeTurn(turn, { allowedCgIds = [], allowedSkills = [], skillGrades = {}, statGrades = {}, existingTraits = [], existingAuthorities = [] } = {}) {
   if (!turn || typeof turn !== 'object') throw new Error('모델 응답이 비어 있습니다.');
   turn.choices = arrays(turn.choices, 3);
   turn.scene = arrays(turn.scene, 24).map((item) => {
@@ -768,7 +853,7 @@ function sanitizeTurn(turn, { allowedCgIds = [], allowedSkills = [], skillGrades
       expression: EXPRESSIONS.has(item?.expression) ? item.expression : 'default',
       emotion_intensity: clamp(item?.emotion_intensity ?? 0.5, 0, 1),
       emotion_confidence: clamp(item?.emotion_confidence ?? 0.65, 0, 1),
-      emotion_reason: String(item?.emotion_reason || '').slice(0,220) || null,
+      emotion_reason: cleanText(item?.emotion_reason, 220) || null,
     };
   });
 
@@ -776,20 +861,24 @@ function sanitizeTurn(turn, { allowedCgIds = [], allowedSkills = [], skillGrades
   if (!turn.cg_id || !allowedCg.has(turn.cg_id)) turn.cg_id = null;
 
   const allowedSkillSet = new Set((allowedSkills || []).map((x) => String(x).trim()).filter(Boolean));
+  const traitSet = new Set((existingTraits || []).map((x) => String(x).trim()).filter(Boolean));
+  const authoritySet = new Set((existingAuthorities || []).map((x) => String(x).trim()).filter(Boolean));
   const allowedStats = new Set(['신체', '마나', '지능', '신성']);
   const rawResolution = turn.resolution_log && typeof turn.resolution_log === 'object' ? turn.resolution_log : {};
   const validRoles = new Set(['primary', 'support', 'passive']);
   const seenAbilities = new Set();
   const resolutionAbilities = [];
   for (const raw of arrays(rawResolution.abilities, 5)) {
-    const kind = raw?.kind === 'stat' ? 'stat' : raw?.kind === 'skill' ? 'skill' : null;
-    const name = String(raw?.name || '').trim();
+    const kind = ['skill','stat','trait','authority'].includes(raw?.kind) ? raw.kind : null;
+    const name = cleanText(raw?.name, 80);
     if (!kind || !name) continue;
     if (kind === 'skill' && !allowedSkillSet.has(name)) continue;
     if (kind === 'stat' && !allowedStats.has(name)) continue;
+    if (kind === 'trait' && !traitSet.has(name)) continue;
+    if (kind === 'authority' && !authoritySet.has(name)) continue;
     const dedupeKey = `${kind}:${name}`;
     if (seenAbilities.has(dedupeKey)) continue;
-    const reason = String(raw?.reason || '').trim().slice(0, 240);
+    const reason = cleanText(raw?.reason, 240);
     if (!reason) continue;
     seenAbilities.add(dedupeKey);
     resolutionAbilities.push({
@@ -797,7 +886,7 @@ function sanitizeTurn(turn, { allowedCgIds = [], allowedSkills = [], skillGrades
       name,
       role: validRoles.has(raw?.role) ? raw.role : 'support',
       reason,
-      grade: String(kind === 'skill' ? (skillGrades?.[name] || '') : (statGrades?.[name] || '')).slice(0, 24) || null,
+      grade: String(kind === 'skill' ? (skillGrades?.[name] || '') : kind === 'stat' ? (statGrades?.[name] || '') : '').slice(0, 24) || null,
     });
   }
   const validOutcomes = new Set(['success', 'partial', 'failure']);
@@ -805,7 +894,7 @@ function sanitizeTurn(turn, { allowedCgIds = [], allowedSkills = [], skillGrades
   turn.resolution_log = {
     triggered: resolutionTriggered,
     outcome: resolutionTriggered && validOutcomes.has(rawResolution.outcome) ? rawResolution.outcome : 'none',
-    summary: resolutionTriggered ? (String(rawResolution.summary || '').trim().slice(0, 320) || null) : null,
+    summary: resolutionTriggered ? (cleanText(rawResolution.summary, 320) || null) : null,
     abilities: resolutionTriggered ? resolutionAbilities : [],
   };
 
@@ -814,11 +903,21 @@ function sanitizeTurn(turn, { allowedCgIds = [], allowedSkills = [], skillGrades
   d.fatigue_delta = clamp(d.fatigue_delta, -10, 10);
   d.gold_delta = clamp(d.gold_delta, -10000, 10000);
   d.relationship_changes = arrays(d.relationship_changes, 10).filter((row) => REGISTERED_SPEAKER_KEYS.has(row?.npc_key));
+  d.relationship_milestones_add = arrays(d.relationship_milestones_add, 6).filter((row) => REGISTERED_SPEAKER_KEYS.has(row?.npc_key));
   d.intimacy_changes = arrays(d.intimacy_changes, 6).filter((row) => REGISTERED_SPEAKER_KEYS.has(row?.npc_key));
-  d.stat_progress = mergeProgressRows(arrays(d.stat_progress, 3), 'stat', 3)
-    .filter((row) => ['신체', '마나', '지능', '신성'].includes(row.stat));
-  d.skill_experience = mergeProgressRows(arrays(d.skill_experience, 4), 'skill', 4)
-    .filter((row) => allowedSkillSet.has(row.skill));
+
+  d.stat_progress = mergeProgressRows(arrays(d.stat_progress, 3), 'stat', 3).filter((row) => allowedStats.has(row.stat));
+  d.skill_experience = mergeProgressRows(arrays(d.skill_experience, 4), 'skill', 4).filter((row) => allowedSkillSet.has(row.skill));
+
+  d.skill_learning = arrays(d.skill_learning, 2).map((raw) => ({
+    skill: cleanText(raw?.skill, 48), amount: clamp(raw?.amount, 1, 15), basis: cleanText(raw?.basis, 120) || null, reason: cleanText(raw?.reason, 280),
+  })).filter((row) => validCandidateName(row.skill) && row.reason && !allowedSkillSet.has(row.skill));
+
+  d.awakening_progress = arrays(d.awakening_progress, 1).map((raw) => ({
+    kind: raw?.kind === 'authority' ? 'authority' : 'trait', name: cleanText(raw?.name, 64), amount: clamp(raw?.amount, 1, 10), milestone: Boolean(raw?.milestone),
+    description: cleanText(raw?.description, 360), limitation: cleanText(raw?.limitation, 360), reason: cleanText(raw?.reason, 300),
+  })).filter((row) => row.name.length >= 2 && row.description && row.limitation && row.reason && !(row.kind === 'trait' ? traitSet : authoritySet).has(row.name));
+
   d.items_add = arrays(d.items_add, 12);
   d.items_remove = arrays(d.items_remove, 12);
   d.active_events_add = arrays(d.active_events_add, 8);
@@ -829,15 +928,43 @@ function sanitizeTurn(turn, { allowedCgIds = [], allowedSkills = [], skillGrades
   d.world_arcs_remove = arrays(d.world_arcs_remove, 8);
   d.completed_events_add = arrays(d.completed_events_add, 8);
   d.pc_knowledge_add = arrays(d.pc_knowledge_add, 10);
+
   d.memories_add = arrays(d.memories_add, 12).filter((row) => {
     const owner = String(row?.owner || '');
     if (owner === 'world' || owner === 'global') return true;
     const match = owner.match(/^npc:([a-z0-9_]+)$/i);
     return Boolean(match && REGISTERED_SPEAKER_KEYS.has(match[1]));
-  });
-  d.npc_state_updates = arrays(d.npc_state_updates, 12).filter((row) => REGISTERED_SPEAKER_KEYS.has(row?.npc_key));
+  }).map((row) => ({
+    ...row,
+    knowledge_type: ['direct','hearsay','inference','secret','world'].includes(row?.knowledge_type) ? row.knowledge_type : null,
+    source: cleanText(row?.source, 160) || null,
+    credibility: row?.credibility == null ? null : clamp(row.credibility, 0, 1),
+  }));
+
+  d.npc_state_updates = arrays(d.npc_state_updates, 12).filter((row) => REGISTERED_SPEAKER_KEYS.has(row?.npc_key)).map((row) => ({
+    ...row,
+    goal_progress: row?.goal_progress == null ? null : clamp(row.goal_progress, 0, 100),
+    next_change_minutes: row?.next_change_minutes == null ? null : clamp(row.next_change_minutes, 0, 10080),
+  }));
+
+  d.npc_schedule_updates = arrays(d.npc_schedule_updates, 8).filter((row) => REGISTERED_SPEAKER_KEYS.has(row?.npc_key)).map((row) => ({
+    ...row, delay_minutes: clamp(row.delay_minutes, 1, 10080), location: cleanText(row.location,160), activity: cleanText(row.activity,240), reason: cleanText(row.reason,260),
+  })).filter((row) => row.location && row.activity && row.reason);
+
+  d.rumors_add = arrays(d.rumors_add, 6).map((row) => ({
+    ...row,
+    source_npc_key: REGISTERED_SPEAKER_KEYS.has(row?.source_npc_key) ? row.source_npc_key : null,
+    target_npc_keys: [...new Set(arrays(row?.target_npc_keys, 6).filter((key) => REGISTERED_SPEAKER_KEYS.has(key)))],
+    credibility: clamp(row?.credibility, 0, 1), delay_turns: clamp(row?.delay_turns, 0, 20),
+    fact: cleanText(row?.fact,420), reason: cleanText(row?.reason,260),
+  })).filter((row) => row.fact && row.reason && row.target_npc_keys.length);
+
+  d.delayed_consequences_add = arrays(d.delayed_consequences_add, 6).map((row) => ({
+    ...row, event_name: cleanText(row?.event_name,220), target_bucket: row?.target_bucket === 'world' ? 'world' : 'active', delay_minutes: clamp(row?.delay_minutes,1,43200), reason: cleanText(row?.reason,320), secret_level: clamp(row?.secret_level,0,5),
+  })).filter((row) => row.event_name && row.reason);
+
   turn.state_delta = d;
-  turn.scene_summary = String(turn.scene_summary || '').slice(0,1200);
+  turn.scene_summary = cleanText(turn.scene_summary, 1200);
   return turn;
 }
 
@@ -854,15 +981,8 @@ function usageSummary(model, usage = {}) {
   const usd = (uncached * price.input + cached * price.cached + cacheWrite * price.input * 1.25 + output * price.output) / 1_000_000;
   const cacheHitRate = input > 0 ? cached / input : 0;
   return {
-    input_tokens: input,
-    output_tokens: output,
-    reasoning_tokens: reasoning,
-    cached_tokens: cached,
-    cache_write_tokens: cacheWrite,
-    uncached_input_tokens: uncached,
-    cache_hit_rate: Number(cacheHitRate.toFixed(4)),
-    estimated_usd: Number(usd.toFixed(6)),
-    cold_cache: input > 12000 && cached < input * 0.15,
+    input_tokens: input, output_tokens: output, reasoning_tokens: reasoning, cached_tokens: cached, cache_write_tokens: cacheWrite, uncached_input_tokens: uncached,
+    cache_hit_rate: Number(cacheHitRate.toFixed(4)), estimated_usd: Number(usd.toFixed(6)), cold_cache: input > 12000 && cached < input * 0.15,
   };
 }
 // ===== END utils.js =====
@@ -943,7 +1063,7 @@ function resolveTurnEmotions(turn, saveState = {}) {
 }
 // ===== END emotion.js =====
 
-// ===== VERCEL HANDLER =====
+// ===== BEGIN handler =====
 export const config = { maxDuration: 300 };
 
 const json = (res, status, payload) => res.status(status).json(payload);
@@ -1005,11 +1125,11 @@ export default async function handler(req, res) {
       }),
       reasoning,
       max_output_tokens: maxOutput,
-      prompt_cache_key: process.env.OPENAI_PROMPT_CACHE_KEY || 'lumensia-v1.3.6-canon',
+      prompt_cache_key: process.env.OPENAI_PROMPT_CACHE_KEY || 'lumensia-v1.3.9-canon',
       prompt_cache_retention: '24h',
       text: {
         verbosity: proseLength === 'long' ? 'high' : proseLength === 'short' ? 'low' : 'medium',
-        format: zodTextFormat(TurnSchema, 'lumensia_turn_v16'),
+        format: zodTextFormat(TurnSchema, 'lumensia_turn_v19'),
       },
     });
 
@@ -1024,6 +1144,8 @@ export default async function handler(req, res) {
       allowedSkills: Object.keys(skillGrades),
       skillGrades,
       statGrades,
+      existingTraits: Object.keys(saveState?.pc?.traits || {}),
+      existingAuthorities: Object.keys(saveState?.pc?.authorities || {}),
     });
     if (!adultActive && turn?.state_delta) turn.state_delta.intimacy_changes = [];
     turn = resolveTurnEmotions(turn, saveState);
@@ -1040,7 +1162,7 @@ export default async function handler(req, res) {
       },
       usage: usageSummary(route.model, response.usage),
       request_id: response._request_id || null,
-      server_version: '0.4.6',
+      server_version: '0.4.9',
     });
   } catch (error) {
     console.error(error);
@@ -1052,3 +1174,5 @@ export default async function handler(req, res) {
     });
   }
 }
+
+// ===== END handler =====
