@@ -1,7 +1,7 @@
 import { ASSETS } from './assets.js';
 
-const APP_VERSION = '0.4.6';
-const SAVE_SCHEMA_VERSION = 5;
+const APP_VERSION = '0.4.9';
+const SAVE_SCHEMA_VERSION = 6;
 const SAVE_KEY = 'lumensia.save.v1';
 const SETTINGS_KEY = 'lumensia.settings.v1';
 const BACKUP_HISTORY_KEY = 'lumensia.backups.v1';
@@ -59,12 +59,26 @@ const defaultSave = () => ({
       '응급처치': { grade: 'B+', hiddenXp: 0 }, '야전 생존': { grade: 'A', hiddenXp: 0 },
       '투척': { grade: 'C+', hiddenXp: 0 }, '승마': { grade: 'B', hiddenXp: 0 },
     },
+    skillCandidates: {},
+    traits: {
+      '사선감각': {
+        description: '자신을 향한 실질적인 살의와 치명적 공격의 기척·궤도를 매우 빠르게 감지하는 영혼각인 특성.',
+        limitation: '미래예지가 아니며 감지 불가능한 공격·압도적 속도·정보 없는 광역공격에는 대응을 보장하지 않는다.',
+        awakenedAtTurn: 0,
+        source: '초기 설정',
+      },
+    },
+    authorities: {},
+    awakeningCandidates: { trait: {}, authority: {} },
     inventory: ['강철 양손대검', '예비 단검 2자루', '가죽 장갑', '야전 치료도구', '숫돌', '용병단 인식표'],
   },
   relationships: {},
   intimacyStates: {},
   npcStates: {},
   emotionStates: {},
+  npcSchedule: [],
+  rumorQueue: [],
+  consequenceQueue: [],
   timeline: [],
   activeEvents: ['입학식/학과 오리엔테이션'],
   scheduledEvents: ['신입생 기량평가'],
@@ -89,6 +103,18 @@ function persist() { save.updatedAt = new Date().toISOString(); localStorage.set
 function persistSettings() { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
 function uniq(arr) { return [...new Set((arr || []).filter(Boolean))]; }
 function clamp(n, min, max) { return Math.min(max, Math.max(min, Number(n) || 0)); }
+function npcName(key) { return ASSETS.characters?.[key]?.name || key || 'NPC'; }
+const REL_STAGE_LABELS = { stranger:'낯선 사이', acquainted:'안면 있음', familiar:'지인', trusted:'신뢰', close:'가까운 사이' };
+function relationshipStage(row = {}) {
+  const affinity = Number(row?.affinity || 0);
+  const trust = Number(row?.trust || 0);
+  const milestones = Array.isArray(row?.milestones) ? row.milestones.length : 0;
+  if (affinity >= 55 && trust >= 50 && milestones >= 3) return 'close';
+  if (affinity >= 30 && trust >= 35 && milestones >= 2) return 'trusted';
+  if (affinity >= 15 && trust >= 10 && milestones >= 1) return 'familiar';
+  if (Math.abs(affinity) + Math.abs(trust) >= 3 || milestones >= 1 || (row?.history || []).length) return 'acquainted';
+  return 'stranger';
+}
 function isRegisteredNpcKey(key) { return Boolean(key && ASSETS.characters?.[key]); }
 function pruneNpcMap(obj = {}) { return Object.fromEntries(Object.entries(obj || {}).filter(([key]) => isRegisteredNpcKey(key))); }
 
@@ -149,11 +175,35 @@ function normalizeSave(raw) {
   next.pc = { ...base.pc, ...(next.pc || {}) };
   next.pc.stats = { ...base.pc.stats, ...(next.pc.stats || {}) };
   next.pc.skills = { ...base.pc.skills, ...(next.pc.skills || {}) };
+  next.pc.skillCandidates = next.pc.skillCandidates && typeof next.pc.skillCandidates === 'object' ? next.pc.skillCandidates : {};
+  next.pc.traits = next.pc.traits && typeof next.pc.traits === 'object' ? next.pc.traits : { ...base.pc.traits };
+  next.pc.authorities = next.pc.authorities && typeof next.pc.authorities === 'object' ? next.pc.authorities : {};
+  next.pc.awakeningCandidates = next.pc.awakeningCandidates && typeof next.pc.awakeningCandidates === 'object' ? next.pc.awakeningCandidates : { trait:{}, authority:{} };
+  next.pc.awakeningCandidates.trait = next.pc.awakeningCandidates.trait && typeof next.pc.awakeningCandidates.trait === 'object' ? next.pc.awakeningCandidates.trait : {};
+  next.pc.awakeningCandidates.authority = next.pc.awakeningCandidates.authority && typeof next.pc.awakeningCandidates.authority === 'object' ? next.pc.awakeningCandidates.authority : {};
   next.pc.inventory = Array.isArray(next.pc.inventory) ? next.pc.inventory : [...base.pc.inventory];
   next.relationships = pruneNpcMap(next.relationships || {});
+  for (const [key, row] of Object.entries(next.relationships)) {
+    next.relationships[key] = {
+      affinity: Number(row?.affinity || 0),
+      trust: Number(row?.trust || 0),
+      status: row?.status || '중립',
+      stage: row?.stage || 'stranger',
+      milestones: Array.isArray(row?.milestones) ? row.milestones.slice(-12) : [],
+      history: Array.isArray(row?.history) ? row.history.slice(-30) : [],
+    };
+    next.relationships[key].stage = relationshipStage(next.relationships[key]);
+  }
   next.intimacyStates = pruneNpcMap(next.intimacyStates || {});
   next.npcStates = pruneNpcMap(next.npcStates || {});
   next.emotionStates = pruneNpcMap(next.emotionStates || {});
+  next.npcSchedule = Array.isArray(next.npcSchedule) ? next.npcSchedule.filter((x)=>isRegisteredNpcKey(x?.npc_key)).slice(-80) : [];
+  next.rumorQueue = Array.isArray(next.rumorQueue) ? next.rumorQueue.map((x)=>({
+    ...x,
+    source_npc_key:isRegisteredNpcKey(x?.source_npc_key) ? x.source_npc_key : null,
+    target_npc_keys:uniq((x?.target_npc_keys || []).filter(isRegisteredNpcKey)),
+  })).filter((x)=>x.fact && x.target_npc_keys.length).slice(-80) : [];
+  next.consequenceQueue = Array.isArray(next.consequenceQueue) ? next.consequenceQueue.filter((x)=>x?.event_name && ['active','world'].includes(x?.target_bucket)).slice(-80) : [];
   next.timeline = Array.isArray(next.timeline) ? next.timeline : [];
   next.activeEvents = Array.isArray(next.activeEvents) ? next.activeEvents : [];
   next.completedEvents = Array.isArray(next.completedEvents) ? next.completedEvents : [];
@@ -242,6 +292,94 @@ function advanceTime(minutes) {
   save.world.time = timeFromMinutes(total);
   if (dayAdd > 0) advanceCalendarDays(dayAdd);
 }
+
+function absoluteGameMinutes(date = save.world.date, time = save.world.time) {
+  const [year, month, day] = String(date || '0001-01-01').split('-').map(Number);
+  const y = Math.max(1, year || 1);
+  const m = clamp(month || 1, 1, 12);
+  const d = clamp(day || 1, 1, 31);
+  const beforeYear = (y - 1) * 365 + Math.floor((y - 1) / 4);
+  let beforeMonth = 0;
+  for (let mm = 1; mm < m; mm++) beforeMonth += daysInMonth(y, mm);
+  return (beforeYear + beforeMonth + d - 1) * 1440 + minutesFromTime(time);
+}
+
+function queueId(prefix) {
+  return `${prefix}-${save.id}-${save.turnNumber}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+}
+
+function processDueNpcSchedules() {
+  const now = absoluteGameMinutes();
+  const pending = [];
+  for (const row of save.npcSchedule || []) {
+    if (Number(row?.dueMinute || 0) > now) { pending.push(row); continue; }
+    if (!isRegisteredNpcKey(row?.npc_key)) continue;
+    const old = save.npcStates[row.npc_key] || {};
+    save.npcStates[row.npc_key] = {
+      ...old,
+      location: row.location || old.location,
+      status: row.activity || old.status,
+      next_activity: null,
+      next_location: null,
+      next_change_minutes: null,
+      schedule_reason: row.reason || null,
+      updatedAtTurn: save.turnNumber,
+    };
+  }
+  save.npcSchedule = pending.slice(-80);
+}
+
+function processDueRumors() {
+  const pending = [];
+  for (const row of save.rumorQueue || []) {
+    if (Number(row?.dueTurn || 0) > Number(save.turnNumber || 0)) { pending.push(row); continue; }
+    for (const key of row.target_npc_keys || []) {
+      if (!isRegisteredNpcKey(key)) continue;
+      save.memories.npc[key] = addMemoryUnique(save.memories.npc[key], {
+        fact: row.fact,
+        importance: Number(row.credibility || 0) >= 0.75 ? 'major' : 'minor',
+        secret_level: 0,
+        knowledge_type: 'hearsay',
+        source: row.source_npc_key ? npcName(row.source_npc_key) : '출처 불명 소문',
+        credibility: clamp(row.credibility, 0, 1),
+      }, 120);
+    }
+  }
+  save.rumorQueue = pending.slice(-80);
+}
+
+function processDueConsequences() {
+  const now = absoluteGameMinutes();
+  const pending = [];
+  for (const row of save.consequenceQueue || []) {
+    if (Number(row?.dueMinute || 0) > now) { pending.push(row); continue; }
+    if (row.target_bucket === 'world') {
+      if (!(save.activeEvents || []).includes(row.event_name) && !(save.completedEvents || []).includes(row.event_name)) {
+        save.scheduledEvents = (save.scheduledEvents || []).filter((x)=>x !== row.event_name);
+        save.worldArcs = uniq([...(save.worldArcs || []), row.event_name]);
+      }
+    } else if (!(save.completedEvents || []).includes(row.event_name)) {
+      save.scheduledEvents = (save.scheduledEvents || []).filter((x)=>x !== row.event_name);
+      save.worldArcs = (save.worldArcs || []).filter((x)=>x !== row.event_name);
+      save.activeEvents = uniq([...(save.activeEvents || []), row.event_name]);
+    }
+    save.memories.global = addMemoryUnique(save.memories.global, {
+      fact: `지연 결과 발생: ${row.event_name}. 원인: ${row.reason}`,
+      importance: 'important',
+      secret_level: clamp(row.secret_level, 0, 5),
+      knowledge_type: 'world',
+      source: '세계 결과 큐',
+      credibility: 1,
+    }, 300);
+  }
+  save.consequenceQueue = pending.slice(-80);
+}
+
+function processDueSystems() {
+  processDueNpcSchedules();
+  processDueRumors();
+  processDueConsequences();
+}
 function nextGrade(grade) { const i = GRADE_LADDER.indexOf(grade); return i >= 0 && i < GRADE_LADDER.length - 1 ? GRADE_LADDER[i+1] : grade; }
 function progressionGainCap(grade) {
   const g = String(grade || 'F');
@@ -255,6 +393,11 @@ function progressionGainCap(grade) {
 function progressionReason(reason) {
   const text = String(reason || '').replace(/\s+/g, ' ').trim();
   return text ? ` — ${text.slice(0, 220)}` : '';
+}
+function skillLearningGainCap(amount) { return clamp(amount, 1, 15); }
+function awakeningGainCap(kind, amount, milestone) {
+  if (kind === 'authority') return clamp(amount, 1, milestone ? 6 : 2);
+  return clamp(amount, 1, milestone ? 10 : 4);
 }
 function addMemoryUnique(list, memory, max = 250) {
   if (!memory?.fact) return list || [];
@@ -372,7 +515,8 @@ function renderTurnRecord(record) {
     log.append(summary);
     for (const row of turn.resolution_log.abilities) {
       const line = document.createElement('div'); line.className = 'resolution-line';
-      line.textContent = `${row.kind === 'stat' ? '◆' : '▸'} ${row.name}${row.grade ? ` ${row.grade}` : ''} [${roleLabels[row.role] || '보조'}] — ${row.reason}`;
+      const icon = row.kind === 'stat' ? '◆' : row.kind === 'trait' ? '◇' : row.kind === 'authority' ? '✦' : '▸';
+      line.textContent = `${icon} ${row.name}${row.grade ? ` ${row.grade}` : ''} [${roleLabels[row.role] || '보조'}] — ${row.reason}`;
       log.append(line);
     }
     if (turn.resolution_log.summary) {
@@ -428,13 +572,17 @@ function updateStatus(route) {
 }
 
 function renderInfo() {
-  const rel = Object.entries(save.relationships || {}).map(([key,v]) => `${ASSETS.characters[key]?.name || key}[호감 ${v.affinity||0} / 신뢰 ${v.trust||0}${v.status ? ` / ${v.status}`:''}]`).join(', ') || '-';
+  const rel = Object.entries(save.relationships || {}).map(([key,v]) => `${npcName(key)}[${REL_STAGE_LABELS[v.stage] || '낯선 사이'} · 호감 ${v.affinity||0} / 신뢰 ${v.trust||0}${v.status ? ` / ${v.status}`:''}]`).join(', ') || '-';
   const intimacy = Object.entries(save.intimacyStates || {}).filter(([,v]) => Number(v?.level || 0) > 0)
-    .map(([key,v]) => `${ASSETS.characters[key]?.name || key}[L${Math.min(4, Number(v.level||0))}${Number(v.level||0)>=5 ? '/MAX':''}${v.status ? ` · ${v.status}`:''}]`)
+    .map(([key,v]) => `${npcName(key)}[L${Math.min(4, Number(v.level||0))}${Number(v.level||0)>=5 ? '/MAX':''}${v.status ? ` · ${v.status}`:''}]`)
     .join(', ') || '-';
-  const skills = Object.entries(save.pc.skills || {}).map(([k,v]) => `${k} ${v.grade}`).join(' | ');
+  const skills = Object.entries(save.pc.skills || {}).map(([k,v]) => `${k} ${v.grade} [${Number(v.hiddenXp||0)}/100]`).join(' | ');
   const stats = Object.entries(save.pc.stats || {}).map(([k,v]) => `- ${k}: ${v.grade} [${v.progress}/100]`).join('\n');
-  $('infoContent').textContent = `경지: ${save.pc.realm} | 소속: 루멘시아 아카데미\n---------\n직위: ${save.pc.department} | 상황: 🟢\n---------\n스킬: ${skills}\n---------\n스탯:\n${stats}\n---------\n🔮[魔] ${save.pc.talents.magic} | ⚔️[武] ${save.pc.talents.martial} | 🌟[魂] ${save.pc.talents.soul} | 📘[智] ${save.pc.talents.knowledge}\n---------\n상태: ${save.pc.status} | 피로 ${save.pc.fatigue}/100\n💼: ${save.pc.inventory.join(', ')}, 금화 ${save.pc.gold}G\n관계: ${rel}\n친밀도(성인모드): ${intimacy}\n---------\n진행 사건: ${save.activeEvents.join(', ') || '-'}\n예정 사건: ${save.scheduledEvents.join(', ') || '-'}\n세계 장기 사건: ${save.worldArcs.join(', ') || '-'}\n토큰 누적: 입력 ${save.usage.inputTokens || 0} / 캐시 ${save.usage.cachedTokens || 0} / 출력 ${save.usage.outputTokens || 0} / 추론 ${save.usage.reasoningTokens || 0}\n직전 턴: 입력 ${save.usage.lastInputTokens || 0} / 출력 ${save.usage.lastOutputTokens || 0} / 캐시 적중 ${Math.round(Number(save.usage.lastCacheHitRate || 0)*100)}% / 비용 $${Number(save.usage.lastTurnUsd || 0).toFixed(4)}\n누적 API 비용(추정): $${Number(save.usage.estimatedUsd || 0).toFixed(4)}\n영구 타임라인: ${save.timeline?.length || 0}건 | NPC 감정상태: ${Object.keys(save.emotionStates || {}).length}명`;
+  const traits = Object.keys(save.pc.traits || {}).join(' | ') || '-';
+  const authorities = Object.keys(save.pc.authorities || {}).join(' | ') || '-';
+  const learning = Object.entries(save.pc.skillCandidates || {}).map(([k,v]) => `${k} [${Number(v.progress||0)}/100]`).join(' | ') || '-';
+  const awakening = ['trait','authority'].flatMap((kind) => Object.entries(save.pc.awakeningCandidates?.[kind] || {}).map(([k,v]) => `${kind === 'trait' ? 'Trait' : 'Authority'} ${k} [${Number(v.progress||0)}/100 · 이정표 ${Number(v.milestones||0)}]`)).join(' | ') || '-';
+  $('infoContent').textContent = `경지: ${save.pc.realm} | 소속: 루멘시아 아카데미\n---------\n직위: ${save.pc.department} | 상황: 🟢\n---------\n스킬: ${skills}\n습득 후보: ${learning}\nTrait: ${traits}\nAuthority: ${authorities}\n각성 후보: ${awakening}\n---------\n스탯:\n${stats}\n---------\n🔮[魔] ${save.pc.talents.magic} | ⚔️[武] ${save.pc.talents.martial} | 🌟[魂] ${save.pc.talents.soul} | 📘[智] ${save.pc.talents.knowledge}\n---------\n상태: ${save.pc.status} | 피로 ${save.pc.fatigue}/100\n💼: ${save.pc.inventory.join(', ')}, 금화 ${save.pc.gold}G\n관계: ${rel}\n친밀도(성인모드): ${intimacy}\n---------\n진행 사건: ${save.activeEvents.join(', ') || '-'}\n예정 사건: ${save.scheduledEvents.join(', ') || '-'}\n세계 장기 사건: ${save.worldArcs.join(', ') || '-'}\n시스템 큐: NPC 일정 ${save.npcSchedule?.length || 0} / 소문 ${save.rumorQueue?.length || 0} / 지연 결과 ${save.consequenceQueue?.length || 0}\n토큰 누적: 입력 ${save.usage.inputTokens || 0} / 캐시 ${save.usage.cachedTokens || 0} / 출력 ${save.usage.outputTokens || 0} / 추론 ${save.usage.reasoningTokens || 0}\n직전 턴: 입력 ${save.usage.lastInputTokens || 0} / 출력 ${save.usage.lastOutputTokens || 0} / 캐시 적중 ${Math.round(Number(save.usage.lastCacheHitRate || 0)*100)}% / 비용 $${Number(save.usage.lastTurnUsd || 0).toFixed(4)}\n누적 API 비용(추정): $${Number(save.usage.estimatedUsd || 0).toFixed(4)}\n영구 타임라인: ${save.timeline?.length || 0}건 | NPC 감정상태: ${Object.keys(save.emotionStates || {}).length}명`;
 }
 
 function applyDelta(delta = {}) {
@@ -463,7 +611,7 @@ function applyDelta(delta = {}) {
 
   for (const row of delta.skill_experience || []) {
     const skill = save.pc.skills[row.skill];
-    if (!skill) continue; // V1.3.6: 경험치 응답만으로 유령 스킬을 자동 생성하지 않는다.
+    if (!skill) continue;
     const gained = clamp(row.amount, 0, progressionGainCap(skill.grade));
     if (gained <= 0) continue;
     notices.push(`스킬 경험: ${row.skill} +${gained}${progressionReason(row.reason)}`);
@@ -478,19 +626,105 @@ function applyDelta(delta = {}) {
     skill.hiddenXp = clamp(xp, 0, 99);
   }
 
+  // 아직 없는 독립 기술은 후보 진척도를 누적하고 100/100에서 정식 F등급 스킬로 등록한다.
+  for (const row of delta.skill_learning || []) {
+    const name = String(row?.skill || '').trim();
+    if (!name || save.pc.skills[name]) continue;
+    const old = save.pc.skillCandidates[name] || { progress: 0, basis: null, reason: null, updatedAtTurn: -1 };
+    const gained = skillLearningGainCap(row.amount);
+    const progress = clamp(Number(old.progress || 0) + gained, 0, 100);
+    save.pc.skillCandidates[name] = {
+      ...old,
+      progress,
+      basis: row.basis || old.basis || null,
+      reason: row.reason || old.reason || null,
+      updatedAtTurn: save.turnNumber + 1,
+    };
+    notices.push(`스킬 습득 진척: ${name} +${gained} [${progress}/100]${progressionReason(row.reason)}`);
+    if (progress >= 100) {
+      save.pc.skills[name] = { grade: 'F', hiddenXp: 0, acquiredAtTurn: save.turnNumber + 1, origin: row.reason || old.reason || '훈련과 실전으로 습득' };
+      delete save.pc.skillCandidates[name];
+      notices.push(`신규 스킬 습득: ${name} F`);
+    }
+  }
+
+  // Trait/Authority 후보는 진척도와 결정적 이정표를 동시에 요구한다.
+  for (const row of delta.awakening_progress || []) {
+    const kind = row?.kind === 'authority' ? 'authority' : 'trait';
+    const name = String(row?.name || '').trim();
+    if (!name) continue;
+    const owned = kind === 'authority' ? save.pc.authorities : save.pc.traits;
+    if (owned[name]) continue;
+    const pool = save.pc.awakeningCandidates[kind] || (save.pc.awakeningCandidates[kind] = {});
+    const old = pool[name] || { progress: 0, milestones: 0, description: '', limitation: '', reasons: [] };
+    const gained = awakeningGainCap(kind, row.amount, row.milestone);
+    const milestones = Number(old.milestones || 0) + (row.milestone ? 1 : 0);
+    const neededMilestones = kind === 'authority' ? 4 : 3;
+    let progress = clamp(Number(old.progress || 0) + gained, 0, 100);
+    if (progress >= 100 && milestones < neededMilestones) progress = 99;
+    pool[name] = {
+      progress,
+      milestones,
+      description: row.description || old.description,
+      limitation: row.limitation || old.limitation,
+      reasons: [...(old.reasons || []), row.reason].filter(Boolean).slice(-8),
+      updatedAtTurn: save.turnNumber + 1,
+    };
+    notices.push(`${kind === 'authority' ? '권능' : '특성'} 각성 징후: ${name} +${gained} [${progress}/100 · 이정표 ${milestones}/${neededMilestones}]${progressionReason(row.reason)}`);
+    if (progress >= 100 && milestones >= neededMilestones) {
+      owned[name] = {
+        description: pool[name].description,
+        limitation: pool[name].limitation,
+        awakenedAtTurn: save.turnNumber + 1,
+        source: row.reason,
+      };
+      delete pool[name];
+      notices.push(`${kind === 'authority' ? '권능 각성' : '특성 각성'}: ${name}`);
+    }
+  }
+
+  const relationshipTouched = new Set();
   for (const row of delta.relationship_changes || []) {
     if (!isRegisteredNpcKey(row?.npc_key)) continue;
-    const r = save.relationships[row.npc_key] || { affinity: 0, trust: 0, status: '중립', history: [] };
-    r.affinity = clamp(r.affinity + row.affinity_delta, -100, 100);
-    r.trust = clamp(r.trust + row.trust_delta, -100, 100);
+    const r = save.relationships[row.npc_key] || { affinity: 0, trust: 0, status: '중립', stage:'stranger', milestones:[], history: [] };
+    const affinityDelta = clamp(row.affinity_delta, -10, 10);
+    const trustDelta = clamp(row.trust_delta, -10, 10);
+    r.affinity = clamp(Number(r.affinity || 0) + affinityDelta, -100, 100);
+    r.trust = clamp(Number(r.trust || 0) + trustDelta, -100, 100);
     if (row.status) r.status = row.status;
+    r.milestones = Array.isArray(r.milestones) ? r.milestones : [];
     r.history = [...(r.history || []), row.reason].filter(Boolean).slice(-30);
     save.relationships[row.npc_key] = r;
+    relationshipTouched.add(row.npc_key);
+    const bits = [];
+    if (affinityDelta) bits.push(`호감 ${affinityDelta > 0 ? '+' : ''}${affinityDelta}`);
+    if (trustDelta) bits.push(`신뢰 ${trustDelta > 0 ? '+' : ''}${trustDelta}`);
+    if (bits.length || row.status) notices.push(`관계 변화: ${npcName(row.npc_key)} ${bits.join(' / ')}${row.status ? ` · ${row.status}` : ''}${progressionReason(row.reason)}`);
+  }
+
+  for (const row of delta.relationship_milestones_add || []) {
+    if (!isRegisteredNpcKey(row?.npc_key)) continue;
+    const r = save.relationships[row.npc_key] || { affinity: 0, trust: 0, status: '중립', stage:'stranger', milestones:[], history: [] };
+    const sig = `${row.kind}|${row.description}`;
+    const existing = Array.isArray(r.milestones) ? r.milestones : [];
+    if (!existing.some((x) => `${x?.kind}|${x?.description}` === sig)) {
+      r.milestones = [...existing, { kind:row.kind, description:row.description, reason:row.reason, turn:save.turnNumber + 1 }].slice(-12);
+      notices.push(`관계 이정표: ${npcName(row.npc_key)} — ${row.description}`);
+    }
+    save.relationships[row.npc_key] = r;
+    relationshipTouched.add(row.npc_key);
+  }
+
+  for (const key of relationshipTouched) {
+    const r = save.relationships[key];
+    const before = r.stage || 'stranger';
+    const after = relationshipStage(r);
+    r.stage = after;
+    if (before !== after) notices.push(`관계 단계: ${npcName(key)} ${REL_STAGE_LABELS[before] || before} → ${REL_STAGE_LABELS[after] || after}`);
   }
 
   for (const row of delta.intimacy_changes || []) {
     if (!isRegisteredNpcKey(row?.npc_key)) continue;
-    // 성인 친밀도는 한 턴에 최대 1단계만 움직인다. 모델이 과하게 점프시켜도 앱이 막는다.
     if (Number(save.pc?.age || 0) < 18) continue;
     const r = save.intimacyStates[row.npc_key] || { level: 0, status: '없음', history: [] };
     const step = clamp(row.level_delta, -1, 1);
@@ -503,14 +737,37 @@ function applyDelta(delta = {}) {
   for (const row of delta.npc_state_updates || []) {
     if (!isRegisteredNpcKey(row?.npc_key)) continue;
     const old = save.npcStates[row.npc_key] || {};
+    const shortGoal = row.short_term_goal || row.current_goal || null;
+    const shortChanged = Boolean(shortGoal && shortGoal !== (old.short_term_goal || old.current_goal));
     save.npcStates[row.npc_key] = {
       ...old,
       ...(row.location ? { location: row.location } : {}),
       ...(row.status ? { status: row.status } : {}),
       ...(row.current_goal ? { current_goal: row.current_goal } : {}),
+      ...(row.long_term_goal ? { long_term_goal: row.long_term_goal } : {}),
+      ...(shortGoal ? { short_term_goal: shortGoal, current_goal: shortGoal } : {}),
+      ...(row.goal_progress != null ? { goal_progress: clamp(row.goal_progress, 0, 100) } : shortChanged ? { goal_progress: 0 } : {}),
+      ...(row.obstacle ? { obstacle: row.obstacle } : {}),
+      ...(row.goal_reason ? { goal_reason: row.goal_reason } : {}),
+      ...(row.next_activity ? { next_activity: row.next_activity } : {}),
+      ...(row.next_location ? { next_location: row.next_location } : {}),
+      ...(row.next_change_minutes != null ? { next_change_minutes: clamp(row.next_change_minutes, 0, 10080) } : {}),
       ...(row.last_seen ? { last_seen: row.last_seen } : {}),
       updatedAtTurn: save.turnNumber + 1,
     };
+  }
+
+  // 실제 미래 이동 계획만 예약한다. 같은 NPC/장소/활동/시각 중복은 제거한다.
+  const nowMinute = absoluteGameMinutes();
+  for (const row of delta.npc_schedule_updates || []) {
+    if (!isRegisteredNpcKey(row?.npc_key)) continue;
+    const dueMinute = nowMinute + clamp(row.delay_minutes, 1, 10080);
+    const signature = `${row.npc_key}|${dueMinute}|${row.location}|${row.activity}`;
+    if ((save.npcSchedule || []).some((x) => x.signature === signature)) continue;
+    save.npcSchedule.push({ id:queueId('npc'), signature, npc_key:row.npc_key, dueMinute, location:row.location, activity:row.activity, reason:row.reason });
+    save.npcSchedule = save.npcSchedule.slice(-80);
+    const old = save.npcStates[row.npc_key] || {};
+    save.npcStates[row.npc_key] = { ...old, next_activity:row.activity, next_location:row.location, next_change_minutes:clamp(row.delay_minutes,1,10080) };
   }
 
   save.pc.inventory = uniq([...save.pc.inventory, ...(delta.items_add || [])]).filter(x => !(delta.items_remove || []).includes(x));
@@ -544,6 +801,33 @@ function applyDelta(delta = {}) {
       save.memories.npc[key] = addMemoryUnique(save.memories.npc[key], m, 120);
     }
   }
+
+  for (const row of delta.rumors_add || []) {
+    const targets = uniq((row.target_npc_keys || []).filter(isRegisteredNpcKey));
+    if (!row.fact || !targets.length) continue;
+    const signature = `${row.fact}|${targets.sort().join(',')}`;
+    if ((save.rumorQueue || []).some((x) => x.signature === signature)) continue;
+    save.rumorQueue.push({
+      id: queueId('rumor'), signature, fact:row.fact, source_npc_key:isRegisteredNpcKey(row.source_npc_key) ? row.source_npc_key : null,
+      target_npc_keys:targets, credibility:clamp(row.credibility,0,1), dueTurn:save.turnNumber + 1 + clamp(row.delay_turns,0,20), reason:row.reason,
+    });
+    save.rumorQueue = save.rumorQueue.slice(-80);
+  }
+
+  const consequenceNow = absoluteGameMinutes();
+  for (const row of delta.delayed_consequences_add || []) {
+    if (!row.event_name) continue;
+    const dueMinute = consequenceNow + clamp(row.delay_minutes,1,43200);
+    const signature = `${row.event_name}|${row.target_bucket}|${dueMinute}`;
+    if ((save.consequenceQueue || []).some((x) => x.signature === signature || x.event_name === row.event_name)) continue;
+    if ((save.activeEvents || []).includes(row.event_name) || (save.worldArcs || []).includes(row.event_name) || (save.completedEvents || []).includes(row.event_name)) continue;
+    save.consequenceQueue.push({
+      id:queueId('consequence'), signature, event_name:row.event_name, target_bucket:row.target_bucket === 'world' ? 'world' : 'active',
+      dueMinute, reason:row.reason, secret_level:clamp(row.secret_level,0,5),
+    });
+    save.consequenceQueue = save.consequenceQueue.slice(-80);
+  }
+
   return notices;
 }
 
@@ -603,10 +887,15 @@ function rebuildRollingSummary() {
 }
 
 function compactState() {
+  const now = absoluteGameMinutes();
   return {
     version: save.version, turnNumber: save.turnNumber, world: save.world, pc: save.pc, relationships: save.relationships, intimacyStates: save.intimacyStates, npcStates: save.npcStates,
     emotionStates: save.emotionStates, activeEvents: save.activeEvents, scheduledEvents: save.scheduledEvents, worldArcs: save.worldArcs, completedEvents: save.completedEvents,
-    pcKnowledge: save.pcKnowledge, memories: save.memories, flags: save.flags,
+    pcKnowledge: save.pcKnowledge, memories: save.memories,
+    npcSchedule: (save.npcSchedule || []).map((x)=>({ ...x, remaining_minutes:Math.max(0, Number(x.dueMinute||0)-now) })),
+    rumorQueue: (save.rumorQueue || []).map((x)=>({ ...x, remaining_turns:Math.max(0, Number(x.dueTurn||0)-Number(save.turnNumber||0)) })),
+    consequenceQueue: (save.consequenceQueue || []).map((x)=>({ ...x, remaining_minutes:Math.max(0, Number(x.dueMinute||0)-now) })),
+    flags: save.flags,
   };
 }
 
@@ -616,6 +905,7 @@ async function sendAction(action) {
   busy = true; sendBtn.disabled = true; actionInput.disabled = true; choicesEl.classList.add('hidden');
   const loader = document.createElement('div'); loader.className = 'turn-card'; loader.innerHTML = '<div class="loading-dots"><i></i><i></i><i></i></div>'; story.append(loader); scrollBottom();
   try {
+    processDueSystems();
     const { accessToken, ...apiSettings } = settings;
     const payload = { action, saveState: compactState(), recentTurns: save.recentTurns, rollingSummary: save.rollingSummary, availableCgIds: Object.keys(ASSETS.cg || {}), forceTerra: forceTerraOnce, ...apiSettings };
     let data;
@@ -638,6 +928,7 @@ async function sendAction(action) {
     rebuildRollingSummary();
     const record = { action, turn: data.turn, route: data.route, usage: data.usage, notices, at: new Date().toISOString() };
     save.turnNumber += 1;
+    processDueSystems();
     save.recentTurns.push({ action, summary: data.turn.scene_summary, scene: data.turn.scene.slice(0,10) });
     save.recentTurns = save.recentTurns.slice(-8);
     save.renderedTurns.push(record); save.renderedTurns = save.renderedTurns.slice(-80);
@@ -698,10 +989,10 @@ function updateForceTerraButton() {
 function scrollBottom(smooth = true) { requestAnimationFrame(() => window.scrollTo({top: document.body.scrollHeight, behavior: smooth ? 'smooth':'auto'})); }
 
 function ensureV12Ui() {
-  document.title = '루멘시아 모바일 V1.3.6';
+  document.title = '루멘시아 모바일 V1.3.9';
   const h1 = document.querySelector('h1');
   if (h1 && !h1.querySelector('.version-tag')) {
-    const small = document.createElement('small'); small.className='version-tag'; small.textContent='V1.3.6'; h1.append(' ', small);
+    const small = document.createElement('small'); small.className='version-tag'; small.textContent='V1.3.9'; h1.append(' ', small);
   }
   if (!$('showEmotionDebug')) {
     const demo = $('demoMode')?.closest('label');
