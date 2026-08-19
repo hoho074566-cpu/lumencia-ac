@@ -141,3 +141,8 @@ h1 { margin: 2px 0 0; font-size: 20px; }
   line-height: 1.55;
   resize: vertical;
 }
+
+.meta-btn.active { color:#dbeafe; border-color:rgba(96,165,250,.85); background:rgba(30,64,175,.62); box-shadow:0 0 14px rgba(59,130,246,.22); }
+.meta-turn { border-color:rgba(96,165,250,.35); background:rgba(15,23,42,.94); }
+.meta-turn .turn-head { color:#bfdbfe; background:rgba(59,130,246,.08); }
+.meta-turn .narration { border-left-color:rgba(96,165,250,.55); font-style:normal; color:#dbeafe; }
