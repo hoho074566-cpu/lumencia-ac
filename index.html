@@ -8,14 +8,14 @@
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/styles.css" />
-  <title>루멘시아 모바일 V1.3.9</title>
+  <title>루멘시아 모바일 V1.4</title>
 </head>
 <body>
   <div id="app">
     <header class="topbar">
       <div>
         <div class="eyebrow">LUMENSIA ACADEMY</div>
-        <h1>루멘시아 모바일 <small class="version-tag">V1.3.9</small></h1>
+        <h1>루멘시아 모바일 <small class="version-tag">V1.4</small></h1>
       </div>
       <div class="top-actions">
         <button id="infoBtn" class="icon-btn" aria-label="상태창">INFO</button>
@@ -41,6 +41,7 @@
     <footer class="footer-row">
       <button id="newGameBtn" class="text-btn">새 게임</button>
       <button id="saveBtn" class="text-btn">저장</button>
+      <button id="debugBtn" class="text-btn hidden">DEBUG</button>
       <button id="forceTerraBtn" class="text-btn terra-btn">TERRA 1턴</button>
       <button id="exportBtn" class="text-btn">내보내기</button>
       <label class="text-btn file-label">불러오기<input id="importInput" type="file" accept="application/json" /></label>
@@ -85,7 +86,7 @@
       <label class="toggle-row"><input id="adultMode" type="checkbox" /><span>성인 친밀도 확장 사용 (18+ · 합의 · 성인강도)</span></label>
       <label class="toggle-row"><input id="demoMode" type="checkbox" /><span>데모 모드(API 호출 안 함)</span></label>
       <label class="toggle-row"><input id="showEmotionDebug" type="checkbox" /><span>감정 태그 디버그 표시 (테스트용)</span></label>
-      <label class="toggle-row"><input id="showResolutionLog" type="checkbox" /><span>판정 로그 표시 (사용 스킬/스탯 · 결과 근거)</span></label>
+      <label class="toggle-row"><input id="developerMode" type="checkbox" /><span>개발자 디버그 패널 표시</span></label>
       <div id="apiHealth" class="health-box">API 상태 확인 중…</div>
       <button id="assetTestBtn" type="button" class="secondary-btn">등록 이미지 빠른 점검 (폴백 확인)</button>
       <button value="default" class="primary-btn">저장하고 닫기</button>
@@ -96,11 +97,6 @@
     <form method="dialog">
       <header><h2>INFO</h2><button value="cancel" class="close-btn">✕</button></header>
       <pre id="infoContent" class="info-content"></pre>
-      <div class="backup-actions">
-        <button id="restore10Btn" type="button" class="secondary-btn">10턴 전 복구</button>
-        <button id="restore50Btn" type="button" class="secondary-btn">50턴 전 복구</button>
-        <small id="backupStatus" class="backup-status">자동 백업 준비 중…</small>
-      </div>
     </form>
   </dialog>
 
@@ -108,6 +104,53 @@
     <form method="dialog">
       <header><h2>이미지 점검</h2><button value="cancel" class="close-btn">✕</button></header>
       <div id="assetResults" class="asset-results"></div>
+    </form>
+  </dialog>
+
+
+  <dialog id="pcCreatorDialog" class="panel-dialog wide-dialog">
+    <form id="pcCreatorForm">
+      <header><h2>PC 생성</h2><button id="pcCreatorClose" type="button" class="close-btn">✕</button></header>
+      <div class="creator-note">Aaa/PC의 설정은 자유다. 아래 값은 시작 세이브에 그대로 기록되고 GM은 이를 최우선 현재 상태로 사용한다.</div>
+      <div class="creator-grid">
+        <label>이름<input id="pcName" required maxlength="40" value="카일" /></label>
+        <label>나이<input id="pcAge" type="number" min="14" max="99" value="20" /></label>
+        <label>성별<input id="pcGender" maxlength="30" value="남성" /></label>
+        <label>학과<select id="pcDepartment"><option>기사과 1학년</option><option>마법과 1학년</option><option>신학부 1학년</option><option>일반학부 1학년</option></select></label>
+        <label>출신<input id="pcOrigin" maxlength="100" value="서부 변경" /></label>
+        <label>신분<input id="pcSocialStatus" maxlength="80" value="평민 / 전직 용병" /></label>
+        <label>입학 경로<input id="pcAdmission" maxlength="100" value="용병장 추천장" /></label>
+        <label>초기 경지/서클<input id="pcRealm" maxlength="100" value="익스퍼트 상급" /></label>
+        <label>금화<input id="pcGold" type="number" min="0" max="999999" value="18" /></label>
+      </div>
+      <label>외형/인상<textarea id="pcAppearance" rows="2" maxlength="800" placeholder="선택 사항. 외형, 체격, 복장 특징 등"></textarea></label>
+      <div class="creator-section-title">재능 (1~10)</div>
+      <div class="talent-grid">
+        <label>🔮 魔<input id="talentMagic" type="number" min="1" max="10" value="2" /></label>
+        <label>⚔️ 武<input id="talentMartial" type="number" min="1" max="10" value="9" /></label>
+        <label>🌟 魂<input id="talentSoul" type="number" min="1" max="10" value="7" /></label>
+        <label>📘 智<input id="talentKnowledge" type="number" min="1" max="10" value="5" /></label>
+      </div>
+      <div class="creator-section-title">초기 스탯 등급</div>
+      <div class="creator-grid">
+        <label>신체<input id="statBody" maxlength="8" value="A-" /></label>
+        <label>마나<input id="statMana" maxlength="8" value="B+" /></label>
+        <label>지능<input id="statInt" maxlength="8" value="C" /></label>
+        <label>신성<input id="statHoly" maxlength="8" value="F" /></label>
+      </div>
+      <label>초기 스킬 <span class="field-help">한 줄에 `스킬명:등급`</span><textarea id="pcSkillsText" rows="7">대검술:A++\n오러 운용:A\n검기:A-\n실전 전투:S\n위험 감지:A++\n전장 판단:A+\n회피:A+</textarea></label>
+      <label>초기 장비 <span class="field-help">쉼표 또는 줄바꿈으로 구분</span><textarea id="pcInventoryText" rows="4">강철 양손대검, 예비 단검 2자루, 가죽 장갑, 야전 치료도구, 숫돌, 용병단 인식표</textarea></label>
+      <div class="creator-actions">
+        <button id="quickKyleBtn" type="button" class="secondary-btn">카일 빠른 시작</button>
+        <button type="submit" class="primary-btn">이 설정으로 새 게임</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="debugDialog" class="panel-dialog wide-dialog">
+    <form method="dialog">
+      <header><h2>개발자 DEBUG</h2><button value="cancel" class="close-btn">✕</button></header>
+      <pre id="debugContent" class="debug-content"></pre>
     </form>
   </dialog>
 
