@@ -1,6 +1,6 @@
 import { ASSETS } from './assets.js';
 
-const APP_VERSION = '1.4.2';
+const APP_VERSION = '1.4.3';
 const SAVE_KEY = 'lumensia.save.v1';
 const SETTINGS_KEY = 'lumensia.settings.v1';
 
@@ -541,9 +541,40 @@ async function sendAction(action) {
     let data;
     if (settings.demoMode) data = demoResponse(action);
     else {
-      const res = await fetch('/api/chat', { method: 'POST', headers: {'Content-Type':'application/json', 'X-Lumensia-Token': accessToken || ''}, body: JSON.stringify(payload) });
-      data = await res.json();
-      if (!res.ok) throw new Error(`${data.error || 'API 오류'}${data.request_id ? `\nRequest ID: ${data.request_id}` : ''}`);
+      const payloadText = JSON.stringify(payload);
+      const requestBytes = new Blob([payloadText]).size;
+      if (save?.debug) save.debug.lastRequestBytes = requestBytes;
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', 'X-Lumensia-Token': accessToken || ''},
+        body: payloadText
+      });
+
+      const raw = await res.text();
+      const contentType = res.headers.get('content-type') || '';
+      const vercelId = res.headers.get('x-vercel-id') || '';
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        const preview = String(raw || '').replace(/\s+/g, ' ').slice(0, 280);
+        const err = new Error(
+          `서버가 JSON이 아닌 응답을 보냈습니다. (HTTP ${res.status})` +
+          `${preview ? `\n${preview}` : ''}` +
+          `${vercelId ? `\nVercel ID: ${vercelId}` : ''}`
+        );
+        err.code = 'NON_JSON_SERVER_RESPONSE';
+        throw err;
+      }
+
+      if (!res.ok) {
+        throw new Error(
+          `${data.error || `API 오류 (HTTP ${res.status})`}` +
+          `${data.code ? `\nCode: ${data.code}` : ''}` +
+          `${data.request_id ? `\nRequest ID: ${data.request_id}` : ''}` +
+          `${vercelId ? `\nVercel ID: ${vercelId}` : ''}`
+        );
+      }
     }
     loader.remove();
     const notices = applyDelta(data.turn.state_delta);
@@ -580,7 +611,16 @@ async function sendAction(action) {
     renderTurnRecord(record); updateStatus(data.route); renderInfo(); actionInput.value = ''; scrollBottom();
   } catch (err) {
     loader.remove();
-    const e = document.createElement('div'); e.className = 'error-card'; e.textContent = err.message || String(err); story.append(e); scrollBottom();
+    const e = document.createElement('div');
+    e.className = 'error-card';
+    e.textContent = err.message || String(err);
+    story.append(e);
+    // 실패한 요청은 게임 상태에 적용하지 않는다. 선택지는 다시 사용할 수 있게 복구.
+    if (save?.renderedTurns?.length) {
+      const lastChoices = save.renderedTurns.at(-1)?.turn?.choices || [];
+      if (lastChoices.length) renderChoices(lastChoices);
+    }
+    scrollBottom();
   } finally { busy = false; sendBtn.disabled = false; actionInput.disabled = false; actionInput.focus(); }
 }
 
@@ -809,7 +849,7 @@ function renderDebug() {
   const npc=Object.entries(sc.npc_schedule||{}).map(([k,v])=>`- ${ASSETS.characters[k]?.name||k}: ${v.commitment} / ${v.area} [${v.confidence}]`).join('\n')||'-';
   const em=Object.entries(save.emotionStates||{}).slice(-12).map(([k,v])=>`- ${ASSETS.characters[k]?.name||k}: ${v.current} ${Number(v.intensity||0).toFixed(2)} · held ${v.turnsHeld||0}`).join('\n')||'-';
   const mem=(save.debug?.lastMemoryAdds||[]).map(x=>`- [${MEMORY_TYPE_LABELS[x.type]||x.type} P${memoryImportance(x.importance)} L${x.secret_level||0}] ${x.fact}`).join('\n')||'-';
-  $('debugContent').textContent=`APP V1.4.2 / SAVE v${save.version}\nTURN ${save.turnNumber}\n\n[MODEL]\n${route.tier||'-'} / ${route.model||'-'}\nreason=${route.reason||'-'} / reasoning=${route.reasoning_effort||'-'}\n\n[TOKENS / COST]\ninput ${usage.input_tokens||0}\ncached ${usage.cached_tokens||0} (${Math.round(Number(usage.cache_hit_rate||0)*100)}%)\noutput ${usage.output_tokens||0}\nreasoning ${usage.reasoning_tokens||0}\nturn $${Number(usage.estimated_usd||0).toFixed(4)} / total $${Number(save.usage.estimatedUsd||0).toFixed(4)}\n\n[WORLD]\n${save.world.date} ${save.world.weekday} ${save.world.time}\n${save.world.location}\n\n[SCHEDULE DUE]\n${due}\n\n[UPCOMING <=4h]\n${upcoming}\n\n[NPC SCHEDULE]\n${npc}\n\n[LAST MEMORY ADDS]\n${mem}\n\n[EMOTION]\n${em}\n\n[COUNTS]\ntimeline ${save.timeline.length}\nscheduled ${(save.scheduledEvents||[]).length}\nglobal memories ${(save.memories?.global||[]).length}\nnpc memories ${Object.values(save.memories?.npc||{}).reduce((n,x)=>n+(x?.length||0),0)}`;
+  $('debugContent').textContent=`APP V1.4.3 / SAVE v${save.version}\nTURN ${save.turnNumber}\n\n[MODEL]\n${route.tier||'-'} / ${route.model||'-'}\nreason=${route.reason||'-'} / reasoning=${route.reasoning_effort||'-'}\n\n[TOKENS / COST]\ninput ${usage.input_tokens||0}\ncached ${usage.cached_tokens||0} (${Math.round(Number(usage.cache_hit_rate||0)*100)}%)\noutput ${usage.output_tokens||0}\nreasoning ${usage.reasoning_tokens||0}\nturn $${Number(usage.estimated_usd||0).toFixed(4)} / total $${Number(save.usage.estimatedUsd||0).toFixed(4)}\n\n[WORLD]\n${save.world.date} ${save.world.weekday} ${save.world.time}\n${save.world.location}\n\n[SCHEDULE DUE]\n${due}\n\n[UPCOMING <=4h]\n${upcoming}\n\n[NPC SCHEDULE]\n${npc}\n\n[LAST MEMORY ADDS]\n${mem}\n\n[EMOTION]\n${em}\n\n[COUNTS]\ntimeline ${save.timeline.length}\nscheduled ${(save.scheduledEvents||[]).length}\nglobal memories ${(save.memories?.global||[]).length}\nnpc memories ${Object.values(save.memories?.npc||{}).reduce((n,x)=>n+(x?.length||0),0)}`;
 }
 
 ensureDynamicUi();
