@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 import { zodTextFormat } from 'openai/helpers/zod';
 import { z } from 'zod/v4';
 
-// LUMENSIA MOBILE V1.4.6 single-file API bundle
+// LUMENSIA MOBILE V1.4.7 single-file API bundle
 // api/lib modules are inlined for mobile-friendly GitHub deployment.
 
 // ===== BEGIN canon-data.js =====
@@ -1520,7 +1520,7 @@ export default async function handler(req, res) {
       }),
       reasoning,
       max_output_tokens: maxOutput,
-      prompt_cache_key: process.env.OPENAI_PROMPT_CACHE_KEY || 'lumensia-v1.4.6-event-director-v1',
+      prompt_cache_key: process.env.OPENAI_PROMPT_CACHE_KEY || 'lumensia-v1.4.7-event-director-v1',
       prompt_cache_retention: '24h',
       text: {
         verbosity: proseLength === 'long' ? 'high' : proseLength === 'short' ? 'low' : 'medium',
@@ -1583,7 +1583,7 @@ export default async function handler(req, res) {
       },
       usage: usageSummary(route.model, response.usage),
       request_id: response._request_id || null,
-      server_version: '0.5.5',
+      server_version: '0.5.6',
     });
   } catch (error) {
     console.error(error);
