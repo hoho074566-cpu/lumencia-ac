@@ -1,6 +1,6 @@
 import { ASSETS } from './assets.js';
 
-const APP_VERSION = '1.4.7';
+const APP_VERSION = '1.4.8';
 const SAVE_KEY = 'lumensia.save.v1';
 const SETTINGS_KEY = 'lumensia.settings.v1';
 
@@ -257,33 +257,115 @@ function addMemoryUnique(list, memory, max = 250) {
   return [...keepProtected, ...normalRows.slice(-room)].sort((x,y) => Number(x.turn||0)-Number(y.turn||0));
 }
 
-function assetUrl(key, expression = 'default') {
+// ===== characters-v2 portrait routing: BEGIN =====
+
+const EXPRESSION_FALLBACKS = Object.freeze({
+  default: ['default'],
+
+  smile: ['smile', 'default'],
+  laugh: ['laugh', 'smile', 'default'],
+  smug: ['smug', 'smile', 'default'],
+
+  blush: ['blush', 'default'],
+  flustered: ['flustered', 'blush', 'confused', 'default'],
+
+  serious: ['serious', 'default'],
+  annoyed: ['annoyed', 'serious', 'angry', 'default'],
+  angry: ['angry', 'annoyed', 'serious', 'default'],
+
+  worried: ['worried', 'sad', 'serious', 'default'],
+  sad: ['sad', 'worried', 'default'],
+
+  confused: ['confused', 'serious', 'worried', 'default'],
+  shock: ['shock', 'confused', 'worried', 'default'],
+});
+
+function portraitCandidates(key, expression = 'default') {
   const char = ASSETS.characters[key];
-  if (!char) return null;
-  return char.expressions?.[expression] || char.default || null;
+  if (!char) return [];
+
+  const requested = String(expression || 'default').toLowerCase();
+  const order =
+    EXPRESSION_FALLBACKS[requested] ||
+    [requested, 'default'];
+
+  const seen = new Set();
+  const rows = [];
+
+  for (const state of order) {
+    const url =
+      state === 'default'
+        ? char.default
+        : char.expressions?.[state];
+
+    if (!url || seen.has(url)) continue;
+
+    seen.add(url);
+    rows.push({ state, url });
+  }
+
+  return rows;
+}
+
+function assetUrl(key, expression = 'default') {
+  return portraitCandidates(key, expression)[0]?.url || null;
 }
 
 function createPortrait(key, expression, alt) {
   const wrap = document.createElement('div');
   wrap.className = 'portrait-wrap';
+  wrap.dataset.requestedExpression = String(expression || 'default');
+
   const placeholder = document.createElement('div');
   placeholder.className = 'portrait-placeholder';
   placeholder.textContent = `${alt || key || 'NPC'} 초상화`;
   wrap.append(placeholder);
+
+  const candidates = portraitCandidates(
+    key,
+    expression || 'default'
+  );
+
+  if (!candidates.length) {
+    return wrap;
+  }
+
   const img = document.createElement('img');
-  let triedDefault = false;
   img.alt = alt || key || 'NPC';
   img.loading = 'lazy';
-  img.src = assetUrl(key, expression) || '';
-  img.addEventListener('load', () => placeholder.remove());
-  img.addEventListener('error', () => {
-    const fallback = ASSETS.characters[key]?.default;
-    if (!triedDefault && fallback && img.src !== fallback) { triedDefault = true; img.src = fallback; }
-    else img.remove();
+
+  let cursor = 0;
+
+  function loadNextCandidate() {
+    const next = candidates[cursor++];
+
+    if (!next) {
+      img.remove();
+      wrap.dataset.displayExpression = 'none';
+      return;
+    }
+
+    img.dataset.expression = next.state;
+    img.src = next.url;
+  }
+
+  img.addEventListener('load', () => {
+    placeholder.remove();
+    wrap.dataset.displayExpression =
+      img.dataset.expression || 'default';
   });
-  if (img.src) wrap.append(img);
+
+  img.addEventListener('error', () => {
+    loadNextCandidate();
+  });
+
+  wrap.append(img);
+  loadNextCandidate();
+
   return wrap;
 }
+
+// ===== characters-v2 portrait routing: END =====
 
 function appendWelcome() {
   story.innerHTML = '';
@@ -1037,7 +1119,7 @@ function renderDebug() {
   const dirPlan=route.director_plan||{};
   const dirCallbacks=(save.director?.callbacks||[]).filter(x=>x.status!=='resolved').slice(-8).map(x=>`- [${x.status}] ${x.key} / T${x.createdTurn}→T${x.lastTurn} / ${x.note||'-'}`).join('\n')||'-';
   const dirRecent=(save.director?.recentSpotlights||[]).slice(-8).map(x=>`- T${x.turn} ${x.beat}/${x.event_kind}: ${(x.keys||[]).join(', ')||'-'}`).join('\n')||'-';
-  $('debugContent').textContent=`APP V1.4.7 / SAVE v${save.version}\nTURN ${save.turnNumber}\n\n[MODEL]\n${route.tier||'-'} / ${route.model||'-'}\nreason=${route.reason||'-'} / reasoning=${route.reasoning_effort||'-'}\n\n[TOKENS / COST]\ninput ${usage.input_tokens||0}\ncached ${usage.cached_tokens||0} (${Math.round(Number(usage.cache_hit_rate||0)*100)}%)\noutput ${usage.output_tokens||0}\nreasoning ${usage.reasoning_tokens||0}\nturn $${Number(usage.estimated_usd||0).toFixed(4)} / total $${Number(save.usage.estimatedUsd||0).toFixed(4)}\n\n[WORLD]\n${save.world.date} ${save.world.weekday} ${save.world.time}\n${save.world.location}\n\n[SCHEDULE DUE]\n${due}\n\n[UPCOMING <=4h]\n${upcoming}\n\n[NPC SCHEDULE]\n${npc}\n\n[LAST MEMORY ADDS]\n${mem}\n\n[LAST RELATION CHANGES]\n${relchg}\n\n[ACTIVE HOOKS]\n${hooks}\n\n[LAST HOOK CHANGES]\n${hookchg}\n\n[EMOTION]\n${em}\n\n[EVENT DIRECTOR]\nplan=${dirPlan.intervention||'-'} / choiceDue=${dirPlan.choice_due?'Y':'N'} / crossDue=${dirPlan.cross_department_due?'Y':'N'} / payoffDue=${dirPlan.payoff_due?'Y':'N'}\nplanCandidates=${(dirPlan.candidates||[]).map(x=>`${x.key}:${x.score}`).join(', ')||'-'}\nactual=${dir.intervention||'-'} / beat=${dir.beat||'-'} / kind=${dir.event_kind||'-'}\nspotlight=${(dir.spotlight_keys||[]).join(', ')||'-'}\ncallback=${dir.callback_key||'-'} / phase=${dir.callback_phase||'-'}\nreason=${dir.reason||'-'}\nlastEventTurn=${save.director?.lastEventTurn??'-'} / lastChoice=${save.director?.lastChoicePressureTurn??'-'} / lastCrossDept=${save.director?.lastCrossDepartmentTurn??'-'}\n\n[DIRECTOR CALLBACKS]\n${dirCallbacks}\n\n[RECENT SPOTLIGHT]\n${dirRecent}\n\n[COUNTS]\ntimeline ${save.timeline.length}\nscheduled ${(save.scheduledEvents||[]).length}\nhooks ${(save.hooks||[]).length}\nglobal memories ${(save.memories?.global||[]).length}\nnpc memories ${Object.values(save.memories?.npc||{}).reduce((n,x)=>n+(x?.length||0),0)}`;
+  $('debugContent').textContent=`APP V1.4.8 / SAVE v${save.version}\nTURN ${save.turnNumber}\n\n[MODEL]\n${route.tier||'-'} / ${route.model||'-'}\nreason=${route.reason||'-'} / reasoning=${route.reasoning_effort||'-'}\n\n[TOKENS / COST]\ninput ${usage.input_tokens||0}\ncached ${usage.cached_tokens||0} (${Math.round(Number(usage.cache_hit_rate||0)*100)}%)\noutput ${usage.output_tokens||0}\nreasoning ${usage.reasoning_tokens||0}\nturn $${Number(usage.estimated_usd||0).toFixed(4)} / total $${Number(save.usage.estimatedUsd||0).toFixed(4)}\n\n[WORLD]\n${save.world.date} ${save.world.weekday} ${save.world.time}\n${save.world.location}\n\n[SCHEDULE DUE]\n${due}\n\n[UPCOMING <=4h]\n${upcoming}\n\n[NPC SCHEDULE]\n${npc}\n\n[LAST MEMORY ADDS]\n${mem}\n\n[LAST RELATION CHANGES]\n${relchg}\n\n[ACTIVE HOOKS]\n${hooks}\n\n[LAST HOOK CHANGES]\n${hookchg}\n\n[EMOTION]\n${em}\n\n[EVENT DIRECTOR]\nplan=${dirPlan.intervention||'-'} / choiceDue=${dirPlan.choice_due?'Y':'N'} / crossDue=${dirPlan.cross_department_due?'Y':'N'} / payoffDue=${dirPlan.payoff_due?'Y':'N'}\nplanCandidates=${(dirPlan.candidates||[]).map(x=>`${x.key}:${x.score}`).join(', ')||'-'}\nactual=${dir.intervention||'-'} / beat=${dir.beat||'-'} / kind=${dir.event_kind||'-'}\nspotlight=${(dir.spotlight_keys||[]).join(', ')||'-'}\ncallback=${dir.callback_key||'-'} / phase=${dir.callback_phase||'-'}\nreason=${dir.reason||'-'}\nlastEventTurn=${save.director?.lastEventTurn??'-'} / lastChoice=${save.director?.lastChoicePressureTurn??'-'} / lastCrossDept=${save.director?.lastCrossDepartmentTurn??'-'}\n\n[DIRECTOR CALLBACKS]\n${dirCallbacks}\n\n[RECENT SPOTLIGHT]\n${dirRecent}\n\n[COUNTS]\ntimeline ${save.timeline.length}\nscheduled ${(save.scheduledEvents||[]).length}\nhooks ${(save.hooks||[]).length}\nglobal memories ${(save.memories?.global||[]).length}\nnpc memories ${Object.values(save.memories?.npc||{}).reduce((n,x)=>n+(x?.length||0),0)}`;
 }
 
 ensureDynamicUi();
@@ -1071,46 +1153,124 @@ function toast(text) { const d=document.createElement('div'); d.textContent=text
 
 async function checkHealth() { try { const r=await fetch('/api/health'); const h=await r.json(); $('apiHealth').textContent=h.apiConfigured?`API 연결 준비됨 · ${h.luna} / ${h.terra}${h.accessTokenRequired ? ' · 접속 토큰 필요' : ''}`:'API 키 미설정. Vercel 환경변수 OPENAI_API_KEY를 추가하거나 데모 모드를 켜세요.'; } catch { $('apiHealth').textContent='API 상태를 확인할 수 없음.'; } }
 
+// ===== characters-v2 asset audit: BEGIN =====
+
+const PORTRAIT_EXPRESSION_ORDER = Object.freeze([
+  'default',
+  'smile',
+  'laugh',
+  'smug',
+  'blush',
+  'flustered',
+  'serious',
+  'annoyed',
+  'angry',
+  'worried',
+  'sad',
+  'confused',
+  'shock',
+]);
+
 function probeImage(url) {
   return new Promise((resolve) => {
     if (!url) return resolve(false);
+
     const img = new Image();
-    const done = (ok) => { img.onload = null; img.onerror = null; resolve(ok); };
+
+    const done = (ok) => {
+      img.onload = null;
+      img.onerror = null;
+      resolve(ok);
+    };
+
     img.onload = () => done(true);
     img.onerror = () => done(false);
-    img.src = `${url}${url.includes('?') ? '&' : '?'}check=${Date.now()}`;
+
+    img.src =
+      `${url}${url.includes('?') ? '&' : '?'}check=${Date.now()}`;
   });
 }
 
 async function testAssets() {
-  const results=$('assetResults'); results.innerHTML=''; $('assetDialog').showModal();
-  const keys=['lilia','anastasia','laris','aria','isabel','chloe','lena','veradin','bellian','aris','mirabelle'];
-  for (const key of keys) {
-    const char=ASSETS.characters[key];
-    const preferred=char?.expressions?.smile || char?.default;
-    const preferredName=char?.expressions?.smile ? 'SMILE' : 'DEFAULT';
-    const item=document.createElement('div'); item.className='asset-item';
-    const img=document.createElement('img');
-    const label=document.createElement('div'); label.textContent=`${char?.name||key}: ${preferredName} 검사 중`;
-    item.append(img,label); results.append(item);
-    const preferredOk = await probeImage(preferred);
-    if (preferredOk) {
-      img.src=preferred; label.textContent=`${char.name}: ${preferredName} OK`;
+  const results = $('assetResults');
+  results.innerHTML = '';
+  $('assetDialog').showModal();
+
+  const characters = Object.entries(ASSETS.characters || {});
+
+  if (!characters.length) {
+    results.textContent = '등록된 캐릭터가 없습니다.';
+    return;
+  }
+
+  for (const [key, char] of characters) {
+    const item = document.createElement('div');
+    item.className = 'asset-item';
+
+    const img = document.createElement('img');
+    const label = document.createElement('div');
+
+    label.textContent =
+      `${char?.name || key}: V2 DEFAULT 검사 중`;
+
+    item.append(img, label);
+    results.append(item);
+
+    // 폴더 자체가 아직 characters-v2에 없으면
+    // 13장을 전부 404 검사하지 않고 DEFAULT 한 장에서 중단한다.
+    const defaultOk = await probeImage(char?.default);
+
+    if (!defaultOk) {
+      img.remove();
+      item.classList.add('asset-fail');
+
+      label.textContent =
+        `${char?.name || key}: V2 폴더/DEFAULT 없음`;
+
       continue;
     }
-    const fallback=char?.default;
-    const defaultOk = fallback && fallback !== preferred ? await probeImage(fallback) : false;
-    if (defaultOk) {
-      img.src=fallback;
-      label.textContent=`${char.name}: ${preferredName} 실패 → DEFAULT OK (게임은 자동 폴백)`;
-      item.classList.add('asset-warn');
-    } else {
-      img.remove();
-      label.textContent=`${char?.name||key}: ${preferredName}${fallback!==preferred?' + DEFAULT':''} 실패`;
-      item.classList.add('asset-fail');
+
+    img.src = char.default;
+
+    const expressionRows =
+      PORTRAIT_EXPRESSION_ORDER
+        .filter((expression) => expression !== 'default')
+        .map((expression) => ({
+          expression,
+          url: char?.expressions?.[expression] || null,
+        }));
+
+    label.textContent =
+      `${char?.name || key}: 나머지 12종 검사 중`;
+
+    // 같은 캐릭터의 12표정은 병렬 검사.
+    const checks = await Promise.all(
+      expressionRows.map(async (row) => ({
+        ...row,
+        ok: await probeImage(row.url),
+      }))
+    );
+
+    const failed = checks
+      .filter((row) => !row.ok)
+      .map((row) => row.expression.toUpperCase());
+
+    const success = 13 - failed.length;
+
+    if (!failed.length) {
+      label.textContent =
+        `${char?.name || key}: 13/13 ALL OK`;
+      continue;
     }
+
+    item.classList.add('asset-warn');
+
+    label.textContent =
+      `${char?.name || key}: ${success}/13 OK · 누락/실패 [${failed.join(', ')}]`;
   }
 }
+
+// ===== characters-v2 asset audit: END =====
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
 refreshScheduleContext(); updateForceTerraButton(); checkHealth(); renderAll();
