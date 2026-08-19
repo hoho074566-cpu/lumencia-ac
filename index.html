@@ -8,14 +8,14 @@
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/styles.css" />
-  <title>루멘시아 모바일 V1.4.6</title>
+  <title>루멘시아 모바일 V1.4.3</title>
 </head>
 <body>
   <div id="app">
     <header class="topbar">
       <div>
         <div class="eyebrow">LUMENSIA ACADEMY</div>
-        <h1>루멘시아 모바일 <small class="version-tag">V1.4.6</small></h1>
+        <h1>루멘시아 모바일 <small class="version-tag">V1.4.3</small></h1>
       </div>
       <div class="top-actions">
         <button id="infoBtn" class="icon-btn" aria-label="상태창">INFO</button>
@@ -34,7 +34,7 @@
     <section id="choices" class="choices hidden"></section>
 
     <form id="actionForm" class="composer">
-      <textarea id="actionInput" rows="2" maxlength="5000" placeholder="카일의 행동이나 대사를 직접 입력…"></textarea>
+      <textarea id="actionInput" rows="2" maxlength="5000" placeholder="PC의 행동이나 대사를 직접 입력…"></textarea>
       <button id="sendBtn" type="submit">진행</button>
     </form>
 
@@ -111,12 +111,12 @@
   <dialog id="pcCreatorDialog" class="panel-dialog wide-dialog">
     <form id="pcCreatorForm">
       <header><h2>PC 생성</h2><button id="pcCreatorClose" type="button" class="close-btn">✕</button></header>
-      <div class="creator-note">새 게임은 완전한 빈 시트에서 시작한다. 직접 입력하거나, 아래에 미리 만든 PC 설정을 붙여넣어 자동으로 채울 수 있다. 카일 프리셋은 별도 빠른 시작 버튼으로만 불러온다.</div>
+      <div class="creator-note">새 게임은 완전한 빈 시트에서 시작한다. 직접 입력하거나, 아래에 미리 만든 PC 설정을 붙여넣어 자동으로 채울 수 있다.</div>
 
       <section class="pc-paste-box">
         <div class="creator-section-title">PC 설정 붙여넣기</div>
         <textarea id="pcPasteText" rows="7" maxlength="12000" placeholder="자연어 또는 JSON 가능. 예:
-이름: 카일
+이름: Aaa
 나이: 20
 성별: 남성
 학과: 기사과 1학년
@@ -133,7 +133,7 @@
       </section>
 
       <div class="creator-grid">
-        <label>이름<input id="pcName" required maxlength="40" placeholder="예: 카일" /></label>
+        <label>이름<input id="pcName" required maxlength="40" placeholder="예: Aaa" /></label>
         <label>나이<input id="pcAge" required type="number" min="14" max="99" placeholder="예: 20" /></label>
         <label>성별<input id="pcGender" maxlength="30" placeholder="예: 남성" /></label>
         <label>학과<select id="pcDepartment"><option value="">-- 선택 안 함 --</option><option>기사과 1학년</option><option>마법과 1학년</option><option>신학부 1학년</option><option>일반학부 1학년</option></select></label>
@@ -177,7 +177,6 @@
 오러 운용:A"></textarea></label>
       <label>초기 장비 <span class="field-help">쉼표 또는 줄바꿈으로 구분</span><textarea id="pcInventoryText" rows="4" placeholder="예: 강철 양손대검, 가죽 장갑"></textarea></label>
       <div class="creator-actions">
-        <button id="quickKyleBtn" type="button" class="secondary-btn">카일 빠른 시작</button>
         <button type="submit" class="primary-btn">이 설정으로 새 게임</button>
       </div>
     </form>

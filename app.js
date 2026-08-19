@@ -1,6 +1,6 @@
 import { ASSETS } from './assets.js';
 
-const APP_VERSION = '1.4.6';
+const APP_VERSION = '1.4.7';
 const SAVE_KEY = 'lumensia.save.v1';
 const SETTINGS_KEY = 'lumensia.settings.v1';
 
@@ -121,26 +121,21 @@ const defaultSave = () => ({
     location: '루멘시아 아카데미 대강당 앞',
   },
   pc: {
-    name: '카일', age: 20, gender: '남성', department: '기사과 1학년',
-    origin: '서부 변경', socialStatus: '평민 / 전직 용병', admission: '용병장 추천장', appearance: '',
+    // 스키마 기본값은 특정 프리셋이 아닌 완전 중립값이어야 한다.
+    // 새 캐릭터의 스킬/장비는 생성창에 사용자가 입력한 것만 저장한다.
+    name: 'Aaa', age: 20, gender: '미지정', department: '미지정',
+    origin: '', socialStatus: '', admission: '', appearance: '',
     characterSetting: '',
-    realm: '익스퍼트 상급', status: '안정', fatigue: 0, gold: 18,
-    talents: { magic: 2, martial: 9, soul: 7, knowledge: 5 },
+    realm: '비기너', status: '안정', fatigue: 0, gold: 0,
+    talents: { magic: 5, martial: 5, soul: 5, knowledge: 5 },
     stats: {
-      '신체': { grade: 'A-', progress: 36 },
-      '마나': { grade: 'B+', progress: 41 },
-      '지능': { grade: 'C', progress: 28 },
+      '신체': { grade: 'D', progress: 0 },
+      '마나': { grade: 'D', progress: 0 },
+      '지능': { grade: 'D', progress: 0 },
       '신성': { grade: 'F', progress: 0 },
     },
-    skills: {
-      '대검술': { grade: 'A++', hiddenXp: 0 }, '오러 운용': { grade: 'A', hiddenXp: 0 },
-      '검기': { grade: 'A-', hiddenXp: 0 }, '실전 전투': { grade: 'S', hiddenXp: 0 },
-      '위험 감지': { grade: 'A++', hiddenXp: 0 }, '전장 판단': { grade: 'A+', hiddenXp: 0 },
-      '회피': { grade: 'A+', hiddenXp: 0 }, '체력 관리': { grade: 'A', hiddenXp: 0 },
-      '응급처치': { grade: 'B+', hiddenXp: 0 }, '야전 생존': { grade: 'A', hiddenXp: 0 },
-      '투척': { grade: 'C+', hiddenXp: 0 }, '승마': { grade: 'B', hiddenXp: 0 },
-    },
-    inventory: ['강철 양손대검', '예비 단검 2자루', '가죽 장갑', '야전 치료도구', '숫돌', '용병단 인식표'],
+    skills: {},
+    inventory: [],
   },
   relationships: {},
   intimacyStates: {},
@@ -166,7 +161,7 @@ const defaultSave = () => ({
   scheduleContext: {},
   debug: { lastRoute:null, lastUsage:null, lastMemoryAdds:[], lastRelationChanges:[], lastHookChanges:[], lastSchedule:null, lastRequestBytes:0, lastDirector:null },
   flags: { majorScene: false, forceTerraNextTurn: true },
-  rollingSummary: '입학식 당일 08:40. 카일은 루멘시아 아카데미 대강당 앞에 도착했으며 입학식 개막 전이다.',
+  rollingSummary: '입학식 당일 08:40. PC는 루멘시아 아카데미 대강당 앞에 도착했으며 입학식 개막 전이다.',
   recentTurns: [],
   renderedTurns: [],
   usage: { inputTokens: 0, outputTokens: 0, reasoningTokens: 0, cachedTokens: 0, cacheWriteTokens: 0, estimatedUsd: 0, lastTurnUsd: 0, lastCacheHitRate: 0, lastInputTokens: 0, lastOutputTokens: 0 },
@@ -192,8 +187,8 @@ function normalizeSave(raw) {
   next.world = { ...base.world, ...(next.world || {}) };
   next.pc = { ...base.pc, ...(next.pc || {}) };
   next.pc.stats = { ...base.pc.stats, ...(next.pc.stats || {}) };
-  next.pc.skills = { ...base.pc.skills, ...(next.pc.skills || {}) };
-  next.pc.inventory = Array.isArray(next.pc.inventory) ? next.pc.inventory : [...base.pc.inventory];
+  next.pc.skills = (next.pc.skills && typeof next.pc.skills === 'object' && !Array.isArray(next.pc.skills)) ? { ...next.pc.skills } : {};
+  next.pc.inventory = Array.isArray(next.pc.inventory) ? [...next.pc.inventory] : [];
   next.relationships = next.relationships || {};
   next.intimacyStates = next.intimacyStates || {};
   next.npcStates = next.npcStates || {};
@@ -415,11 +410,11 @@ function renderInfo() {
   const intimacy = Object.entries(save.intimacyStates || {}).filter(([,v]) => Number(v?.level || 0) > 0)
     .map(([key,v]) => `${ASSETS.characters[key]?.name || key}[L${Math.min(4, Number(v.level||0))}${Number(v.level||0)>=5 ? '/MAX':''}${v.status ? ` · ${v.status}`:''}]`)
     .join(', ') || '-';
-  const skills = Object.entries(save.pc.skills || {}).map(([k,v]) => `${k} ${v.grade}`).join(' | ');
+  const skills = Object.entries(save.pc.skills || {}).map(([k,v]) => `${k} ${v.grade}`).join(' | ') || '-';
   const stats = Object.entries(save.pc.stats || {}).map(([k,v]) => `- ${k}: ${v.grade} [${v.progress}/100]`).join('\n');
   $('infoContent').textContent = `PC: ${save.pc.name} (${save.pc.age}세 / ${save.pc.gender})
 출신: ${save.pc.origin || '-'} | 신분: ${save.pc.socialStatus || '-'} | 입학: ${save.pc.admission || '-'}
-경지: ${save.pc.realm} | 소속: 루멘시아 아카데미\n---------\n직위: ${save.pc.department} | 상황: 🟢\n---------\n스킬: ${skills}\n---------\n스탯:\n${stats}\n---------\n🔮[魔] ${save.pc.talents.magic} | ⚔️[武] ${save.pc.talents.martial} | 🌟[魂] ${save.pc.talents.soul} | 📘[智] ${save.pc.talents.knowledge}\n---------\n상태: ${save.pc.status} | 피로 ${save.pc.fatigue}/100\n💼: ${save.pc.inventory.join(', ')}, 금화 ${save.pc.gold}G\n관계: ${rel}\n친밀도(성인모드): ${intimacy}\n---------\n진행 사건: ${save.activeEvents.join(', ') || '-'}\n토큰 누적: 입력 ${save.usage.inputTokens || 0} / 캐시 ${save.usage.cachedTokens || 0} / 출력 ${save.usage.outputTokens || 0} / 추론 ${save.usage.reasoningTokens || 0}\n직전 턴: 입력 ${save.usage.lastInputTokens || 0} / 출력 ${save.usage.lastOutputTokens || 0} / 캐시 적중 ${Math.round(Number(save.usage.lastCacheHitRate || 0)*100)}% / 비용 $${Number(save.usage.lastTurnUsd || 0).toFixed(4)}\n누적 API 비용(추정): $${Number(save.usage.estimatedUsd || 0).toFixed(4)}\n영구 타임라인: ${save.timeline?.length || 0}건 | NPC 감정상태: ${Object.keys(save.emotionStates || {}).length}명
+경지: ${save.pc.realm} | 소속: 루멘시아 아카데미\n---------\n직위: ${save.pc.department} | 상황: 🟢\n---------\n스킬: ${skills}\n---------\n스탯:\n${stats}\n---------\n🔮[魔] ${save.pc.talents.magic} | ⚔️[武] ${save.pc.talents.martial} | 🌟[魂] ${save.pc.talents.soul} | 📘[智] ${save.pc.talents.knowledge}\n---------\n상태: ${save.pc.status} | 피로 ${save.pc.fatigue}/100\n💼: ${(save.pc.inventory||[]).join(', ') || '-'} | 금화 ${save.pc.gold}G\n관계: ${rel}\n친밀도(성인모드): ${intimacy}\n---------\n진행 사건: ${save.activeEvents.join(', ') || '-'}\n토큰 누적: 입력 ${save.usage.inputTokens || 0} / 캐시 ${save.usage.cachedTokens || 0} / 출력 ${save.usage.outputTokens || 0} / 추론 ${save.usage.reasoningTokens || 0}\n직전 턴: 입력 ${save.usage.lastInputTokens || 0} / 출력 ${save.usage.lastOutputTokens || 0} / 캐시 적중 ${Math.round(Number(save.usage.lastCacheHitRate || 0)*100)}% / 비용 $${Number(save.usage.lastTurnUsd || 0).toFixed(4)}\n누적 API 비용(추정): $${Number(save.usage.estimatedUsd || 0).toFixed(4)}\n영구 타임라인: ${save.timeline?.length || 0}건 | NPC 감정상태: ${Object.keys(save.emotionStates || {}).length}명
 예약 일정: ${(save.scheduledEvents||[]).filter(x=>x.status!=='completed'&&x.status!=='cancelled').length}건 | 훅: ${(save.hooks||[]).filter(x=>!['resolved','expired'].includes(x.status)).length}건 | 기억: ${(save.memories?.global||[]).length + Object.values(save.memories?.npc||{}).reduce((n,x)=>n+(x?.length||0),0)}건`;
 }
 
@@ -1042,7 +1037,7 @@ function renderDebug() {
   const dirPlan=route.director_plan||{};
   const dirCallbacks=(save.director?.callbacks||[]).filter(x=>x.status!=='resolved').slice(-8).map(x=>`- [${x.status}] ${x.key} / T${x.createdTurn}→T${x.lastTurn} / ${x.note||'-'}`).join('\n')||'-';
   const dirRecent=(save.director?.recentSpotlights||[]).slice(-8).map(x=>`- T${x.turn} ${x.beat}/${x.event_kind}: ${(x.keys||[]).join(', ')||'-'}`).join('\n')||'-';
-  $('debugContent').textContent=`APP V1.4.6 / SAVE v${save.version}\nTURN ${save.turnNumber}\n\n[MODEL]\n${route.tier||'-'} / ${route.model||'-'}\nreason=${route.reason||'-'} / reasoning=${route.reasoning_effort||'-'}\n\n[TOKENS / COST]\ninput ${usage.input_tokens||0}\ncached ${usage.cached_tokens||0} (${Math.round(Number(usage.cache_hit_rate||0)*100)}%)\noutput ${usage.output_tokens||0}\nreasoning ${usage.reasoning_tokens||0}\nturn $${Number(usage.estimated_usd||0).toFixed(4)} / total $${Number(save.usage.estimatedUsd||0).toFixed(4)}\n\n[WORLD]\n${save.world.date} ${save.world.weekday} ${save.world.time}\n${save.world.location}\n\n[SCHEDULE DUE]\n${due}\n\n[UPCOMING <=4h]\n${upcoming}\n\n[NPC SCHEDULE]\n${npc}\n\n[LAST MEMORY ADDS]\n${mem}\n\n[LAST RELATION CHANGES]\n${relchg}\n\n[ACTIVE HOOKS]\n${hooks}\n\n[LAST HOOK CHANGES]\n${hookchg}\n\n[EMOTION]\n${em}\n\n[EVENT DIRECTOR]\nplan=${dirPlan.intervention||'-'} / choiceDue=${dirPlan.choice_due?'Y':'N'} / crossDue=${dirPlan.cross_department_due?'Y':'N'} / payoffDue=${dirPlan.payoff_due?'Y':'N'}\nplanCandidates=${(dirPlan.candidates||[]).map(x=>`${x.key}:${x.score}`).join(', ')||'-'}\nactual=${dir.intervention||'-'} / beat=${dir.beat||'-'} / kind=${dir.event_kind||'-'}\nspotlight=${(dir.spotlight_keys||[]).join(', ')||'-'}\ncallback=${dir.callback_key||'-'} / phase=${dir.callback_phase||'-'}\nreason=${dir.reason||'-'}\nlastEventTurn=${save.director?.lastEventTurn??'-'} / lastChoice=${save.director?.lastChoicePressureTurn??'-'} / lastCrossDept=${save.director?.lastCrossDepartmentTurn??'-'}\n\n[DIRECTOR CALLBACKS]\n${dirCallbacks}\n\n[RECENT SPOTLIGHT]\n${dirRecent}\n\n[COUNTS]\ntimeline ${save.timeline.length}\nscheduled ${(save.scheduledEvents||[]).length}\nhooks ${(save.hooks||[]).length}\nglobal memories ${(save.memories?.global||[]).length}\nnpc memories ${Object.values(save.memories?.npc||{}).reduce((n,x)=>n+(x?.length||0),0)}`;
+  $('debugContent').textContent=`APP V1.4.7 / SAVE v${save.version}\nTURN ${save.turnNumber}\n\n[MODEL]\n${route.tier||'-'} / ${route.model||'-'}\nreason=${route.reason||'-'} / reasoning=${route.reasoning_effort||'-'}\n\n[TOKENS / COST]\ninput ${usage.input_tokens||0}\ncached ${usage.cached_tokens||0} (${Math.round(Number(usage.cache_hit_rate||0)*100)}%)\noutput ${usage.output_tokens||0}\nreasoning ${usage.reasoning_tokens||0}\nturn $${Number(usage.estimated_usd||0).toFixed(4)} / total $${Number(save.usage.estimatedUsd||0).toFixed(4)}\n\n[WORLD]\n${save.world.date} ${save.world.weekday} ${save.world.time}\n${save.world.location}\n\n[SCHEDULE DUE]\n${due}\n\n[UPCOMING <=4h]\n${upcoming}\n\n[NPC SCHEDULE]\n${npc}\n\n[LAST MEMORY ADDS]\n${mem}\n\n[LAST RELATION CHANGES]\n${relchg}\n\n[ACTIVE HOOKS]\n${hooks}\n\n[LAST HOOK CHANGES]\n${hookchg}\n\n[EMOTION]\n${em}\n\n[EVENT DIRECTOR]\nplan=${dirPlan.intervention||'-'} / choiceDue=${dirPlan.choice_due?'Y':'N'} / crossDue=${dirPlan.cross_department_due?'Y':'N'} / payoffDue=${dirPlan.payoff_due?'Y':'N'}\nplanCandidates=${(dirPlan.candidates||[]).map(x=>`${x.key}:${x.score}`).join(', ')||'-'}\nactual=${dir.intervention||'-'} / beat=${dir.beat||'-'} / kind=${dir.event_kind||'-'}\nspotlight=${(dir.spotlight_keys||[]).join(', ')||'-'}\ncallback=${dir.callback_key||'-'} / phase=${dir.callback_phase||'-'}\nreason=${dir.reason||'-'}\nlastEventTurn=${save.director?.lastEventTurn??'-'} / lastChoice=${save.director?.lastChoicePressureTurn??'-'} / lastCrossDept=${save.director?.lastCrossDepartmentTurn??'-'}\n\n[DIRECTOR CALLBACKS]\n${dirCallbacks}\n\n[RECENT SPOTLIGHT]\n${dirRecent}\n\n[COUNTS]\ntimeline ${save.timeline.length}\nscheduled ${(save.scheduledEvents||[]).length}\nhooks ${(save.hooks||[]).length}\nglobal memories ${(save.memories?.global||[]).length}\nnpc memories ${Object.values(save.memories?.npc||{}).reduce((n,x)=>n+(x?.length||0),0)}`;
 }
 
 ensureDynamicUi();
@@ -1066,7 +1061,6 @@ $('metaBtn')?.addEventListener('click',()=>{ if (busy) return; metaModeOnce=!met
 $('pcCreatorClose').addEventListener('click',()=>$('pcCreatorDialog').close());
 $('pcCreatorClearBtn').addEventListener('click',()=>clearPcCreatorForm({keepPaste:false}));
 $('pcPasteApplyBtn').addEventListener('click',applyPastedPcText);
-$('quickKyleBtn').addEventListener('click',()=>{save=normalizeSave(defaultSave());refreshScheduleContext();persist();$('pcCreatorDialog').close();renderAll();toast('카일 빠른 시작 세이브 생성');});
 $('pcCreatorForm').addEventListener('submit',(e)=>{e.preventDefault();save=createNewSaveFromCreator();refreshScheduleContext();persist();$('pcCreatorDialog').close();renderAll();toast(`${save.pc.name} 새 게임 생성`);});
 
 function exportSave() {
