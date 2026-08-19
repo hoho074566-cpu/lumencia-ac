@@ -1,6 +1,6 @@
 import { ASSETS } from './assets.js';
 
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.2';
 const SAVE_KEY = 'lumensia.save.v1';
 const SETTINGS_KEY = 'lumensia.settings.v1';
 
@@ -111,6 +111,7 @@ const defaultSave = () => ({
   pc: {
     name: '카일', age: 20, gender: '남성', department: '기사과 1학년',
     origin: '서부 변경', socialStatus: '평민 / 전직 용병', admission: '용병장 추천장', appearance: '',
+    characterSetting: '',
     realm: '익스퍼트 상급', status: '안정', fatigue: 0, gold: 18,
     talents: { magic: 2, martial: 9, soul: 7, knowledge: 5 },
     stats: {
@@ -613,10 +614,10 @@ function updateForceTerraButton() {
 function scrollBottom(smooth = true) { requestAnimationFrame(() => window.scrollTo({top: document.body.scrollHeight, behavior: smooth ? 'smooth':'auto'})); }
 
 function ensureDynamicUi() {
-  document.title = '루멘시아 모바일 V1.4';
+  document.title = '루멘시아 모바일 V1.4.1';
   const h1 = document.querySelector('h1');
   const tag = h1?.querySelector('.version-tag');
-  if (tag) tag.textContent = 'V1.4';
+  if (tag) tag.textContent = 'V1.4.1';
   if (!$('v14DynamicStyle')) {
     const style=document.createElement('style'); style.id='v14DynamicStyle';
     style.textContent='.version-tag{font-size:10px;color:#d9b86c;font-weight:800;vertical-align:middle}.emotion-debug{margin:0 14px 12px;padding:6px 8px;border-radius:8px;background:rgba(99,102,241,.10);color:#b8c0ff;font-size:10px;line-height:1.4}.cache-notice{margin:8px 12px 14px;padding:8px 10px;border-radius:10px;background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.25);color:#bfdbfe;font-size:10px;line-height:1.5}.asset-item.asset-warn{border-color:rgba(245,158,11,.65)}.asset-item.asset-warn div{color:#fcd34d}.asset-item.asset-fail{border-color:rgba(239,68,68,.65)}.asset-item.asset-fail div{color:#fecaca}';
@@ -642,23 +643,157 @@ function parseSkills(text='') {
   return out;
 }
 function parseList(text='') { return uniq(String(text).split(/[\n,]+/).map(x=>x.trim()).filter(Boolean)); }
+function clearPcCreatorForm({keepPaste=false} = {}) {
+  for (const id of ['pcName','pcAge','pcGender','pcOrigin','pcSocialStatus','pcAdmission','pcRealm','pcGold','pcAppearance','pcCharacterSetting','talentMagic','talentMartial','talentSoul','talentKnowledge','statBody','statMana','statInt','statHoly','pcSkillsText','pcInventoryText']) {
+    const el=$(id); if (el) el.value='';
+  }
+  if ($('pcDepartment')) $('pcDepartment').value='';
+  if (!keepPaste && $('pcPasteText')) $('pcPasteText').value='';
+  if ($('pcPasteResult')) { $('pcPasteResult').textContent='빈 새 캐릭터 시트. 직접 입력하거나 위에 설정을 붙여넣어 자동채우기.'; $('pcPasteResult').className='field-help pc-paste-result'; }
+}
+
+function setCreatorSelectValue(id, value='') {
+  const el=$(id); if (!el) return;
+  const v=String(value||'').trim();
+  if (!v) { el.value=''; return; }
+  let opt=[...el.options].find(o=>o.value===v || o.textContent.trim()===v);
+  if (!opt) { opt=document.createElement('option'); opt.value=v; opt.textContent=v; el.append(opt); }
+  el.value=opt.value;
+}
+
+function firstDefined(obj, keys, fallback='') {
+  for (const k of keys) if (obj && obj[k] !== undefined && obj[k] !== null && obj[k] !== '') return obj[k];
+  return fallback;
+}
+
+function skillsToText(value) {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.map(x => typeof x==='string' ? x : `${x.name||x.skill||''}:${x.grade||x.rank||'F'}`).filter(Boolean).join('\n');
+  if (typeof value === 'object') return Object.entries(value).map(([k,v])=>`${k}:${typeof v==='string'?v:(v?.grade||v?.rank||'F')}`).join('\n');
+  return '';
+}
+function inventoryToText(value) {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.map(x=>typeof x==='string'?x:(x?.name||'')).filter(Boolean).join(', ');
+  return '';
+}
+
+function parsePcNaturalText(text='') {
+  const out={ talents:{}, stats:{} };
+  const normalized=String(text).replace(/\r/g,'');
+  const lines=normalized.split('\n');
+  const aliases={
+    name:['이름','name'], age:['나이','age'], gender:['성별','gender','sex'], department:['학과','department'],
+    origin:['출신','origin'], socialStatus:['신분','social status','status'], admission:['입학 경로','입학경로','admission'],
+    realm:['초기 경지/서클','초기 경지','경지','서클','realm','circle'], gold:['금화','골드','gold'], appearance:['외형/인상','외형','인상','appearance'],
+    characterSetting:['캐릭터 상세 설정','캐릭터 설정','캐릭터설정','상세 설정','배경 설정','설정','character setting','profile'],
+    skills:['초기 스킬','스킬','skills'], inventory:['초기 장비','장비','소지품','inventory','equipment']
+  };
+  const keyFor=(label)=>Object.entries(aliases).find(([,arr])=>arr.some(a=>a.toLowerCase()===label.toLowerCase()))?.[0];
+  let section='';
+  for (let raw of lines) {
+    const line=raw.trim(); if(!line) continue;
+    const sec=line.match(/^\[?\s*(스킬|skills|장비|소지품|inventory|equipment|캐릭터 상세 설정|캐릭터 설정|캐릭터설정|상세 설정|배경 설정|character setting|profile)\s*\]?\s*$/i);
+    if(sec){
+      if(/스킬|skills/i.test(sec[1])) section='skills';
+      else if(/장비|소지품|inventory|equipment/i.test(sec[1])) section='inventory';
+      else section='characterSetting';
+      continue;
+    }
+    const m=line.match(/^([^:=]{1,30})\s*[:=]\s*(.*)$/);
+    if(m){
+      const label=m[1].trim(), value=m[2].trim(); const key=keyFor(label);
+      if(key){
+        out[key]=value;
+        section=(key==='skills'||key==='inventory'||key==='characterSetting')?key:'';
+        continue;
+      }
+      if(/재능|talent/i.test(label)){ out.talentText=value; continue; }
+      if(/스탯|능력치|stats?/i.test(label)){ out.statText=value; continue; }
+    }
+    if(section==='skills') out.skills=(out.skills?out.skills+'\n':'')+line;
+    if(section==='inventory') out.inventory=(out.inventory?out.inventory+', ':'')+line;
+    if(section==='characterSetting') out.characterSetting=(out.characterSetting?out.characterSetting+'\n':'')+raw.trim();
+  }
+  // tolerate "나이 20" style lines
+  const simplePatterns=[
+    ['name',/(?:^|\n)\s*(?:이름|name)\s+([^\n]+)/i],['age',/(?:^|\n)\s*(?:나이|age)\s+(\d{1,3})/i],
+    ['gender',/(?:^|\n)\s*(?:성별|gender|sex)\s+([^\n]+)/i],['department',/(?:^|\n)\s*(?:학과|department)\s+([^\n]+)/i]
+  ];
+  for(const [k,re] of simplePatterns) if(!out[k]){ const m=normalized.match(re); if(m) out[k]=m[1].trim(); }
+  const talentSource=(out.talentText||normalized);
+  const talentDefs={magic:['마법','마력','魔','magic'],martial:['무','무예','무력','武','martial'],soul:['영혼','혼','魂','soul'],knowledge:['지식','지능','智','knowledge']};
+  for(const [k,names] of Object.entries(talentDefs)){
+    for(const n of names){ const re=new RegExp(`${n}\\s*[:=]?\\s*(\\d{1,2})`,'i'); const m=talentSource.match(re); if(m){out.talents[k]=Number(m[1]);break;} }
+  }
+  const statSource=(out.statText||normalized);
+  for(const [k,names] of Object.entries({'신체':['신체','body'],'마나':['마나','mana'],'지능':['지능','intelligence','int'],'신성':['신성','divinity','holy']})){
+    for(const n of names){ const re=new RegExp(`${n}\\s*[:=]?\\s*([FEDSABC]{1,3}(?:[+-])?)`,'i'); const m=statSource.match(re); if(m){out.stats[k]=m[1].toUpperCase();break;} }
+  }
+  return out;
+}
+
+function normalizePastedPcObject(value) {
+  const src=(value?.pc && typeof value.pc==='object') ? value.pc : value;
+  if(!src || typeof src!=='object') return {};
+  const talents=firstDefined(src,['talents','재능'],{})||{};
+  const stats=firstDefined(src,['stats','스탯','능력치'],{})||{};
+  return {
+    name:firstDefined(src,['name','이름']), age:firstDefined(src,['age','나이']), gender:firstDefined(src,['gender','sex','성별']),
+    department:firstDefined(src,['department','학과']), origin:firstDefined(src,['origin','출신']), socialStatus:firstDefined(src,['socialStatus','social_status','신분']),
+    admission:firstDefined(src,['admission','입학경로','입학 경로']), realm:firstDefined(src,['realm','circle','경지','서클']), gold:firstDefined(src,['gold','금화','골드']),
+    appearance:firstDefined(src,['appearance','외형','인상']),
+    characterSetting:firstDefined(src,['characterSetting','character_setting','profile','캐릭터 상세 설정','캐릭터 설정','상세 설정','설정']),
+    skills:firstDefined(src,['skills','스킬']), inventory:firstDefined(src,['inventory','equipment','장비','소지품']),
+    talents:{ magic:firstDefined(talents,['magic','魔','마법']), martial:firstDefined(talents,['martial','武','무']), soul:firstDefined(talents,['soul','魂','혼']), knowledge:firstDefined(talents,['knowledge','智','지']) },
+    stats:{ '신체':firstDefined(stats,['신체','body']), '마나':firstDefined(stats,['마나','mana']), '지능':firstDefined(stats,['지능','intelligence','int']), '신성':firstDefined(stats,['신성','divinity','holy']) }
+  };
+}
+
+function applyPcDataToCreator(data={}) {
+  const value=(id,v)=>{ if(v!==undefined&&v!==null&&String(v)!=='') $(id).value=String(v); };
+  value('pcName',data.name); value('pcAge',data.age); value('pcGender',data.gender); setCreatorSelectValue('pcDepartment',data.department);
+  value('pcOrigin',data.origin); value('pcSocialStatus',data.socialStatus); value('pcAdmission',data.admission); value('pcRealm',data.realm); value('pcGold',data.gold); value('pcAppearance',data.appearance); value('pcCharacterSetting',data.characterSetting);
+  value('talentMagic',data.talents?.magic); value('talentMartial',data.talents?.martial); value('talentSoul',data.talents?.soul); value('talentKnowledge',data.talents?.knowledge);
+  value('statBody',typeof data.stats?.['신체']==='object'?data.stats['신체']?.grade:data.stats?.['신체']);
+  value('statMana',typeof data.stats?.['마나']==='object'?data.stats['마나']?.grade:data.stats?.['마나']);
+  value('statInt',typeof data.stats?.['지능']==='object'?data.stats['지능']?.grade:data.stats?.['지능']);
+  value('statHoly',typeof data.stats?.['신성']==='object'?data.stats['신성']?.grade:data.stats?.['신성']);
+  const sk=skillsToText(data.skills); if(sk) $('pcSkillsText').value=sk;
+  const inv=inventoryToText(data.inventory); if(inv) $('pcInventoryText').value=inv;
+}
+
+function applyPastedPcText() {
+  const text=$('pcPasteText').value.trim();
+  const result=$('pcPasteResult');
+  if(!text){ result.textContent='붙여넣은 내용이 없음.'; result.className='field-help pc-paste-result warn'; return; }
+  try {
+    let data;
+    try { data=normalizePastedPcObject(JSON.parse(text)); }
+    catch { data=parsePcNaturalText(text); }
+    const before=[...document.querySelectorAll('#pcCreatorForm input, #pcCreatorForm textarea, #pcCreatorForm select')].map(x=>x.value).join('|');
+    applyPcDataToCreator(data);
+    const after=[...document.querySelectorAll('#pcCreatorForm input, #pcCreatorForm textarea, #pcCreatorForm select')].map(x=>x.value).join('|');
+    if(before===after){ result.textContent='읽을 수 있는 필드를 찾지 못함. `이름: 값` 형식이나 JSON을 사용해줘.'; result.className='field-help pc-paste-result warn'; }
+    else { result.textContent='자동채우기 완료. 아래 값을 확인하고 필요한 부분만 수정하면 됨.'; result.className='field-help pc-paste-result ok'; }
+  } catch(err) { result.textContent=`자동채우기 실패: ${err.message}`; result.className='field-help pc-paste-result warn'; }
+}
+
 function openPcCreator() {
-  const p=save.pc;
-  $('pcName').value=p.name||'Aaa'; $('pcAge').value=p.age||20; $('pcGender').value=p.gender||'';
-  $('pcDepartment').value=p.department||'기사과 1학년'; $('pcOrigin').value=p.origin||''; $('pcSocialStatus').value=p.socialStatus||'';
-  $('pcAdmission').value=p.admission||''; $('pcRealm').value=p.realm||''; $('pcGold').value=p.gold||0; $('pcAppearance').value=p.appearance||'';
-  $('talentMagic').value=p.talents?.magic||5; $('talentMartial').value=p.talents?.martial||5; $('talentSoul').value=p.talents?.soul||5; $('talentKnowledge').value=p.talents?.knowledge||5;
-  $('statBody').value=p.stats?.['신체']?.grade||'D'; $('statMana').value=p.stats?.['마나']?.grade||'D'; $('statInt').value=p.stats?.['지능']?.grade||'D'; $('statHoly').value=p.stats?.['신성']?.grade||'F';
-  $('pcSkillsText').value=Object.entries(p.skills||{}).map(([k,v])=>`${k}:${v.grade}`).join('\n'); $('pcInventoryText').value=(p.inventory||[]).join(', ');
+  clearPcCreatorForm();
   $('pcCreatorDialog').showModal();
 }
 function createNewSaveFromCreator() {
   const base=defaultSave();
   base.pc={...base.pc,
-    name:$('pcName').value.trim()||'Aaa', age:clamp($('pcAge').value,14,99), gender:$('pcGender').value.trim()||'미지정', department:$('pcDepartment').value,
-    origin:$('pcOrigin').value.trim(), socialStatus:$('pcSocialStatus').value.trim(), admission:$('pcAdmission').value.trim(), appearance:$('pcAppearance').value.trim(), realm:$('pcRealm').value.trim()||'비기너',
+    name:$('pcName').value.trim()||'Aaa', age:clamp($('pcAge').value||20,14,99), gender:$('pcGender').value.trim()||'미지정', department:$('pcDepartment').value||'미지정',
+    origin:$('pcOrigin').value.trim(), socialStatus:$('pcSocialStatus').value.trim(), admission:$('pcAdmission').value.trim(), appearance:$('pcAppearance').value.trim(),
+    characterSetting:$('pcCharacterSetting').value.trim(),
+    realm:$('pcRealm').value.trim()||'비기너',
     gold:Math.max(0,Number($('pcGold').value)||0), fatigue:0, status:'안정',
-    talents:{magic:clamp($('talentMagic').value,1,10),martial:clamp($('talentMartial').value,1,10),soul:clamp($('talentSoul').value,1,10),knowledge:clamp($('talentKnowledge').value,1,10)},
+    talents:{magic:clamp($('talentMagic').value||5,1,10),martial:clamp($('talentMartial').value||5,1,10),soul:clamp($('talentSoul').value||5,1,10),knowledge:clamp($('talentKnowledge').value||5,1,10)},
     stats:{'신체':{grade:$('statBody').value.trim()||'D',progress:0},'마나':{grade:$('statMana').value.trim()||'D',progress:0},'지능':{grade:$('statInt').value.trim()||'D',progress:0},'신성':{grade:$('statHoly').value.trim()||'F',progress:0}},
     skills:parseSkills($('pcSkillsText').value), inventory:parseList($('pcInventoryText').value),
   };
@@ -674,7 +809,7 @@ function renderDebug() {
   const npc=Object.entries(sc.npc_schedule||{}).map(([k,v])=>`- ${ASSETS.characters[k]?.name||k}: ${v.commitment} / ${v.area} [${v.confidence}]`).join('\n')||'-';
   const em=Object.entries(save.emotionStates||{}).slice(-12).map(([k,v])=>`- ${ASSETS.characters[k]?.name||k}: ${v.current} ${Number(v.intensity||0).toFixed(2)} · held ${v.turnsHeld||0}`).join('\n')||'-';
   const mem=(save.debug?.lastMemoryAdds||[]).map(x=>`- [${MEMORY_TYPE_LABELS[x.type]||x.type} P${memoryImportance(x.importance)} L${x.secret_level||0}] ${x.fact}`).join('\n')||'-';
-  $('debugContent').textContent=`APP V1.4 / SAVE v${save.version}\nTURN ${save.turnNumber}\n\n[MODEL]\n${route.tier||'-'} / ${route.model||'-'}\nreason=${route.reason||'-'} / reasoning=${route.reasoning_effort||'-'}\n\n[TOKENS / COST]\ninput ${usage.input_tokens||0}\ncached ${usage.cached_tokens||0} (${Math.round(Number(usage.cache_hit_rate||0)*100)}%)\noutput ${usage.output_tokens||0}\nreasoning ${usage.reasoning_tokens||0}\nturn $${Number(usage.estimated_usd||0).toFixed(4)} / total $${Number(save.usage.estimatedUsd||0).toFixed(4)}\n\n[WORLD]\n${save.world.date} ${save.world.weekday} ${save.world.time}\n${save.world.location}\n\n[SCHEDULE DUE]\n${due}\n\n[UPCOMING <=4h]\n${upcoming}\n\n[NPC SCHEDULE]\n${npc}\n\n[LAST MEMORY ADDS]\n${mem}\n\n[EMOTION]\n${em}\n\n[COUNTS]\ntimeline ${save.timeline.length}\nscheduled ${(save.scheduledEvents||[]).length}\nglobal memories ${(save.memories?.global||[]).length}\nnpc memories ${Object.values(save.memories?.npc||{}).reduce((n,x)=>n+(x?.length||0),0)}`;
+  $('debugContent').textContent=`APP V1.4.2 / SAVE v${save.version}\nTURN ${save.turnNumber}\n\n[MODEL]\n${route.tier||'-'} / ${route.model||'-'}\nreason=${route.reason||'-'} / reasoning=${route.reasoning_effort||'-'}\n\n[TOKENS / COST]\ninput ${usage.input_tokens||0}\ncached ${usage.cached_tokens||0} (${Math.round(Number(usage.cache_hit_rate||0)*100)}%)\noutput ${usage.output_tokens||0}\nreasoning ${usage.reasoning_tokens||0}\nturn $${Number(usage.estimated_usd||0).toFixed(4)} / total $${Number(save.usage.estimatedUsd||0).toFixed(4)}\n\n[WORLD]\n${save.world.date} ${save.world.weekday} ${save.world.time}\n${save.world.location}\n\n[SCHEDULE DUE]\n${due}\n\n[UPCOMING <=4h]\n${upcoming}\n\n[NPC SCHEDULE]\n${npc}\n\n[LAST MEMORY ADDS]\n${mem}\n\n[EMOTION]\n${em}\n\n[COUNTS]\ntimeline ${save.timeline.length}\nscheduled ${(save.scheduledEvents||[]).length}\nglobal memories ${(save.memories?.global||[]).length}\nnpc memories ${Object.values(save.memories?.npc||{}).reduce((n,x)=>n+(x?.length||0),0)}`;
 }
 
 ensureDynamicUi();
@@ -695,6 +830,8 @@ for (const key of ['adultMode','proReasoning','demoMode','showEmotionDebug','dev
 $('assetTestBtn').addEventListener('click', testAssets);
 $('debugBtn').addEventListener('click',()=>{renderDebug();$('debugDialog').showModal();});
 $('pcCreatorClose').addEventListener('click',()=>$('pcCreatorDialog').close());
+$('pcCreatorClearBtn').addEventListener('click',()=>clearPcCreatorForm({keepPaste:false}));
+$('pcPasteApplyBtn').addEventListener('click',applyPastedPcText);
 $('quickKyleBtn').addEventListener('click',()=>{save=normalizeSave(defaultSave());refreshScheduleContext();persist();$('pcCreatorDialog').close();renderAll();toast('카일 빠른 시작 세이브 생성');});
 $('pcCreatorForm').addEventListener('submit',(e)=>{e.preventDefault();save=createNewSaveFromCreator();refreshScheduleContext();persist();$('pcCreatorDialog').close();renderAll();toast(`${save.pc.name} 새 게임 생성`);});
 

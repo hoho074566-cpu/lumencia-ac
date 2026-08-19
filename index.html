@@ -8,14 +8,14 @@
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/styles.css" />
-  <title>루멘시아 모바일 V1.4</title>
+  <title>루멘시아 모바일 V1.4.2</title>
 </head>
 <body>
   <div id="app">
     <header class="topbar">
       <div>
         <div class="eyebrow">LUMENSIA ACADEMY</div>
-        <h1>루멘시아 모바일 <small class="version-tag">V1.4</small></h1>
+        <h1>루멘시아 모바일 <small class="version-tag">V1.4.2</small></h1>
       </div>
       <div class="top-actions">
         <button id="infoBtn" class="icon-btn" aria-label="상태창">INFO</button>
@@ -111,35 +111,71 @@
   <dialog id="pcCreatorDialog" class="panel-dialog wide-dialog">
     <form id="pcCreatorForm">
       <header><h2>PC 생성</h2><button id="pcCreatorClose" type="button" class="close-btn">✕</button></header>
-      <div class="creator-note">Aaa/PC의 설정은 자유다. 아래 값은 시작 세이브에 그대로 기록되고 GM은 이를 최우선 현재 상태로 사용한다.</div>
+      <div class="creator-note">새 게임은 완전한 빈 시트에서 시작한다. 직접 입력하거나, 아래에 미리 만든 PC 설정을 붙여넣어 자동으로 채울 수 있다. 카일 프리셋은 별도 빠른 시작 버튼으로만 불러온다.</div>
+
+      <section class="pc-paste-box">
+        <div class="creator-section-title">PC 설정 붙여넣기</div>
+        <textarea id="pcPasteText" rows="7" maxlength="12000" placeholder="자연어 또는 JSON 가능. 예:
+이름: 카일
+나이: 20
+성별: 남성
+학과: 기사과 1학년
+출신: 서부 변경
+재능: 魔 2 / 武 9 / 魂 7 / 智 5
+스탯: 신체 A-, 마나 B+, 지능 C, 신성 F
+스킬: 대검술:A++, 오러 운용:A
+장비: 강철 양손대검, 예비 단검 2자루"></textarea>
+        <div class="pc-paste-actions">
+          <button id="pcPasteApplyBtn" type="button" class="secondary-btn">붙여넣은 설정 자동채우기</button>
+          <button id="pcCreatorClearBtn" type="button" class="ghost-btn">전부 비우기</button>
+        </div>
+        <div id="pcPasteResult" class="field-help pc-paste-result">붙여넣은 내용은 자동 적용 후에도 직접 수정할 수 있음.</div>
+      </section>
+
       <div class="creator-grid">
-        <label>이름<input id="pcName" required maxlength="40" value="카일" /></label>
-        <label>나이<input id="pcAge" type="number" min="14" max="99" value="20" /></label>
-        <label>성별<input id="pcGender" maxlength="30" value="남성" /></label>
-        <label>학과<select id="pcDepartment"><option>기사과 1학년</option><option>마법과 1학년</option><option>신학부 1학년</option><option>일반학부 1학년</option></select></label>
-        <label>출신<input id="pcOrigin" maxlength="100" value="서부 변경" /></label>
-        <label>신분<input id="pcSocialStatus" maxlength="80" value="평민 / 전직 용병" /></label>
-        <label>입학 경로<input id="pcAdmission" maxlength="100" value="용병장 추천장" /></label>
-        <label>초기 경지/서클<input id="pcRealm" maxlength="100" value="익스퍼트 상급" /></label>
-        <label>금화<input id="pcGold" type="number" min="0" max="999999" value="18" /></label>
+        <label>이름<input id="pcName" required maxlength="40" placeholder="예: 카일" /></label>
+        <label>나이<input id="pcAge" required type="number" min="14" max="99" placeholder="예: 20" /></label>
+        <label>성별<input id="pcGender" maxlength="30" placeholder="예: 남성" /></label>
+        <label>학과<select id="pcDepartment"><option value="">-- 선택 안 함 --</option><option>기사과 1학년</option><option>마법과 1학년</option><option>신학부 1학년</option><option>일반학부 1학년</option></select></label>
+        <label>출신<input id="pcOrigin" maxlength="100" placeholder="예: 서부 변경" /></label>
+        <label>신분<input id="pcSocialStatus" maxlength="80" placeholder="예: 평민 / 전직 용병" /></label>
+        <label>입학 경로<input id="pcAdmission" maxlength="100" placeholder="예: 추천장" /></label>
+        <label>초기 경지/서클<input id="pcRealm" maxlength="100" placeholder="예: 익스퍼트 상급 / 4서클" /></label>
+        <label>금화<input id="pcGold" type="number" min="0" max="999999" placeholder="예: 18" /></label>
       </div>
       <label>외형/인상<textarea id="pcAppearance" rows="2" maxlength="800" placeholder="선택 사항. 외형, 체격, 복장 특징 등"></textarea></label>
+
+      <div class="creator-section-title">캐릭터 상세 설정</div>
+      <label>
+        <textarea id="pcCharacterSetting" rows="9" maxlength="5000" placeholder="성격, 성장 배경, 과거, 가치관, 목표, 말투 성향, 전투 습관, 비밀, 약점, 특수 설정 등 자유롭게 작성.
+
+예:
+- 유년기에 용병단에 구조되어 전장에서 성장했다.
+- 마나를 사용할 수 없으며 대검술에 특화되어 있다.
+- 빠른 습득과 교정 능력이 있지만 현재는 초기 단계다.
+- 귀족 권위에 쉽게 눌리지 않지만 무례함을 목표로 하지는 않는다.
+- 자신의 감정/대사/선택은 플레이어가 직접 결정한다."></textarea>
+        <span class="field-help">PC의 고정 프로필로 저장됨. NPC가 이 내용을 자동으로 알고 있는 것은 아님.</span>
+      </label>
+
       <div class="creator-section-title">재능 (1~10)</div>
       <div class="talent-grid">
-        <label>🔮 魔<input id="talentMagic" type="number" min="1" max="10" value="2" /></label>
-        <label>⚔️ 武<input id="talentMartial" type="number" min="1" max="10" value="9" /></label>
-        <label>🌟 魂<input id="talentSoul" type="number" min="1" max="10" value="7" /></label>
-        <label>📘 智<input id="talentKnowledge" type="number" min="1" max="10" value="5" /></label>
+        <label>🔮 魔<input id="talentMagic" type="number" min="1" max="10" placeholder="1~10" /></label>
+        <label>⚔️ 武<input id="talentMartial" type="number" min="1" max="10" placeholder="1~10" /></label>
+        <label>🌟 魂<input id="talentSoul" type="number" min="1" max="10" placeholder="1~10" /></label>
+        <label>📘 智<input id="talentKnowledge" type="number" min="1" max="10" placeholder="1~10" /></label>
       </div>
       <div class="creator-section-title">초기 스탯 등급</div>
       <div class="creator-grid">
-        <label>신체<input id="statBody" maxlength="8" value="A-" /></label>
-        <label>마나<input id="statMana" maxlength="8" value="B+" /></label>
-        <label>지능<input id="statInt" maxlength="8" value="C" /></label>
-        <label>신성<input id="statHoly" maxlength="8" value="F" /></label>
+        <label>신체<input id="statBody" maxlength="8" placeholder="예: D / A-" /></label>
+        <label>마나<input id="statMana" maxlength="8" placeholder="예: D / B+" /></label>
+        <label>지능<input id="statInt" maxlength="8" placeholder="예: C" /></label>
+        <label>신성<input id="statHoly" maxlength="8" placeholder="예: F" /></label>
       </div>
-      <label>초기 스킬 <span class="field-help">한 줄에 `스킬명:등급`</span><textarea id="pcSkillsText" rows="7">대검술:A++\n오러 운용:A\n검기:A-\n실전 전투:S\n위험 감지:A++\n전장 판단:A+\n회피:A+</textarea></label>
-      <label>초기 장비 <span class="field-help">쉼표 또는 줄바꿈으로 구분</span><textarea id="pcInventoryText" rows="4">강철 양손대검, 예비 단검 2자루, 가죽 장갑, 야전 치료도구, 숫돌, 용병단 인식표</textarea></label>
+      <label>초기 스킬 <span class="field-help">한 줄에 `스킬명:등급`</span><textarea id="pcSkillsText" rows="7" placeholder="예:
+대검술:A++
+오러 운용:A"></textarea></label>
+      <label>초기 장비 <span class="field-help">쉼표 또는 줄바꿈으로 구분</span><textarea id="pcInventoryText" rows="4" placeholder="예: 강철 양손대검, 가죽 장갑"></textarea></label>
       <div class="creator-actions">
         <button id="quickKyleBtn" type="button" class="secondary-btn">카일 빠른 시작</button>
         <button type="submit" class="primary-btn">이 설정으로 새 게임</button>
