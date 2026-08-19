@@ -146,3 +146,9 @@ h1 { margin: 2px 0 0; font-size: 20px; }
 .meta-turn { border-color:rgba(96,165,250,.35); background:rgba(15,23,42,.94); }
 .meta-turn .turn-head { color:#bfdbfe; background:rgba(59,130,246,.08); }
 .meta-turn .narration { border-left-color:rgba(96,165,250,.55); font-style:normal; color:#dbeafe; }
+
+/* V1.4.5: 새 응답 생성 후 카드 시작점을 읽기 위치로 맞춘다. */
+.turn-card,
+.user-action {
+  scroll-margin-top: 118px;
+}

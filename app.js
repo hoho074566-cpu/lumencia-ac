@@ -1,6 +1,6 @@
 import { ASSETS } from './assets.js';
 
-const APP_VERSION = '1.4.4';
+const APP_VERSION = '1.4.6';
 const SAVE_KEY = 'lumensia.save.v1';
 const SETTINGS_KEY = 'lumensia.settings.v1';
 
@@ -25,6 +25,18 @@ const defaultSettings = {
 
 
 const MEMORY_TYPE_LABELS = { fact:'FACT', observer:'OBSERVER', belief:'BELIEF', rumor:'RUMOR', promise:'PROMISE', deferred_hook:'DEFERRED', relationship:'RELATION', secret:'SECRET', event:'EVENT', obligation:'OBLIGATION', knowledge:'KNOWLEDGE' };
+const DIRECTOR_NPC_DEPT = {
+  lilia:'knight', laris:'knight', sera:'knight', isabel:'knight', artemis:'knight', anastasia:'knight',
+  lena:'magic', sia:'magic', serena:'magic', chloe:'magic', elena:'magic', lucia:'magic', elise:'magic',
+  mirabelle:'theology', aria:'theology', emily:'common'
+};
+function pcDirectorDept() {
+  const d = String(save?.pc?.department || '');
+  if (/기사/.test(d)) return 'knight';
+  if (/마법/.test(d)) return 'magic';
+  if (/신학|성직|신성/.test(d)) return 'theology';
+  return 'common';
+}
 const DEFAULT_SCHEDULE_EVENTS = [
   { id:'entrance_ceremony', title:'입학식', date:'1285-03-01', time:'09:00', location:'루멘시아 아카데미 대강당', kind:'academic', participants:['emily','lena'], importance:4, note:'09:00 에밀리 환영사. 09:15 레나 신입생 대표 짧은 연설과 기숙사/정오 학과 오리엔테이션 안내.', status:'scheduled' },
   { id:'knight_orientation', title:'기사과 1학년 오리엔테이션', date:'1285-03-01', time:'12:00', location:'기사과 지정 오리엔테이션 장소', kind:'academic', participants:['artemis','lilia','laris','sera','isabel'], importance:3, note:'기사과 1학년 대상.', status:'scheduled' },
@@ -95,7 +107,7 @@ function refreshScheduleContext() {
 }
 
 const defaultSave = () => ({
-  version: 5,
+  version: 6,
   appVersion: APP_VERSION,
   id: crypto.randomUUID?.() || String(Date.now()),
   createdAt: new Date().toISOString(),
@@ -140,9 +152,19 @@ const defaultSave = () => ({
   pcKnowledge: [],
   memories: { global: [], npc: {} },
   hooks: [],
+  director: {
+    version:1,
+    npcExposure:{},
+    recentBeats:[],
+    recentSpotlights:[],
+    callbacks:[],
+    lastEventTurn:0,
+    lastChoicePressureTurn:0,
+    lastCrossDepartmentTurn:0,
+  },
   scheduledEvents: DEFAULT_SCHEDULE_EVENTS.map(x => ({...x})),
   scheduleContext: {},
-  debug: { lastRoute:null, lastUsage:null, lastMemoryAdds:[], lastRelationChanges:[], lastHookChanges:[], lastSchedule:null, lastRequestBytes:0 },
+  debug: { lastRoute:null, lastUsage:null, lastMemoryAdds:[], lastRelationChanges:[], lastHookChanges:[], lastSchedule:null, lastRequestBytes:0, lastDirector:null },
   flags: { majorScene: false, forceTerraNextTurn: true },
   rollingSummary: '입학식 당일 08:40. 카일은 루멘시아 아카데미 대강당 앞에 도착했으며 입학식 개막 전이다.',
   recentTurns: [],
@@ -165,7 +187,7 @@ function clamp(n, min, max) { return Math.min(max, Math.max(min, Number(n) || 0)
 function normalizeSave(raw) {
   const base = defaultSave();
   const next = raw && typeof raw === 'object' ? raw : base;
-  next.version = 5;
+  next.version = 6;
   next.appVersion = APP_VERSION;
   next.world = { ...base.world, ...(next.world || {}) };
   next.pc = { ...base.pc, ...(next.pc || {}) };
@@ -182,6 +204,11 @@ function normalizeSave(raw) {
   next.pcKnowledge = Array.isArray(next.pcKnowledge) ? next.pcKnowledge : [];
   next.memories = next.memories || { global: [], npc: {} };
   next.hooks = Array.isArray(next.hooks) ? next.hooks : [];
+  next.director = { ...base.director, ...(next.director || {}) };
+  next.director.npcExposure = next.director.npcExposure || {};
+  next.director.recentBeats = Array.isArray(next.director.recentBeats) ? next.director.recentBeats : [];
+  next.director.recentSpotlights = Array.isArray(next.director.recentSpotlights) ? next.director.recentSpotlights : [];
+  next.director.callbacks = Array.isArray(next.director.callbacks) ? next.director.callbacks : [];
   next.memories.global = (Array.isArray(next.memories.global) ? next.memories.global : []).map(normalizeMemoryRow);
   next.memories.npc = next.memories.npc || {};
   for (const key of Object.keys(next.memories.npc)) next.memories.npc[key] = (Array.isArray(next.memories.npc[key]) ? next.memories.npc[key] : []).map(normalizeMemoryRow);
@@ -286,14 +313,15 @@ function renderAll() {
 }
 
 function renderTurnRecord(record) {
+  let user = null;
   if (record.action) {
-    const user = document.createElement('div');
+    user = document.createElement('div');
     user.className = 'user-action';
     user.textContent = record.action;
     story.append(user);
   }
   const turn = record.turn;
-  if (!turn) return;
+  if (!turn) return { user, card: null };
   const card = document.createElement('section');
   card.className = record.meta ? 'turn-card meta-turn' : 'turn-card';
   const head = document.createElement('div');
@@ -344,6 +372,7 @@ function renderTurnRecord(record) {
   story.append(card);
   if (record.meta) renderChoices([]);
   else renderChoices(turn.choices || []);
+  return { user, card };
 }
 function escapeHtml(s='') { return String(s).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
 
@@ -538,6 +567,67 @@ function applyEmotionUpdates(updates = []) {
   }
 }
 
+function updateDirectorState(turn) {
+  save.director = save.director || defaultSave().director;
+  const d = save.director;
+  d.npcExposure = d.npcExposure || {};
+  d.recentBeats = Array.isArray(d.recentBeats) ? d.recentBeats : [];
+  d.recentSpotlights = Array.isArray(d.recentSpotlights) ? d.recentSpotlights : [];
+  d.callbacks = Array.isArray(d.callbacks) ? d.callbacks : [];
+
+  const t = save.turnNumber + 1;
+  const meta = turn?.director || {
+    intervention:'light', beat:turn?.importance === 'routine' ? 'routine':'encounter',
+    event_kind:'none', spotlight_keys:[], callback_key:null, callback_phase:'none',
+    callback_note:null, reason:'director meta 누락'
+  };
+  const speakers = uniq((turn?.scene || []).filter(x=>x?.kind==='dialogue' && x?.speaker_key).map(x=>x.speaker_key));
+  const spotlights = uniq([...(meta.spotlight_keys || []), ...speakers]).filter(key=>ASSETS.characters?.[key]);
+
+  for (const key of spotlights) {
+    const old = d.npcExposure[key] || {};
+    d.npcExposure[key] = {
+      lastSeenTurn:t,
+      appearances:Number(old.appearances || 0) + (speakers.includes(key) ? 1 : 0),
+      lastSceneTitle:String(turn?.scene_title || '').slice(0,120),
+    };
+  }
+
+  d.recentSpotlights.push({turn:t, keys:spotlights.slice(0,5), beat:meta.beat, event_kind:meta.event_kind});
+  d.recentSpotlights = d.recentSpotlights.slice(-24);
+  d.recentBeats.push({turn:t, beat:meta.beat, event_kind:meta.event_kind, intervention:meta.intervention});
+  d.recentBeats = d.recentBeats.slice(-16);
+
+  if (!['routine','aftermath'].includes(meta.beat)) d.lastEventTurn = t;
+  if (['choice','payoff_opportunity'].includes(meta.beat)) d.lastChoicePressureTurn = t;
+
+  const pcDept = pcDirectorDept();
+  if (spotlights.some(key => {
+    const dept = DIRECTOR_NPC_DEPT[key];
+    return dept && ['knight','magic','theology'].includes(dept) && dept !== pcDept;
+  })) d.lastCrossDepartmentTurn = t;
+
+  const cbKey = String(meta.callback_key || '').trim().slice(0,80);
+  const phase = meta.callback_phase || 'none';
+  if (cbKey && phase !== 'none') {
+    let row = d.callbacks.find(x=>x.key===cbKey);
+    if (!row) {
+      row = { key:cbKey, status:'open', createdTurn:t, lastTurn:t, note:'', spotlight_keys:[] };
+      d.callbacks.push(row);
+    }
+    row.lastTurn = t;
+    row.note = String(meta.callback_note || row.note || '').slice(0,280);
+    row.spotlight_keys = uniq([...(row.spotlight_keys||[]), ...spotlights]).slice(0,4);
+    if (['friction','pressure'].includes(phase)) row.status = 'open';
+    else if (phase === 'payoff_opportunity') row.status = 'opportunity';
+    else if (['payoff','aftermath'].includes(phase)) row.status = 'resolved';
+  }
+  const unresolved = d.callbacks.filter(x=>x.status!=='resolved').slice(-12);
+  const resolved = d.callbacks.filter(x=>x.status==='resolved').slice(-8);
+  d.callbacks = [...resolved, ...unresolved].slice(-20);
+  save.debug.lastDirector = meta;
+}
+
 function addTimeline(turn) {
   if (!turn?.scene_summary) return;
   save.timeline.push({
@@ -565,7 +655,7 @@ function compactState() {
   return {
     version: save.version, turnNumber: save.turnNumber, world: save.world, pc: save.pc, relationships: save.relationships, intimacyStates: save.intimacyStates, npcStates: save.npcStates,
     emotionStates: save.emotionStates, activeEvents: save.activeEvents, completedEvents: save.completedEvents,
-    pcKnowledge: save.pcKnowledge, memories: save.memories, hooks:save.hooks, scheduledEvents:save.scheduledEvents, scheduleContext:save.scheduleContext, flags: save.flags,
+    pcKnowledge: save.pcKnowledge, memories: save.memories, hooks:save.hooks, scheduledEvents:save.scheduledEvents, scheduleContext:save.scheduleContext, director:save.director, flags: save.flags,
   };
 }
 
@@ -625,13 +715,14 @@ async function sendAction(action) {
     if (!isMeta) {
       notices = applyDelta(data.turn.state_delta);
       applyEmotionUpdates(data.turn.emotion_updates || []);
+      updateDirectorState(data.turn);
       addTimeline(data.turn);
       rebuildRollingSummary();
     }
     const record = { action:displayAction, turn: data.turn, route: data.route, usage: data.usage, notices, meta:isMeta, at: new Date().toISOString() };
     if (!isMeta) {
       save.turnNumber += 1;
-      save.recentTurns.push({ action:apiAction, summary: data.turn.scene_summary, scene: data.turn.scene.slice(0,10) });
+      save.recentTurns.push({ action:apiAction, summary: data.turn.scene_summary, importance: data.turn.importance || 'routine', scene: data.turn.scene.slice(0,10) });
       save.recentTurns = save.recentTurns.slice(-12);
     }
     save.renderedTurns.push(record); save.renderedTurns = save.renderedTurns.slice(-80);
@@ -660,7 +751,11 @@ async function sendAction(action) {
     save.debug.lastUsage = data.usage || null;
     save.debug.lastSchedule = save.scheduleContext;
     persist();
-    renderTurnRecord(record); updateStatus(data.route); renderInfo(); actionInput.value = ''; scrollBottom();
+    const rendered = renderTurnRecord(record);
+    updateStatus(data.route);
+    renderInfo();
+    actionInput.value = '';
+    scrollToTurnStart(rendered?.card || rendered?.user);
   } catch (err) {
     loader.remove();
     const e = document.createElement('div');
@@ -682,6 +777,7 @@ function demoResponse(action, inputMode='game') {
   if (inputMode === 'meta') {
     return {
       turn:{
+        director:{intervention:'none',beat:'routine',event_kind:'none',spotlight_keys:[],callback_key:null,callback_phase:'none',callback_note:null,reason:'META freeze'},
         scene_title:'META 점검', importance:'routine', cg_id:null,
         scene:[{kind:'narration',text:`데모 META 응답: ${action}`,speaker_key:null,speaker_name:null,expression:null}],
         choices:[],
@@ -694,6 +790,7 @@ function demoResponse(action, inputMode='game') {
   }
   const first = save.turnNumber === 0;
   const turn = first ? {
+    director:{intervention:'light',beat:'encounter',event_kind:'social',spotlight_keys:['lilia'],callback_key:null,callback_phase:'none',callback_note:null,reason:'입학식 전 자연스러운 신입생 조우'},
     scene_title: '입학식 전, 대강당 앞', importance: 'routine', cg_id: null,
     scene: [
       {kind:'narration', text:'대강당을 둘러싼 흰 석조 회랑에 아침 햇살이 비친다. 신입생들의 목소리 사이로 검집이 부딪히는 소리와 마법 도구의 미세한 진동음이 섞인다.', speaker_key:null, speaker_name:null, expression:null},
@@ -704,6 +801,7 @@ function demoResponse(action, inputMode='game') {
     state_delta:{advance_minutes:3,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0,relationship_changes:[],stat_progress:[],skill_experience:[],items_add:[],items_remove:[],active_events_add:[],active_events_remove:[],completed_events_add:[],pc_knowledge_add:[],scheduled_events_add:[],scheduled_events_complete:[],hooks_add:[],hooks_update:[],memories_add:[{owner:'npc:lilia',fact:`입학식 전 대강당 앞에서 ${save.pc.name}의 오래된 대검에 먼저 관심을 보였다.`,type:'event',importance:2,secret_level:0}],npc_state_updates:[{npc_key:'lilia',location:'루멘시아 아카데미 대강당 앞',status:`${save.pc.name}에게 먼저 말을 건 상태`,current_goal:'신입생 입학식 참가',last_seen:'1285-03-01 08:43'}]},
     scene_summary:`입학식 전 대강당 앞에서 릴리아가 ${save.pc.name}의 대검에 관심을 보이며 먼저 말을 걸었다.`
   } : {
+    director:{intervention:'light',beat:'routine',event_kind:'none',spotlight_keys:[],callback_key:null,callback_phase:'none',callback_note:null,reason:'데모'},
     scene_title:'데모 응답',importance:'routine',cg_id:null,
     scene:[{kind:'narration',text:`${save.pc.name}의 행동 「${action}」에 주변 상황이 반응한다. 데모 모드라 실제 AI 판정은 생략된다.`,speaker_key:null,speaker_name:null,expression:null}],choices:[],
     state_delta:{advance_minutes:1,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0,relationship_changes:[],stat_progress:[],skill_experience:[],items_add:[],items_remove:[],active_events_add:[],active_events_remove:[],completed_events_add:[],pc_knowledge_add:[],scheduled_events_add:[],scheduled_events_complete:[],hooks_add:[],hooks_update:[],memories_add:[],npc_state_updates:[]},scene_summary:'데모 모드로 UI 동작을 확인했다.'
@@ -732,6 +830,13 @@ function stripMetaPrefix(action='') {
   return String(action).replace(/^\/meta(?:\s+|$)/i, '').trim();
 }
 
+function scrollToTurnStart(el, smooth = true) {
+  if (!el) return;
+  requestAnimationFrame(() => {
+    const top = Math.max(0, el.getBoundingClientRect().top + window.scrollY - 118);
+    window.scrollTo({ top, behavior: smooth ? 'smooth' : 'auto' });
+  });
+}
 function scrollBottom(smooth = true) { requestAnimationFrame(() => window.scrollTo({top: document.body.scrollHeight, behavior: smooth ? 'smooth':'auto'})); }
 
 function ensureDynamicUi() {
@@ -933,7 +1038,11 @@ function renderDebug() {
   const relchg=(save.debug?.lastRelationChanges||[]).map(x=>`- ${x.npc_key}: 호감 ${x.affinity_delta>=0?'+':''}${x.affinity_delta}, 신뢰 ${x.trust_delta>=0?'+':''}${x.trust_delta}${x.status?` / ${x.status}`:''}\n  cause=${x.cause||x.reason||'-'}\n  expression=${x.expression||'-'}\n  followup=${x.followup||'-'}`).join('\n')||'-';
   const hooks=(save.hooks||[]).filter(x=>!['resolved','expired'].includes(x.status)).slice(-10).map(x=>`- [${x.status}] ${x.title} (${x.id})${x.source_npc_key?` / ${x.source_npc_key}`:''}`).join('\n')||'-';
   const hookchg=(save.debug?.lastHookChanges||[]).map(x=>`- ${x.id}: ${x.status} / ${x.reason||''}`).join('\n')||'-';
-  $('debugContent').textContent=`APP V1.4.4 / SAVE v${save.version}\nTURN ${save.turnNumber}\n\n[MODEL]\n${route.tier||'-'} / ${route.model||'-'}\nreason=${route.reason||'-'} / reasoning=${route.reasoning_effort||'-'}\n\n[TOKENS / COST]\ninput ${usage.input_tokens||0}\ncached ${usage.cached_tokens||0} (${Math.round(Number(usage.cache_hit_rate||0)*100)}%)\noutput ${usage.output_tokens||0}\nreasoning ${usage.reasoning_tokens||0}\nturn $${Number(usage.estimated_usd||0).toFixed(4)} / total $${Number(save.usage.estimatedUsd||0).toFixed(4)}\n\n[WORLD]\n${save.world.date} ${save.world.weekday} ${save.world.time}\n${save.world.location}\n\n[SCHEDULE DUE]\n${due}\n\n[UPCOMING <=4h]\n${upcoming}\n\n[NPC SCHEDULE]\n${npc}\n\n[LAST MEMORY ADDS]\n${mem}\n\n[LAST RELATION CHANGES]\n${relchg}\n\n[ACTIVE HOOKS]\n${hooks}\n\n[LAST HOOK CHANGES]\n${hookchg}\n\n[EMOTION]\n${em}\n\n[COUNTS]\ntimeline ${save.timeline.length}\nscheduled ${(save.scheduledEvents||[]).length}\nhooks ${(save.hooks||[]).length}\nglobal memories ${(save.memories?.global||[]).length}\nnpc memories ${Object.values(save.memories?.npc||{}).reduce((n,x)=>n+(x?.length||0),0)}`;
+  const dir=save.debug?.lastDirector||{};
+  const dirPlan=route.director_plan||{};
+  const dirCallbacks=(save.director?.callbacks||[]).filter(x=>x.status!=='resolved').slice(-8).map(x=>`- [${x.status}] ${x.key} / T${x.createdTurn}→T${x.lastTurn} / ${x.note||'-'}`).join('\n')||'-';
+  const dirRecent=(save.director?.recentSpotlights||[]).slice(-8).map(x=>`- T${x.turn} ${x.beat}/${x.event_kind}: ${(x.keys||[]).join(', ')||'-'}`).join('\n')||'-';
+  $('debugContent').textContent=`APP V1.4.6 / SAVE v${save.version}\nTURN ${save.turnNumber}\n\n[MODEL]\n${route.tier||'-'} / ${route.model||'-'}\nreason=${route.reason||'-'} / reasoning=${route.reasoning_effort||'-'}\n\n[TOKENS / COST]\ninput ${usage.input_tokens||0}\ncached ${usage.cached_tokens||0} (${Math.round(Number(usage.cache_hit_rate||0)*100)}%)\noutput ${usage.output_tokens||0}\nreasoning ${usage.reasoning_tokens||0}\nturn $${Number(usage.estimated_usd||0).toFixed(4)} / total $${Number(save.usage.estimatedUsd||0).toFixed(4)}\n\n[WORLD]\n${save.world.date} ${save.world.weekday} ${save.world.time}\n${save.world.location}\n\n[SCHEDULE DUE]\n${due}\n\n[UPCOMING <=4h]\n${upcoming}\n\n[NPC SCHEDULE]\n${npc}\n\n[LAST MEMORY ADDS]\n${mem}\n\n[LAST RELATION CHANGES]\n${relchg}\n\n[ACTIVE HOOKS]\n${hooks}\n\n[LAST HOOK CHANGES]\n${hookchg}\n\n[EMOTION]\n${em}\n\n[EVENT DIRECTOR]\nplan=${dirPlan.intervention||'-'} / choiceDue=${dirPlan.choice_due?'Y':'N'} / crossDue=${dirPlan.cross_department_due?'Y':'N'} / payoffDue=${dirPlan.payoff_due?'Y':'N'}\nplanCandidates=${(dirPlan.candidates||[]).map(x=>`${x.key}:${x.score}`).join(', ')||'-'}\nactual=${dir.intervention||'-'} / beat=${dir.beat||'-'} / kind=${dir.event_kind||'-'}\nspotlight=${(dir.spotlight_keys||[]).join(', ')||'-'}\ncallback=${dir.callback_key||'-'} / phase=${dir.callback_phase||'-'}\nreason=${dir.reason||'-'}\nlastEventTurn=${save.director?.lastEventTurn??'-'} / lastChoice=${save.director?.lastChoicePressureTurn??'-'} / lastCrossDept=${save.director?.lastCrossDepartmentTurn??'-'}\n\n[DIRECTOR CALLBACKS]\n${dirCallbacks}\n\n[RECENT SPOTLIGHT]\n${dirRecent}\n\n[COUNTS]\ntimeline ${save.timeline.length}\nscheduled ${(save.scheduledEvents||[]).length}\nhooks ${(save.hooks||[]).length}\nglobal memories ${(save.memories?.global||[]).length}\nnpc memories ${Object.values(save.memories?.npc||{}).reduce((n,x)=>n+(x?.length||0),0)}`;
 }
 
 ensureDynamicUi();
