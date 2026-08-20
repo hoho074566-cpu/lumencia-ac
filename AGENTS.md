@@ -66,3 +66,11 @@ These rules apply to the entire repository and must be followed whenever Codex m
 - Before a large refactor, produce an analysis and plan without modifying files.
 - Preserve behavior before improving architecture.
 - Do not combine a structural refactor with gameplay or AI behavior changes in the same pull request.
+
+## PR Self-Review
+
+Before presenting an implementation as complete, Codex must:
+
+- Inspect the final Git diff.
+- Perform a second self-review focused on regressions and scope creep.
+- Run `scripts/lumensia-pr-check.mjs` when it is available.
