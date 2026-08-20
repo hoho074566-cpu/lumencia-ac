@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Lumensia Dev QA Bench</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{margin:0;background:#0b1020;color:#e5e7eb}
+main{max-width:920px;margin:0 auto;padding:18px}
+h1{font-size:20px;margin:0 0 6px}.sub{color:#94a3b8;font-size:13px;line-height:1.55;margin-bottom:16px}
+.card{background:#111827;border:1px solid #273449;border-radius:14px;padding:14px;margin:10px 0}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button{border:1px solid #3b4a64;border-radius:10px;background:#1e293b;color:#f8fafc;padding:10px 12px;font-weight:800;cursor:pointer}
+button.primary{background:#3b2f12;border-color:#80651e;color:#fde68a}
+button:disabled{opacity:.4;cursor:not-allowed}
+.badge{display:inline-block;border:1px solid #334155;border-radius:999px;padding:4px 8px;font-size:11px;color:#cbd5e1}
+.ok{color:#86efac}.warn{color:#fde68a}.bad{color:#fca5a5}
+pre{white-space:pre-wrap;word-break:break-word;background:#070b14;border-radius:10px;padding:11px;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;max-height:420px;overflow:auto}
+.case-title{font-weight:900;margin-bottom:6px}.muted{color:#94a3b8}
+.stat{font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace}
+.sep{height:1px;background:#243042;margin:10px 0}
+</style>
+</head>
+<body>
+<main>
+  <h1>🧪 LUMENSIA DEV QA BENCH</h1>
+  <div class="sub">
+    현재 브라우저의 루멘시아 세이브를 <b>복제</b>해서 API만 호출한다.
+    실제 localStorage 세이브·턴·관계·시간은 수정하지 않는다.
+    단, 테스트 호출은 실제 API 토큰을 사용한다.
+  </div>
+
+  <section class="card">
+    <div class="row">
+      <button id="runAll" class="primary">▶ 4종 연속 테스트</button>
+      <button data-case="0">① 평범한 대화</button>
+      <button data-case="1">② 재대화/연속성</button>
+      <button data-case="2">③ 복합 관계 대화</button>
+      <button data-case="3">④ 대련/전투</button>
+    </div>
+    <div class="sep"></div>
+    <div id="env" class="stat">환경 확인 중…</div>
+    <div id="total" class="stat muted"></div>
+  </section>
+
+  <section id="results"></section>
+</main>
+<script>
+const SAVE_KEY='lumensia.save.v1';
+const SETTINGS_KEY='lumensia.settings.v1';
+let endpoint='/api/chat-v153';
+let running=false;
+let chainedRecent=[];
+let chainedSummary='';
+let lastPrimaryNpc='';
+
+const $=id=>document.getElementById(id);
+const clone=x=>JSON.parse(JSON.stringify(x??null));
+const arr=x=>Array.isArray(x)?x:[];
+const obj=x=>x&&typeof x==='object'&&!Array.isArray(x)?x:{};
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const cut=(s,n=1600)=>{s=String(s??'');return s.length>n?s.slice(0,n)+'…':s};
+
+function loadJson(key){try{return JSON.parse(localStorage.getItem(key)||'null')}catch{return null}}
+function saveBase(){
+  const s=loadJson(SAVE_KEY);
+  if(!s?.pc||!s?.world) throw new Error('현재 origin에 루멘시아 세이브가 없음. 게임 페이지와 같은 도메인에서 열어야 함.');
+  return clone(s);
+}
+function settingsBase(){return loadJson(SETTINGS_KEY)||{}}
+
+function npcLabel(key){
+  const known={
+    lilia:'릴리아',laris:'라리스',sera:'세라',isabel:'이사벨',artemis:'아르테미스',
+    sia:'시아',emily:'에밀리',lena:'레나',anastasia:'아나스타샤',lucia:'루시아',
+    elena:'엘레나',serena:'세레나',chloe:'클로에',mirabelle:'미라벨'
+  };
+  return known[key]||key;
+}
+function choosePrimary(save){
+  const scene=arr(save.sceneRuntime?.participants).filter(Boolean);
+  const latest=arr(save.renderedTurns).slice().reverse().flatMap(r=>arr(r?.turn?.scene).slice().reverse()).find(x=>x?.speaker_key);
+  const keys=[...scene,latest?.speaker_key,'sia','emily','lilia','laris'].filter(Boolean);
+  return keys[0]||'sia';
+}
+function chooseCombatNpc(save){
+  const candidates=['laris','lilia','sera','isabel','artemis'];
+  const all=new Set([
+    ...Object.keys(obj(save.npcStates)),
+    ...Object.keys(obj(save.relationships)),
+    ...arr(save.sceneRuntime?.participants)
+  ]);
+  return candidates.find(k=>all.has(k))||'laris';
+}
+
+const CASES=[
+  {
+    name:'① 평범한 NPC 대화',
+    kind:'routine',
+    build(save,primary){
+      const n=npcLabel(primary);
+      return `${n}에게 자연스럽게 다가가 "입학식은 어땠어?"라고 가볍게 말을 건다. 상대의 기존 성격과 현재 기분에 맞는 짧고 자연스러운 반응을 보여줘.`;
+    }
+  },
+  {
+    name:'② 재대화 / 연속성',
+    kind:'routine-followup',
+    build(save,primary){
+      const n=npcLabel(primary);
+      return `${n}와 방금 나눈 대화의 맥락을 그대로 이어서 "아까 네 반응, 생각보다 솔직하네."라고 말한다. 방금 전 대화를 처음 보는 것처럼 리셋하지 말고 자연스럽게 이어 반응하게 해줘.`;
+    }
+  },
+  {
+    name:'③ 복합 관계 / 감정 대화',
+    kind:'relationship',
+    build(save,primary){
+      const n=npcLabel(primary);
+      return `${n}에게 목소리를 조금 낮춰 "나를 어떻게 보고 있는지는 대충 알겠어. 그래도 네가 내 앞에서 계속 선을 긋는 이유는 궁금하네."라고 말한다. 호감도 하나로 친절/적대를 단순 결정하지 말고 자존심, 목표, 경계, 기존 인상을 함께 반영해 반응시켜줘.`;
+    }
+  },
+  {
+    name:'④ 대련 / 전투 판정',
+    kind:'combat',
+    build(save,primary,combat){
+      const n=npcLabel(combat);
+      return `${n}와 사전에 합의한 가벼운 대련을 시작한다. PC는 먼저 거리를 재며 상대의 중심 이동을 관찰한 뒤, 무리하게 승부를 확정하지 않고 첫 합에서 짧게 파고들어 검으로 압박을 시도한다. 경지·기술·신체·경험·거리·타이밍을 실제로 비교해 성공/부분성공/실패를 판정하고 그 근거가 묘사와 일치하게 해줘.`;
+    }
+  }
+];
+
+function addRecent(recent, action, data){
+  const t=data?.turn||{};
+  recent.push({
+    action,
+    summary:t.scene_summary||'',
+    importance:t.importance||'routine',
+    scene:arr(t.scene).slice(0,10)
+  });
+  return recent.slice(-12);
+}
+function sceneText(turn){
+  return arr(turn?.scene).map(x=>{
+    const who=x?.speaker_name||x?.speaker_key;
+    return `${x?.kind==='dialogue'&&who?`[${who}] `:''}${x?.text||''}`;
+  }).filter(Boolean).join('\n');
+}
+function resultCard(index, pending=false){
+  let el=document.getElementById('case-'+index);
+  if(!el){
+    el=document.createElement('article');
+    el.className='card';
+    el.id='case-'+index;
+    $('results').appendChild(el);
+  }
+  if(pending) el.innerHTML=`<div class="case-title">${esc(CASES[index].name)}</div><div class="warn">실행 중…</div>`;
+  return el;
+}
+function routeStats(data){
+  const r=obj(data?.route), u=obj(data?.usage);
+  const c=obj(r.context_router||data?.context_router||data?.pipeline?.context_router);
+  return {
+    tier:r.tier||'-', model:r.model||'-', reason:r.reason||'-',
+    input:Number(u.input_tokens||0), output:Number(u.output_tokens||0), reasoning:Number(u.reasoning_tokens||0),
+    cached:Number(u.cached_tokens||0),
+    profile:c.profile||r.context_profile||'-',
+    target:c.target_input_tokens??'-',
+    soft:c.soft_max_tokens??'-',
+    actual:Number(u.input_tokens||0),
+    cut:c.char_reduction_ratio!=null?Math.round(Number(c.char_reduction_ratio)*100)+'%':'-',
+    npcs:arr(c.selected_npcs).join(', ')||'-',
+    world:arr(c.canon_modules?.world).join(' | ')||'-',
+    npcCanon:arr(c.canon_modules?.npc).join(' | ')||'-',
+    speech:arr(c.canon_modules?.speech).join(' | ')||'-'
+  };
+}
+
+async function callCase(index,{chain=true}={}){
+  const el=resultCard(index,true);
+  const originalSave=saveBase();
+  const temp=clone(originalSave);
+  const settings=settingsBase();
+  const primary=lastPrimaryNpc||choosePrimary(temp);
+  const combat=chooseCombatNpc(temp);
+  lastPrimaryNpc=primary;
+
+  // Combat sandbox only: move the cloned world/scene, never localStorage.
+  if(index===3){
+    temp.world={...obj(temp.world),location:'루멘시아 아카데미 기사과 훈련장'};
+    temp.sceneRuntime={...obj(temp.sceneRuntime),scene_key:'dev-qa-spar',participants:[combat],ongoing_topic:'합의된 가벼운 대련',unresolved_question:'',remaining_beats:[]};
+  }
+
+  const action=CASES[index].build(temp,primary,combat);
+  const {accessToken,...apiSettings}=settings;
+  const recent = chain ? [...arr(originalSave.recentTurns),...chainedRecent].slice(-12) : arr(originalSave.recentTurns).slice(-12);
+  const rolling = chain && chainedSummary ? `${originalSave.rollingSummary||''}\n[DEV QA 임시 연속성]\n${chainedSummary}` : (originalSave.rollingSummary||'');
+
+  const payload={
+    action,
+    inputMode:'game',
+    saveState:temp,
+    recentTurns:recent,
+    rollingSummary:rolling,
+    availableCgIds:[],
+    forceTerra:false,
+    ...apiSettings,
+    demoMode:false
+  };
+
+  const t0=performance.now();
+  try{
+    const response=await fetch(endpoint,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Lumensia-Token':accessToken||''},
+      body:JSON.stringify(payload)
+    });
+    const raw=await response.text();
+    let data={};
+    try{data=raw?JSON.parse(raw):{}}catch{throw new Error(`HTTP ${response.status} non-JSON: ${cut(raw,260)}`)}
+    if(!response.ok) throw new Error(data.error||`HTTP ${response.status}`);
+    const ms=Math.round(performance.now()-t0);
+    const s=routeStats(data);
+    const text=sceneText(data.turn);
+
+    el.innerHTML=`
+      <div class="case-title">${esc(CASES[index].name)} <span class="badge ok">PASS HTTP</span></div>
+      <div class="stat">
+        ${esc(s.tier)} / ${esc(s.model)} · ${ms}ms<br>
+        input <b>${s.input.toLocaleString()}</b> · output ${s.output.toLocaleString()} · reasoning ${s.reasoning.toLocaleString()} · cached ${s.cached.toLocaleString()}<br>
+        router <b>${esc(s.profile)}</b> · target ${esc(s.target)} · softMax ${esc(s.soft)} · cut ${esc(s.cut)}<br>
+        selected NPC: ${esc(s.npcs)}<br>
+        world: ${esc(s.world)}
+      </div>
+      <details><summary>선택된 NPC CANON / SPEECH</summary><pre>NPC CANON: ${esc(s.npcCanon)}\n\nSPEECH: ${esc(s.speech)}</pre></details>
+      <details open><summary>실제 생성 결과</summary><pre>${esc(text||'(scene 없음)')}</pre></details>
+      <details><summary>scene_summary</summary><pre>${esc(data?.turn?.scene_summary||'')}</pre></details>
+    `;
+
+    if(chain){
+      chainedRecent=addRecent(chainedRecent,action,data).slice(-4);
+      chainedSummary=[chainedSummary,data?.turn?.scene_summary||''].filter(Boolean).join(' / ').slice(-1800);
+    }
+    return {ok:true,index,input:s.input,output:s.output,reasoning:s.reasoning,ms,profile:s.profile,data};
+  }catch(err){
+    const ms=Math.round(performance.now()-t0);
+    el.innerHTML=`<div class="case-title">${esc(CASES[index].name)} <span class="badge bad">FAIL</span></div><pre>${esc(err?.message||err)}\n${ms}ms</pre>`;
+    return {ok:false,index,input:0,output:0,reasoning:0,ms,error:String(err?.message||err)};
+  }
+}
+
+function setDisabled(v){
+  running=v;
+  document.querySelectorAll('button').forEach(b=>b.disabled=v);
+}
+async function runAll(){
+  if(running)return;
+  setDisabled(true);
+  chainedRecent=[];chainedSummary='';lastPrimaryNpc='';
+  $('results').innerHTML='';
+  const out=[];
+  for(let i=0;i<CASES.length;i++) out.push(await callCase(i,{chain:true}));
+  const ok=out.filter(x=>x.ok);
+  const input=ok.reduce((n,x)=>n+x.input,0), output=ok.reduce((n,x)=>n+x.output,0), reasoning=ok.reduce((n,x)=>n+x.reasoning,0);
+  const ms=ok.reduce((n,x)=>n+x.ms,0);
+  $('total').innerHTML=`4종 완료: ${ok.length}/4 PASS · input <b>${input.toLocaleString()}</b> · output ${output.toLocaleString()} · reasoning ${reasoning.toLocaleString()} · 총 대기 ${(ms/1000).toFixed(1)}s<br><span class="ok">실제 게임 세이브에는 아무 변화 없음.</span>`;
+  setDisabled(false);
+}
+async function runSingle(i){
+  if(running)return;
+  setDisabled(true);
+  chainedRecent=[];chainedSummary='';lastPrimaryNpc='';
+  await callCase(i,{chain:false});
+  setDisabled(false);
+}
+
+async function init(){
+  try{
+    const s=saveBase();
+    const health=await fetch('/api/health',{cache:'no-store'}).then(r=>r.json()).catch(()=>({}));
+    endpoint=health.adapter||'/api/chat-v153';
+    const p=choosePrimary(s), c=chooseCombatNpc(s);
+    $('env').innerHTML=`APP save TURN ${Number(s.turnNumber||0)} · endpoint <b>${esc(endpoint)}</b> · primary <b>${esc(npcLabel(p))}</b> · combat <b>${esc(npcLabel(c))}</b><br>API ${esc(health.version||'?')} / APP ${esc(health.appVersion||'?')}`;
+  }catch(err){
+    $('env').innerHTML=`<span class="bad">${esc(err?.message||err)}</span>`;
+    document.querySelectorAll('button').forEach(b=>b.disabled=true);
+  }
+}
+$('runAll').addEventListener('click',runAll);
+document.querySelectorAll('[data-case]').forEach(b=>b.addEventListener('click',()=>runSingle(Number(b.dataset.case))));
+init();
+</script>
+</body>
+</html>
