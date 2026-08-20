@@ -83,11 +83,29 @@ export function clampText(value,max=1200){
 function safeJson(v){try{return JSON.stringify(v??null);}catch{return '{}';}}
 function norm(v){return String(v||'').toLowerCase();}
 function uniq(v){return [...new Set(array(v).filter(Boolean))];}
+function actionClauseAt(action,index){
+  const text=String(action||'');
+  const start=Math.max(text.lastIndexOf('\n',index-1),text.lastIndexOf('.',index-1),text.lastIndexOf('!',index-1),text.lastIndexOf('?',index-1),text.lastIndexOf('。',index-1),text.lastIndexOf('！',index-1),text.lastIndexOf('？',index-1))+1;
+  const ends=['\n','.','!','?','。','！','？'].map(mark=>text.indexOf(mark,index)).filter(pos=>pos>=0);
+  const end=ends.length?Math.min(...ends)+1:text.length;
+  return text.slice(start,end).trim();
+}
+function isNonCommittedClause(clause){
+  const text=String(clause||'').trim();
+  if(!text)return true;
+  if(/[?？]/.test(text))return true;
+  if(/(?:언제|누구|누가|무엇|뭐|어디|왜|어떻게|어느|몇|(?:알려|설명해|말해|가르쳐)\s*(?:줘|주세요|줄래)|정보(?:를|가)?|궁금(?:해|하다))/.test(text))return true;
+  if(/(?:만약|가정(?:하면|해서|하자면)?|상상(?:하면|해서)?|경우(?:에는|엔)?|(?:으|라|다|한다|된다|온다|오|하|되|이|라)면\b|면[,.\s]|면$|고\s*싶|(?:할|될|일)\s*수\s*있|(?:하|되|이)려면|(?:한|할|된|될)\s*때|해도)/.test(text))return true;
+  if(/\b(?:if|unless|suppose|assuming|imagine|hypothetically|would|could|should|can|may|what|who|when|where|why|how|explain|information)\b/i.test(text))return true;
+  if(/(?:하지|되지|아니|않|못하|못해|못했|못할|말자|말고|말아|말라)|(?:^|\s)안\s/.test(text))return true;
+  if(/(?:알려|설명해|말해|가르쳐)\s*[.!。！]?$/.test(text))return true;
+  if(/(?:는|은|냐|니|나요|인가요|일까요|할까|할까요|해도\s*돼|해도\s*될까)\s*[.!。！]?$/.test(text))return true;
+  return false;
+}
 function hasAffirmedActionKeyword(action,pattern){
   const matcher=new RegExp(pattern.source,pattern.flags.includes('g')?pattern.flags:`${pattern.flags}g`);
   for(const match of String(action).matchAll(matcher)){
-    const suffix=String(action).slice((match.index||0)+match[0].length,(match.index||0)+match[0].length+20);
-    if(!/^(?:은|는|을|를)?\s*(?:하?지\s*(?:않|못|말)|안\s*하|하지\s*말)/.test(suffix))return true;
+    if(!isNonCommittedClause(actionClauseAt(action,match.index||0)))return true;
   }
   return false;
 }
