@@ -1,8 +1,20 @@
-// Lumensia characters-v2 portrait routing
+// LUMENSIA MOBILE V1.4.9 — characters-v2 live manifest router
 // PNG legacy assets are intentionally not used.
 
 const CHARACTER_V2_BASE =
   'https://raw.githubusercontent.com/dudghl/test/main/assets/characters-v2';
+
+export const ASSET_MANIFEST_VERSION = 'characters-v2-live-2026-08-19';
+
+const LIVE_V2_FOLDERS = new Set([
+  'beelzebub',
+  'bellian',
+  'delpirem',
+  'levian',
+  'lily_lumina',
+  'nemesis',
+  'veradin',
+]);
 
 const PORTRAIT_EXPRESSIONS = Object.freeze([
   'default',
@@ -24,21 +36,34 @@ function portraitUrl(folder, expression = 'default') {
   return `${CHARACTER_V2_BASE}/${folder}/portrait/${expression}.webp`;
 }
 
+function fullbodyUrl(folder) {
+  return `${CHARACTER_V2_BASE}/${folder}/fullbody/default.webp`;
+}
+
 function character(name, folder) {
+  const live = LIVE_V2_FOLDERS.has(folder);
   return {
     name,
     folder,
-    default: portraitUrl(folder, 'default'),
-    expressions: Object.fromEntries(
-      PORTRAIT_EXPRESSIONS
-        .filter((expression) => expression !== 'default')
-        .map((expression) => [expression, portraitUrl(folder, expression)])
-    ),
+    available: live,
+    default: live ? portraitUrl(folder, 'default') : null,
+    portraitDefault: live ? portraitUrl(folder, 'default') : null,
+    fullbody: live ? fullbodyUrl(folder) : null,
+    expressions: live
+      ? Object.fromEntries(
+          PORTRAIT_EXPRESSIONS
+            .filter((expression) => expression !== 'default')
+            .map((expression) => [expression, portraitUrl(folder, expression)])
+        )
+      : {},
   };
 }
 
 export const ASSETS = {
+  version: ASSET_MANIFEST_VERSION,
   base: CHARACTER_V2_BASE,
+  liveFolders: [...LIVE_V2_FOLDERS],
+  portraitExpressions: [...PORTRAIT_EXPRESSIONS],
 
   characters: {
     anastasia: character('아나스타샤', 'anastasia'),
@@ -75,7 +100,5 @@ export const ASSETS = {
     veradin: character('베라딘', 'veradin'),
   },
 
-  // 현재 배포 assets.js의 CG가 비어 있으므로 그대로 유지.
-  // 나중에 CG를 추가할 때 이 객체에만 넣으면 된다.
   cg: {},
 };
