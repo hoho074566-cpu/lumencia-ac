@@ -6,12 +6,18 @@ export default async function handler(req, res) {
     terra: process.env.OPENAI_MODEL_TERRA || 'gpt-5.6-terra',
     accessTokenRequired: Boolean(process.env.LUMENSIA_ACCESS_TOKEN),
     promptCacheRetention: '24h',
-    version: '0.7.0',
-    appVersion: '1.5.3',
-    adapter: '/api/chat-v153',
+    version: '0.8.0',
+    appVersion: '1.5.4',
+    adapter: '/api/chat-router',
     canonicalCore: '/api/chat',
+    stablePaths: {
+      runtime: '/app-runtime.js',
+      api: '/api/chat-router',
+      contextRouter: '/api/lib/context-router.js',
+    },
     qualityPipeline: 'Single canonical pass + local runtime/QA/background',
-    contextRouter: 'routine target 18k / soft max 20k; relevant CANON + memories',
-    tokenBudget: { routine: 18000, routineSoftMax: 20000, important: 20000, critical: 24000 },
+    contextRouter: 'HF1 budgets preserved: routine 17k target / 20k soft max',
+    eventDirector: 'V2 seeded weighted variation + 3-turn surprise cooldown + no-event outcome',
+    tokenBudget: { routine: 17000, routineSoftMax: 20000, scheduled: 18000, important: 20000, critical: 24000 },
   });
 }
