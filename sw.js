@@ -1,5 +1,5 @@
-const CACHE='lumensia-shell-v6-v153';
-const SHELL=['/','/index.html','/styles.css','/app-v153-loader.js','/app.js','/assets.js','/manifest.webmanifest'];
+const CACHE='lumensia-shell-v7-stable-v154';
+const SHELL=['/','/index.html','/styles.css','/app-runtime.js','/app.js','/assets.js','/manifest.webmanifest'];
 self.addEventListener('install',e=>{
   self.skipWaiting();
   e.waitUntil(caches.open(CACHE).then(c=>Promise.allSettled(SHELL.map(url=>c.add(url)))));
