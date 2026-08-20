@@ -53,7 +53,9 @@ const ROUTER_GM_RULES = String.raw`너는 판타지 아카데미 장기 RPG 「�
 10) 등록 NPC speaker_key는 CHARACTER REGISTRY의 정확한 키만 쓴다. 단역은 speaker_key=null과 표시명 사용.
 11) choices는 PC 선택이 실제로 필요한 지점에서만 정확히 3개, 아니면 빈 배열.
 12) scene_summary는 장기적으로 유용한 사실을 1~4문장으로 압축한다.
-13) 제공된 구조화 JSON 스키마만 반환하고 내부 판정 메모/Router 설명은 출력하지 않는다.`;
+13) USER ACTION의 긍정형 직접 선언은 이번 턴에 확정된 행동/대사다. 생각·의도로 되돌리지 말고 시도와 즉각적인 반응을 처리한다. 단, 명시적으로 부정·거절되었거나 하지 않겠다고 한 행동, 가정·질문·조건으로만 언급된 행동은 확정 행동이 아니므로 실행하지 않는다.
+14) USER ACTION 원문 전체를 반영한다. 서로 충돌하지 않는 선언을 생략하지 않되 성공 여부와 결과는 능력·상황·판정에 따른다.
+15) 제공된 구조화 JSON 스키마만 반환하고 내부 판정 메모/Router 설명은 출력하지 않는다.`;
 
 const NATURAL_STYLE = String.raw`[NATURAL NPC / SCENE]
 - NPC 대사는 설정집 낭독이 아니라 직전 말/행동에 대한 실제 반응이어야 한다.
@@ -81,6 +83,14 @@ export function clampText(value,max=1200){
 function safeJson(v){try{return JSON.stringify(v??null);}catch{return '{}';}}
 function norm(v){return String(v||'').toLowerCase();}
 function uniq(v){return [...new Set(array(v).filter(Boolean))];}
+function hasAffirmedActionKeyword(action,pattern){
+  const matcher=new RegExp(pattern.source,pattern.flags.includes('g')?pattern.flags:`${pattern.flags}g`);
+  for(const match of String(action).matchAll(matcher)){
+    const suffix=String(action).slice((match.index||0)+match[0].length,(match.index||0)+match[0].length+20);
+    if(!/^(?:은|는|을|를)?\s*(?:하?지\s*(?:않|못|말)|안\s*하|하지\s*말)/.test(suffix))return true;
+  }
+  return false;
+}
 function extractKeywords(text='',max=32){
   const tokens=norm(text).match(/[가-힣a-z0-9_]{2,}/g)||[]; const counts=new Map();
   for(const t of tokens){if(STOP_WORDS.has(t)||/^\d+$/.test(t))continue;counts.set(t,(counts.get(t)||0)+1);}
@@ -248,7 +258,7 @@ function selectMemories(rows,keywords,names,limit){
   return array(rows).map((row,i)=>{const text=norm(memoryText(row));let score=Number(row?.importance||1)*5+i/Math.max(1,array(rows).length);for(const kw of keywords)if(text.includes(kw))score+=3;for(const n of names)if(text.includes(norm(n)))score+=7;return{row,score,i};}).sort((a,b)=>b.score-a.score||b.i-a.i).slice(0,limit).sort((a,b)=>a.i-b.i).map(x=>x.row);
 }
 function secretAccess(incoming,keywords){
-  const action=String(incoming.action||''); if(!SECRET_RE.test(action))return false;
+  const action=String(incoming.action||''); if(!hasAffirmedActionKeyword(action,SECRET_RE))return false;
   const save=incoming.saveState||{}; const evidence=[...array(save.pcKnowledge),...array(save.hooks),...array(save?.memories?.global)].map(x=>norm(memoryText(x))).join('\n');
   if(!evidence.trim())return /L4|L5|델피렘|마신|대죄주교|사도|어비스|심연/i.test(action);
   return keywords.some(k=>k.length>=2&&evidence.includes(k))||/L4|L5/i.test(action);
@@ -271,10 +281,10 @@ function compactRecent(recentTurns,count){return array(recentTurns).slice(-count
 function classifyProfile(incoming={},mode='game'){
   if(mode==='continue')return PROFILES.continue;
   const save=incoming.saveState||{},action=String(incoming.action||'');
-  if(save?.flags?.majorScene||CRITICAL_ACTION_RE.test(action))return PROFILES.critical;
+  if(save?.flags?.majorScene||hasAffirmedActionKeyword(action,CRITICAL_ACTION_RE))return PROFILES.critical;
   const dueMajor=array(save?.scheduleContext?.due).some(ev=>Number(ev?.importance||0)>=4);
   if(dueMajor)return PROFILES.scheduled;
-  if(incoming.proReasoning||IMPORTANT_RE.test(action))return PROFILES.important;
+  if(incoming.proReasoning||hasAffirmedActionKeyword(action,IMPORTANT_RE))return PROFILES.important;
   return PROFILES.routine;
 }
 function adjustedProfile(base,incoming={}){
@@ -282,7 +292,7 @@ function adjustedProfile(base,incoming={}){
 }
 function contextSeed(incoming){const save=incoming.saveState||{},last=array(incoming.recentTurns).slice(-1)[0];return[incoming.action,save?.world?.location,save?.pc?.department,clampText(incoming.rollingSummary||'',900),safeJson(save?.sceneRuntime||{}),safeJson(array(save?.scheduleContext?.due).map(x=>({title:x?.title,location:x?.location,time:x?.time}))),last?.summary,array(last?.scene).map(x=>`${x?.speaker_key||''} ${x?.text||''}`).join(' ')].filter(Boolean).join('\n');}
 function buildInstructions(original,incoming,profile,originalInput,mode){
-  const sec=parseInstructionSections(original),registry=parseRegistry(sec.registry),directorV2=buildEventDirectorV2(incoming,originalInput,registry,mode),seed=contextSeed(incoming),keywords=extractKeywords(seed,36),keys=deriveKeys(incoming,registry,profile.maxNpcs,directorV2),names=keys.map(k=>registry[k]).filter(Boolean),secretAllowed=secretAccess(incoming,keywords),combat=COMBAT_RE.test(String(incoming.action||''));
+  const sec=parseInstructionSections(original),registry=parseRegistry(sec.registry),directorV2=buildEventDirectorV2(incoming,originalInput,registry,mode),seed=contextSeed(incoming),keywords=extractKeywords(seed,36),keys=deriveKeys(incoming,registry,profile.maxNpcs,directorV2),names=keys.map(k=>registry[k]).filter(Boolean),secretAllowed=secretAccess(incoming,keywords),combat=hasAffirmedActionKeyword(incoming.action||'',COMBAT_RE);
   const world=chooseBlocks(parseBlocks(sec.world),{budget:profile.worldChars,keywords,names,secretAllowed,mode:'world',combat});
   const npc=chooseBlocks(parseBlocks(sec.npc),{budget:profile.npcChars,keywords,names,secretAllowed,mode:'npc'});
   const speech=chooseBlocks(parseBlocks(sec.speech),{budget:profile.speechChars,keywords,names,secretAllowed:false,mode:'speech'});
@@ -297,9 +307,11 @@ function cleanDirector(originalInput,limit){
   d=d.split('\n').filter(line=>!/candidate|후보|planCandidates|candidates=/i.test(line)).join('\n');return clampText(d,limit);
 }
 function buildInput(incoming,originalInput,profile,routed){
-  const save=compactSave(incoming,routed.keys,routed.registry,profile,routed.keywords),recent=compactRecent(incoming.recentTurns,profile.recentTurns),opts=clampText(sectionBetween(originalInput,'===== TURN OPTIONS =====','===== AUTHORITATIVE SAVE_STATE ====='),700),director=cleanDirector(originalInput,profile.name.includes('routine')?650:900),directorV2=clampText(routed.directorV2?.directive||'',850),schedule=compactSchedule(incoming.saveState||{},routed.keys),runtime={npcInnerStates:Object.fromEntries(routed.keys.filter(k=>incoming.saveState?.npcInnerStates?.[k]).map(k=>[k,incoming.saveState.npcInnerStates[k]])),sceneRuntime:incoming.saveState?.sceneRuntime||{},backgroundDigest:clampText(incoming.saveState?.backgroundDigest||'',350)},action=clampText(incoming.action||'',5000),cg=array(incoming.availableCgIds).slice(0,60).join(', ');
-  let text=`===== TURN OPTIONS =====\n${opts}\n\n===== AUTHORITATIVE SAVE_STATE (ROUTED) =====\n${safeJson(save)}\n\n===== ROLLING SUMMARY TAIL =====\n${clampText(incoming.rollingSummary||'아직 없음',1500)}\n\n===== RECENT TURNS =====\n${safeJson(recent)}\n\n===== CURRENT NPC/SCENE RUNTIME =====\n${clampText(runtime,1600)}\n\n===== AVAILABLE_CG_IDS =====\n${cg||'없음'}\n\n===== GM EVENT DIRECTOR (ROUTED) =====\n${director||'없음'}\n\n===== EVENT DIRECTOR V2 (ROUTED) =====\n${directorV2||'없음'}\n\n===== SCHEDULE ENGINE (ROUTED) =====\n${safeJson(schedule)}\n\n===== USER ACTION =====\n${action}\n\n위 행동까지만 처리하고 PC의 다음 행동을 정하지 마라. ROUTINE은 빠르게 압축하고 주요 NPC 대사에는 감정 태그/강도/근거를 일치시켜라.`;
-  return{text:clampText(text,profile.inputChars)};
+  const save=compactSave(incoming,routed.keys,routed.registry,profile,routed.keywords),recent=compactRecent(incoming.recentTurns,profile.recentTurns),opts=clampText(sectionBetween(originalInput,'===== TURN OPTIONS =====','===== AUTHORITATIVE SAVE_STATE ====='),700),director=cleanDirector(originalInput,profile.name.includes('routine')?650:900),directorV2=clampText(routed.directorV2?.directive||'',850),schedule=compactSchedule(incoming.saveState||{},routed.keys),runtime={npcInnerStates:Object.fromEntries(routed.keys.filter(k=>incoming.saveState?.npcInnerStates?.[k]).map(k=>[k,incoming.saveState.npcInnerStates[k]])),sceneRuntime:incoming.saveState?.sceneRuntime||{},backgroundDigest:clampText(incoming.saveState?.backgroundDigest||'',350)},action=String(incoming.action||''),cg=array(incoming.availableCgIds).slice(0,60).join(', ');
+  const variableContext=`===== TURN OPTIONS =====\n${opts}\n\n===== AUTHORITATIVE SAVE_STATE (ROUTED) =====\n${safeJson(save)}\n\n===== ROLLING SUMMARY TAIL =====\n${clampText(incoming.rollingSummary||'아직 없음',1500)}\n\n===== RECENT TURNS =====\n${safeJson(recent)}\n\n===== CURRENT NPC/SCENE RUNTIME =====\n${clampText(runtime,1600)}\n\n===== AVAILABLE_CG_IDS =====\n${cg||'없음'}\n\n===== GM EVENT DIRECTOR (ROUTED) =====\n${director||'없음'}\n\n===== EVENT DIRECTOR V2 (ROUTED) =====\n${directorV2||'없음'}\n\n===== SCHEDULE ENGINE (ROUTED) =====\n${safeJson(schedule)}`;
+  const actionBlock=`===== USER ACTION =====\n${action}\n\n위 행동까지만 처리하고 PC의 다음 행동을 정하지 마라. ROUTINE은 빠르게 압축하고 주요 NPC 대사에는 감정 태그/강도/근거를 일치시켜라.`;
+  const variableBudget=Math.max(0,profile.inputChars-actionBlock.length-2);
+  return{text:`${clampText(variableContext,variableBudget)}\n\n${actionBlock}`};
 }
 
 export function routeOpenAIParams(params,{incoming={},mode='game'}={}){
