@@ -105,6 +105,11 @@ S4. 예약 이벤트가 실제로 종료되었거나 세계에서 종료되었�
 S5. PC 설정은 SAVE_STATE.pc가 절대 우선이다. 이름·나이·성별·출신·신분·학과·경지·재능·스킬·장비를 다른 자료의 예시 PC로 덮어쓰지 않는다.
 S6. SAVE_STATE.pc.characterSetting은 PC의 권위 있는 상세 프로필이다. 성격 경향·과거·가치관·목표·신체/능력 제약·전투 습관·개인 비밀 등을 세계 반응과 판정에 일관되게 반영한다. 단, 이 프로필을 근거로 PC의 현재 감정·대사·행동·수락/거절을 대신 확정하지 않는다. 또한 NPC는 실제로 알게 된 내용만 안다.
 
+[PLAYER ACTION COMMIT]
+C1. USER ACTION은 이번 턴에 사용자가 확정한 현재 행동과 대사의 권위 있는 원문이다. 긍정형으로 직접 선언한 행동은 단순한 생각·의도·제안으로 되돌리지 말고, 그 시도와 즉각적인 세계 반응을 이번 턴에 처리한다.
+C2. USER ACTION에 명시적으로 부정되거나 거절된 행동, 하지 않겠다고 한 행동, 가정·질문·조건으로만 언급된 행동은 확정 행동이 아니다. 키워드가 포함됐다는 이유만으로 실행하거나 발생시키지 않는다.
+C3. USER ACTION의 일부를 생략하거나 앞부분만 처리하지 않는다. 서로 충돌하지 않는 선언은 원문 전체를 반영하되, 성공 여부와 결과는 능력·상황·판정 규칙에 따른다.
+
 
 [원작 맛 V2 핵심 운영]
 G1. 장면은 짧은 현장 정착 뒤 빠르게 사람/문제/발견 중 하나가 움직이게 한다. 정적인 설명만 길게 끌지 않는다.
@@ -1084,6 +1089,15 @@ INPUT_MODE가 META라면 인게임 장면을 이어가지 말고 요청한 설�
 const IMPORTANT_RE = /(전투|공격|기습|결투|살해|죽음|도망|추적|구출|협상|정치|황위|비밀|조사|잠입|권능|사도|대죄주교|마신|심연|부상|치료|판정|대련|시험|고백|배신|의식|L4|L5)/i;
 const REASONING_LEVELS = new Set(['none', 'low', 'medium', 'high', 'xhigh', 'max']);
 
+function hasAffirmedActionKeyword(action, pattern) {
+  const matcher = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`);
+  for (const match of String(action).matchAll(matcher)) {
+    const suffix = String(action).slice((match.index || 0) + match[0].length, (match.index || 0) + match[0].length + 20);
+    if (!/^(?:은|는|을|를)?\s*(?:하?지\s*(?:않|못|말)|안\s*하|하지\s*말)/.test(suffix)) return true;
+  }
+  return false;
+}
+
 function chooseModel({ mode = 'auto', action = '', saveState = {}, proReasoning = false, forceTerra = false }) {
   const luna = process.env.OPENAI_MODEL_LUNA || 'gpt-5.6-luna';
   const terra = process.env.OPENAI_MODEL_TERRA || 'gpt-5.6-terra';
@@ -1095,7 +1109,7 @@ function chooseModel({ mode = 'auto', action = '', saveState = {}, proReasoning 
 
   const forced = Boolean(saveState?.flags?.forceTerraNextTurn);
   const major = Boolean(saveState?.flags?.majorScene);
-  const importantAction = IMPORTANT_RE.test(String(action));
+  const importantAction = hasAffirmedActionKeyword(action, IMPORTANT_RE);
   const dueSchedule = (saveState?.scheduleContext?.due || []).some(ev => Number(ev?.importance || 0) >= 4);
   if (forced) return { model: terra, tier: 'terra', reason: 'save-flag' };
   if (major) return { model: terra, tier: 'terra', reason: 'critical-followup' };
