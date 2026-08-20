@@ -6,10 +6,11 @@ export default async function handler(req, res) {
     terra: process.env.OPENAI_MODEL_TERRA || 'gpt-5.6-terra',
     accessTokenRequired: Boolean(process.env.LUMENSIA_ACCESS_TOKEN),
     promptCacheRetention: '24h',
-    version: '0.6.0',
-    appVersion: '1.5.2',
+    version: '0.6.1',
+    appVersion: '1.5.2-HF1',
     adapter: '/api/chat-v152',
     canonicalCore: '/api/chat',
-    qualityPipeline: 'Simulator -> Writer -> QA -> optional rewrite',
+    qualityPipeline: 'Single canonical pass + local runtime/QA/background',
+    tokenHotfix: true,
   });
 }
