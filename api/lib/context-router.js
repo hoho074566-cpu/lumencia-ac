@@ -169,7 +169,7 @@ function mentionedNpcKeys(action='',registry={}){
 }
 export function isCommittedMovement(action=''){
   const text=String(action||'').trim().toLowerCase();
-  if(!text||/(갈까|갈까요|가고\s*싶|가면|향할까|들어갈까|떠날까|이동할까|should\s+i\s+go|maybe\s+(?:i\s+)?go|want\s+to\s+go|if\s+i\s+go)/i.test(text))return false;
+  if(!text||/(갈까|갈까요|가고\s*싶|가면|향할까|들어갈까|떠날까|이동할까|안\s*(?:간다|갑니다|향한다|향합니다|들어간다|들어갑니다|떠난다|떠납니다|이동한다|이동합니다)|(?:가|향하|들어가|떠나|이동하)지\s*않|should\s+i\s+go|maybe\s+(?:i\s+)?go|want\s+to\s+go|if\s+i\s+go|\b(?:(?:do|does|did|will|would|am|is|are|can|could|should)\s+not|(?:don|doesn|didn|won|wouldn|isn|aren|can|couldn|shouldn)'t|cannot|never)\s+(?:go(?:ing)?|head(?:ing)?|enter(?:ing)?|leave|leaving|depart(?:ing)?|move|moving)\b)/i.test(text))return false;
   return /(?:간다|갑니다|향한다|향합니다|들어간다|들어갑니다|떠난다|떠납니다|이동한다|이동합니다)(?:[.!?\s]|$)/.test(text)
     || /\b(?:i\s+)?(?:go|head|move)(?:\s+(?:to|toward|towards|into|for|from)\b|[.!\s]*$)/i.test(text)
     || /\b(?:i\s+)?(?:enter|leave|depart)(?:\s+(?:(?:the|this|that|a|an|from)\s+)?[a-z][\w-]*|[.!\s]*$)/i.test(text);
