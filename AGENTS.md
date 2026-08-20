@@ -61,6 +61,14 @@ These rules apply to the entire repository and must be followed whenever Codex m
 - Never merge directly into `main`.
 - Prefer one logically focused pull request per change.
 
+## PR Self-Review
+
+Before presenting an implementation as complete, Codex must:
+
+- Inspect the final Git diff.
+- Perform a second self-review focused on regressions and scope creep.
+- Run `scripts/lumensia-pr-check.mjs` when it is available.
+
 ## Large Refactors
 
 - Before a large refactor, produce an analysis and plan without modifying files.
