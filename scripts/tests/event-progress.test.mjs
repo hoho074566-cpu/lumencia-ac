@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { compactEventProgress, isEventBeatEligible, mergeEventProgress, mergeRoutedEventProgress, normalizeEventProgress, occurrenceIdFromStartEvidence } from '../../lib/event-progress.js';
+import { compactEventProgress, isEventBeatEligible, mergeEventProgress, mergeRoutedEventProgress, normalizeEventProgress, occurrenceIdFromStartEvidence, scheduledIdsDueByTurnEnd } from '../../lib/event-progress.js';
 
 const previous={eventInstanceId:'entrance_ceremony#1285-03-01T09:00',activeBeat:null,completedBeats:['welcome_address','freshman_rep_speech']};
 const rewind=mergeEventProgress(previous,{event_instance_id:previous.eventInstanceId,active_beat:'freshman_rep_speech',completed_beats:['welcome_address']});
@@ -41,6 +41,20 @@ const playerStarted=mergeRoutedEventProgress(previous,{event_instance_id:'arbitr
 assert.equal(playerStarted.eventInstanceId,playerStartedId,'authoritative current-turn start evidence replaces stale progress, not the model ID');
 assert.equal(playerStarted.activeBeat,'opening_salute','player-started occurrence preserves canonical beat progress');
 
+const crossingSave={world:{date:'1285-03-01',time:'08:58'},scheduleContext:{due:[]},scheduledEvents:[{id:'entrance_ceremony',date:'1285-03-01',time:'09:00',status:'scheduled'}]};
+const newlyDue=scheduledIdsDueByTurnEnd(crossingSave,3);
+assert.deepEqual(newlyDue,['entrance_ceremony'],'a schedule becoming due during the current turn is authoritative');
+assert.equal(mergeRoutedEventProgress(previous,{event_instance_id:'entrance_ceremony',active_beat:'welcome_address',completed_beats:[]},{dueEventIds:newlyDue}).eventInstanceId,'entrance_ceremony','newly-due scheduled occurrence can replace stale progress');
+
+const scheduledCurrent={eventInstanceId:'entrance_ceremony',activeBeat:'ceremony_close',completedBeats:['freshman_rep_speech']};
+const sideArcId=occurrenceIdFromStartEvidence('1285-03-01',11,'rumor side arc');
+const preservedScheduled=mergeRoutedEventProgress(scheduledCurrent,{event_instance_id:'entrance_ceremony',active_beat:'ceremony_close',completed_beats:['freshman_rep_speech']},{dueEventIds:['entrance_ceremony'],startedOccurrenceId:sideArcId});
+assert.equal(preservedScheduled.eventInstanceId,'entrance_ceremony','merely adding a side arc cannot relabel the current scheduled occurrence');
+
+const terminalContinue=mergeEventProgress(scheduledCurrent,{event_instance_id:'entrance_ceremony',active_beat:null,completed_beats:['freshman_rep_speech','ceremony_close']},{allowInstanceChange:false});
+assert.equal(terminalContinue.activeBeat,null,'frozen CONTINUE accepts terminal progress without inventing another beat');
+assert.equal(isEventBeatEligible(terminalContinue,'ceremony_close'),false,'terminal CONTINUE completion remains authoritative');
+
 assert.equal(mergeEventProgress(previous,null),null,'explicit event_progress null clears a finished event');
 assert.equal(mergeEventProgress(previous,undefined).eventInstanceId,previous.eventInstanceId.toLowerCase(),'absent metadata preserves authoritative progress');
 assert.equal(mergeEventProgress(previous,{event_instance_id:'bad id!'}).eventInstanceId,previous.eventInstanceId.toLowerCase(),'malformed metadata preserves authoritative progress');
@@ -53,6 +67,7 @@ const router=readFileSync('api/chat-router.js','utf8');
 assert.match(router,/continueAction[\s\S]*compactEventProgress\(runtime\.eventProgress\)/,'CONTINUE action carries compact progress');
 assert.match(router,/consumeContinuationRuntime[\s\S]*allowInstanceChange:false/,'CONTINUE merge rejects event switching');
 assert.match(router,/localSceneRuntime[\s\S]*actualScheduledEntrants[\s\S]*reconcileParticipants/,'scene continuity remains authoritative');
+assert.match(router,/explicitPlayerStart[\s\S]*active_events_add/,'unscheduled start evidence requires an explicit player start or authoritative hook');
 assert.match(router,/if\(mode==='continue'\)[\s\S]*lockContinueTurn\(data\.turn\)/,'CONTINUE state freeze remains authoritative');
 assert.equal((router.match(/await runCore\(/g)||[]).length,1,'adapter retains one canonical model-call site');
 

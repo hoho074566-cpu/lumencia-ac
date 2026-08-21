@@ -8,7 +8,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import coreHandler, { CHARACTER_REGISTRY } from './chat.js';
 import { routeOpenAIParams, routerVersion, array, object, clampText } from './lib/context-router.js';
 import { actualScheduledEntrants, freshChoices, reconcileParticipants } from '../lib/scene-continuity.js';
-import { compactEventProgress, mergeEventProgress, mergeRoutedEventProgress, occurrenceIdFromStartEvidence } from '../lib/event-progress.js';
+import { compactEventProgress, mergeEventProgress, mergeRoutedEventProgress, occurrenceIdFromStartEvidence, scheduledIdsDueByTurnEnd } from '../lib/event-progress.js';
 
 export const config = { maxDuration: 300 };
 
@@ -114,10 +114,11 @@ function localSceneRuntime(incoming,turn,directorTelemetry=null){
   const choices=array(turn?.choices).map(x=>clampText(x,140)).filter(Boolean).slice(0,3);
   const hasDecision=choices.length>0;
   const directorOccurrence=String(directorTelemetry?.occurrence_id||'').trim().toLowerCase();
-  const dueIds=array(incoming.saveState?.scheduleContext?.due).map(row=>String(row?.id||''));
+  const dueIds=scheduledIdsDueByTurnEnd(incoming.saveState,turn?.state_delta?.advance_minutes);
   const callbackKey=String(turn?.director?.callback_key||'').trim();
   const knownCallback=new Set([...array(incoming.saveState?.director?.callbacks).map(row=>String(row?.key||'')),...array(incoming.saveState?.hooks).map(row=>String(row?.id||''))]);
-  const startedEvidence=array(turn?.state_delta?.active_events_add)[0]||(knownCallback.has(callbackKey)?callbackKey:'');
+  const explicitPlayerStart=/(?:결투|대련|조사|수사|추적|탐사|의뢰를?\s*(?:시작|수락)|duel|investigat|start(?:s|ed|ing)?\s+(?:a\s+)?(?:duel|investigation))/i.test(String(incoming.action||''));
+  const startedEvidence=(explicitPlayerStart?array(turn?.state_delta?.active_events_add)[0]:'')||(knownCallback.has(callbackKey)?callbackKey:'');
   const startedOccurrence=occurrenceIdFromStartEvidence(incoming.saveState?.world?.date,incoming.saveState?.turnNumber,startedEvidence);
   return {
     scene_key:clampText(turn?.scene_title||previous.scene_key||'scene',120),
