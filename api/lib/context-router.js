@@ -7,9 +7,9 @@ const DIRECTOR_V2_VERSION = '2.0';
 const DIRECTOR_COOLDOWN_TURNS = 3;
 
 const IMPORTANT_RE = /(전투|공격|기습|결투|도망|추적|구출|협상|정치|황위|조사|잠입|권능|부상|치료|판정|대련|시험|고백|배신|의식|각성|성유물|마유물|던전|정령왕)/i;
-const CRITICAL_ACTION_RE = /(L5|마신|델피렘|대죄주교|사도|심검|8서클|9서클|국가\s*전략|암살|살해|죽음|치명|대규모|전면전|성유물|마유물)/i;
+const CRITICAL_ACTION_RE = /(L5|마신|델피렘|Delphirem|대죄주교|사도|심검|8서클|9서클|국가\s*전략|암살|살해|죽음|치명|대규모|전면전|성유물|마유물)/i;
 const COMBAT_RE = /(전투|공격|베어|베고|찌르|쏘|회피|막아|막고|패링|결투|대련|검기|오러|마법을?\s*쏘|주먹|발차기|기습|제압|살해|죽이)/i;
-const SECRET_RE = /(L4|L5|비밀|기밀|진실|정체|흑막|마신|델피렘|대죄주교|사도|어비스|심연)/i;
+const SECRET_RE = /(L4|L5|비밀|기밀|진실|정체|흑막|마신|델피렘|Delphirem|대죄주교|사도|어비스|심연)/i;
 
 const PROFILES = Object.freeze({
   continue: {
@@ -83,11 +83,42 @@ export function clampText(value,max=1200){
 function safeJson(v){try{return JSON.stringify(v??null);}catch{return '{}';}}
 function norm(v){return String(v||'').toLowerCase();}
 function uniq(v){return [...new Set(array(v).filter(Boolean))];}
+function actionPhraseAt(action,index){
+  const text=String(action||'');
+  const separator=/(?:지\s*않고|지\s*못하고|지\s*말고|모르고|지만|그리고|그러나|하지만|그렇지만)\s*|\band\s+then\b[\s,]*|\bbut\b[\s,]*|[\n.!?;。！？]+/gi;
+  let start=0,end=text.length;
+  for(const match of text.matchAll(separator)){
+    const separatorStart=match.index||0,separatorEnd=separatorStart+match[0].length;
+    if(separatorEnd<=index){start=separatorEnd;continue;}
+    end=separatorEnd;break;
+  }
+  return text.slice(start,end).trim();
+}
+function isNonCommittedPhrase(phrase){
+  const text=String(phrase||'').trim();
+  if(!text)return true;
+  if(/[?？]/.test(text))return true;
+  if(/(?:(?:언제|누구|누가|무엇|뭐|어디|왜|어떻게|어느|몇).*(?:야|니|냐|나요|까|지)|(?:알려|설명해|말해|가르쳐)\s*(?:줘|주세요|줄래)|궁금(?:해|하다)|정보(?:를|가)?\s*[.!。！]?$)/.test(text))return true;
+  if(/(?:만약|가정(?:하면|해서|하자면)?|상상(?:하면|해서)?|경우(?:에는|엔)?|(?:으|라|다|한다|된다|온다|오|하|되|이|라)면\b|면[,.\s]|면$|고\s*싶|(?:할|될|일)\s*수\s*있|(?:하|되|이)려면|(?:한|할|된|될)\s*때|해도)/.test(text))return true;
+  if(/\b(?:if|unless|suppose|assuming|imagine|hypothetically|maybe|would|could|should|can|may|want|wish|what|who|when|where|why|how|explain|information)\b/i.test(text))return true;
+  if(/(?:하지|되지|아니|않|못하|못해|못했|못할|말자|말고|말아|말라)|(?:^|\s)안\s/.test(text))return true;
+  if(/(?:모(?:르|른|를|릅)|아는\s*(?:것|게|바)?\s*(?:이\s*)?없)/.test(text))return true;
+  if(/\b(?:do\s+not|don't|not|never|won't|will\s+not)\b/i.test(text))return true;
+  if(/\b(?:have\s+no\s+idea|know\s+nothing|(?:am|are|is)\s+not\s+sure)\b/i.test(text))return true;
+  if(/(?:알려|설명해|말해|가르쳐)\s*[.!。！]?$/.test(text))return true;
+  if(/(?:는|은|냐|니|나요|인가요|일까요|[가-힣]+까(?:요)?|해도\s*돼|해도\s*될까)\s*[.!。！]?$/.test(text))return true;
+  return false;
+}
+function hasCommittedFindFollowup(action,index){
+  const tail=String(action||'').slice(index);
+  const followup=tail.match(/(?:지만|그리고|그러나|하지만|그렇지만)\s*([^.!?。！？]+[.!?。！？]?)|\b(?:but|and\s+then)\b[\s,]*([^.!?]+[.!?]?)/i);
+  const phrase=(followup?.[1]||followup?.[2]||'').trim();
+  return /(?:찾으러|찾는다|찾아가|수색|추적|go\s+(?:and\s+)?find|find\s+them|seek|look\s+for)/i.test(phrase)&&!isNonCommittedPhrase(phrase);
+}
 function hasAffirmedActionKeyword(action,pattern){
   const matcher=new RegExp(pattern.source,pattern.flags.includes('g')?pattern.flags:`${pattern.flags}g`);
   for(const match of String(action).matchAll(matcher)){
-    const suffix=String(action).slice((match.index||0)+match[0].length,(match.index||0)+match[0].length+20);
-    if(!/^(?:은|는|을|를)?\s*(?:하?지\s*(?:않|못|말)|안\s*하|하지\s*말)/.test(suffix))return true;
+    if(!isNonCommittedPhrase(actionPhraseAt(action,match.index||0))||(/^(?:L4|L5|델피렘|Delphirem|마신|대죄주교|사도|어비스|심연)$/i.test(match[0])&&hasCommittedFindFollowup(action,match.index||0)))return true;
   }
   return false;
 }
@@ -260,7 +291,7 @@ function selectMemories(rows,keywords,names,limit){
 function secretAccess(incoming,keywords){
   const action=String(incoming.action||''); if(!hasAffirmedActionKeyword(action,SECRET_RE))return false;
   const save=incoming.saveState||{}; const evidence=[...array(save.pcKnowledge),...array(save.hooks),...array(save?.memories?.global)].map(x=>norm(memoryText(x))).join('\n');
-  if(!evidence.trim())return /L4|L5|델피렘|마신|대죄주교|사도|어비스|심연/i.test(action);
+  if(!evidence.trim())return /L4|L5|델피렘|Delphirem|마신|대죄주교|사도|어비스|심연/i.test(action);
   return keywords.some(k=>k.length>=2&&evidence.includes(k))||/L4|L5/i.test(action);
 }
 function compactPc(pc={},important=false){const out={...object(pc)};if('characterSetting'in out)out.characterSetting=clampText(out.characterSetting||'',important?1700:1100);if('appearance'in out)out.appearance=clampText(out.appearance||'',350);if(Array.isArray(out.inventory))out.inventory=out.inventory.slice(0,18);if(out.skills&&typeof out.skills==='object')out.skills=Object.fromEntries(Object.entries(out.skills).slice(0,24));return out;}
