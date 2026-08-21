@@ -96,4 +96,11 @@ const crowded = routeOpenAIParams(
 assert.equal(crowded.telemetry.selected_npcs[0], 'p5', 'latest authoritative speaker must be prioritized before truncation');
 assert.equal(crowded.telemetry.selected_npcs.includes('p5'), true, 'latest authoritative speaker was dropped from a crowded scene');
 
-console.log(`PASS context router regressions (${cases.length + 11} checks)`);
+const addressed = routeOpenAIParams(
+  { instructions:crowdedInstructions, input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}' },
+  { incoming:{ action:'p5에게 직접 질문한다.', saveState:{turnNumber:3,world:{location:'academy'},sceneRuntime:{participants:['p1','p2','p3','p4']}}, recentTurns:[] }, mode:'game' },
+);
+assert.equal(addressed.telemetry.selected_npcs.includes('p5'), true, 'action-mentioned canonical NPC must be selected before lower-priority participants');
+assert.equal(addressed.telemetry.selected_npcs.length, 4, 'action priority must preserve the context NPC cap');
+
+console.log(`PASS context router regressions (${cases.length + 13} checks)`);

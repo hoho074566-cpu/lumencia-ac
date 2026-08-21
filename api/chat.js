@@ -10,7 +10,7 @@ const CANON = {"world": "루멘시아 세계관 확정 설정 v3 — 프로젝�
 // ===== END canon-data.js =====
 
 // ===== BEGIN character-registry.js =====
-const CHARACTER_REGISTRY = Object.freeze({
+export const CHARACTER_REGISTRY = Object.freeze({
   anastasia: '아나스타샤',
   aria: '아리아',
   arien: '아리엔',

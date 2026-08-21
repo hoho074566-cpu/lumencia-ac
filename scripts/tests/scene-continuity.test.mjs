@@ -25,6 +25,12 @@ const recent = [{ scene:[dialogue('mirabelle', '미라벨', '또 봐요.')] }];
   assert.deepEqual([...explicitDepartures({scene:[narration('Mirabelle says goodbye to Lillia and walks away.')]}, cast)], ['mirabelle'], 'an object name does not steal the departure from the clause subject');
   assert.equal(explicitDepartures({scene:[narration('Mirabelle tried to leave, but the door was locked.')]}, cast).size, 0, 'failed English departure is not completed');
   assert.equal(explicitDepartures({scene:[narration('미라벨은 떠나려 했지만 문이 잠겨 있었다.')]}, cast).size, 0, 'failed Korean departure is not completed');
+  assert.deepEqual([...explicitDepartures({scene:[narration('릴리아는 떠나지 않았지만 미라벨은 방을 나갔다.')]}, cast)], ['mirabelle'], 'one negated clause does not suppress another NPC completed departure');
+  assert.deepEqual([...explicitDepartures({scene:[narration('릴리아는 떠나려 했지만 미라벨은 방을 나갔다.')]}, cast)], ['mirabelle'], 'one failed clause does not suppress another NPC completed departure');
+}
+
+for (const text of ['미라벨이 방을 떠났다.', '미라벨이 방을 떠나고 복도로 향했다.', '미라벨이 방을 떠나며 문을 닫았다.', '미라벨이 방을 떠났고 발소리가 멀어졌다.']) {
+  assert.deepEqual([...explicitDepartures({scene:[narration(text)]}, recent)], ['mirabelle'], `completed Korean departure: ${text}`);
 }
 
 for (const text of ['Mirabelle does not leave the room.', 'Mirabelle might leave.', 'Should I leave, Mirabelle?', '미라벨은 떠나지 않는다.', '미라벨은 떠날지도 모른다.', '미라벨은 떠나야 할까?']) {
@@ -37,6 +43,7 @@ assert.deepEqual(reconcileParticipants({ previous:[], turn:{ scene:[narration('�
 assert.deepEqual(reconcileParticipants({ previous:['mirabelle'], action:'미라벨과 함께 기사과 건물로 간다.', turn:{ scene:[narration('두 사람은 함께 기사과 건물에 도착했다.')], state_delta:{new_location:'기사과 건물'} }, recentTurns:recent }), ['mirabelle'], 'an explicitly accompanying NPC crosses locations');
 assert.deepEqual(reconcileParticipants({ previous:['mirabelle'], action:'기사과 건물로 간다.', turn:{ scene:[narration('PC는 기사과 건물에 도착했다.')], state_delta:{new_location:'기사과 건물'} }, recentTurns:recent }), [], 'location change does not carry an unmentioned NPC');
 assert.deepEqual(reconcileParticipants({ previous:['old1','old2','old3','old4','old5','old6','old7','old8'], turn:{scene:[dialogue('current','현재 인물')],state_delta:{}}, recentTurns:[] }), ['current','old1','old2','old3','old4','old5','old6','old7'], 'current speakers take priority over stale participants at the cap');
+assert.deepEqual(reconcileParticipants({ previous:['mirabelle','lillia'], turn:{scene:[narration('미라벨이 방을 떠났다.')],state_delta:{}}, recentTurns:[], registry:{mirabelle:'미라벨',lillia:'릴리아'} }), ['lillia'], 'an old active participant can depart through canonical display-name resolution');
 
 {
   const scheduledRecent = [{scene:[dialogue('mirabelle','미라벨')]}];
