@@ -8,6 +8,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import coreHandler, { CHARACTER_REGISTRY } from './chat.js';
 import { routeOpenAIParams, routerVersion, array, object, clampText } from './lib/context-router.js';
 import { actualScheduledEntrants, freshChoices, reconcileParticipants } from '../lib/scene-continuity.js';
+import { compactEventProgress, mergeEventProgress, normalizeEventProgress } from '../lib/event-progress.js';
 
 export const config = { maxDuration: 300 };
 
@@ -57,7 +58,8 @@ function emptyStateDelta() {
 function continueAction(incoming) {
   const runtime = object(incoming.saveState?.sceneRuntime);
   const beat = array(runtime.remaining_beats)[0] || '';
-  return clampText(`${CONTINUE_DIRECTIVE}${beat?`\n미처리 같은-장면 beat: ${beat}`:''}\n직전 장면 연속성: ${clampText(runtime,900)}`,5000);
+  const eventAnchor = compactEventProgress(runtime.eventProgress);
+  return clampText(`${CONTINUE_DIRECTIVE}${beat?`\n미처리 같은-장면 beat: ${beat}`:''}${eventAnchor?`\n현재 이벤트 진행(권위 상태): ${eventAnchor}`:''}\n직전 장면 연속성: ${clampText(runtime,900)}`,5000);
 }
 
 function lockContinueTurn(turn) {
@@ -111,6 +113,10 @@ function localSceneRuntime(incoming,turn){
   const participants=reconcileParticipants({previous:previous.participants,action:incoming.action,turn,recentTurns:incoming.recentTurns,scheduledEntries,registry:CHARACTER_REGISTRY,currentLocation:incoming.saveState?.world?.location});
   const choices=array(turn?.choices).map(x=>clampText(x,140)).filter(Boolean).slice(0,3);
   const hasDecision=choices.length>0;
+  const previousProgress=normalizeEventProgress(previous.eventProgress);
+  const incomingProgress=normalizeEventProgress(turn?.event_progress);
+  const dueIds=new Set(array(incoming.saveState?.scheduleContext?.due).map(row=>String(row?.id||'')).filter(Boolean));
+  const allowInstanceChange=!previousProgress||Boolean(incomingProgress&&dueIds.has(incomingProgress.eventInstanceId));
   return {
     scene_key:clampText(turn?.scene_title||previous.scene_key||'scene',120),
     participants,
@@ -121,10 +127,11 @@ function localSceneRuntime(incoming,turn){
     immediate_pressure:clampText(previous.immediate_pressure||'',220),
     tone:clampText(turn?.importance||previous.tone||'routine',80),
     remaining_beats:hasDecision?[]:array(previous.remaining_beats).slice(0,1),
+    eventProgress:mergeEventProgress(previousProgress,incomingProgress,{allowInstanceChange}),
   };
 }
 function clone(value){try{return structuredClone(value);}catch{return JSON.parse(JSON.stringify(value??null));}}
-function consumeContinuationRuntime(incoming){const prev=clone(object(incoming.saveState?.sceneRuntime));prev.remaining_beats=array(prev.remaining_beats).slice(1);return{npc_updates:{},scene_runtime:prev};}
+function consumeContinuationRuntime(incoming,turn){const prev=clone(object(incoming.saveState?.sceneRuntime));prev.remaining_beats=array(prev.remaining_beats).slice(1);prev.eventProgress=mergeEventProgress(prev.eventProgress,turn?.event_progress,{allowInstanceChange:false});return{npc_updates:{},scene_runtime:prev};}
 
 function localBackgroundDigest(incoming,turn,participants){
   const prior=String(incoming.saveState?.backgroundDigest||'').slice(-1100);
@@ -220,7 +227,7 @@ export default async function handler(req,res){
 
     if(mode==='continue'){
       lockContinueTurn(data.turn); applyExtendedExpressions(data.turn,incoming0.saveState||{});
-      data.runtime_state=consumeContinuationRuntime(incoming0);
+      data.runtime_state=consumeContinuationRuntime(incoming0,data.turn);
       data.background_digest=String(incoming0.saveState?.backgroundDigest||'').slice(-1800);
       const pipeline={pipeline:'continue-stable-v154',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null};
       data.pipeline=pipeline; setAdapterRoute(data,mode,pipeline,telemetry); return res.status(200).json(data);
