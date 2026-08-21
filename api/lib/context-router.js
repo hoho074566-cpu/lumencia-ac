@@ -274,7 +274,8 @@ function deriveKeys(incoming,registry,maxNpcs,directorV2=null){
   addExplicitKeys(set,incoming.action||'',registry,maxNpcs);
   if(directorV2?.selectedKey&&registry[directorV2.selectedKey]&&set.size<maxNpcs)set.add(String(directorV2.selectedKey));
   const last=array(incoming.recentTurns).slice(-1)[0];
-  for(const item of array(last?.scene).slice(-4)){if(set.size>=maxNpcs)break;if(item?.speaker_key&&registry[item.speaker_key])set.add(String(item.speaker_key));}
+  // Once runtime presence exists it is authoritative; speaker history is context, not physical presence.
+  if(!Object.hasOwn(object(save?.sceneRuntime),'participants'))for(const item of array(last?.scene).slice(-4)){if(set.size>=maxNpcs)break;if(item?.speaker_key&&registry[item.speaker_key])set.add(String(item.speaker_key));}
   for(const row of array(save?.director?.recentSpotlights).slice(-1)){for(const k of array(row?.keys).slice(0,2)){if(set.size>=maxNpcs)break;if(registry[k])set.add(String(k));}}
   // Large ceremonies often list the whole class. Never treat every attendee as context-relevant.
   for(const ev of array(save?.scheduleContext?.due).slice(0,2)){

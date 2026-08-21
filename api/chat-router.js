@@ -7,6 +7,7 @@ import OpenAI from 'openai';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import coreHandler from './chat.js';
 import { routeOpenAIParams, routerVersion, array, object, clampText } from './lib/context-router.js';
+import { freshChoices, reconcileParticipants } from '../lib/scene-continuity.js';
 
 export const config = { maxDuration: 300 };
 
@@ -106,12 +107,12 @@ function localNpcUpdates(incoming,turn){
 
 function localSceneRuntime(incoming,turn){
   const previous=object(incoming.saveState?.sceneRuntime);
-  const participants=[...new Set(array(turn?.scene).map(x=>x?.speaker_key).filter(Boolean).map(String))].slice(0,8);
+  const participants=reconcileParticipants({previous:previous.participants,turn,recentTurns:incoming.recentTurns});
   const choices=array(turn?.choices).map(x=>clampText(x,140)).filter(Boolean).slice(0,3);
   const hasDecision=choices.length>0;
   return {
     scene_key:clampText(turn?.scene_title||previous.scene_key||'scene',120),
-    participants:participants.length?participants:array(previous.participants).slice(0,8),
+    participants,
     objects:array(previous.objects).slice(0,10),
     positions:Object.fromEntries(Object.entries(object(previous.positions)).slice(0,10)),
     ongoing_topic:clampText(turn?.scene_summary||previous.ongoing_topic||'',280),
@@ -230,6 +231,7 @@ export default async function handler(req,res){
     }
 
     applyExtendedExpressions(data.turn,incoming0.saveState||{});
+    data.turn.choices=freshChoices(incoming.action,data.turn);
     const sceneRuntime=localSceneRuntime(incoming0,data.turn);
     const npcUpdates=incoming0.qualityPipeline===false?{}:localNpcUpdates(incoming0,data.turn);
     data.runtime_state={npc_updates:npcUpdates,scene_runtime:sceneRuntime};
