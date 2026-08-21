@@ -107,7 +107,7 @@ function localNpcUpdates(incoming,turn){
 
 function localSceneRuntime(incoming,turn){
   const previous=object(incoming.saveState?.sceneRuntime);
-  const participants=reconcileParticipants({previous:previous.participants,turn,recentTurns:incoming.recentTurns});
+  const participants=reconcileParticipants({previous:previous.participants,action:incoming.action,turn,recentTurns:incoming.recentTurns});
   const choices=array(turn?.choices).map(x=>clampText(x,140)).filter(Boolean).slice(0,3);
   const hasDecision=choices.length>0;
   return {
