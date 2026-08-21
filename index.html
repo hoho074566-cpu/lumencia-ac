@@ -188,6 +188,30 @@
     <form method="dialog">
       <header><h2>개발자 DEBUG</h2><button value="cancel" class="close-btn">✕</button></header>
       <pre id="debugContent" class="debug-content"></pre>
+      <section id="regressionConsole" class="regression-console" aria-labelledby="regressionTitle">
+        <h3 id="regressionTitle">회귀 테스트</h3>
+        <p class="regression-note">로컬 검사는 API를 호출하지 않습니다. 이미지 요청도 아래 미리보기를 눌렀을 때만 발생합니다.</p>
+        <div class="regression-actions">
+          <button id="regressionFastBtn" type="button" class="secondary-btn">빠른 전체 검사</button>
+          <button id="regressionImageBtn" type="button" class="secondary-btn">이미지/표정 검사</button>
+          <button id="regressionRerunBtn" type="button" class="ghost-btn">전체 다시 실행</button>
+          <button id="regressionCopyBtn" type="button" class="ghost-btn">결과 복사</button>
+        </div>
+        <div id="regressionMeta" class="regression-meta">아직 실행하지 않음</div>
+        <div id="regressionResults" class="regression-results" aria-live="polite"></div>
+        <details class="visual-sweep">
+          <summary>21명 이미지 수동 확인</summary>
+          <div class="visual-controls">
+            <select id="regressionCharacter" aria-label="캐릭터"></select>
+            <select id="regressionExpression" aria-label="표정"></select>
+            <button id="regressionShowImage" type="button" class="secondary-btn">표시</button>
+            <button id="regressionNextCharacter" type="button" class="ghost-btn">다음 캐릭터</button>
+            <button id="regressionNextExpression" type="button" class="ghost-btn">다음 표정</button>
+          </div>
+          <div id="regressionPreview" class="regression-preview">표시를 누르면 manifest가 허용한 이미지 한 장만 불러옵니다.</div>
+        </details>
+        <div class="live-smoke-note"><strong>실전 스모크 (선택)</strong><br>정상 API/모델을 사용하는 완전 격리 호출 경로가 현재 없어 비활성화했습니다. 실제 저장을 위험에 빠뜨리는 테스트 호출은 만들지 않습니다.<br><button type="button" disabled>실전 스모크 실행 (사용 불가)</button> · 예상 API 호출 0회</div>
+      </section>
     </form>
   </dialog>
 
