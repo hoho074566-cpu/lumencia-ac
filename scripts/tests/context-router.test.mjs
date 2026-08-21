@@ -2,6 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { routeOpenAIParams } from '../../api/lib/context-router.js';
+import { promotePausedEventProgress } from '../../lib/event-progress.js';
 
 const divider = '='.repeat(20);
 const instructions = `===== CHARACTER REGISTRY =====
@@ -76,6 +77,10 @@ assert.match(routedContract,/event_progress=null/, 'routed GAME prompt is missin
 const overflowContext=route('행사를 계속 지켜본다.',{saveState:{sceneRuntime:{eventProgress:{eventInstanceId:'long_event#1',activeBeat:'beat_25',completedBeats:Array.from({length:24},(_,i)=>`beat_${i+1}`),omittedCompletedCount:1,completionFingerprint:'0'.repeat(256)}}}});
 assert.match(overflowContext.params.input,/"omittedCompletedCount":1/, 'normal GAME generation context is missing overflow completion authority');
 assert.match(overflowContext.params.input,/"beat_24"/, 'normal GAME generation context must retain the bounded explicit completion window');
+const pausedRuntime={eventProgress:null,eventProgressByInstance:{entrance_ceremony:{eventInstanceId:'entrance_ceremony',activeBeat:'ceremony_close',completedBeats:['welcome_address','freshman_rep_speech']}}};
+const resumedBeforeGeneration=promotePausedEventProgress(pausedRuntime,['entrance_ceremony']);
+const resumedContext=route('입학식을 계속 지켜본다.',{saveState:{sceneRuntime:resumedBeforeGeneration,scheduleContext:{due:[{id:'entrance_ceremony'}]}}});
+assert.match(resumedContext.params.input,/"completedBeats":\["welcome_address","freshman_rep_speech"\]/, 'resumed occurrence completions must reach routed GAME context before prose generation');
 
 const continueAction = `[LUMENSIA V1.5.4 CONTINUE]\n${'직전 장면의 같은 순간을 이어 쓴다. '.repeat(120)}`;
 const continuedRouted = routeOpenAIParams(

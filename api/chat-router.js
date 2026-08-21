@@ -8,7 +8,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import coreHandler, { CHARACTER_REGISTRY } from './chat.js';
 import { routeOpenAIParams, routerVersion, array, object, clampText } from './lib/context-router.js';
 import { actualScheduledEntrants, freshChoices, reconcileParticipants } from '../lib/scene-continuity.js';
-import { compactEventProgress, mergeContinuationEventProgressState, mergeRoutedEventProgressState, occurrenceIdFromStartEvidence, scheduledIdsDueByTurnEnd } from '../lib/event-progress.js';
+import { compactEventProgress, mergeContinuationEventProgressState, mergeRoutedEventProgressState, occurrenceIdFromStartEvidence, promotePausedEventProgress, scheduledIdsDueByTurnEnd } from '../lib/event-progress.js';
 
 export const config = { maxDuration: 300 };
 
@@ -205,12 +205,14 @@ export default async function handler(req,res){
     const incoming0=req.body&&typeof req.body==='object'?req.body:{};
     const mode=SUPPORTED_MODES.has(incoming0.inputMode)?incoming0.inputMode:'game';
     const incoming={...incoming0};
+    const resumableIds=scheduledIdsDueByTurnEnd(incoming0.saveState,0);
+    incoming.saveState={...object(incoming0.saveState),sceneRuntime:promotePausedEventProgress(incoming0.saveState?.sceneRuntime,resumableIds)};
 
     if(mode==='meta'){
       incoming.inputMode='meta';
       incoming.action=String(incoming0.action||'');
     }else if(mode==='continue'){
-      incoming.inputMode='game'; incoming.action=continueAction(incoming0); incoming.forceTerra=false;
+      incoming.inputMode='game'; incoming.action=continueAction(incoming); incoming.forceTerra=false;
       incoming.rollingSummary=String(incoming0.rollingSummary||'').slice(-3600);
     }else if(mode==='auto'){
       incoming.inputMode='game'; incoming.action=AUTO_DIRECTIVE;
@@ -231,8 +233,8 @@ export default async function handler(req,res){
 
     if(mode==='continue'){
       lockContinueTurn(data.turn); applyExtendedExpressions(data.turn,incoming0.saveState||{});
-      data.runtime_state=consumeContinuationRuntime(incoming0,data.turn);
-      data.background_digest=String(incoming0.saveState?.backgroundDigest||'').slice(-1800);
+      data.runtime_state=consumeContinuationRuntime(incoming,data.turn);
+      data.background_digest=String(incoming.saveState?.backgroundDigest||'').slice(-1800);
       const pipeline={pipeline:'continue-stable-v154',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null};
       data.pipeline=pipeline; setAdapterRoute(data,mode,pipeline,telemetry); return res.status(200).json(data);
     }
@@ -244,7 +246,7 @@ export default async function handler(req,res){
 
     applyExtendedExpressions(data.turn,incoming0.saveState||{});
     data.turn.choices=freshChoices(incoming.action,data.turn);
-    const sceneRuntime=localSceneRuntime(incoming0,data.turn,telemetry?.event_director_v2);
+    const sceneRuntime=localSceneRuntime({...incoming0,saveState:incoming.saveState},data.turn,telemetry?.event_director_v2);
     const npcUpdates=incoming0.qualityPipeline===false?{}:localNpcUpdates(incoming0,data.turn);
     data.runtime_state={npc_updates:npcUpdates,scene_runtime:sceneRuntime};
     data.background_digest=localBackgroundDigest(incoming0,data.turn,sceneRuntime.participants);

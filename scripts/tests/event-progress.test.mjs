@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { compactEventProgress, isEventBeatEligible, mergeContinuationEventProgressState, mergeEventProgress, mergeRoutedEventProgress, mergeRoutedEventProgressState, normalizeEventProgress, occurrenceIdFromStartEvidence, scheduledIdsDueByTurnEnd } from '../../lib/event-progress.js';
+import { compactEventProgress, isEventBeatEligible, mergeContinuationEventProgressState, mergeEventProgress, mergeRoutedEventProgress, mergeRoutedEventProgressState, normalizeEventProgress, occurrenceIdFromStartEvidence, promotePausedEventProgress, scheduledIdsDueByTurnEnd } from '../../lib/event-progress.js';
 
 const previous={eventInstanceId:'entrance_ceremony#1285-03-01T09:00',activeBeat:null,completedBeats:['welcome_address','freshman_rep_speech']};
 const rewind=mergeEventProgress(previous,{event_instance_id:previous.eventInstanceId,active_beat:'freshman_rep_speech',completed_beats:['welcome_address']});
@@ -69,6 +69,9 @@ const endedInterruption=mergeRoutedEventProgressState(interrupted.eventProgress,
 const resumed=mergeRoutedEventProgressState(endedInterruption.eventProgress,endedInterruption.eventProgressByInstance,{event_instance_id:'entrance_ceremony',active_beat:'ceremony_close',completed_beats:[]},{dueEventIds:['entrance_ceremony']});
 assert.deepEqual(resumed.eventProgress.completedBeats,['welcome_address','freshman_rep_speech'],'resuming a paused occurrence restores completed-beat authority');
 assert.equal(isEventBeatEligible(resumed.eventProgress,'freshman_rep_speech'),false,'resumed occurrence cannot replay a completed beat');
+const preGenerationResume=promotePausedEventProgress({eventProgress:null,eventProgressByInstance:endedInterruption.eventProgressByInstance},['entrance_ceremony']);
+assert.deepEqual(preGenerationResume.eventProgress.completedBeats,['welcome_address','freshman_rep_speech'],'paused progress is promoted before resumed prose generation');
+assert.equal(mergeEventProgress(preGenerationResume.eventProgress,{event_instance_id:'entrance_ceremony',active_beat:'freshman_rep_speech',completed_beats:[]}).activeBeat,null,'pre-generation promoted completion cannot reactivate');
 
 const malformedContinue=mergeContinuationEventProgressState(previous,{}, {event_instance_id:'INVALID ID!'});
 assert.equal(malformedContinue.eventProgress.eventInstanceId,previous.eventInstanceId.toLowerCase(),'malformed CONTINUE metadata preserves prior progress');
