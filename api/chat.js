@@ -32,7 +32,7 @@ const CHARACTER_REGISTRY = Object.freeze({
   laris: '라리스',
   lena: '레나',
   levian: '레비안',
-  lilia: '릴리아',
+  lillia: '릴리아',
   lily_lumina: '릴리 루미나',
   lucia: '루시아',
   mirabelle: '미라벨',
@@ -170,7 +170,7 @@ D8. 이벤트가 발생했다면 세계에 흔적을 남긴다. 필요한 경우
 D9. director 메타데이터는 내부 운영용이다. 실제 장면의 성격을 간결하게 태깅하고, 고구마-사이다 callback을 추적할 필요가 있을 때만 callback_key를 쓴다.
 
 [감정 태그 — 중요]
-E1. dialogue 항목마다 그 순간 NPC에게 실제로 드러나는 감정을 expression으로 태깅한다. 가능한 값: default, smile, blush, serious, angry, sad, shock.
+E1. dialogue 항목마다 그 순간 NPC에게 실제로 드러나는 감정을 expression으로 태깅한다. 가능한 값: default, smile, blush, serious, angry, sad, shock, smug, annoyed, worried, confused, laugh, flustered.
 E2. expression은 이미지 선택을 위한 '감지 태그'이며 다양성을 위해 억지로 바꾸지 않는다. 직전 감정이 자연스럽게 이어지면 같은 태그를 유지한다.
 E3. emotion_intensity는 0~1로 감정의 강도, emotion_confidence는 0~1로 태그 판단 확신도를 기록한다. emotion_reason은 장면상 직접 근거를 짧게 쓴다.
 E4. blush는 단순 호의가 아니라 실제 수줍음/당황/친밀 반응이 드러날 때, shock는 갑작스러운 충격이 명확할 때만 쓴다. angry/sad도 충분한 계기가 있어야 한다.
@@ -551,7 +551,7 @@ Purpose:
 
 // ===== BEGIN event-director.js =====
 const DIRECTOR_ROSTER = Object.freeze({
-  lilia:     { dept:'knight', year:1, roles:['student','rival'], zones:['knight','common','dormA'] },
+  lillia:     { dept:'knight', year:1, roles:['student','rival'], zones:['knight','common','dormA'] },
   laris:     { dept:'knight', year:1, roles:['student','rival'], zones:['knight','common','dormA'] },
   sera:      { dept:'knight', year:1, roles:['student','streetwise'], zones:['knight','common','dormA','city'] },
   isabel:    { dept:'knight', year:1, roles:['student','politics'], zones:['knight','common','dormA','city','council'] },
@@ -1169,7 +1169,7 @@ function reasoningFor(tier, requested = 'auto', proReasoning = false) {
 // ===== END router.js =====
 
 // ===== BEGIN schema.js =====
-const Expression = z.enum(['default', 'smile', 'blush', 'serious', 'angry', 'sad', 'shock']);
+const Expression = z.enum(['default', 'smile', 'blush', 'serious', 'angry', 'sad', 'shock', 'smug', 'annoyed', 'worried', 'confused', 'laugh', 'flustered']);
 const Importance = z.enum(['routine', 'important', 'critical']);
 
 const SceneItem = z.object({
@@ -1311,7 +1311,7 @@ const TurnSchema = z.object({
 // ===== END schema.js =====
 
 // ===== BEGIN emotion.js =====
-const EMOTION_EXPRESSIONS = new Set(['default','smile','blush','serious','angry','sad','shock']);
+const EMOTION_EXPRESSIONS = new Set(['default','smile','blush','serious','angry','sad','shock','smug','annoyed','worried','confused','laugh','flustered']);
 const THRESHOLD = { default:0.48, smile:0.42, blush:0.58, serious:0.38, angry:0.56, sad:0.52, shock:0.68 };
 const clamp01 = (n) => Math.max(0, Math.min(1, Number(n) || 0));
 
@@ -1393,7 +1393,7 @@ const PRICES = {
   'gpt-5.6-sol': { input: 5, cached: 0.5, output: 30 },
 };
 
-const EXPRESSIONS = new Set(['default', 'smile', 'blush', 'serious', 'angry', 'sad', 'shock']);
+const EXPRESSIONS = new Set(['default', 'smile', 'blush', 'serious', 'angry', 'sad', 'shock', 'smug', 'annoyed', 'worried', 'confused', 'laugh', 'flustered']);
 const clamp = (n, min, max) => Math.min(max, Math.max(min, Number(n) || 0));
 const arrays = (value, max) => Array.isArray(value) ? value.slice(0, max) : [];
 

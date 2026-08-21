@@ -1,6 +1,6 @@
 import { z } from 'zod/v4';
 
-const Expression = z.enum(['default', 'smile', 'blush', 'serious', 'angry', 'sad', 'shock']);
+const Expression = z.enum(['default', 'smile', 'blush', 'serious', 'angry', 'sad', 'shock', 'smug', 'annoyed', 'worried', 'confused', 'laugh', 'flustered']);
 const Importance = z.enum(['routine', 'important', 'critical']);
 
 const SceneItem = z.object({
