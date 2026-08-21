@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { compactEventProgress, isEventBeatEligible, mergeContinuationEventProgressState, mergeEventProgress, mergeRoutedEventProgress, mergeRoutedEventProgressState, normalizeEventProgress, occurrenceIdFromStartEvidence, promotePausedEventProgress, scheduledIdsDueByTurnEnd } from '../../lib/event-progress.js';
+import { compactEventProgress, isEventBeatEligible, mergeContinuationEventProgressState, mergeEventProgress, mergeRoutedEventProgress, mergeRoutedEventProgressState, normalizeEventProgress, occurrenceIdFromStartEvidence, promotePausedEventProgress, scheduledIdsDueByTurnEnd, unscheduledPausedIdsForResume } from '../../lib/event-progress.js';
 
 const previous={eventInstanceId:'entrance_ceremony#1285-03-01T09:00',activeBeat:null,completedBeats:['welcome_address','freshman_rep_speech']};
 const rewind=mergeEventProgress(previous,{event_instance_id:previous.eventInstanceId,active_beat:'freshman_rep_speech',completed_beats:['welcome_address']});
@@ -77,12 +77,27 @@ const malformedContinue=mergeContinuationEventProgressState(previous,{}, {event_
 assert.equal(malformedContinue.eventProgress.eventInstanceId,previous.eventInstanceId.toLowerCase(),'malformed CONTINUE metadata preserves prior progress');
 assert.equal(mergeContinuationEventProgressState(previous,{},null).eventProgress,null,'only explicit null clears CONTINUE progress');
 
+const unscheduledPaused={eventProgress:null,eventProgressByInstance:{[duelId]:{eventInstanceId:duelId,activeBeat:'second_exchange',completedBeats:['opening_salute'],resumeKey:'lena duel'}}};
+const unscheduledResumeIds=unscheduledPausedIdsForResume(unscheduledPaused,'Return and continue the Lena duel.',['lena duel']);
+assert.deepEqual(unscheduledResumeIds,[duelId],'explicit player resume evidence selects a paused unscheduled occurrence');
+const unscheduledPromoted=promotePausedEventProgress(unscheduledPaused,unscheduledResumeIds);
+assert.deepEqual(unscheduledPromoted.eventProgress.completedBeats,['opening_salute'],'unscheduled completion anchor is restored before generation');
+assert.equal(unscheduledPausedIdsForResume(unscheduledPaused,'I read a book.',['lena duel']).length,0,'unrelated normal action cannot resume an unscheduled occurrence');
+
+const unfinished={eventInstanceId:'investigation#1',activeBeat:'search_library',completedBeats:['accept_case'],resumeKey:'library investigation'};
+const pausedNull=mergeRoutedEventProgressState(unfinished,{},null,{pauseOnNull:true});
+assert.ok(pausedNull.eventProgressByInstance['investigation#1'],'terminal-looking null retains an authoritatively unfinished occurrence as paused');
+const removedNull=mergeRoutedEventProgressState(unfinished,{},null,{pauseOnNull:false});
+assert.equal(removedNull.eventProgressByInstance['investigation#1'],undefined,'completed/removed occurrence is not retained as paused');
+
 const retrospective='Emily later says the representative speech was brief.';
 assert.ok(retrospective.includes('speech')&&isEventBeatEligible(previous,'ceremony_close'),'prose references do not reactivate structured beats');
 
 const router=readFileSync('api/chat-router.js','utf8');
 assert.match(router,/continueAction[\s\S]*compactEventProgress\(runtime\.eventProgress\)/,'CONTINUE action carries compact progress');
 assert.match(router,/consumeContinuationRuntime[\s\S]*mergeContinuationEventProgressState/,'CONTINUE uses conservative occurrence-aware merging');
+assert.match(router,/mode==='game'\?promotePausedEventProgress/, 'paused occurrence promotion must be disabled for CONTINUE/AUTO/META');
+assert.match(router,/scheduled_events_complete[\s\S]*scheduledStillActive/, 'scheduled null is paused only while the occurrence remains authoritative and unfinished');
 assert.match(router,/localSceneRuntime[\s\S]*actualScheduledEntrants[\s\S]*reconcileParticipants/,'scene continuity remains authoritative');
 assert.match(router,/explicitPlayerStart[\s\S]*active_events_add/,'unscheduled start evidence requires an explicit player start or authoritative hook');
 assert.match(router,/if\(mode==='continue'\)[\s\S]*lockContinueTurn\(data\.turn\)/,'CONTINUE state freeze remains authoritative');

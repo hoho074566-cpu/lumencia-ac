@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { routeOpenAIParams } from '../../api/lib/context-router.js';
-import { promotePausedEventProgress } from '../../lib/event-progress.js';
+import { promotePausedEventProgress, unscheduledPausedIdsForResume } from '../../lib/event-progress.js';
 
 const divider = '='.repeat(20);
 const instructions = `===== CHARACTER REGISTRY =====
@@ -81,6 +81,11 @@ const pausedRuntime={eventProgress:null,eventProgressByInstance:{entrance_ceremo
 const resumedBeforeGeneration=promotePausedEventProgress(pausedRuntime,['entrance_ceremony']);
 const resumedContext=route('입학식을 계속 지켜본다.',{saveState:{sceneRuntime:resumedBeforeGeneration,scheduleContext:{due:[{id:'entrance_ceremony'}]}}});
 assert.match(resumedContext.params.input,/"completedBeats":\["welcome_address","freshman_rep_speech"\]/, 'resumed occurrence completions must reach routed GAME context before prose generation');
+const duelId='started:1285-03-01:t12:abcd1234';
+const pausedDuel={eventProgress:null,eventProgressByInstance:{[duelId]:{eventInstanceId:duelId,activeBeat:'second_exchange',completedBeats:['opening_salute'],resumeKey:'lena duel'}}};
+const duelResumeIds=unscheduledPausedIdsForResume(pausedDuel,'Return and continue the Lena duel.',['lena duel']);
+const duelContext=route('Return and continue the Lena duel.',{saveState:{activeEvents:['lena duel'],sceneRuntime:promotePausedEventProgress(pausedDuel,duelResumeIds)}});
+assert.match(duelContext.params.input,/"completedBeats":\["opening_salute"\]/, 'resumed unscheduled completions must reach GAME context before generation');
 
 const continueAction = `[LUMENSIA V1.5.4 CONTINUE]\n${'직전 장면의 같은 순간을 이어 쓴다. '.repeat(120)}`;
 const continuedRouted = routeOpenAIParams(

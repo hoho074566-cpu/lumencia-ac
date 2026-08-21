@@ -8,7 +8,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import coreHandler, { CHARACTER_REGISTRY } from './chat.js';
 import { routeOpenAIParams, routerVersion, array, object, clampText } from './lib/context-router.js';
 import { actualScheduledEntrants, freshChoices, reconcileParticipants } from '../lib/scene-continuity.js';
-import { compactEventProgress, mergeContinuationEventProgressState, mergeRoutedEventProgressState, occurrenceIdFromStartEvidence, promotePausedEventProgress, scheduledIdsDueByTurnEnd } from '../lib/event-progress.js';
+import { compactEventProgress, mergeContinuationEventProgressState, mergeRoutedEventProgressState, occurrenceIdFromStartEvidence, promotePausedEventProgress, scheduledIdsDueByTurnEnd, unscheduledPausedIdsForResume } from '../lib/event-progress.js';
 
 export const config = { maxDuration: 300 };
 
@@ -120,7 +120,14 @@ function localSceneRuntime(incoming,turn,directorTelemetry=null){
   const explicitPlayerStart=/(?:결투|대련|조사|수사|추적|탐사|의뢰를?\s*(?:시작|수락)|duel|investigat|start(?:s|ed|ing)?\s+(?:a\s+)?(?:duel|investigation))/i.test(String(incoming.action||''));
   const startedEvidence=(explicitPlayerStart?array(turn?.state_delta?.active_events_add)[0]:'')||(knownCallback.has(callbackKey)?callbackKey:'');
   const startedOccurrence=occurrenceIdFromStartEvidence(incoming.saveState?.world?.date,incoming.saveState?.turnNumber,startedEvidence);
-  const progressState=mergeRoutedEventProgressState(previous.eventProgress,previous.eventProgressByInstance,turn?.event_progress,{dueEventIds:dueIds,directorOccurrenceId:directorOccurrence,startedOccurrenceId:startedOccurrence});
+  const priorProgress=previous.eventProgress;
+  const removed=new Set([...array(turn?.state_delta?.active_events_remove),...array(turn?.state_delta?.completed_events_add),...array(turn?.state_delta?.scheduled_events_complete)].map(x=>String(x).trim().toLowerCase()));
+  const priorResumeKey=String(priorProgress?.resumeKey||'').trim().toLowerCase();
+  const priorId=String(priorProgress?.eventInstanceId||'').trim().toLowerCase();
+  const scheduledStillActive=dueIds.map(x=>String(x).trim().toLowerCase()).includes(priorId)&&!removed.has(priorId);
+  const unscheduledStillActive=priorResumeKey&&array(incoming.saveState?.activeEvents).map(x=>String(x).trim().toLowerCase()).includes(priorResumeKey)&&!removed.has(priorResumeKey);
+  const pauseOnNull=Boolean(scheduledStillActive||unscheduledStillActive);
+  const progressState=mergeRoutedEventProgressState(priorProgress,previous.eventProgressByInstance,turn?.event_progress,{dueEventIds:dueIds,directorOccurrenceId:directorOccurrence,startedOccurrenceId:startedOccurrence,startedResumeKey:startedEvidence,pauseOnNull});
   return {
     scene_key:clampText(turn?.scene_title||previous.scene_key||'scene',120),
     participants,
@@ -205,8 +212,8 @@ export default async function handler(req,res){
     const incoming0=req.body&&typeof req.body==='object'?req.body:{};
     const mode=SUPPORTED_MODES.has(incoming0.inputMode)?incoming0.inputMode:'game';
     const incoming={...incoming0};
-    const resumableIds=scheduledIdsDueByTurnEnd(incoming0.saveState,0);
-    incoming.saveState={...object(incoming0.saveState),sceneRuntime:promotePausedEventProgress(incoming0.saveState?.sceneRuntime,resumableIds)};
+    const resumableIds=mode==='game'?[...scheduledIdsDueByTurnEnd(incoming0.saveState,0),...unscheduledPausedIdsForResume(incoming0.saveState?.sceneRuntime,incoming0.action,incoming0.saveState?.activeEvents)]:[];
+    incoming.saveState={...object(incoming0.saveState),sceneRuntime:mode==='game'?promotePausedEventProgress(incoming0.saveState?.sceneRuntime,resumableIds):object(incoming0.saveState?.sceneRuntime)};
 
     if(mode==='meta'){
       incoming.inputMode='meta';
