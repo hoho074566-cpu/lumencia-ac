@@ -1430,7 +1430,7 @@ function sanitizeTurn(turn, { allowedCgIds = [] } = {}) {
     event_instance_id:safeEventId,
     active_beat:/^[a-z0-9][a-z0-9._:#-]{0,79}$/i.test(beatId) ? beatId.toLowerCase() : null,
     completed_beats:[...new Set(arrays(eventProgress?.completed_beats,24).map(String).map(x=>x.trim().toLowerCase()).filter(x=>/^[a-z0-9][a-z0-9._:#-]{0,79}$/i.test(x)))],
-  } : null;
+  } : eventProgress === null ? null : undefined;
   const sceneCap = turn.importance === 'routine' ? 8 : turn.importance === 'important' ? 14 : 18;
   turn.scene = arrays(turn.scene, sceneCap).map((item) => {
     if (item?.kind !== 'dialogue') {

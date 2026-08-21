@@ -8,7 +8,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import coreHandler, { CHARACTER_REGISTRY } from './chat.js';
 import { routeOpenAIParams, routerVersion, array, object, clampText } from './lib/context-router.js';
 import { actualScheduledEntrants, freshChoices, reconcileParticipants } from '../lib/scene-continuity.js';
-import { compactEventProgress, mergeEventProgress, mergeRoutedEventProgress, occurrenceIdFromStartEvidence, scheduledIdsDueByTurnEnd } from '../lib/event-progress.js';
+import { compactEventProgress, mergeContinuationEventProgressState, mergeRoutedEventProgressState, occurrenceIdFromStartEvidence, scheduledIdsDueByTurnEnd } from '../lib/event-progress.js';
 
 export const config = { maxDuration: 300 };
 
@@ -120,6 +120,7 @@ function localSceneRuntime(incoming,turn,directorTelemetry=null){
   const explicitPlayerStart=/(?:결투|대련|조사|수사|추적|탐사|의뢰를?\s*(?:시작|수락)|duel|investigat|start(?:s|ed|ing)?\s+(?:a\s+)?(?:duel|investigation))/i.test(String(incoming.action||''));
   const startedEvidence=(explicitPlayerStart?array(turn?.state_delta?.active_events_add)[0]:'')||(knownCallback.has(callbackKey)?callbackKey:'');
   const startedOccurrence=occurrenceIdFromStartEvidence(incoming.saveState?.world?.date,incoming.saveState?.turnNumber,startedEvidence);
+  const progressState=mergeRoutedEventProgressState(previous.eventProgress,previous.eventProgressByInstance,turn?.event_progress,{dueEventIds:dueIds,directorOccurrenceId:directorOccurrence,startedOccurrenceId:startedOccurrence});
   return {
     scene_key:clampText(turn?.scene_title||previous.scene_key||'scene',120),
     participants,
@@ -130,11 +131,11 @@ function localSceneRuntime(incoming,turn,directorTelemetry=null){
     immediate_pressure:clampText(previous.immediate_pressure||'',220),
     tone:clampText(turn?.importance||previous.tone||'routine',80),
     remaining_beats:hasDecision?[]:array(previous.remaining_beats).slice(0,1),
-    eventProgress:mergeRoutedEventProgress(previous.eventProgress,turn?.event_progress,{dueEventIds:dueIds,directorOccurrenceId:directorOccurrence,startedOccurrenceId:startedOccurrence}),
+    ...progressState,
   };
 }
 function clone(value){try{return structuredClone(value);}catch{return JSON.parse(JSON.stringify(value??null));}}
-function consumeContinuationRuntime(incoming,turn){const prev=clone(object(incoming.saveState?.sceneRuntime));prev.remaining_beats=array(prev.remaining_beats).slice(1);prev.eventProgress=mergeEventProgress(prev.eventProgress,turn?.event_progress,{allowInstanceChange:false});return{npc_updates:{},scene_runtime:prev};}
+function consumeContinuationRuntime(incoming,turn){const prev=clone(object(incoming.saveState?.sceneRuntime));prev.remaining_beats=array(prev.remaining_beats).slice(1);Object.assign(prev,mergeContinuationEventProgressState(prev.eventProgress,prev.eventProgressByInstance,turn?.event_progress));return{npc_updates:{},scene_runtime:prev};}
 
 function localBackgroundDigest(incoming,turn,participants){
   const prior=String(incoming.saveState?.backgroundDigest||'').slice(-1100);

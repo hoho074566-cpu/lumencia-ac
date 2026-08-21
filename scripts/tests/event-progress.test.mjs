@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { compactEventProgress, isEventBeatEligible, mergeEventProgress, mergeRoutedEventProgress, normalizeEventProgress, occurrenceIdFromStartEvidence, scheduledIdsDueByTurnEnd } from '../../lib/event-progress.js';
+import { compactEventProgress, isEventBeatEligible, mergeContinuationEventProgressState, mergeEventProgress, mergeRoutedEventProgress, mergeRoutedEventProgressState, normalizeEventProgress, occurrenceIdFromStartEvidence, scheduledIdsDueByTurnEnd } from '../../lib/event-progress.js';
 
 const previous={eventInstanceId:'entrance_ceremony#1285-03-01T09:00',activeBeat:null,completedBeats:['welcome_address','freshman_rep_speech']};
 const rewind=mergeEventProgress(previous,{event_instance_id:previous.eventInstanceId,active_beat:'freshman_rep_speech',completed_beats:['welcome_address']});
@@ -60,18 +60,33 @@ assert.equal(mergeEventProgress(previous,undefined).eventInstanceId,previous.eve
 assert.equal(mergeEventProgress(previous,{event_instance_id:'bad id!'}).eventInstanceId,previous.eventInstanceId.toLowerCase(),'malformed metadata preserves authoritative progress');
 assert.equal(mergeRoutedEventProgress(previous,{event_instance_id:'bad id!'}).eventInstanceId,previous.eventInstanceId.toLowerCase(),'routed malformed metadata also fails safe');
 
+const pausedCeremony={eventInstanceId:'entrance_ceremony',activeBeat:'ceremony_close',completedBeats:['welcome_address','freshman_rep_speech']};
+const duelId=occurrenceIdFromStartEvidence('1285-03-01',12,'player duel');
+const interrupted=mergeRoutedEventProgressState(pausedCeremony,{}, {event_instance_id:'model_duel',active_beat:'opening',completed_beats:[]},{startedOccurrenceId:duelId});
+assert.equal(interrupted.eventProgress.eventInstanceId,duelId,'interrupting occurrence becomes current');
+assert.ok(interrupted.eventProgressByInstance.entrance_ceremony,'interrupted occurrence progress is retained by identity');
+const endedInterruption=mergeRoutedEventProgressState(interrupted.eventProgress,interrupted.eventProgressByInstance,null);
+const resumed=mergeRoutedEventProgressState(endedInterruption.eventProgress,endedInterruption.eventProgressByInstance,{event_instance_id:'entrance_ceremony',active_beat:'ceremony_close',completed_beats:[]},{dueEventIds:['entrance_ceremony']});
+assert.deepEqual(resumed.eventProgress.completedBeats,['welcome_address','freshman_rep_speech'],'resuming a paused occurrence restores completed-beat authority');
+assert.equal(isEventBeatEligible(resumed.eventProgress,'freshman_rep_speech'),false,'resumed occurrence cannot replay a completed beat');
+
+const malformedContinue=mergeContinuationEventProgressState(previous,{}, {event_instance_id:'INVALID ID!'});
+assert.equal(malformedContinue.eventProgress.eventInstanceId,previous.eventInstanceId.toLowerCase(),'malformed CONTINUE metadata preserves prior progress');
+assert.equal(mergeContinuationEventProgressState(previous,{},null).eventProgress,null,'only explicit null clears CONTINUE progress');
+
 const retrospective='Emily later says the representative speech was brief.';
 assert.ok(retrospective.includes('speech')&&isEventBeatEligible(previous,'ceremony_close'),'prose references do not reactivate structured beats');
 
 const router=readFileSync('api/chat-router.js','utf8');
 assert.match(router,/continueAction[\s\S]*compactEventProgress\(runtime\.eventProgress\)/,'CONTINUE action carries compact progress');
-assert.match(router,/consumeContinuationRuntime[\s\S]*allowInstanceChange:false/,'CONTINUE merge rejects event switching');
+assert.match(router,/consumeContinuationRuntime[\s\S]*mergeContinuationEventProgressState/,'CONTINUE uses conservative occurrence-aware merging');
 assert.match(router,/localSceneRuntime[\s\S]*actualScheduledEntrants[\s\S]*reconcileParticipants/,'scene continuity remains authoritative');
 assert.match(router,/explicitPlayerStart[\s\S]*active_events_add/,'unscheduled start evidence requires an explicit player start or authoritative hook');
 assert.match(router,/if\(mode==='continue'\)[\s\S]*lockContinueTurn\(data\.turn\)/,'CONTINUE state freeze remains authoritative');
 assert.equal((router.match(/await runCore\(/g)||[]).length,1,'adapter retains one canonical model-call site');
 
 const chat=readFileSync('api/chat.js','utf8');
+assert.match(chat,/eventProgress === null \? null : undefined/,'sanitization must not convert malformed metadata into terminal null');
 assert.match(chat,/\[PLAYER ACTION COMMIT\][\s\S]*C1\./,'PLAYER ACTION COMMIT remains authoritative');
 assert.match(chat,/store:\s*false/,'store:false remains enabled');
 assert.match(chat,/prompt_cache_key/,'prompt cache remains enabled');
