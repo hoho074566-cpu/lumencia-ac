@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { explicitDepartures, freshChoices, reconcileParticipants } from '../../lib/scene-continuity.js';
+import { actualScheduledEntrants, explicitDepartures, freshChoices, reconcileParticipants } from '../../lib/scene-continuity.js';
 
 const dialogue = (key, name, text = '안녕.') => ({ kind:'dialogue', speaker_key:key, speaker_name:name, text });
 const narration = text => ({ kind:'narration', speaker_key:null, text });
@@ -18,6 +18,15 @@ const recent = [{ scene:[dialogue('mirabelle', '미라벨', '또 봐요.')] }];
   assert.deepEqual([...explicitDepartures({scene:[narration('엘레나는 방을 나갔다.')]}, similar)], ['elena'], '레나 must not match inside 엘레나');
 }
 
+{
+  const cast = [{scene:[dialogue('mirabelle','미라벨'),dialogue('lillia','릴리아')]}];
+  assert.deepEqual([...explicitDepartures({scene:[narration('미라벨이 떠나고 릴리아는 문을 닫았다.')]}, cast)], ['mirabelle'], 'departure binds to its named subject');
+  assert.deepEqual([...explicitDepartures({scene:[narration('Mirabelle left the room while Lillia closed the door.')]}, cast)], ['mirabelle'], 'English irregular left is an explicit departure');
+  assert.deepEqual([...explicitDepartures({scene:[narration('Mirabelle says goodbye to Lillia and walks away.')]}, cast)], ['mirabelle'], 'an object name does not steal the departure from the clause subject');
+  assert.equal(explicitDepartures({scene:[narration('Mirabelle tried to leave, but the door was locked.')]}, cast).size, 0, 'failed English departure is not completed');
+  assert.equal(explicitDepartures({scene:[narration('미라벨은 떠나려 했지만 문이 잠겨 있었다.')]}, cast).size, 0, 'failed Korean departure is not completed');
+}
+
 for (const text of ['Mirabelle does not leave the room.', 'Mirabelle might leave.', 'Should I leave, Mirabelle?', '미라벨은 떠나지 않는다.', '미라벨은 떠날지도 모른다.', '미라벨은 떠나야 할까?']) {
   assert.equal(explicitDepartures({ scene:[narration(text)] }, recent).size, 0, text);
 }
@@ -27,6 +36,18 @@ assert.deepEqual(reconcileParticipants({ previous:[], turn:{ scene:[dialogue('mi
 assert.deepEqual(reconcileParticipants({ previous:[], turn:{ scene:[narration('행사가 시작된다.')], state_delta:{} }, recentTurns:recent, scheduledEntries:['mirabelle'] }), ['mirabelle'], 'scheduled re-entry remains possible');
 assert.deepEqual(reconcileParticipants({ previous:['mirabelle'], action:'미라벨과 함께 기사과 건물로 간다.', turn:{ scene:[narration('두 사람은 함께 기사과 건물에 도착했다.')], state_delta:{new_location:'기사과 건물'} }, recentTurns:recent }), ['mirabelle'], 'an explicitly accompanying NPC crosses locations');
 assert.deepEqual(reconcileParticipants({ previous:['mirabelle'], action:'기사과 건물로 간다.', turn:{ scene:[narration('PC는 기사과 건물에 도착했다.')], state_delta:{new_location:'기사과 건물'} }, recentTurns:recent }), [], 'location change does not carry an unmentioned NPC');
+assert.deepEqual(reconcileParticipants({ previous:['old1','old2','old3','old4','old5','old6','old7','old8'], turn:{scene:[dialogue('current','현재 인물')],state_delta:{}}, recentTurns:[] }), ['current','old1','old2','old3','old4','old5','old6','old7'], 'current speakers take priority over stale participants at the cap');
+
+{
+  const scheduledRecent = [{scene:[dialogue('mirabelle','미라벨')]}];
+  const due = [{id:'orientation',participants:['mirabelle']}];
+  const entered = {scene:[narration('미라벨이 강당에 들어왔다.')],state_delta:{new_location:null,npc_state_updates:[]}};
+  assert.deepEqual(actualScheduledEntrants({due,turn:entered,recentTurns:scheduledRecent,currentLocation:'강당'}), ['mirabelle'], 'a narrated due entrant is recognized');
+  assert.deepEqual(reconcileParticipants({previous:[],turn:entered,recentTurns:scheduledRecent,scheduledEntries:actualScheduledEntrants({due,turn:entered,recentTurns:scheduledRecent,currentLocation:'강당'})}), ['mirabelle'], 'a silent scheduled entrant reaches runtime presence');
+  assert.deepEqual(actualScheduledEntrants({due,turn:{scene:[narration('행사 시간이 되었다.')],state_delta:{npc_state_updates:[]}},recentTurns:scheduledRecent,currentLocation:'강당'}), [], 'merely due NPCs are not inserted');
+  const completedDue = [{id:'orientation',location:'강당',participants:['mirabelle']}];
+  assert.deepEqual(actualScheduledEntrants({due:completedDue,turn:{scene:[narration('예정된 참가자들이 강당에 들어왔다.')],state_delta:{npc_state_updates:[],scheduled_events_complete:['orientation']}},recentTurns:[],currentLocation:'강당'}), ['mirabelle'], 'matching event completion plus entry narration preserves silent scheduled entrants');
+}
 
 {
   const turn = { scene:[narration('PC는 기사과 건물에 도착해 안으로 들어갔다.')], state_delta:{ new_location:'기사과 건물 내부' }, choices:['기사과 건물로 간다.','기사과 건물 안으로 들어간다.','훈련장을 둘러본다.'] };
@@ -34,6 +55,8 @@ assert.deepEqual(reconcileParticipants({ previous:['mirabelle'], action:'기사�
   assert.deepEqual(freshChoices('주변을 살핀다.', { ...turn, choices:['기사과 훈련장으로 간다.'] }), ['기사과 훈련장으로 간다.'], 'movement within the current building stays available');
   assert.deepEqual(freshChoices('주변을 살핀다.', { ...turn, choices:['마법과 건물 안으로 들어간다.'] }), ['마법과 건물 안으로 들어간다.'], 'generic building words do not establish the same destination');
   assert.deepEqual(freshChoices('주변을 살핀다.', { ...turn, state_delta:{new_location:'건물'}, choices:['마법과 건물 안으로 들어간다.'] }), ['마법과 건물 안으로 들어간다.'], 'a generic current location alone does not establish destination identity');
+  assert.deepEqual(freshChoices('주변을 살핀다.', { ...turn, state_delta:{new_location:'기사과 건물'}, choices:['기사과 건물로 이동한다.'] }), [], 'movement verbs are not mistaken for destination tokens');
+  assert.deepEqual(freshChoices('주변을 살핀다.', { ...turn, state_delta:{new_location:'기사과 건물'}, choices:['마법과 건물로 이동한다.'] }), ['마법과 건물로 이동한다.'], 'normalized movement still preserves a different destination');
 }
 
 {

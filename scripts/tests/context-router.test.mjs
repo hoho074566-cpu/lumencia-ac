@@ -88,4 +88,12 @@ const publicTurn = route('도서관으로 이동한다.');
 assert.equal(publicTurn.telemetry.secret_allowed, false, 'ordinary movement must not unlock secret routing');
 assert.equal(publicTurn.params.instructions.includes('PRIVATE_TEST_MARKER'), false, 'secret block leaked into ordinary context');
 
-console.log(`PASS context router regressions (${cases.length + 9} checks)`);
+const crowdedInstructions = instructions.replace('guide=Guide', 'p1=One, p2=Two, p3=Three, p4=Four, p5=Five');
+const crowded = routeOpenAIParams(
+  { instructions:crowdedInstructions, input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}' },
+  { incoming:{ action:'기다린다.', saveState:{turnNumber:3,world:{location:'academy'},sceneRuntime:{participants:['p1','p2','p3','p4','p5']}}, recentTurns:[{scene:[{kind:'dialogue',speaker_key:'p5',text:'말한다.'}]}] }, mode:'game' },
+);
+assert.equal(crowded.telemetry.selected_npcs[0], 'p5', 'latest authoritative speaker must be prioritized before truncation');
+assert.equal(crowded.telemetry.selected_npcs.includes('p5'), true, 'latest authoritative speaker was dropped from a crowded scene');
+
+console.log(`PASS context router regressions (${cases.length + 11} checks)`);

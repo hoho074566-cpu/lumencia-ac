@@ -7,7 +7,7 @@ import OpenAI from 'openai';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import coreHandler from './chat.js';
 import { routeOpenAIParams, routerVersion, array, object, clampText } from './lib/context-router.js';
-import { freshChoices, reconcileParticipants } from '../lib/scene-continuity.js';
+import { actualScheduledEntrants, freshChoices, reconcileParticipants } from '../lib/scene-continuity.js';
 
 export const config = { maxDuration: 300 };
 
@@ -107,7 +107,8 @@ function localNpcUpdates(incoming,turn){
 
 function localSceneRuntime(incoming,turn){
   const previous=object(incoming.saveState?.sceneRuntime);
-  const participants=reconcileParticipants({previous:previous.participants,action:incoming.action,turn,recentTurns:incoming.recentTurns});
+  const scheduledEntries=actualScheduledEntrants({due:incoming.saveState?.scheduleContext?.due,turn,recentTurns:incoming.recentTurns,currentLocation:incoming.saveState?.world?.location});
+  const participants=reconcileParticipants({previous:previous.participants,action:incoming.action,turn,recentTurns:incoming.recentTurns,scheduledEntries});
   const choices=array(turn?.choices).map(x=>clampText(x,140)).filter(Boolean).slice(0,3);
   const hasDecision=choices.length>0;
   return {

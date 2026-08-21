@@ -270,10 +270,12 @@ function buildEventDirectorV2(incoming,originalInput,registry,mode='game'){
 function addExplicitKeys(set,text,registry,limit){const lower=norm(text);for(const [k,n] of Object.entries(registry)){if(set.size>=limit)break;if(lower.includes(k.toLowerCase())||lower.includes(norm(n)))set.add(k);}}
 function deriveKeys(incoming,registry,maxNpcs,directorV2=null){
   const save=incoming.saveState||{}, set=new Set();
-  for(const k of array(save?.sceneRuntime?.participants).slice(0,3))if(registry[k])set.add(String(k));
+  const authoritative=array(save?.sceneRuntime?.participants).map(String), present=new Set(authoritative);
+  const last=array(incoming.recentTurns).slice(-1)[0], latestSpeaker=[...array(last?.scene)].reverse().find(item=>item?.speaker_key)?.speaker_key;
+  if(latestSpeaker&&present.has(String(latestSpeaker))&&registry[latestSpeaker])set.add(String(latestSpeaker));
+  for(const k of authoritative)if(set.size<maxNpcs&&registry[k])set.add(String(k));
   addExplicitKeys(set,incoming.action||'',registry,maxNpcs);
   if(directorV2?.selectedKey&&registry[directorV2.selectedKey]&&set.size<maxNpcs)set.add(String(directorV2.selectedKey));
-  const last=array(incoming.recentTurns).slice(-1)[0];
   // Once runtime presence exists it is authoritative; speaker history is context, not physical presence.
   if(!Object.hasOwn(object(save?.sceneRuntime),'participants'))for(const item of array(last?.scene).slice(-4)){if(set.size>=maxNpcs)break;if(item?.speaker_key&&registry[item.speaker_key])set.add(String(item.speaker_key));}
   for(const row of array(save?.director?.recentSpotlights).slice(-1)){for(const k of array(row?.keys).slice(0,2)){if(set.size>=maxNpcs)break;if(registry[k])set.add(String(k));}}
