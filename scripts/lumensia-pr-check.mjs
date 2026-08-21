@@ -13,6 +13,7 @@ const stableJavaScriptFiles = [
 ];
 
 const corePaths = new Set(stableJavaScriptFiles);
+const allowedApiEntrypoints = new Set(['api/chat-router.js', 'api/chat.js', 'api/health.js']);
 const failures = [];
 
 function fail(message) {
@@ -25,18 +26,39 @@ function runGit(args) {
   return result.status === 0 ? result.stdout.trim() : '';
 }
 
+function runNodeCheck(file) {
+  const result = spawnSync(process.execPath, ['--check', file], { encoding: 'utf8' });
+  if (result.status !== 0) {
+    fail(`Syntax check failed: ${file}`);
+    process.stderr.write(result.stderr || result.stdout);
+    return;
+  }
+  console.log(`PASS syntax: ${file}`);
+}
+
 for (const file of stableJavaScriptFiles) {
   if (!existsSync(file)) {
     fail(`Required stable file is missing: ${file}`);
     continue;
   }
 
-  const result = spawnSync(process.execPath, ['--check', file], { encoding: 'utf8' });
+  runNodeCheck(file);
+}
+
+const testDirectory = 'scripts/tests';
+const deterministicTests = existsSync(testDirectory)
+  ? readdirSync(testDirectory).filter((file) => file.endsWith('.test.mjs')).sort().map((file) => `${testDirectory}/${file}`)
+  : [];
+if (!deterministicTests.length) fail('No permanent deterministic tests found under scripts/tests');
+for (const file of deterministicTests) {
+  runNodeCheck(file);
+  const result = spawnSync(process.execPath, [file], { encoding: 'utf8' });
   if (result.status !== 0) {
-    fail(`Syntax check failed: ${file}`);
+    fail(`Deterministic test failed: ${file}`);
     process.stderr.write(result.stderr || result.stdout);
   } else {
-    console.log(`PASS syntax: ${file}`);
+    const summary = (result.stdout || '').trim().split('\n').at(-1);
+    console.log(summary || `PASS test: ${file}`);
   }
 }
 
@@ -76,6 +98,8 @@ const riskyFiles = changedFiles.filter((file) => corePaths.has(file));
 const apiEntrypoints = existsSync('api')
   ? readdirSync('api', { withFileTypes: true }).filter((entry) => entry.isFile() && entry.name.endsWith('.js')).map((entry) => `api/${entry.name}`)
   : [];
+const unexpectedApiEntrypoints = apiEntrypoints.filter((file) => !allowedApiEntrypoints.has(file));
+for (const file of unexpectedApiEntrypoints) fail(`Unexpected top-level API entrypoint: ${file}`);
 
 if (riskyFiles.length) {
   console.log(`::warning::Core/stabilization files changed: ${riskyFiles.join(', ')}`);

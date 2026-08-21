@@ -69,6 +69,33 @@ Before presenting an implementation as complete, Codex must:
 - Perform a second self-review focused on regressions and scope creep.
 - Run `scripts/lumensia-pr-check.mjs` when it is available.
 
+## Implementation Completion Protocol
+
+Every implementation task must:
+
+- Inspect the final diff against the best available base.
+- Run `scripts/lumensia-pr-check.mjs`, syntax/static checks for changed files, and relevant repository-owned deterministic tests.
+- Perform a SECOND self-review for regressions, scope creep, regex/classifier edge cases, architecture invariants, and stale or unrelated files. This review may be brief for LOW-risk work, but must be substantive for MEDIUM/HIGH-risk work.
+- Fix blockers within the focused task and branch, then rerun tests and review. Allow at most two automatic fix/review iterations; if blockers remain, report `FAIL` and stop.
+- Treat hosted GitHub Safety Gate and Vercel results as authoritative for hosted PR/base integration. Local inability to resolve `remote/main` alone is not a blocker when those hosted checks are available and green.
+- Report the highest applicable risk: LOW for docs, CI, or non-core presentation-only changes; MEDIUM for `api/chat.js`, context routing, prompts, Event Director, NPC behavior, combat, runtime synthesis, or ordinary persistence; HIGH for schema/save migration, auth/security, major API/core rewrites, large cross-cutting refactors, or save-corruption risk.
+- Never auto-merge. LOW/MEDIUM/HIGH work may be merged by the user only when `MERGE_GATE` is `PASS`, GitHub Safety Gate is green, and Vercel is green. The mandatory second review normally replaces a separate final-review prompt, including for MEDIUM/HIGH work.
+
+Always end the implementation report with:
+
+```text
+MERGE_GATE: PASS | FAIL
+RISK: LOW | MEDIUM | HIGH
+CHANGED_FILES:
+TESTS:
+ARCHITECTURE:
+REGRESSION_REVIEW:
+BLOCKERS:
+CI_EXPECTATION:
+MERGE_RECOMMENDATION:
+REPOSITORY_INTEGRITY:
+```
+
 ## Large Refactors
 
 - Before a large refactor, produce an analysis and plan without modifying files.
