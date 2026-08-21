@@ -71,7 +71,11 @@ assert.ok(oversized.params.input.indexOf('===== USER ACTION =====') > 0, 'variab
 const routedContract=route('주변을 살핀다.').params.instructions;
 assert.match(routedContract,/event_progress는 현재 논리적 이벤트 occurrence의 compact 진행 상태/, 'routed GAME prompt is missing event progress contract');
 assert.match(routedContract,/완료 beat는 언급·회상할 수 있지만 현재 행동으로 재실행하거나 active로 되돌리지 않는다/, 'routed GAME prompt is missing monotonic completion rule');
+assert.match(routedContract,/omittedCompletedCount가 1 이상이면 compact 목록에서 생략된 더 이른 beat도 전부 완료/, 'routed GAME prompt cannot interpret overflow completions before generation');
 assert.match(routedContract,/event_progress=null/, 'routed GAME prompt is missing inactive-event clearing rule');
+const overflowContext=route('행사를 계속 지켜본다.',{saveState:{sceneRuntime:{eventProgress:{eventInstanceId:'long_event#1',activeBeat:'beat_25',completedBeats:Array.from({length:24},(_,i)=>`beat_${i+1}`),omittedCompletedCount:1,completionFingerprint:'0'.repeat(256)}}}});
+assert.match(overflowContext.params.input,/"omittedCompletedCount":1/, 'normal GAME generation context is missing overflow completion authority');
+assert.match(overflowContext.params.input,/"beat_24"/, 'normal GAME generation context must retain the bounded explicit completion window');
 
 const continueAction = `[LUMENSIA V1.5.4 CONTINUE]\n${'직전 장면의 같은 순간을 이어 쓴다. '.repeat(120)}`;
 const continuedRouted = routeOpenAIParams(

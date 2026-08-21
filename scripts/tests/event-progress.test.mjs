@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { compactEventProgress, isEventBeatEligible, mergeEventProgress, mergeRoutedEventProgress, normalizeEventProgress } from '../../lib/event-progress.js';
+import { compactEventProgress, isEventBeatEligible, mergeEventProgress, mergeRoutedEventProgress, normalizeEventProgress, occurrenceIdFromStartEvidence } from '../../lib/event-progress.js';
 
 const previous={eventInstanceId:'entrance_ceremony#1285-03-01T09:00',activeBeat:null,completedBeats:['welcome_address','freshman_rep_speech']};
 const rewind=mergeEventProgress(previous,{event_instance_id:previous.eventInstanceId,active_beat:'freshman_rep_speech',completed_beats:['welcome_address']});
@@ -24,6 +24,7 @@ assert.deepEqual(mixed.completedBeats,['freshman_rep_speech'],'mixed-case beat I
 const full={eventInstanceId:'bounded#1',completedBeats:Array.from({length:24},(_,i)=>`beat_${i}`)};
 const overflow=mergeEventProgress(full,{event_instance_id:'bounded#1',active_beat:null,completed_beats:['beat_24']});
 assert.equal(overflow.completedBeats.length,24,'prompt-facing completed list stays bounded');
+assert.match(compactEventProgress(overflow),/omitted_completed=1; anchor=all omitted beats are also completed/, 'generation context interprets omitted completions before generation');
 assert.equal(mergeEventProgress(overflow,{event_instance_id:'bounded#1',active_beat:'BEAT_0',completed_beats:[]}).activeBeat,null,'completion #25+ storage cannot make an evicted completion replayable');
 assert.equal(isEventBeatEligible(overflow,'beat_0'),false,'authoritative fingerprint retains completion beyond compact-list eviction');
 const malformed=mergeEventProgress(previous,{event_instance_id:'bad id!',active_beat:{},completed_beats:'bad'});
@@ -32,8 +33,18 @@ assert.deepEqual(malformed.completedBeats,previous.completedBeats,'malformed met
 assert.equal(normalizeEventProgress(null),null,'old saves without progress remain valid');
 
 const organic=mergeRoutedEventProgress(previous,{event_instance_id:'model_guess',active_beat:'First_Contact',completed_beats:[]},{directorOccurrenceId:'director:1285-03-01:t9:lena'});
-assert.equal(organic.eventInstanceId,'director:1285-03-01:t9:lena','selected unscheduled Director occurrence replaces stale progress');
-assert.equal(organic.activeBeat,'first_contact','Director occurrence beat is canonicalized');
+assert.equal(organic.eventInstanceId,previous.eventInstanceId.toLowerCase(),'unused Director side roll cannot relabel the current event');
+const usedDirector=mergeRoutedEventProgress(previous,{event_instance_id:'director:1285-03-01:t9:lena',active_beat:'First_Contact',completed_beats:[]},{directorOccurrenceId:'director:1285-03-01:t9:lena'});
+assert.equal(usedDirector.eventInstanceId,'director:1285-03-01:t9:lena','returned Director occurrence replaces stale progress');
+const playerStartedId=occurrenceIdFromStartEvidence('1285-03-01',10,'player-started duel with Lena');
+const playerStarted=mergeRoutedEventProgress(previous,{event_instance_id:'arbitrary_model_id',active_beat:'Opening_Salute',completed_beats:[]},{startedOccurrenceId:playerStartedId});
+assert.equal(playerStarted.eventInstanceId,playerStartedId,'authoritative current-turn start evidence replaces stale progress, not the model ID');
+assert.equal(playerStarted.activeBeat,'opening_salute','player-started occurrence preserves canonical beat progress');
+
+assert.equal(mergeEventProgress(previous,null),null,'explicit event_progress null clears a finished event');
+assert.equal(mergeEventProgress(previous,undefined).eventInstanceId,previous.eventInstanceId.toLowerCase(),'absent metadata preserves authoritative progress');
+assert.equal(mergeEventProgress(previous,{event_instance_id:'bad id!'}).eventInstanceId,previous.eventInstanceId.toLowerCase(),'malformed metadata preserves authoritative progress');
+assert.equal(mergeRoutedEventProgress(previous,{event_instance_id:'bad id!'}).eventInstanceId,previous.eventInstanceId.toLowerCase(),'routed malformed metadata also fails safe');
 
 const retrospective='Emily later says the representative speech was brief.';
 assert.ok(retrospective.includes('speech')&&isEventBeatEligible(previous,'ceremony_close'),'prose references do not reactivate structured beats');

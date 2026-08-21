@@ -8,7 +8,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import coreHandler, { CHARACTER_REGISTRY } from './chat.js';
 import { routeOpenAIParams, routerVersion, array, object, clampText } from './lib/context-router.js';
 import { actualScheduledEntrants, freshChoices, reconcileParticipants } from '../lib/scene-continuity.js';
-import { compactEventProgress, mergeEventProgress, mergeRoutedEventProgress } from '../lib/event-progress.js';
+import { compactEventProgress, mergeEventProgress, mergeRoutedEventProgress, occurrenceIdFromStartEvidence } from '../lib/event-progress.js';
 
 export const config = { maxDuration: 300 };
 
@@ -115,6 +115,10 @@ function localSceneRuntime(incoming,turn,directorTelemetry=null){
   const hasDecision=choices.length>0;
   const directorOccurrence=String(directorTelemetry?.occurrence_id||'').trim().toLowerCase();
   const dueIds=array(incoming.saveState?.scheduleContext?.due).map(row=>String(row?.id||''));
+  const callbackKey=String(turn?.director?.callback_key||'').trim();
+  const knownCallback=new Set([...array(incoming.saveState?.director?.callbacks).map(row=>String(row?.key||'')),...array(incoming.saveState?.hooks).map(row=>String(row?.id||''))]);
+  const startedEvidence=array(turn?.state_delta?.active_events_add)[0]||(knownCallback.has(callbackKey)?callbackKey:'');
+  const startedOccurrence=occurrenceIdFromStartEvidence(incoming.saveState?.world?.date,incoming.saveState?.turnNumber,startedEvidence);
   return {
     scene_key:clampText(turn?.scene_title||previous.scene_key||'scene',120),
     participants,
@@ -125,7 +129,7 @@ function localSceneRuntime(incoming,turn,directorTelemetry=null){
     immediate_pressure:clampText(previous.immediate_pressure||'',220),
     tone:clampText(turn?.importance||previous.tone||'routine',80),
     remaining_beats:hasDecision?[]:array(previous.remaining_beats).slice(0,1),
-    eventProgress:mergeRoutedEventProgress(previous.eventProgress,turn?.event_progress,{dueEventIds:dueIds,directorOccurrenceId:directorOccurrence}),
+    eventProgress:mergeRoutedEventProgress(previous.eventProgress,turn?.event_progress,{dueEventIds:dueIds,directorOccurrenceId:directorOccurrence,startedOccurrenceId:startedOccurrence}),
   };
 }
 function clone(value){try{return structuredClone(value);}catch{return JSON.parse(JSON.stringify(value??null));}}
