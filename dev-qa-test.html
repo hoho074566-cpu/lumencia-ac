@@ -72,7 +72,7 @@ function settingsBase(){return loadJson(SETTINGS_KEY)||{}}
 
 function npcLabel(key){
   const known={
-    lilia:'릴리아',laris:'라리스',sera:'세라',isabel:'이사벨',artemis:'아르테미스',
+    lillia:'릴리아',laris:'라리스',sera:'세라',isabel:'이사벨',artemis:'아르테미스',
     sia:'시아',emily:'에밀리',lena:'레나',anastasia:'아나스타샤',lucia:'루시아',
     elena:'엘레나',serena:'세레나',chloe:'클로에',mirabelle:'미라벨'
   };
@@ -81,11 +81,11 @@ function npcLabel(key){
 function choosePrimary(save){
   const scene=arr(save.sceneRuntime?.participants).filter(Boolean);
   const latest=arr(save.renderedTurns).slice().reverse().flatMap(r=>arr(r?.turn?.scene).slice().reverse()).find(x=>x?.speaker_key);
-  const keys=[...scene,latest?.speaker_key,'sia','emily','lilia','laris'].filter(Boolean);
+  const keys=[...scene,latest?.speaker_key,'sia','emily','lillia','laris'].filter(Boolean);
   return keys[0]||'sia';
 }
 function chooseCombatNpc(save){
-  const candidates=['laris','lilia','sera','isabel','artemis'];
+  const candidates=['laris','lillia','sera','isabel','artemis'];
   const all=new Set([
     ...Object.keys(obj(save.npcStates)),
     ...Object.keys(obj(save.relationships)),

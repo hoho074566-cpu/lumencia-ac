@@ -4,33 +4,55 @@
 const CHARACTER_V2_BASE =
   'https://raw.githubusercontent.com/dudghl/test/main/assets/characters-v2';
 
-export const ASSET_MANIFEST_VERSION = 'characters-v2-live-2026-08-19';
+export const ASSET_MANIFEST_VERSION = 'characters-v2-availability-2026-08-21';
 
-const LIVE_V2_FOLDERS = new Set([
-  'beelzebub',
-  'bellian',
-  'delpirem',
-  'levian',
-  'lily_lumina',
-  'nemesis',
-  'veradin',
-]);
-
-const PORTRAIT_EXPRESSIONS = Object.freeze([
+export const CANONICAL_PORTRAIT_EXPRESSIONS = Object.freeze([
   'default',
   'smile',
-  'laugh',
-  'smug',
   'blush',
-  'flustered',
   'serious',
-  'annoyed',
   'angry',
-  'worried',
   'sad',
-  'confused',
   'shock',
+  'smug',
+  'annoyed',
+  'worried',
+  'confused',
+  'laugh',
+  'flustered',
 ]);
+
+const NON_DEFAULT_EXPRESSIONS = CANONICAL_PORTRAIT_EXPRESSIONS.filter(
+  (expression) => expression !== 'default'
+);
+
+const FULL_V2_CHARACTERS = [
+  'beelzebub',
+  'bellian',
+  'chloe',
+  'delpirem',
+  'isabel',
+  'laris',
+  'lena',
+  'levian',
+  'lillia',
+  'lily_lumina',
+  'mirabelle',
+  'nemesis',
+  'sera',
+  'serena',
+  'veradin',
+];
+
+const DEFAULT_ONLY_V2_CHARACTERS = ['aria', 'artemis', 'elise', 'lucia', 'sia'];
+
+// This reviewed manifest describes physical files. Keep partial characters explicit:
+// Anastasia has no default portrait, while the default-only group has no expressions.
+const V2_AVAILABILITY = Object.freeze({
+  ...Object.fromEntries(FULL_V2_CHARACTERS.map((key) => [key, CANONICAL_PORTRAIT_EXPRESSIONS])),
+  anastasia: NON_DEFAULT_EXPRESSIONS,
+  ...Object.fromEntries(DEFAULT_ONLY_V2_CHARACTERS.map((key) => [key, ['default']])),
+});
 
 function portraitUrl(folder, expression = 'default') {
   return `${CHARACTER_V2_BASE}/${folder}/portrait/${expression}.webp`;
@@ -41,29 +63,29 @@ function fullbodyUrl(folder) {
 }
 
 function character(name, folder) {
-  const live = LIVE_V2_FOLDERS.has(folder);
+  const portraits = V2_AVAILABILITY[folder] || [];
+  const available = portraits.length > 0;
+  const hasDefault = portraits.includes('default');
   return {
     name,
     folder,
-    available: live,
-    default: live ? portraitUrl(folder, 'default') : null,
-    portraitDefault: live ? portraitUrl(folder, 'default') : null,
-    fullbody: live ? fullbodyUrl(folder) : null,
-    expressions: live
-      ? Object.fromEntries(
-          PORTRAIT_EXPRESSIONS
-            .filter((expression) => expression !== 'default')
-            .map((expression) => [expression, portraitUrl(folder, expression)])
-        )
-      : {},
+    available,
+    default: hasDefault ? portraitUrl(folder, 'default') : null,
+    portraitDefault: hasDefault ? portraitUrl(folder, 'default') : null,
+    fullbody: available ? fullbodyUrl(folder) : null,
+    expressions: Object.fromEntries(
+      portraits
+        .filter((expression) => expression !== 'default')
+        .map((expression) => [expression, portraitUrl(folder, expression)])
+    ),
   };
 }
 
 export const ASSETS = {
   version: ASSET_MANIFEST_VERSION,
   base: CHARACTER_V2_BASE,
-  liveFolders: [...LIVE_V2_FOLDERS],
-  portraitExpressions: [...PORTRAIT_EXPRESSIONS],
+  liveFolders: Object.keys(V2_AVAILABILITY),
+  portraitExpressions: [...CANONICAL_PORTRAIT_EXPRESSIONS],
 
   characters: {
     anastasia: character('아나스타샤', 'anastasia'),
@@ -87,7 +109,7 @@ export const ASSETS = {
     laris: character('라리스', 'laris'),
     lena: character('레나', 'lena'),
     levian: character('레비안', 'levian'),
-    lilia: character('릴리아', 'lilia'),
+    lillia: character('릴리아', 'lillia'),
     lily_lumina: character('릴리 루미나', 'lily_lumina'),
     lucia: character('루시아', 'lucia'),
     mirabelle: character('미라벨', 'mirabelle'),

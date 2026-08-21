@@ -1,4 +1,5 @@
 import { ASSETS } from './assets.js';
+import { migrateLegacyNpcKeys } from './save-migrations.js';
 
 const APP_VERSION = '1.4.8';
 const SAVE_KEY = 'lumensia.save.v1';
@@ -26,7 +27,7 @@ const defaultSettings = {
 
 const MEMORY_TYPE_LABELS = { fact:'FACT', observer:'OBSERVER', belief:'BELIEF', rumor:'RUMOR', promise:'PROMISE', deferred_hook:'DEFERRED', relationship:'RELATION', secret:'SECRET', event:'EVENT', obligation:'OBLIGATION', knowledge:'KNOWLEDGE' };
 const DIRECTOR_NPC_DEPT = {
-  lilia:'knight', laris:'knight', sera:'knight', isabel:'knight', artemis:'knight', anastasia:'knight',
+  lillia:'knight', laris:'knight', sera:'knight', isabel:'knight', artemis:'knight', anastasia:'knight',
   lena:'magic', sia:'magic', serena:'magic', chloe:'magic', elena:'magic', lucia:'magic', elise:'magic',
   mirabelle:'theology', aria:'theology', emily:'common'
 };
@@ -39,7 +40,7 @@ function pcDirectorDept() {
 }
 const DEFAULT_SCHEDULE_EVENTS = [
   { id:'entrance_ceremony', title:'입학식', date:'1285-03-01', time:'09:00', location:'루멘시아 아카데미 대강당', kind:'academic', participants:['emily','lena'], importance:4, note:'09:00 에밀리 환영사. 09:15 레나 신입생 대표 짧은 연설과 기숙사/정오 학과 오리엔테이션 안내.', status:'scheduled' },
-  { id:'knight_orientation', title:'기사과 1학년 오리엔테이션', date:'1285-03-01', time:'12:00', location:'기사과 지정 오리엔테이션 장소', kind:'academic', participants:['artemis','lilia','laris','sera','isabel'], importance:3, note:'기사과 1학년 대상.', status:'scheduled' },
+  { id:'knight_orientation', title:'기사과 1학년 오리엔테이션', date:'1285-03-01', time:'12:00', location:'기사과 지정 오리엔테이션 장소', kind:'academic', participants:['artemis','lillia','laris','sera','isabel'], importance:3, note:'기사과 1학년 대상.', status:'scheduled' },
   { id:'magic_orientation', title:'마법과 1학년 오리엔테이션', date:'1285-03-01', time:'12:00', location:'마법과 지정 오리엔테이션 장소', kind:'academic', participants:['elena','lena','sia','serena','chloe'], importance:3, note:'마법과 1학년 대상.', status:'scheduled' },
   { id:'theology_orientation', title:'신학부 1학년 오리엔테이션', date:'1285-03-01', time:'12:00', location:'신학부 지정 오리엔테이션 장소', kind:'academic', participants:['mirabelle'], importance:3, note:'신학부 1학년 대상.', status:'scheduled' },
 ];
@@ -66,7 +67,7 @@ function npcScheduleSnapshot() {
   if (save.world.date !== '1285-03-01') return out;
   const m = minutesFromTime(save.world.time);
   const set = (keys, commitment, area, confidence='fixed') => keys.forEach(key => out[key] = { commitment, area, confidence });
-  const knight = ['lilia','laris','sera','isabel'];
+  const knight = ['lillia','laris','sera','isabel'];
   const magic = ['lena','sia','serena','chloe'];
   if (m < 570) { // before 09:30
     set([...knight,...magic,'mirabelle'], '09:00 입학식 참석', '대강당/대강당 앞 집결 동선', 'fixed');
@@ -181,7 +182,8 @@ function clamp(n, min, max) { return Math.min(max, Math.max(min, Number(n) || 0)
 
 function normalizeSave(raw) {
   const base = defaultSave();
-  const next = raw && typeof raw === 'object' ? raw : base;
+  const migrated = migrateLegacyNpcKeys(raw);
+  const next = migrated && typeof migrated === 'object' ? migrated : base;
   next.version = 6;
   next.appVersion = APP_VERSION;
   next.world = { ...base.world, ...(next.world || {}) };
@@ -284,10 +286,9 @@ function portraitCandidates(key, expression = 'default') {
   const char = ASSETS.characters[key];
   if (!char) return [];
 
-  const requested = String(expression || 'default').toLowerCase();
-  const order =
-    EXPRESSION_FALLBACKS[requested] ||
-    [requested, 'default'];
+  const normalized = String(expression || 'default').toLowerCase();
+  const requested = ASSETS.portraitExpressions.includes(normalized) ? normalized : 'default';
+  const order = EXPRESSION_FALLBACKS[requested];
 
   const seen = new Set();
   const rows = [];
@@ -867,15 +868,15 @@ function demoResponse(action, inputMode='game') {
   }
   const first = save.turnNumber === 0;
   const turn = first ? {
-    director:{intervention:'light',beat:'encounter',event_kind:'social',spotlight_keys:['lilia'],callback_key:null,callback_phase:'none',callback_note:null,reason:'입학식 전 자연스러운 신입생 조우'},
+    director:{intervention:'light',beat:'encounter',event_kind:'social',spotlight_keys:['lillia'],callback_key:null,callback_phase:'none',callback_note:null,reason:'입학식 전 자연스러운 신입생 조우'},
     scene_title: '입학식 전, 대강당 앞', importance: 'routine', cg_id: null,
     scene: [
       {kind:'narration', text:'대강당을 둘러싼 흰 석조 회랑에 아침 햇살이 비친다. 신입생들의 목소리 사이로 검집이 부딪히는 소리와 마법 도구의 미세한 진동음이 섞인다.', speaker_key:null, speaker_name:null, expression:null},
-      {kind:'dialogue', text:'너도 기사과야? 그 대검, 꽤 오래 쓴 것 같은데!', speaker_key:'lilia', speaker_name:'릴리아', expression:'smile'},
+      {kind:'dialogue', text:'너도 기사과야? 그 대검, 꽤 오래 쓴 것 같은데!', speaker_key:'lillia', speaker_name:'릴리아', expression:'smile'},
       {kind:'narration', text:`붉은 머리의 소녀가 거리낌 없이 다가오며 ${save.pc.name}의 대검을 흥미롭게 살핀다.`, speaker_key:null, speaker_name:null, expression:null}
     ],
     choices:['소녀에게 이름과 소속을 묻는다.','대검을 살피는 이유를 묻는다.','입학식 전에 가볍게 검을 맞춰보자고 제안한다.'],
-    state_delta:{advance_minutes:3,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0,relationship_changes:[],stat_progress:[],skill_experience:[],items_add:[],items_remove:[],active_events_add:[],active_events_remove:[],completed_events_add:[],pc_knowledge_add:[],scheduled_events_add:[],scheduled_events_complete:[],hooks_add:[],hooks_update:[],memories_add:[{owner:'npc:lilia',fact:`입학식 전 대강당 앞에서 ${save.pc.name}의 오래된 대검에 먼저 관심을 보였다.`,type:'event',importance:2,secret_level:0}],npc_state_updates:[{npc_key:'lilia',location:'루멘시아 아카데미 대강당 앞',status:`${save.pc.name}에게 먼저 말을 건 상태`,current_goal:'신입생 입학식 참가',last_seen:'1285-03-01 08:43'}]},
+    state_delta:{advance_minutes:3,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0,relationship_changes:[],stat_progress:[],skill_experience:[],items_add:[],items_remove:[],active_events_add:[],active_events_remove:[],completed_events_add:[],pc_knowledge_add:[],scheduled_events_add:[],scheduled_events_complete:[],hooks_add:[],hooks_update:[],memories_add:[{owner:'npc:lillia',fact:`입학식 전 대강당 앞에서 ${save.pc.name}의 오래된 대검에 먼저 관심을 보였다.`,type:'event',importance:2,secret_level:0}],npc_state_updates:[{npc_key:'lillia',location:'루멘시아 아카데미 대강당 앞',status:`${save.pc.name}에게 먼저 말을 건 상태`,current_goal:'신입생 입학식 참가',last_seen:'1285-03-01 08:43'}]},
     scene_summary:`입학식 전 대강당 앞에서 릴리아가 ${save.pc.name}의 대검에 관심을 보이며 먼저 말을 걸었다.`
   } : {
     director:{intervention:'light',beat:'routine',event_kind:'none',spotlight_keys:[],callback_key:null,callback_phase:'none',callback_note:null,reason:'데모'},
@@ -1210,42 +1211,35 @@ async function testAssets() {
     const img = document.createElement('img');
     const label = document.createElement('div');
 
-    label.textContent =
-      `${char?.name || key}: V2 DEFAULT 검사 중`;
+    label.textContent = `${char?.name || key}: V2 등록 이미지 검사 중`;
 
     item.append(img, label);
     results.append(item);
 
-    // 폴더 자체가 아직 characters-v2에 없으면
-    // 13장을 전부 404 검사하지 않고 DEFAULT 한 장에서 중단한다.
-    const defaultOk = await probeImage(char?.default);
-
-    if (!defaultOk) {
+    if (!char?.available) {
       img.remove();
       item.classList.add('asset-fail');
-
-      label.textContent =
-        `${char?.name || key}: V2 폴더/DEFAULT 없음`;
-
+      label.textContent = `${char?.name || key}: 등록된 V2 이미지 없음`;
       continue;
     }
 
-    img.src = char.default;
+    // Only probe files declared by the reviewed manifest. Anastasia intentionally
+    // has no portrait/default.webp, while other characters may declare one.
+    const portraitRows = PORTRAIT_EXPRESSION_ORDER
+      .map((expression) => ({
+        expression,
+        url: expression === 'default' ? char.default : char?.expressions?.[expression],
+      }))
+      .filter((row) => row.url);
+    const declaredRows = [
+      ...portraitRows,
+      ...(char.fullbody ? [{ expression: 'fullbody', url: char.fullbody }] : []),
+    ];
 
-    const expressionRows =
-      PORTRAIT_EXPRESSION_ORDER
-        .filter((expression) => expression !== 'default')
-        .map((expression) => ({
-          expression,
-          url: char?.expressions?.[expression] || null,
-        }));
+    label.textContent = `${char?.name || key}: 등록 ${declaredRows.length}종 검사 중`;
 
-    label.textContent =
-      `${char?.name || key}: 나머지 12종 검사 중`;
-
-    // 같은 캐릭터의 12표정은 병렬 검사.
     const checks = await Promise.all(
-      expressionRows.map(async (row) => ({
+      declaredRows.map(async (row) => ({
         ...row,
         ok: await probeImage(row.url),
       }))
@@ -1255,18 +1249,22 @@ async function testAssets() {
       .filter((row) => !row.ok)
       .map((row) => row.expression.toUpperCase());
 
-    const success = 13 - failed.length;
+    const success = declaredRows.length - failed.length;
+    const defaultFailed = Boolean(char.default) && failed.includes('DEFAULT');
+
+    const preview = checks.find((row) => row.ok);
+    if (preview) img.src = preview.url;
+    else img.remove();
 
     if (!failed.length) {
-      label.textContent =
-        `${char?.name || key}: 13/13 ALL OK`;
+      label.textContent = `${char?.name || key}: ${success}/${declaredRows.length} DECLARED OK`;
       continue;
     }
 
-    item.classList.add('asset-warn');
+    item.classList.add(defaultFailed ? 'asset-fail' : 'asset-warn');
 
     label.textContent =
-      `${char?.name || key}: ${success}/13 OK · 누락/실패 [${failed.join(', ')}]`;
+      `${char?.name || key}: ${success}/${declaredRows.length} OK · 누락/실패 [${failed.join(', ')}]`;
   }
 }
 

@@ -1,11 +1,11 @@
 // LUMENSIA MOBILE V1.5.4 stable runtime
 // V1.5.4 stable-path migration base head: hoho074566-cpu/lumencia-ac @ a9170d6dca82c613436dcc5b3bc6ba86b9f86ba4
-// Proven app.js blob remains SHA 39187078f0965cec067cc8dad2b38dd95351ef7b
+// Reviewed app.js blob includes the canonical characters-v2 integration.
 // Why loader: preserve the large proven V1.4.8 app.js byte-for-byte in GitHub while applying
 // a stable-path V1.5.4 delta at boot. If required source markers disappear, boot stops visibly.
 
 const PATCH_VERSION = '1.5.4';
-const BASE_APP_SHA = '39187078f0965cec067cc8dad2b38dd95351ef7b';
+const BASE_APP_SHA = 'b5ca1de1996361638b9e4f5d49a73101302a0a68';
 const LIVE_BASE_HEAD = 'a9170d6dca82c613436dcc5b3bc6ba86b9f86ba4';
 const AUTO_GESTURE_PX = 84;
 
@@ -16,8 +16,9 @@ function portraitCandidatesStable(key, expression = 'default') {
   const char = ASSETS.characters[key];
   if (!char) return [];
 
-  const requested = String(expression || 'default').toLowerCase();
-  const order = EXPRESSION_FALLBACKS[requested] || [requested, 'default'];
+  const normalized = String(expression || 'default').toLowerCase();
+  const requested = ASSETS.portraitExpressions.includes(normalized) ? normalized : 'default';
+  const order = EXPRESSION_FALLBACKS[requested];
   const seen = new Set();
   const rows = [];
 
@@ -565,6 +566,12 @@ async function boot() {
       "import { ASSETS } from './assets.js';",
       `import { ASSETS } from '${location.origin}/assets.js?v=154';`,
       'ASSETS import'
+    );
+    source = replaceOnce(
+      source,
+      "import { migrateLegacyNpcKeys } from './save-migrations.js';",
+      `import { migrateLegacyNpcKeys } from '${location.origin}/save-migrations.js?v=154';`,
+      'save migration import'
     );
 
     source = replaceRegexOnce(

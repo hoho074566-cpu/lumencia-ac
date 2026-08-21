@@ -116,7 +116,7 @@ OPENAI_MODEL_TERRA = gpt-5.6-terra
 `assets.js`에 URL을 넣습니다.
 
 ```js
-lilia: {
+lillia: {
   name: '릴리아',
   default: '.../lilia_default.png',
   expressions: {
