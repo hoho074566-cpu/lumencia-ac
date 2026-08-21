@@ -1139,7 +1139,16 @@ for (const key of ['modelMode','reasoningEffort','proseLength']) { $(key).value 
 $('accessToken').value = settings.accessToken || ''; $('accessToken').addEventListener('change', e => { settings.accessToken = e.target.value.trim(); persistSettings(); });
 for (const key of ['adultMode','proReasoning','demoMode','showEmotionDebug','developerMode']) { const el=$(key); if (!el) continue; el.checked = Boolean(settings[key]); el.addEventListener('change', e => { settings[key] = e.target.checked; persistSettings(); if(key==='developerMode') updateDeveloperUi(); }); }
 $('assetTestBtn').addEventListener('click', testAssets);
-$('debugBtn').addEventListener('click',()=>{renderDebug();$('debugDialog').showModal();});
+$('debugBtn').addEventListener('click',async()=>{
+  renderDebug(); $('debugDialog').showModal();
+  try {
+    const { mountDebugRegression } = await import('/lib/debug-regression.js');
+    mountDebugRegression($('regressionConsole'));
+  } catch (error) {
+    const target = $('regressionResults');
+    if (target) target.textContent = `회귀 테스트 모듈 로드 실패: ${error.message}`;
+  }
+});
 $('metaBtn')?.addEventListener('click',()=>{ if (busy) return; metaModeOnce=!metaModeOnce; updateMetaButton(); actionInput.focus(); });
 $('pcCreatorClose').addEventListener('click',()=>$('pcCreatorDialog').close());
 $('pcCreatorClearBtn').addEventListener('click',()=>clearPcCreatorForm({keepPaste:false}));
