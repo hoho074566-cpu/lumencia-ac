@@ -1211,42 +1211,35 @@ async function testAssets() {
     const img = document.createElement('img');
     const label = document.createElement('div');
 
-    label.textContent =
-      `${char?.name || key}: V2 DEFAULT 검사 중`;
+    label.textContent = `${char?.name || key}: V2 등록 이미지 검사 중`;
 
     item.append(img, label);
     results.append(item);
 
-    // 폴더 자체가 아직 characters-v2에 없으면
-    // 13장을 전부 404 검사하지 않고 DEFAULT 한 장에서 중단한다.
-    const defaultOk = await probeImage(char?.default);
-
-    if (!defaultOk) {
+    if (!char?.available) {
       img.remove();
       item.classList.add('asset-fail');
-
-      label.textContent =
-        `${char?.name || key}: V2 폴더/DEFAULT 없음`;
-
+      label.textContent = `${char?.name || key}: 등록된 V2 이미지 없음`;
       continue;
     }
 
-    img.src = char.default;
+    // Only probe files declared by the reviewed manifest. Anastasia intentionally
+    // has no portrait/default.webp, while other characters may declare one.
+    const portraitRows = PORTRAIT_EXPRESSION_ORDER
+      .map((expression) => ({
+        expression,
+        url: expression === 'default' ? char.default : char?.expressions?.[expression],
+      }))
+      .filter((row) => row.url);
+    const declaredRows = [
+      ...portraitRows,
+      ...(char.fullbody ? [{ expression: 'fullbody', url: char.fullbody }] : []),
+    ];
 
-    const expressionRows =
-      PORTRAIT_EXPRESSION_ORDER
-        .filter((expression) => expression !== 'default')
-        .map((expression) => ({
-          expression,
-          url: char?.expressions?.[expression] || null,
-        }));
+    label.textContent = `${char?.name || key}: 등록 ${declaredRows.length}종 검사 중`;
 
-    label.textContent =
-      `${char?.name || key}: 나머지 12종 검사 중`;
-
-    // 같은 캐릭터의 12표정은 병렬 검사.
     const checks = await Promise.all(
-      expressionRows.map(async (row) => ({
+      declaredRows.map(async (row) => ({
         ...row,
         ok: await probeImage(row.url),
       }))
@@ -1256,18 +1249,22 @@ async function testAssets() {
       .filter((row) => !row.ok)
       .map((row) => row.expression.toUpperCase());
 
-    const success = 13 - failed.length;
+    const success = declaredRows.length - failed.length;
+    const defaultFailed = Boolean(char.default) && failed.includes('DEFAULT');
+
+    const preview = checks.find((row) => row.ok);
+    if (preview) img.src = preview.url;
+    else img.remove();
 
     if (!failed.length) {
-      label.textContent =
-        `${char?.name || key}: 13/13 ALL OK`;
+      label.textContent = `${char?.name || key}: ${success}/${declaredRows.length} DECLARED OK`;
       continue;
     }
 
-    item.classList.add('asset-warn');
+    item.classList.add(defaultFailed ? 'asset-fail' : 'asset-warn');
 
     label.textContent =
-      `${char?.name || key}: ${success}/13 OK · 누락/실패 [${failed.join(', ')}]`;
+      `${char?.name || key}: ${success}/${declaredRows.length} OK · 누락/실패 [${failed.join(', ')}]`;
   }
 }
 
