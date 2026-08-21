@@ -1142,7 +1142,8 @@ $('assetTestBtn').addEventListener('click', testAssets);
 $('debugBtn').addEventListener('click',async()=>{
   renderDebug(); $('debugDialog').showModal();
   try {
-    const { mountDebugRegression } = await import('/lib/debug-regression.js');
+    const regressionUrl = new URL('/lib/debug-regression.js', window.location.origin).href;
+    const { mountDebugRegression } = await import(regressionUrl);
     mountDebugRegression($('regressionConsole'));
   } catch (error) {
     const target = $('regressionResults');
