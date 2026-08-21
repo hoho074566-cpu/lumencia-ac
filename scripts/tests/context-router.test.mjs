@@ -103,4 +103,14 @@ const addressed = routeOpenAIParams(
 assert.equal(addressed.telemetry.selected_npcs.includes('p5'), true, 'action-mentioned canonical NPC must be selected before lower-priority participants');
 assert.equal(addressed.telemetry.selected_npcs.length, 4, 'action priority must preserve the context NPC cap');
 
-console.log(`PASS context router regressions (${cases.length + 13} checks)`);
+const directorInput = `===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}\n===== GM EVENT DIRECTOR (SERVER GUIDANCE) =====\nINTERVENTION: medium\nROUTINE_STREAK=3 / EVENT_GAP=4 / CHOICE_GAP=1 / CROSS_DEPT_GAP=0\n- p5(Five) score=100: test\n===== SCHEDULE ENGINE (AUTHORITATIVE) =====\nnone`;
+let directorSelected;
+for(let seed=0;seed<100&&!directorSelected;seed++){
+  const result=routeOpenAIParams({instructions:crowdedInstructions,input:directorInput},{incoming:{action:'기다린다.',saveState:{id:`seed-${seed}`,turnNumber:8,world:{location:'academy'},sceneRuntime:{participants:['p1','p2','p3','p4']}},recentTurns:[]},mode:'game'});
+  if(result.telemetry.event_director_v2?.selected_key==='p5')directorSelected=result;
+}
+assert.ok(directorSelected,'test fixture must produce a director-selected NPC');
+assert.equal(directorSelected.telemetry.selected_npcs.includes('p5'),true,'context capacity must be reserved for the director-selected NPC');
+assert.equal(directorSelected.telemetry.selected_npcs.length,4,'director reservation must preserve the NPC cap');
+
+console.log(`PASS context router regressions (${cases.length + 16} checks)`);
