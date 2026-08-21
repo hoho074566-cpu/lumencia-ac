@@ -10,7 +10,7 @@ const CANON = {"world": "루멘시아 세계관 확정 설정 v3 — 프로젝�
 // ===== END canon-data.js =====
 
 // ===== BEGIN character-registry.js =====
-const CHARACTER_REGISTRY = Object.freeze({
+export const CHARACTER_REGISTRY = Object.freeze({
   anastasia: '아나스타샤',
   aria: '아리아',
   arien: '아리엔',
@@ -82,6 +82,7 @@ const GM_RULES = `너는 판타지 아카데미 장기 RPG 「루멘시아 아�
 11. 매 응답은 제공된 JSON 구조만 반환한다. Markdown 이미지 링크를 출력하지 않는다. 화면에 표시할 NPC는 speaker_key로 지정한다.
 12. scene 배열은 실제 출력 순서다. 대사 직전의 행동이 필요하면 narration 뒤 dialogue 순으로 둔다. 대사 후 반응은 dialogue 뒤 narration으로 둔다.
 13. choices는 PC의 선택이 필요한 자연스러운 지점에서만 정확히 3개를 제시하고, 아니면 빈 배열로 둔다. 추천 외 자유행동도 가능하다는 전제를 유지한다.
+13-1. choices는 이번 USER ACTION과 그 결과가 모두 끝난 뒤의 선택지다. 방금 완료된 이동·입장·정보 전달·상호작용을 그대로 다시 제안하지 말고 결과 위치와 상태에서 가능한 후속 행동을 제시한다. 단, 실패·저지된 시도의 재시도와 진행 중 전투의 반복 공격은 허용한다.
 14. state_delta에는 실제로 발생한 변화만 넣는다. 변하지 않은 수치·관계·아이템을 꾸며내지 않는다.
 15. memories_add에는 다음 턴 이후에도 기억해야 할 구체적 정보만 넣는다. type은 fact/observer/belief/rumor/promise/deferred_hook/relationship/secret/event/obligation/knowledge 중 하나다.
 - fact: 실제 발생 사실.

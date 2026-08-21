@@ -88,4 +88,42 @@ const publicTurn = route('도서관으로 이동한다.');
 assert.equal(publicTurn.telemetry.secret_allowed, false, 'ordinary movement must not unlock secret routing');
 assert.equal(publicTurn.params.instructions.includes('PRIVATE_TEST_MARKER'), false, 'secret block leaked into ordinary context');
 
-console.log(`PASS context router regressions (${cases.length + 9} checks)`);
+const crowdedInstructions = instructions.replace('guide=Guide', 'p1=One, p2=Two, p3=Three, p4=Four, p5=Five');
+const crowded = routeOpenAIParams(
+  { instructions:crowdedInstructions, input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}' },
+  { incoming:{ action:'기다린다.', saveState:{turnNumber:3,world:{location:'academy'},sceneRuntime:{participants:['p1','p2','p3','p4','p5']}}, recentTurns:[{scene:[{kind:'dialogue',speaker_key:'p5',text:'말한다.'}]}] }, mode:'game' },
+);
+assert.equal(crowded.telemetry.selected_npcs[0], 'p5', 'latest authoritative speaker must be prioritized before truncation');
+assert.equal(crowded.telemetry.selected_npcs.includes('p5'), true, 'latest authoritative speaker was dropped from a crowded scene');
+
+const addressed = routeOpenAIParams(
+  { instructions:crowdedInstructions, input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}' },
+  { incoming:{ action:'p5에게 직접 질문한다.', saveState:{turnNumber:3,world:{location:'academy'},sceneRuntime:{participants:['p1','p2','p3','p4']}}, recentTurns:[] }, mode:'game' },
+);
+assert.equal(addressed.telemetry.selected_npcs.includes('p5'), true, 'action-mentioned canonical NPC must be selected before lower-priority participants');
+assert.equal(addressed.telemetry.selected_npcs.length, 4, 'action priority must preserve the context NPC cap');
+
+const directorInput = `===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}\n===== GM EVENT DIRECTOR (SERVER GUIDANCE) =====\nINTERVENTION: medium\nROUTINE_STREAK=3 / EVENT_GAP=4 / CHOICE_GAP=1 / CROSS_DEPT_GAP=0\n- p5(Five) score=100: test\n===== SCHEDULE ENGINE (AUTHORITATIVE) =====\nnone`;
+let directorSelected;
+for(let seed=0;seed<100&&!directorSelected;seed++){
+  const result=routeOpenAIParams({instructions:crowdedInstructions,input:directorInput},{incoming:{action:'기다린다.',saveState:{id:`seed-${seed}`,turnNumber:8,world:{location:'academy'},sceneRuntime:{participants:['p1','p2','p3','p4']}},recentTurns:[]},mode:'game'});
+  if(result.telemetry.event_director_v2?.selected_key==='p5')directorSelected=result;
+}
+assert.ok(directorSelected,'test fixture must produce a director-selected NPC');
+assert.equal(directorSelected.telemetry.selected_npcs.includes('p5'),true,'context capacity must be reserved for the director-selected NPC');
+assert.equal(directorSelected.telemetry.selected_npcs.length,4,'director reservation must preserve the NPC cap');
+
+const similarInstructions=instructions.replace('guide=Guide','elena=Elena, lena=Lena');
+const exactAddress=routeOpenAIParams({instructions:similarInstructions,input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}'},{incoming:{action:'Elena에게 질문한다.',saveState:{turnNumber:3,world:{location:'academy'},sceneRuntime:{participants:[]}},recentTurns:[]},mode:'game'});
+assert.equal(exactAddress.telemetry.selected_npcs.includes('elena'),true,'exact addressed NPC must be routed');
+assert.equal(exactAddress.telemetry.selected_npcs.includes('lena'),false,'Lena must not match inside Elena');
+const koreanSimilar=instructions.replace('guide=Guide','elena=엘레나, lena=레나');
+const koreanExact=routeOpenAIParams({instructions:koreanSimilar,input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}'},{incoming:{action:'엘레나에게 질문한다.',saveState:{turnNumber:3,world:{location:'academy'},sceneRuntime:{participants:[]}},recentTurns:[]},mode:'game'});
+assert.equal(koreanExact.telemetry.selected_npcs.includes('elena'),true,'exact Korean display name must be routed');
+assert.equal(koreanExact.telemetry.selected_npcs.includes('lena'),false,'레나 must not match inside 엘레나');
+
+const duePriority=routeOpenAIParams({instructions:crowdedInstructions,input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}'},{incoming:{action:'기다린다.',saveState:{turnNumber:3,world:{location:'academy'},sceneRuntime:{participants:['p1','p2','p3','p4']},scheduleContext:{due:[{participants:['p5']}]}},recentTurns:[]},mode:'game'});
+assert.equal(duePriority.telemetry.selected_npcs.includes('p5'),true,'due scheduled participant must reserve context capacity');
+assert.equal(duePriority.telemetry.selected_npcs.length,4,'due reservation must preserve the NPC cap');
+
+console.log(`PASS context router regressions (${cases.length + 24} checks)`);
