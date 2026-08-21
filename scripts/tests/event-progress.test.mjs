@@ -90,6 +90,19 @@ assert.ok(pausedNull.eventProgressByInstance['investigation#1'],'terminal-lookin
 const removedNull=mergeRoutedEventProgressState(unfinished,{},null,{pauseOnNull:false});
 assert.equal(removedNull.eventProgressByInstance['investigation#1'],undefined,'completed/removed occurrence is not retained as paused');
 
+const eventAId=occurrenceIdFromStartEvidence('1285-03-01',20,'lena field investigation');
+const eventAStarted=mergeRoutedEventProgressState(null,{}, {event_instance_id:'model_event_a',active_beat:'open_case',completed_beats:[]},{startedOccurrenceId:eventAId,startedResumeKey:'lena field investigation'});
+const eventAContinued=mergeRoutedEventProgressState(eventAStarted.eventProgress,eventAStarted.eventProgressByInstance,{event_instance_id:eventAId,active_beat:'follow_clue',completed_beats:['open_case'],resume_key:'replacement key'});
+assert.equal(eventAContinued.eventProgress.resumeKey,'lena field investigation','same-occurrence merge preserves the authoritative resumeKey');
+const eventBId=occurrenceIdFromStartEvidence('1285-03-01',21,'urgent messenger');
+const eventAInterrupted=mergeRoutedEventProgressState(eventAContinued.eventProgress,eventAContinued.eventProgressByInstance,{event_instance_id:'model_event_b',active_beat:'hear_message',completed_beats:[]},{startedOccurrenceId:eventBId,startedResumeKey:'urgent messenger'});
+assert.equal(eventAInterrupted.eventProgressByInstance[eventAId].resumeKey,'lena field investigation','paused occurrence retains its original resumeKey');
+const eventBEnded=mergeRoutedEventProgressState(eventAInterrupted.eventProgress,eventAInterrupted.eventProgressByInstance,null);
+const eventAResumeIds=unscheduledPausedIdsForResume(eventBEnded,'Return and continue the Lena field investigation.',['lena field investigation']);
+const eventAResumed=promotePausedEventProgress(eventBEnded,eventAResumeIds);
+assert.equal(eventAResumed.eventProgress.resumeKey,'lena field investigation','resumed occurrence restores the same resumeKey without regeneration');
+assert.equal(isEventBeatEligible(eventAResumed.eventProgress,'open_case'),false,'completed beat remains non-replayable after same-occurrence continuation and resume');
+
 const retrospective='Emily later says the representative speech was brief.';
 assert.ok(retrospective.includes('speech')&&isEventBeatEligible(previous,'ceremony_close'),'prose references do not reactivate structured beats');
 
