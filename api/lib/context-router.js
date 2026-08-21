@@ -197,8 +197,9 @@ function parseDirectorV2Guidance(originalInput=''){
   return{raw,intervention,routineStreak,eventGap,choiceGap,crossGap,payoffDue,crossDue,choiceDue,focused,callbacks,candidates};
 }
 function mentionedNpcKeys(action='',registry={}){
-  const out=[];const t=norm(action);
-  for(const [k,n] of Object.entries(registry))if(t.includes(k.toLowerCase())||t.includes(norm(n)))out.push(k);
+  const out=[],t=String(action||'');const esc=v=>String(v).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const rows=Object.entries(registry).flatMap(([key,name])=>[{key,name:key},{key,name}]).sort((a,b)=>String(b.name).length-String(a.name).length);
+  for(const row of rows){const suffix='(?=$|[\\s.,!?…\'"():;]|은|는|이|가|을|를|와|과|도|에게|께서)';if(new RegExp(`(?<![\\p{L}\\p{N}_])${esc(row.name)}${suffix}`,'iu').test(t)&&!out.includes(row.key))out.push(row.key);}
   return out;
 }
 function recentSpeakerCountsV2(recentTurns=[]){
@@ -267,7 +268,7 @@ function buildEventDirectorV2(incoming,originalInput,registry,mode='game'){
   return{telemetry,selectedKey:picked.key,directive};
 }
 
-function addExplicitKeys(set,text,registry,limit){const lower=norm(text);for(const [k,n] of Object.entries(registry)){if(set.size>=limit)break;if(lower.includes(k.toLowerCase())||lower.includes(norm(n)))set.add(k);}}
+function addExplicitKeys(set,text,registry,limit){for(const key of mentionedNpcKeys(text,registry)){if(set.size>=limit)break;set.add(key);}}
 function deriveKeys(incoming,registry,maxNpcs,directorV2=null){
   const save=incoming.saveState||{}, set=new Set();
   const authoritative=array(save?.sceneRuntime?.participants).map(String), present=new Set(authoritative);
@@ -275,6 +276,7 @@ function deriveKeys(incoming,registry,maxNpcs,directorV2=null){
   if(latestSpeaker&&present.has(String(latestSpeaker))&&registry[latestSpeaker])set.add(String(latestSpeaker));
   if(directorV2?.selectedKey&&registry[directorV2.selectedKey]&&set.size<maxNpcs)set.add(String(directorV2.selectedKey));
   addExplicitKeys(set,incoming.action||'',registry,maxNpcs);
+  for(const k of array(save?.scheduleContext?.due).flatMap(ev=>array(ev?.participants)))if(set.size<maxNpcs&&registry[k])set.add(String(k));
   for(const k of authoritative)if(set.size<maxNpcs&&registry[k])set.add(String(k));
   // Once runtime presence exists it is authoritative; speaker history is context, not physical presence.
   if(!Object.hasOwn(object(save?.sceneRuntime),'participants'))for(const item of array(last?.scene).slice(-4)){if(set.size>=maxNpcs)break;if(item?.speaker_key&&registry[item.speaker_key])set.add(String(item.speaker_key));}

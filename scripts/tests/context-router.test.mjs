@@ -113,4 +113,17 @@ assert.ok(directorSelected,'test fixture must produce a director-selected NPC');
 assert.equal(directorSelected.telemetry.selected_npcs.includes('p5'),true,'context capacity must be reserved for the director-selected NPC');
 assert.equal(directorSelected.telemetry.selected_npcs.length,4,'director reservation must preserve the NPC cap');
 
-console.log(`PASS context router regressions (${cases.length + 16} checks)`);
+const similarInstructions=instructions.replace('guide=Guide','elena=Elena, lena=Lena');
+const exactAddress=routeOpenAIParams({instructions:similarInstructions,input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}'},{incoming:{action:'Elena에게 질문한다.',saveState:{turnNumber:3,world:{location:'academy'},sceneRuntime:{participants:[]}},recentTurns:[]},mode:'game'});
+assert.equal(exactAddress.telemetry.selected_npcs.includes('elena'),true,'exact addressed NPC must be routed');
+assert.equal(exactAddress.telemetry.selected_npcs.includes('lena'),false,'Lena must not match inside Elena');
+const koreanSimilar=instructions.replace('guide=Guide','elena=엘레나, lena=레나');
+const koreanExact=routeOpenAIParams({instructions:koreanSimilar,input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}'},{incoming:{action:'엘레나에게 질문한다.',saveState:{turnNumber:3,world:{location:'academy'},sceneRuntime:{participants:[]}},recentTurns:[]},mode:'game'});
+assert.equal(koreanExact.telemetry.selected_npcs.includes('elena'),true,'exact Korean display name must be routed');
+assert.equal(koreanExact.telemetry.selected_npcs.includes('lena'),false,'레나 must not match inside 엘레나');
+
+const duePriority=routeOpenAIParams({instructions:crowdedInstructions,input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}'},{incoming:{action:'기다린다.',saveState:{turnNumber:3,world:{location:'academy'},sceneRuntime:{participants:['p1','p2','p3','p4']},scheduleContext:{due:[{participants:['p5']}]}},recentTurns:[]},mode:'game'});
+assert.equal(duePriority.telemetry.selected_npcs.includes('p5'),true,'due scheduled participant must reserve context capacity');
+assert.equal(duePriority.telemetry.selected_npcs.length,4,'due reservation must preserve the NPC cap');
+
+console.log(`PASS context router regressions (${cases.length + 24} checks)`);

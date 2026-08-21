@@ -49,6 +49,8 @@ assert.deepEqual(reconcileParticipants({previous:['mirabelle','lillia'],turn:{sc
 assert.deepEqual(reconcileParticipants({previous:['mirabelle'],turn:{scene:[narration('미라벨이 방을 떠났다.'),dialogue('mirabelle','미라벨','금방 돌아왔어요.')],state_delta:{}},registry:{mirabelle:'미라벨'}}),['mirabelle'],'a later same-turn return restores presence');
 assert.deepEqual(reconcileParticipants({previous:['mirabelle'],turn:{scene:[narration('미라벨이 방을 떠났다가 곧 돌아왔다.')],state_delta:{}},registry:{mirabelle:'미라벨'}}),['mirabelle'],'a later return in the same narration restores presence');
 assert.deepEqual(reconcileParticipants({previous:['mirabelle'],action:'미라벨과 함께 강당으로 간다.',turn:{scene:[narration('둘은 함께 강당에 도착했다.')],state_delta:{new_location:'강당'}},recentTurns:[],registry:{mirabelle:'미라벨'}}),['mirabelle'],'canonical registry identifies an active companion without recent speech');
+assert.deepEqual(reconcileParticipants({previous:['mirabelle','lillia'],action:'미라벨과 함께 강당으로 간다. 릴리아는 교실에 남아 있기로 한다.',turn:{scene:[narration('미라벨과 함께 강당에 도착하고 릴리아는 뒤에 남았다.')],state_delta:{new_location:'강당'}},registry:{mirabelle:'미라벨',lillia:'릴리아'}}),['mirabelle'],'an NPC explicitly staying behind is not carried with the PC');
+assert.deepEqual(reconcileParticipants({previous:['mirabelle','lillia'],turn:{scene:[narration('미라벨이 방을 떠났다. 잠시 뒤 릴리아가 돌아왔다.')],state_delta:{}},registry:{mirabelle:'미라벨',lillia:'릴리아'}}),['lillia'],'another NPC returning does not restore the departed NPC');
 
 {
   const scheduledRecent = [{scene:[dialogue('mirabelle','미라벨')]}];
@@ -61,6 +63,7 @@ assert.deepEqual(reconcileParticipants({previous:['mirabelle'],action:'미라벨
   assert.deepEqual(actualScheduledEntrants({due:completedDue,turn:{scene:[narration('미라벨이 강당에 들어왔다.')],state_delta:{npc_state_updates:[],scheduled_events_complete:['orientation']}},recentTurns:[],currentLocation:'강당',registry:{mirabelle:'미라벨'}}), ['mirabelle'], 'scheduled entry resolves the actual entrant display name from the registry');
   const twoDue=[{id:'orientation',participants:['mirabelle','lillia']}],registry={mirabelle:'미라벨',lillia:'릴리아'};
   assert.deepEqual(actualScheduledEntrants({due:twoDue,turn:{scene:[narration('미라벨이 지켜보는 동안 릴리아가 강당에 들어왔다.')],state_delta:{npc_state_updates:[]}},recentTurns:[],currentLocation:'강당',registry}),['lillia'],'scheduled entry binds to the NPC who actually enters');
+  assert.deepEqual(actualScheduledEntrants({due:twoDue,turn:{scene:[narration('릴리아가 도서관에 들어왔다.')],state_delta:{npc_state_updates:[]}},recentTurns:[],currentLocation:'강당',registry}),[],'prose entry at another destination does not enter the PC scene runtime');
 }
 
 {
