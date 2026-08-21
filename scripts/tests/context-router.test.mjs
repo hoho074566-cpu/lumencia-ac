@@ -69,6 +69,17 @@ const oversized = route(oversizedAction, { rollingSummary: 'old context '.repeat
 assert.ok(oversized.params.input.includes(oversizedAction), 'oversized USER ACTION must be retained verbatim');
 assert.ok(oversized.params.input.indexOf('===== USER ACTION =====') > 0, 'variable context should precede USER ACTION');
 
+const continueAction = `[LUMENSIA V1.5.4 CONTINUE]\n${'직전 장면의 같은 순간을 이어 쓴다. '.repeat(120)}`;
+const continuedRouted = routeOpenAIParams(
+  { instructions, input: '===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}' },
+  { incoming: { action: continueAction, saveState: {}, recentTurns: [], rollingSummary: 'optional '.repeat(10000) }, mode: 'continue' },
+);
+assert.equal(continuedRouted.telemetry.profile, 'continue-11k-v154', 'CONTINUE profile must remain selected');
+assert.equal(continuedRouted.telemetry.target_input_tokens, 11000, 'CONTINUE target budget changed');
+assert.equal(continuedRouted.telemetry.soft_max_tokens, 14000, 'CONTINUE soft maximum changed');
+assert.match(continuedRouted.params.input, /===== USER ACTION =====\n\[LUMENSIA V1\.5\.4 CONTINUE\]/, 'routed CONTINUE marker is missing');
+assert.ok(continuedRouted.params.input.includes(continueAction), 'complete synthetic CONTINUE action must survive optional-context truncation');
+
 const secretQuestion = route('L5 비밀 기록은 무엇인가요?');
 assert.equal(secretQuestion.telemetry.secret_allowed, false, 'a question must not unlock secret routing');
 assert.equal(secretQuestion.params.instructions.includes('PRIVATE_TEST_MARKER'), false, 'secret block leaked into a question');
@@ -77,4 +88,4 @@ const publicTurn = route('도서관으로 이동한다.');
 assert.equal(publicTurn.telemetry.secret_allowed, false, 'ordinary movement must not unlock secret routing');
 assert.equal(publicTurn.params.instructions.includes('PRIVATE_TEST_MARKER'), false, 'secret block leaked into ordinary context');
 
-console.log(`PASS context router regressions (${cases.length + 4} checks)`);
+console.log(`PASS context router regressions (${cases.length + 9} checks)`);

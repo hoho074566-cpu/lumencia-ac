@@ -208,6 +208,18 @@ function renderChoicesStable(choices) {
   renderFlowControlsStable();
 }
 
+function renderAllStable() {
+  const flowControls = $('flowControlsStable');
+  story.innerHTML = '';
+  if (!save.renderedTurns?.length) appendWelcome();
+  else save.renderedTurns.forEach(renderTurnRecord);
+  updateStatus();
+  renderInfo();
+  if (flowControls) story.append(flowControls);
+  renderFlowControlsStable();
+  scrollBottom(false);
+}
+
 function updateStatusStable(route) {
   $('timeStatus').textContent = `D+${save.world.dayElapsed} · ${save.world.date} ${save.world.weekday} ${save.world.time}`;
   $('locationStatus').textContent = save.world.location;
@@ -221,11 +233,18 @@ function updateStatusStable(route) {
   $('costStatus').textContent = `턴 $${Number(save.usage.lastTurnUsd || 0).toFixed(4)} / Σ$${Number(save.usage.estimatedUsd || 0).toFixed(3)}`;
 }
 
+function continuationSceneTailStable(scene, limit = 10) {
+  return (Array.isArray(scene) ? scene : []).slice(-limit);
+}
+
 function mergeContinuationIntoRecentStable(turn) {
-  const rows = save.recentTurns || [];
+  const rows = Array.isArray(save.recentTurns) ? save.recentTurns : [];
   const last = rows[rows.length - 1];
   if (!last || !turn) return;
-  const mergedScene = [...(last.scene || []), ...(turn.scene || [])].slice(-12);
+  const mergedScene = continuationSceneTailStable([
+    ...(Array.isArray(last.scene) ? last.scene : []),
+    ...(Array.isArray(turn.scene) ? turn.scene : []),
+  ], 12);
   const mergedSummary = [last.summary, turn.scene_summary].filter(Boolean).join(' / ').slice(-1800);
   last.scene = mergedScene;
   last.summary = mergedSummary;
@@ -438,7 +457,7 @@ async function sendActionStable(action, requestedMode = null) {
         action: isAuto ? FLOW_AUTO_ACTION_Stable : apiAction,
         summary: data.turn.scene_summary,
         importance: data.turn.importance || 'routine',
-        scene: (data.turn.scene || []).slice(0, 10),
+        scene: continuationSceneTailStable(data.turn.scene, 10),
       });
       save.recentTurns = save.recentTurns.slice(-12);
     } else if (isContinue) {
@@ -600,6 +619,13 @@ async function boot() {
 
     source = replaceRegexOnce(
       source,
+      /function renderAll\(\) \{[\s\S]*?\n\}\n\nfunction renderTurnRecord/,
+      `${renameFunction(renderAllStable, 'renderAllStable', 'renderAll')}\n\nfunction renderTurnRecord`,
+      'renderAll flow controls lifecycle'
+    );
+
+    source = replaceRegexOnce(
+      source,
       /function updateStatus\(route\) \{[\s\S]*?\n\}\n\nfunction renderInfo/,
       `${renameFunction(updateStatusStable, 'updateStatusStable', 'updateStatus')}\n\nfunction renderInfo`,
       'updateStatus'
@@ -614,6 +640,7 @@ async function boot() {
       canContinueStable.toString(),
       renderFlowControlsStable.toString(),
       installAutoFlowGestureStable.toString(),
+      continuationSceneTailStable.toString(),
       mergeContinuationIntoRecentStable.toString(),
       accumulateUsageStable.toString(),
       zeroStateDeltaStable.toString(),
@@ -651,7 +678,7 @@ async function boot() {
     source = replaceOnce(
       source,
       'refreshScheduleContext(); updateForceTerraButton(); checkHealth(); renderAll();',
-      'refreshScheduleContext(); updateForceTerraButton(); checkHealth(); installAutoFlowGestureStable(); renderAll(); renderFlowControlsStable();',
+      'refreshScheduleContext(); updateForceTerraButton(); checkHealth(); installAutoFlowGestureStable(); renderAll();',
       'boot hook'
     );
   } catch (error) {
