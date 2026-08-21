@@ -1,4 +1,5 @@
 import { ASSETS } from './assets.js';
+import { migrateLegacyNpcKeys } from './save-migrations.js';
 
 const APP_VERSION = '1.4.8';
 const SAVE_KEY = 'lumensia.save.v1';
@@ -181,7 +182,8 @@ function clamp(n, min, max) { return Math.min(max, Math.max(min, Number(n) || 0)
 
 function normalizeSave(raw) {
   const base = defaultSave();
-  const next = raw && typeof raw === 'object' ? raw : base;
+  const migrated = migrateLegacyNpcKeys(raw);
+  const next = migrated && typeof migrated === 'object' ? migrated : base;
   next.version = 6;
   next.appVersion = APP_VERSION;
   next.world = { ...base.world, ...(next.world || {}) };
