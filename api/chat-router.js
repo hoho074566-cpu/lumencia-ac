@@ -8,6 +8,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import coreHandler, { CHARACTER_REGISTRY } from './chat.js';
 import { routeOpenAIParams, routerVersion, array, object, clampText } from './lib/context-router.js';
 import { actualScheduledEntrants, freshChoices, reconcileParticipants } from '../lib/scene-continuity.js';
+import { compactEventProgress, mergeContinuationEventProgressState, mergeRoutedEventProgressState, occurrenceIdFromStartEvidence, promotePausedEventProgress, scheduledIdsDueByTurnEnd, unscheduledPausedIdsForResume } from '../lib/event-progress.js';
 
 export const config = { maxDuration: 300 };
 
@@ -57,7 +58,8 @@ function emptyStateDelta() {
 function continueAction(incoming) {
   const runtime = object(incoming.saveState?.sceneRuntime);
   const beat = array(runtime.remaining_beats)[0] || '';
-  return clampText(`${CONTINUE_DIRECTIVE}${beat?`\n미처리 같은-장면 beat: ${beat}`:''}\n직전 장면 연속성: ${clampText(runtime,900)}`,5000);
+  const eventAnchor = compactEventProgress(runtime.eventProgress);
+  return clampText(`${CONTINUE_DIRECTIVE}${beat?`\n미처리 같은-장면 beat: ${beat}`:''}${eventAnchor?`\n현재 이벤트 진행(권위 상태): ${eventAnchor}`:''}\n직전 장면 연속성: ${clampText(runtime,900)}`,5000);
 }
 
 function lockContinueTurn(turn) {
@@ -105,12 +107,27 @@ function localNpcUpdates(incoming,turn){
   return out;
 }
 
-function localSceneRuntime(incoming,turn){
+function localSceneRuntime(incoming,turn,directorTelemetry=null){
   const previous=object(incoming.saveState?.sceneRuntime);
   const scheduledEntries=actualScheduledEntrants({due:incoming.saveState?.scheduleContext?.due,turn,recentTurns:incoming.recentTurns,currentLocation:incoming.saveState?.world?.location,registry:CHARACTER_REGISTRY});
   const participants=reconcileParticipants({previous:previous.participants,action:incoming.action,turn,recentTurns:incoming.recentTurns,scheduledEntries,registry:CHARACTER_REGISTRY,currentLocation:incoming.saveState?.world?.location});
   const choices=array(turn?.choices).map(x=>clampText(x,140)).filter(Boolean).slice(0,3);
   const hasDecision=choices.length>0;
+  const directorOccurrence=String(directorTelemetry?.occurrence_id||'').trim().toLowerCase();
+  const dueIds=scheduledIdsDueByTurnEnd(incoming.saveState,turn?.state_delta?.advance_minutes);
+  const callbackKey=String(turn?.director?.callback_key||'').trim();
+  const knownCallback=new Set([...array(incoming.saveState?.director?.callbacks).map(row=>String(row?.key||'')),...array(incoming.saveState?.hooks).map(row=>String(row?.id||''))]);
+  const explicitPlayerStart=/(?:결투|대련|조사|수사|추적|탐사|의뢰를?\s*(?:시작|수락)|duel|investigat|start(?:s|ed|ing)?\s+(?:a\s+)?(?:duel|investigation))/i.test(String(incoming.action||''));
+  const startedEvidence=(explicitPlayerStart?array(turn?.state_delta?.active_events_add)[0]:'')||(knownCallback.has(callbackKey)?callbackKey:'');
+  const startedOccurrence=occurrenceIdFromStartEvidence(incoming.saveState?.world?.date,incoming.saveState?.turnNumber,startedEvidence);
+  const priorProgress=previous.eventProgress;
+  const removed=new Set([...array(turn?.state_delta?.active_events_remove),...array(turn?.state_delta?.completed_events_add),...array(turn?.state_delta?.scheduled_events_complete)].map(x=>String(x).trim().toLowerCase()));
+  const priorResumeKey=String(priorProgress?.resumeKey||'').trim().toLowerCase();
+  const priorId=String(priorProgress?.eventInstanceId||'').trim().toLowerCase();
+  const scheduledStillActive=dueIds.map(x=>String(x).trim().toLowerCase()).includes(priorId)&&!removed.has(priorId);
+  const unscheduledStillActive=priorResumeKey&&array(incoming.saveState?.activeEvents).map(x=>String(x).trim().toLowerCase()).includes(priorResumeKey)&&!removed.has(priorResumeKey);
+  const pauseOnNull=Boolean(scheduledStillActive||unscheduledStillActive);
+  const progressState=mergeRoutedEventProgressState(priorProgress,previous.eventProgressByInstance,turn?.event_progress,{dueEventIds:dueIds,directorOccurrenceId:directorOccurrence,startedOccurrenceId:startedOccurrence,startedResumeKey:startedEvidence,pauseOnNull});
   return {
     scene_key:clampText(turn?.scene_title||previous.scene_key||'scene',120),
     participants,
@@ -121,10 +138,11 @@ function localSceneRuntime(incoming,turn){
     immediate_pressure:clampText(previous.immediate_pressure||'',220),
     tone:clampText(turn?.importance||previous.tone||'routine',80),
     remaining_beats:hasDecision?[]:array(previous.remaining_beats).slice(0,1),
+    ...progressState,
   };
 }
 function clone(value){try{return structuredClone(value);}catch{return JSON.parse(JSON.stringify(value??null));}}
-function consumeContinuationRuntime(incoming){const prev=clone(object(incoming.saveState?.sceneRuntime));prev.remaining_beats=array(prev.remaining_beats).slice(1);return{npc_updates:{},scene_runtime:prev};}
+function consumeContinuationRuntime(incoming,turn){const prev=clone(object(incoming.saveState?.sceneRuntime));prev.remaining_beats=array(prev.remaining_beats).slice(1);Object.assign(prev,mergeContinuationEventProgressState(prev.eventProgress,prev.eventProgressByInstance,turn?.event_progress));return{npc_updates:{},scene_runtime:prev};}
 
 function localBackgroundDigest(incoming,turn,participants){
   const prior=String(incoming.saveState?.backgroundDigest||'').slice(-1100);
@@ -194,12 +212,14 @@ export default async function handler(req,res){
     const incoming0=req.body&&typeof req.body==='object'?req.body:{};
     const mode=SUPPORTED_MODES.has(incoming0.inputMode)?incoming0.inputMode:'game';
     const incoming={...incoming0};
+    const resumableIds=mode==='game'?[...scheduledIdsDueByTurnEnd(incoming0.saveState,0),...unscheduledPausedIdsForResume(incoming0.saveState?.sceneRuntime,incoming0.action,incoming0.saveState?.activeEvents)]:[];
+    incoming.saveState={...object(incoming0.saveState),sceneRuntime:mode==='game'?promotePausedEventProgress(incoming0.saveState?.sceneRuntime,resumableIds):object(incoming0.saveState?.sceneRuntime)};
 
     if(mode==='meta'){
       incoming.inputMode='meta';
       incoming.action=String(incoming0.action||'');
     }else if(mode==='continue'){
-      incoming.inputMode='game'; incoming.action=continueAction(incoming0); incoming.forceTerra=false;
+      incoming.inputMode='game'; incoming.action=continueAction(incoming); incoming.forceTerra=false;
       incoming.rollingSummary=String(incoming0.rollingSummary||'').slice(-3600);
     }else if(mode==='auto'){
       incoming.inputMode='game'; incoming.action=AUTO_DIRECTIVE;
@@ -220,8 +240,8 @@ export default async function handler(req,res){
 
     if(mode==='continue'){
       lockContinueTurn(data.turn); applyExtendedExpressions(data.turn,incoming0.saveState||{});
-      data.runtime_state=consumeContinuationRuntime(incoming0);
-      data.background_digest=String(incoming0.saveState?.backgroundDigest||'').slice(-1800);
+      data.runtime_state=consumeContinuationRuntime(incoming,data.turn);
+      data.background_digest=String(incoming.saveState?.backgroundDigest||'').slice(-1800);
       const pipeline={pipeline:'continue-stable-v154',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null};
       data.pipeline=pipeline; setAdapterRoute(data,mode,pipeline,telemetry); return res.status(200).json(data);
     }
@@ -233,7 +253,7 @@ export default async function handler(req,res){
 
     applyExtendedExpressions(data.turn,incoming0.saveState||{});
     data.turn.choices=freshChoices(incoming.action,data.turn);
-    const sceneRuntime=localSceneRuntime(incoming0,data.turn);
+    const sceneRuntime=localSceneRuntime({...incoming0,saveState:incoming.saveState},data.turn,telemetry?.event_director_v2);
     const npcUpdates=incoming0.qualityPipeline===false?{}:localNpcUpdates(incoming0,data.turn);
     data.runtime_state={npc_updates:npcUpdates,scene_runtime:sceneRuntime};
     data.background_digest=localBackgroundDigest(incoming0,data.turn,sceneRuntime.participants);

@@ -55,7 +55,8 @@ const ROUTER_GM_RULES = String.raw`너는 판타지 아카데미 장기 RPG 「�
 12) scene_summary는 장기적으로 유용한 사실을 1~4문장으로 압축한다.
 13) USER ACTION의 긍정형 직접 선언은 이번 턴에 확정된 행동/대사다. 생각·의도로 되돌리지 말고 시도와 즉각적인 반응을 처리한다. 단, 명시적으로 부정·거절되었거나 하지 않겠다고 한 행동, 가정·질문·조건으로만 언급된 행동은 확정 행동이 아니므로 실행하지 않는다.
 14) USER ACTION 원문 전체를 반영한다. 서로 충돌하지 않는 선언을 생략하지 않되 성공 여부와 결과는 능력·상황·판정에 따른다.
-15) 제공된 구조화 JSON 스키마만 반환하고 내부 판정 메모/Router 설명은 출력하지 않는다.`;
+15) 제공된 구조화 JSON 스키마만 반환하고 내부 판정 메모/Router 설명은 출력하지 않는다.
+16) event_progress는 현재 논리적 이벤트 occurrence의 compact 진행 상태다. event_instance_id는 제공된 schedule/Event Director occurrence ID를 우선하고 event/beat ID는 안정된 짧은 영문 소문자로 쓴다. 명확히 끝난 beat만 completed_beats에 추가하고 최근 완료 ID를 최대 24개 반환한다. AUTHORITATIVE SAVE_STATE.sceneRuntime.eventProgress의 완료 beat는 언급·회상할 수 있지만 현재 행동으로 재실행하거나 active로 되돌리지 않는다. omittedCompletedCount가 1 이상이면 compact 목록에서 생략된 더 이른 beat도 전부 완료된 것이므로 설정/대기/실행 상태로 되돌리지 않는다. 같은 occurrence의 완료 상태를 의미상 지우지 말고 완료 뒤로 전진하며, 새 occurrence가 실제 시작되면 그 ID로 교체한다. 이벤트가 끝났거나 구조화할 활성 이벤트가 없으면 event_progress=null이다.`;
 
 const NATURAL_STYLE = String.raw`[NATURAL NPC / SCENE]
 - NPC 대사는 설정집 낭독이 아니라 직전 말/행동에 대한 실제 반응이어야 한다.
@@ -263,8 +264,9 @@ function buildEventDirectorV2(incoming,originalInput,registry,mode='game'){
     return{telemetry,selectedKey:null,directive:`[EVENT DIRECTOR V2 — SEEDED WEIGHTED VARIATION]\nMODE=${eventMode}\nRESULT=NO_EVENT\n이번 턴에는 새 우연 조우/마찰/카메오를 추가하지 마라. 고정 일정과 현재 장면만 자연스럽게 진행한다.`};
   }
   const style=eventStyleFor(seedBase,eventMode);
-  const telemetry={...base,mode:eventMode,result:'NPC_EVENT',selected_key:picked.key,selected_name:registry[picked.key]||picked.name,event_style:style,eligible_keys:rows.map(x=>x.key),roll:Number(roll.toFixed(4)),none_weight:Number(noneWeight.toFixed(2)),weights:Object.fromEntries(rows.map(x=>[x.key,Number(x.weight.toFixed(2))]))};
-  const directive=`[EVENT DIRECTOR V2 — SEEDED WEIGHTED VARIATION]\nMODE=${eventMode}\nRESULT=NPC_EVENT\nSELECTED=${picked.key}(${registry[picked.key]||picked.name})\nSTYLE=${style}\n- 고정 일정, 사용자의 직접 행동, 기존 훅이 항상 우선한다.\n- 물리적 위치/일정상 자연스러울 때만 선택 NPC를 작은 접점에 사용한다. 불가능하면 순간이동시키지 말고 NO_EVENT처럼 처리한다.\n- 이 랜덤 슬롯은 작은 조우·마찰·관찰·공개 정보·사소한 실무 문제 수준이다. 새 대형 사건, 새 비밀, 새 능력, 중상, 강제 관계변화는 만들지 않는다.\n- 선택 NPC가 등장해도 PC에게 자동 관심/호감을 주지 않는다.`;
+  const occurrenceId=`director:${save?.world?.date||'undated'}:t${turn}:${picked.key}`.toLowerCase();
+  const telemetry={...base,mode:eventMode,result:'NPC_EVENT',occurrence_id:occurrenceId,selected_key:picked.key,selected_name:registry[picked.key]||picked.name,event_style:style,eligible_keys:rows.map(x=>x.key),roll:Number(roll.toFixed(4)),none_weight:Number(noneWeight.toFixed(2)),weights:Object.fromEntries(rows.map(x=>[x.key,Number(x.weight.toFixed(2))]))};
+  const directive=`[EVENT DIRECTOR V2 — SEEDED WEIGHTED VARIATION]\nMODE=${eventMode}\nRESULT=NPC_EVENT\nEVENT_INSTANCE_ID=${occurrenceId}\nSELECTED=${picked.key}(${registry[picked.key]||picked.name})\nSTYLE=${style}\n- 고정 일정, 사용자의 직접 행동, 기존 훅이 항상 우선한다.\n- 물리적 위치/일정상 자연스러울 때만 선택 NPC를 작은 접점에 사용한다. 불가능하면 순간이동시키지 말고 NO_EVENT처럼 처리한다.\n- 이 랜덤 슬롯은 작은 조우·마찰·관찰·공개 정보·사소한 실무 문제 수준이다. 새 대형 사건, 새 비밀, 새 능력, 중상, 강제 관계변화는 만들지 않는다.\n- 선택 NPC가 등장해도 PC에게 자동 관심/호감을 주지 않는다.`;
   return{telemetry,selectedKey:picked.key,directive};
 }
 

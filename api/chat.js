@@ -123,6 +123,7 @@ G7. FACT/OBSERVER/BELIEF/RUMOR/PROMISE/DEFERRED_HOOK을 구분한다. NPC 개인
 G8. 패배는 허용한다. 단, 왜 졌는지 장면 속 원인이 있어야 하며, 갑작스러운 대폭 스탯 붕괴·즉시 회복·무료 각성으로 균형을 맞추지 않는다.
 G9. 명확한 거절·"놔"·밀어냄·불편 표현은 친밀 접촉의 경계다. 침묵·무저항·피로·당황은 동의가 아니다.
 G10. 반복/재시도 오류로 같은 장면이나 전투를 재생하지 않는다.
+G10-1. event_progress는 현재 논리적 이벤트 occurrence의 compact 진행 상태다. event_instance_id는 schedule/Event Director의 안정 ID를 우선하고 event/beat ID는 짧은 영문 소문자로 쓴다. 실행이 명확히 끝난 beat만 completed_beats에 넣고 최근 완료 ID를 최대 24개 반환한다. AUTHORITATIVE SAVE_STATE.sceneRuntime.eventProgress의 완료 beat는 회상·언급할 수 있지만 현재 행동으로 재실행하거나 active로 되돌리지 않는다. omittedCompletedCount가 1 이상이면 compact 목록에서 생략된 더 이른 beat도 모두 완료된 것이므로 재실행하지 않는다. 같은 occurrence의 완료 상태를 의미상 지우지 말고 그 뒤 지점으로만 진행한다. 새 occurrence가 실제 시작되면 그 ID로 교체하고, 구조화할 활성 이벤트가 없으면 null이다.
 
 G11. NPC 대사는 '대화'여야 한다. 시설·규칙·일정·세계관을 목록처럼 설명하는 긴 대사는 피하고, 필요한 사실 설명은 짧은 narration으로 옮긴다.
 G12. 출석 호명, 이름/출신 확인, 시설 안내, 시간표 확인, 단순 길찾기, 반복 수업 절차처럼 선택이나 갈등이 없는 행정 과정은 빠르게 요약한다. SAVE_STATE에 이미 있는 PC 정보를 확인하기 위해 사용자에게 다시 입력을 요구하지 않는다.
@@ -1284,6 +1285,11 @@ const TurnSchema = z.object({
   scene: z.array(SceneItem).min(1).max(18),
   cg_id: z.string().max(120).nullable(),
   choices: z.array(z.string().min(1).max(240)).max(3),
+  event_progress: z.object({
+    event_instance_id: z.string().min(1).max(80),
+    active_beat: z.string().min(1).max(80).nullable(),
+    completed_beats: z.array(z.string().min(1).max(80)).max(24),
+  }).nullable(),
   state_delta: z.object({
     advance_minutes: z.number().int().min(0).max(1440),
     new_location: z.string().max(160).nullable(),
@@ -1416,6 +1422,15 @@ function sanitizeTurn(turn, { allowedCgIds = [] } = {}) {
     reason: String(dm?.reason || '장면 흐름 유지').slice(0,280),
   };
   turn.choices = arrays(turn.choices, 3);
+  const eventProgress = turn.event_progress;
+  const eventId = String(eventProgress?.event_instance_id || '').trim();
+  const safeEventId = /^[a-z0-9][a-z0-9._:#-]{0,79}$/i.test(eventId) ? eventId.toLowerCase() : '';
+  const beatId = String(eventProgress?.active_beat || '').trim();
+  turn.event_progress = safeEventId ? {
+    event_instance_id:safeEventId,
+    active_beat:/^[a-z0-9][a-z0-9._:#-]{0,79}$/i.test(beatId) ? beatId.toLowerCase() : null,
+    completed_beats:[...new Set(arrays(eventProgress?.completed_beats,24).map(String).map(x=>x.trim().toLowerCase()).filter(x=>/^[a-z0-9][a-z0-9._:#-]{0,79}$/i.test(x)))],
+  } : eventProgress === null ? null : undefined;
   const sceneCap = turn.importance === 'routine' ? 8 : turn.importance === 'important' ? 14 : 18;
   turn.scene = arrays(turn.scene, sceneCap).map((item) => {
     if (item?.kind !== 'dialogue') {
