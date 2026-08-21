@@ -68,6 +68,10 @@ const oversizedAction = `나는 북문으로 이동한다. ${'계속 전진한�
 const oversized = route(oversizedAction, { rollingSummary: 'old context '.repeat(3000) });
 assert.ok(oversized.params.input.includes(oversizedAction), 'oversized USER ACTION must be retained verbatim');
 assert.ok(oversized.params.input.indexOf('===== USER ACTION =====') > 0, 'variable context should precede USER ACTION');
+const routedContract=route('주변을 살핀다.').params.instructions;
+assert.match(routedContract,/event_progress는 현재 논리적 이벤트 occurrence의 compact 진행 상태/, 'routed GAME prompt is missing event progress contract');
+assert.match(routedContract,/완료 beat는 언급·회상할 수 있지만 현재 행동으로 재실행하거나 active로 되돌리지 않는다/, 'routed GAME prompt is missing monotonic completion rule');
+assert.match(routedContract,/event_progress=null/, 'routed GAME prompt is missing inactive-event clearing rule');
 
 const continueAction = `[LUMENSIA V1.5.4 CONTINUE]\n${'직전 장면의 같은 순간을 이어 쓴다. '.repeat(120)}`;
 const continuedRouted = routeOpenAIParams(

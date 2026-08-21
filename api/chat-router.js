@@ -8,7 +8,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import coreHandler, { CHARACTER_REGISTRY } from './chat.js';
 import { routeOpenAIParams, routerVersion, array, object, clampText } from './lib/context-router.js';
 import { actualScheduledEntrants, freshChoices, reconcileParticipants } from '../lib/scene-continuity.js';
-import { compactEventProgress, mergeEventProgress, normalizeEventProgress } from '../lib/event-progress.js';
+import { compactEventProgress, mergeEventProgress, mergeRoutedEventProgress } from '../lib/event-progress.js';
 
 export const config = { maxDuration: 300 };
 
@@ -107,16 +107,14 @@ function localNpcUpdates(incoming,turn){
   return out;
 }
 
-function localSceneRuntime(incoming,turn){
+function localSceneRuntime(incoming,turn,directorTelemetry=null){
   const previous=object(incoming.saveState?.sceneRuntime);
   const scheduledEntries=actualScheduledEntrants({due:incoming.saveState?.scheduleContext?.due,turn,recentTurns:incoming.recentTurns,currentLocation:incoming.saveState?.world?.location,registry:CHARACTER_REGISTRY});
   const participants=reconcileParticipants({previous:previous.participants,action:incoming.action,turn,recentTurns:incoming.recentTurns,scheduledEntries,registry:CHARACTER_REGISTRY,currentLocation:incoming.saveState?.world?.location});
   const choices=array(turn?.choices).map(x=>clampText(x,140)).filter(Boolean).slice(0,3);
   const hasDecision=choices.length>0;
-  const previousProgress=normalizeEventProgress(previous.eventProgress);
-  const incomingProgress=normalizeEventProgress(turn?.event_progress);
-  const dueIds=new Set(array(incoming.saveState?.scheduleContext?.due).map(row=>String(row?.id||'')).filter(Boolean));
-  const allowInstanceChange=!previousProgress||Boolean(incomingProgress&&dueIds.has(incomingProgress.eventInstanceId));
+  const directorOccurrence=String(directorTelemetry?.occurrence_id||'').trim().toLowerCase();
+  const dueIds=array(incoming.saveState?.scheduleContext?.due).map(row=>String(row?.id||''));
   return {
     scene_key:clampText(turn?.scene_title||previous.scene_key||'scene',120),
     participants,
@@ -127,7 +125,7 @@ function localSceneRuntime(incoming,turn){
     immediate_pressure:clampText(previous.immediate_pressure||'',220),
     tone:clampText(turn?.importance||previous.tone||'routine',80),
     remaining_beats:hasDecision?[]:array(previous.remaining_beats).slice(0,1),
-    eventProgress:mergeEventProgress(previousProgress,incomingProgress,{allowInstanceChange}),
+    eventProgress:mergeRoutedEventProgress(previous.eventProgress,turn?.event_progress,{dueEventIds:dueIds,directorOccurrenceId:directorOccurrence}),
   };
 }
 function clone(value){try{return structuredClone(value);}catch{return JSON.parse(JSON.stringify(value??null));}}
@@ -240,7 +238,7 @@ export default async function handler(req,res){
 
     applyExtendedExpressions(data.turn,incoming0.saveState||{});
     data.turn.choices=freshChoices(incoming.action,data.turn);
-    const sceneRuntime=localSceneRuntime(incoming0,data.turn);
+    const sceneRuntime=localSceneRuntime(incoming0,data.turn,telemetry?.event_director_v2);
     const npcUpdates=incoming0.qualityPipeline===false?{}:localNpcUpdates(incoming0,data.turn);
     data.runtime_state={npc_updates:npcUpdates,scene_runtime:sceneRuntime};
     data.background_digest=localBackgroundDigest(incoming0,data.turn,sceneRuntime.participants);
