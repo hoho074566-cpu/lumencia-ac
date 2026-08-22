@@ -6,6 +6,7 @@ import {
   deliverDiscord,
   evaluateChecks,
   evaluateCodex,
+  reconcileCodexCleanReaction,
   evaluateReadiness,
   findReadinessCheck,
   hydratePulls,
@@ -31,7 +32,7 @@ const ACTORS = 'trusted-codex[bot]';
 const codex = (state = 'PASS', extra = {}) => ({ state, P0: 0, P1: 0, P2: 0, P3: 0, unknown: 0, ...extra });
 const checks = (extra = {}) => ({ safety: 'PASS', vercel: 'PASS', required: 'PASS', ...extra });
 const review = (commit_id, body = 'No findings.', extra = {}) => ({ id: 1, commit_id, body, state: 'COMMENTED', submitted_at: '2026-01-01T00:00:00Z', user: { login: 'trusted-codex[bot]' }, ...extra });
-const reaction = (login = 'trusted-codex[bot]', created_at = '2026-01-01T00:01:00Z') => ({ content: '+1', created_at, user: { login } });
+const reaction = (id, login = 'trusted-codex[bot]') => ({ id, content: '+1', user: { login } });
 const comment = (commit_id, body, extra = {}) => ({ commit_id, body, pull_request_review_id: 1, user: { login: 'trusted-codex[bot]' }, ...extra });
 const evaluateReview = (input) => evaluateCodex({ configuredActors: ACTORS, ...input });
 const readyInput = (extra = {}) => ({ codex: codex(), checks: checks(), mergeable: true, mergeableState: 'clean', ...extra });
@@ -60,31 +61,46 @@ test('new head without a current review waits', () => {
 
 test('clean current review passes', () => assert.equal(evaluateReview({ head: HEAD, reviews: [review(HEAD)] }).state, 'PASS'));
 
-test('current-head trusted Codex clean reaction passes', () => {
-  const result = evaluateReview({ head: HEAD, headCommittedAt: '2026-01-01T00:00:00Z', reactions: [reaction()] });
+test('newly observed trusted Codex clean signal explicitly bound to current HEAD passes', () => {
+  const cleanReaction = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(2)], configuredActors: ACTORS, previous: { headSha: HEAD, seenReactionIds: ['1'] } });
+  const result = evaluateReview({ head: HEAD, cleanReaction });
   assert.equal(result.state, 'PASS');
+  assert.equal(cleanReaction.reactionId, '2');
 });
 
 test('arbitrary user clean reaction remains pending', () => {
-  const result = evaluateReview({ head: HEAD, headCommittedAt: '2026-01-01T00:00:00Z', reactions: [reaction('ordinary-user')] });
+  const cleanReaction = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1, 'ordinary-user')], configuredActors: ACTORS, previous: { headSha: HEAD, seenReactionIds: [] } });
+  const result = evaluateReview({ head: HEAD, cleanReaction });
   assert.equal(result.state, 'PENDING');
 });
 
-test('old-head Codex clean reaction cannot satisfy a newer head', () => {
-  const result = evaluateReview({ head: HEAD, headCommittedAt: '2026-01-01T00:02:00Z', reactions: [reaction('trusted-codex[bot]', '2026-01-01T00:01:00Z')] });
+test('new HEAD with an already-existing old reaction remains pending', () => {
+  const cleanReaction = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1)], configuredActors: ACTORS, previous: { headSha: 'old-head', seenReactionIds: [], reactionId: '1' } });
+  const result = evaluateReview({ head: HEAD, cleanReaction });
   assert.equal(result.state, 'PENDING');
+  assert.deepEqual(cleanReaction, { headSha: HEAD, seenReactionIds: ['1'] });
+});
+
+test('stale reaction remains pending when force-pushed back to an older existing SHA', () => {
+  const cleanReaction = reconcileCodexCleanReaction({ head: 'previously-reviewed-sha', reactions: [reaction(1)], configuredActors: ACTORS, previous: { headSha: 'newer-sha', seenReactionIds: ['1'] } });
+  assert.equal(evaluateReview({ head: 'previously-reviewed-sha', cleanReaction }).state, 'PENDING');
 });
 
 test('current-head P1 blocks even when a trusted clean reaction exists', () => {
-  const result = evaluateReview({ head: HEAD, headCommittedAt: '2026-01-01T00:00:00Z', reviews: [review(HEAD, 'P1: blocking finding')], reactions: [reaction()] });
+  const result = evaluateReview({ head: HEAD, reviews: [review(HEAD, 'P1: blocking finding')], cleanReaction: { headSha: HEAD, reactionId: '1' } });
   assert.equal(result.state, 'BLOCK');
   assert.equal(result.P1, 1);
 });
 
 test('current-head P2-only review passes with clean reaction support enabled', () => {
-  const result = evaluateReview({ head: HEAD, headCommittedAt: '2026-01-01T00:00:00Z', reviews: [review(HEAD, 'P2: non-blocking suggestion')], reactions: [reaction()] });
+  const result = evaluateReview({ head: HEAD, reviews: [review(HEAD, 'P2: non-blocking suggestion')], cleanReaction: { headSha: HEAD, reactionId: '1' } });
   assert.equal(result.state, 'PASS');
   assert.equal(result.P2, 1);
+});
+
+test('prior-head clean association never satisfies a new HEAD', () => {
+  const result = evaluateReview({ head: HEAD, cleanReaction: { headSha: 'old-head', reactionId: '1' } });
+  assert.equal(result.state, 'PENDING');
 });
 
 test('old Vercel success cannot satisfy a new head', () => {
