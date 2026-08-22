@@ -14,7 +14,7 @@ const HEAD = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const NEW_HEAD = 'cccccccccccccccccccccccccccccccccccccccc';
 const BASE = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
-function pull(head = HEAD, mergeableState = 'clean') {
+function pull(head = HEAD, mergeableState = 'clean', base = BASE) {
   return {
     number: 21,
     state: 'open',
@@ -26,7 +26,7 @@ function pull(head = HEAD, mergeableState = 'clean') {
     html_url: 'https://github.com/hoho074566-cpu/lumencia-ac/pull/21',
     user: { login: OWNER },
     head: { ref: 'codex/final-signals', sha: head, repo: { full_name: FULL } },
-    base: { ref: 'main', sha: BASE, repo: { full_name: FULL } },
+    base: { ref: 'main', sha: base, repo: { full_name: FULL } },
   };
 }
 
@@ -226,10 +226,53 @@ test('unstable final snapshot merges only after post-snapshot signals pass', asy
     mergeApi: { mergePull: async () => { mergeCalls += 1; return { merged: true, sha: 'd'.repeat(40) }; } },
     logger: silent, now: new Date('2026-08-23T00:02:00Z'),
   });
-  assert.equal(getPullCalls, 4);
+  assert.equal(getPullCalls, 5);
   assert.equal(checkCalls, 4);
   assert.equal(mergeCalls, 1);
   assert.equal(summary.merged, 1);
   assert.equal(summary.humanRequired, 0);
+  assert.equal(summary.errors.length, 0);
+});
+
+test('base advance during unstable post-snapshot signal read prevents merge', async () => {
+  const issueComments = [requestComment(), cleanCodexComment()];
+  const newBase = 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+  let getPullCalls = 0;
+  let checkCalls = 0;
+  let mergeCalls = 0;
+  const api = {
+    validate: async () => true,
+    listOpenPulls: async () => [pull()],
+    getPull: async () => {
+      getPullCalls += 1;
+      if (getPullCalls >= 5) return pull(HEAD, 'unstable', newBase);
+      return getPullCalls >= 4 ? pull(HEAD, 'unstable') : pull();
+    },
+    listIssueComments: async () => [...issueComments],
+    listReviews: async () => [],
+    listReviewComments: async () => [],
+    listCheckRuns: async () => {
+      checkCalls += 1;
+      return { check_runs: [successCheck()] };
+    },
+    getCombinedStatus: async () => ({ statuses: [vercelStatus] }),
+    listPullFiles: async () => [file],
+    updatePull: async () => pull(),
+    createIssueComment: async (_number, body) => {
+      const comment = { id: 400 + issueComments.length, body, created_at: '2026-08-23T00:03:00Z', user: { login: OWNER } };
+      issueComments.push(comment);
+      return comment;
+    },
+  };
+  const summary = await maintainAutoPulls({
+    token: 'pat', mergeToken: 'ephemeral', owner: OWNER, repo: REPO, api,
+    mergeApi: { mergePull: async () => { mergeCalls += 1; return { merged: true, sha: 'd'.repeat(40) }; } },
+    logger: silent, now: new Date('2026-08-23T00:02:00Z'),
+  });
+  assert.equal(getPullCalls, 5);
+  assert.equal(checkCalls, 4);
+  assert.equal(mergeCalls, 0);
+  assert.equal(summary.merged, 0);
+  assert.equal(summary.waiting, 1);
   assert.equal(summary.errors.length, 0);
 });
