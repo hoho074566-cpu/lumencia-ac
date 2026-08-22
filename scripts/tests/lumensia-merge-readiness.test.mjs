@@ -7,10 +7,13 @@ import {
   evaluateCodex,
   evaluateReadiness,
   hydratePulls,
+  isOpenPull,
+  newestAttempts,
   parseCodexSeverities,
   parseMachineState,
   plannedNotifications,
   recordDeliveredNotification,
+  reusableReadinessCheck,
   renderComment,
   renderCheckSummary,
 } from '../lumensia-merge-readiness.mjs';
@@ -257,4 +260,40 @@ test('Safety Gate and Vercel pass only on actual success conclusions', () => {
   ] });
   assert.equal(cancelled.safety, 'FAIL'); assert.equal(cancelled.vercel, 'FAIL');
   assert.equal(evaluateReadiness({ ...readyInput(), checks: cancelled }).state, 'BLOCKED');
+});
+
+test('Safety Gate and Vercel use only the newest logical check attempt', () => {
+  const app = { id: 7, name: 'GitHub Actions' };
+  const old = { head_sha: HEAD, conclusion: 'failure', completed_at: '2026-01-01T00:00:00Z', app };
+  const latest = { head_sha: HEAD, conclusion: 'success', completed_at: '2026-01-01T00:01:00Z', app };
+  const result = evaluateChecks({ head: HEAD, checkRuns: [
+    { ...old, id: 1, name: 'Repository checks' },
+    { ...latest, id: 2, name: 'Repository checks' },
+    { ...old, id: 3, name: 'Vercel', app: { id: 8, name: 'Vercel' } },
+    { ...latest, id: 4, name: 'Vercel', app: { id: 8, name: 'Vercel' } },
+  ] });
+  assert.equal(result.safety, 'PASS'); assert.equal(result.vercel, 'PASS');
+  assert.equal(newestAttempts([{ id: 1 }, { id: 2 }], () => 'same')[0].id, 2);
+});
+
+test('completed readiness check is recreated when state returns to waiting', () => {
+  const completed = { id: 99, status: 'completed', conclusion: 'success' };
+  assert.equal(reusableReadinessCheck(completed, 'WAITING'), undefined);
+  assert.equal(reusableReadinessCheck(completed, 'READY'), completed);
+  const active = { id: 100, status: 'in_progress', conclusion: null };
+  assert.equal(reusableReadinessCheck(active, 'WAITING'), active);
+});
+
+test('zero-open-PR discovery is a successful matrix no-op', () => {
+  const workflow = readFileSync(new URL('../../.github/workflows/lumensia-merge-readiness.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /has_pulls: \$\{\{ steps\.list\.outputs\.has_pulls \}\}/);
+  assert.match(workflow, /needs\.discover\.outputs\.has_pulls == 'true'/);
+  assert.match(workflow, /pulls\.data\.length > 0 \? 'true' : 'false'/);
+});
+
+test('closed or merged pulls are skipped before evaluation', () => {
+  assert.equal(isOpenPull({ state: 'open', merged_at: null }), true);
+  assert.equal(isOpenPull({ state: 'closed', merged_at: null }), false);
+  assert.equal(isOpenPull({ state: 'closed', merged_at: '2026-01-01T00:00:00Z' }), false);
+  assert.equal(isOpenPull({ state: 'open', merged: true, merged_at: '2026-01-01T00:00:00Z' }), false);
 });

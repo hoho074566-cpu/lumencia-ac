@@ -35,6 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       pulls: ${{ steps.list.outputs.result }}
+      has_pulls: ${{ steps.list.outputs.has_pulls }}
     steps:
       - name: List open pull request numbers
         id: list
@@ -47,11 +48,12 @@ jobs:
               state: 'open',
               per_page: 50,
             });
+            core.setOutput('has_pulls', pulls.data.length > 0 ? 'true' : 'false');
             return pulls.data.map((pull) => pull.number);
 
   evaluate-scan:
     needs: discover
-    if: needs.discover.result == 'success'
+    if: needs.discover.result == 'success' && needs.discover.outputs.has_pulls == 'true'
     strategy:
       matrix:
         pr: ${{ fromJSON(needs.discover.outputs.pulls) }}

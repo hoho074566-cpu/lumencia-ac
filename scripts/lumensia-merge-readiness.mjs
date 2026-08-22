@@ -62,11 +62,24 @@ function normalizeAuthoritativeCheck(check) {
   return conclusion === 'success' ? 'PASS' : conclusion && TERMINAL_FAILURES.has(conclusion) ? 'FAIL' : 'PENDING';
 }
 
+export function newestAttempts(items, identity) {
+  const newest = new Map();
+  for (const item of items) {
+    const key = identity(item);
+    const previous = newest.get(key);
+    const stamp = Date.parse(item.completed_at || item.updated_at || item.started_at || item.created_at || 0) || 0;
+    const previousStamp = previous ? Date.parse(previous.completed_at || previous.updated_at || previous.started_at || previous.created_at || 0) || 0 : -1;
+    if (!previous || stamp > previousStamp || stamp === previousStamp && Number(item.id || 0) > Number(previous.id || 0)) newest.set(key, item);
+  }
+  return [...newest.values()];
+}
+
 export function evaluateChecks({ head, checkRuns = [], statuses = [], requiredCheckNames = [] }) {
   const currentChecks = checkRuns.filter((check) => !check.head_sha || check.head_sha === head);
-  const safetyItems = currentChecks.filter((check) => /^(repository checks|lumensia pr safety gate)$/i.test(check.name));
-  const vercelChecks = currentChecks.filter((check) => /vercel/i.test(`${check.name} ${check.app?.name || ''}`));
-  const vercelStatuses = statuses.filter((status) => (!status.sha || status.sha === head) && /vercel/i.test(status.context || ''));
+  const checkIdentity = (check) => `${check.app?.id || check.app?.slug || check.app?.name || 'unknown'}:${check.name}`.toLowerCase();
+  const safetyItems = newestAttempts(currentChecks.filter((check) => /^(repository checks|lumensia pr safety gate)$/i.test(check.name)), checkIdentity);
+  const vercelChecks = newestAttempts(currentChecks.filter((check) => /vercel/i.test(`${check.name} ${check.app?.name || ''}`)), checkIdentity);
+  const vercelStatuses = newestAttempts(statuses.filter((status) => (!status.sha || status.sha === head) && /vercel/i.test(status.context || '')), (status) => status.context.toLowerCase());
   const summarize = (states, absent = 'PENDING') => states.length === 0 ? absent : states.some((state) => state === 'FAIL') ? 'FAIL' : states.some((state) => state === 'PENDING') ? 'PENDING' : 'PASS';
   const safety = summarize(safetyItems.map(normalizeAuthoritativeCheck));
   const vercel = summarize([
@@ -161,6 +174,14 @@ export async function hydratePulls(pulls, fetchPull) {
   return Promise.all(pulls.map((pull) => fetchPull(pull.number)));
 }
 
+export function isOpenPull(pull) {
+  return pull?.state === 'open' && !pull.merged && !pull.merged_at;
+}
+
+export function reusableReadinessCheck(check, readinessState) {
+  return readinessState === 'WAITING' && check?.status === 'completed' ? undefined : check;
+}
+
 async function evaluatePull(owner, repo, pr) {
   const head = pr.head.sha;
   const [reviews, comments, runs, combined, issueComments] = await Promise.all([
@@ -185,7 +206,10 @@ async function evaluatePull(owner, repo, pr) {
   const body = renderComment(result, notificationState);
   if (!priorComment) await github(`/repos/${owner}/${repo}/issues/${pr.number}/comments`, { method: 'POST', body: JSON.stringify({ body }) });
   else if (priorComment.body !== body) await github(`/repos/${owner}/${repo}/issues/comments/${priorComment.id}`, { method: 'PATCH', body: JSON.stringify({ body }) });
-  const existing = runs.check_runs.find((run) => run.name === 'Lumensia Merge Readiness' && run.head_sha === head);
+  const existing = reusableReadinessCheck(newestAttempts(
+    runs.check_runs.filter((run) => run.name === 'Lumensia Merge Readiness' && run.head_sha === head),
+    () => 'lumensia-merge-readiness',
+  )[0], readiness.state);
   const checkPayload = readiness.state === 'WAITING'
     ? { name: 'Lumensia Merge Readiness', head_sha: head, status: 'in_progress', output: { title: 'Waiting for current-head results', summary: renderCheckSummary(body) } }
     : { name: 'Lumensia Merge Readiness', head_sha: head, status: 'completed', conclusion: readiness.state === 'READY' ? 'success' : 'failure', output: { title: readiness.state === 'READY' ? 'Ready for manual merge' : 'Action required', summary: renderCheckSummary(body) } };
@@ -202,7 +226,10 @@ async function main() {
   const pulls = number
     ? [await github(`/repos/${owner}/${repo}/pulls/${number}`)]
     : await hydratePulls(await github(`/repos/${owner}/${repo}/pulls?state=open&per_page=50`), (pullNumber) => github(`/repos/${owner}/${repo}/pulls/${pullNumber}`));
-  for (const pull of pulls) await evaluatePull(owner, repo, pull);
+  for (const pull of pulls) {
+    if (!isOpenPull(pull)) { console.log(`PR #${pull.number} is no longer open; skipping.`); continue; }
+    await evaluatePull(owner, repo, pull);
+  }
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) main().catch((error) => { console.error(error.message); process.exitCode = 1; });
