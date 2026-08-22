@@ -463,9 +463,9 @@ async function evaluatePull(owner, repo, pr, event = {}) {
   const checkRequest = existing ? (({ head_sha: _head, ...update }) => update)(checkPayload) : checkPayload;
   await github(existing ? `/repos/${owner}/${repo}/check-runs/${existing.id}` : `/repos/${owner}/${repo}/check-runs`, { method: existing ? 'PATCH' : 'POST', body: JSON.stringify(checkRequest) });
 
-  for (const notificationEvent of notificationPhases.afterPublish) {
-    const delivery = await deliverDiscord(process.env.DISCORD_WEBHOOK_URL, discordMessage(notificationEvent, result));
-    if (delivery.delivered) notificationState = recordDeliveredNotification(notificationState, notificationEvent, result);
+  for (const event of notificationPhases.afterPublish) {
+    const delivery = await deliverDiscord(process.env.DISCORD_WEBHOOK_URL, discordMessage(event, result));
+    if (delivery.delivered) notificationState = recordDeliveredNotification(notificationState, event, result);
   }
   const deliveredBody = renderComment(result, notificationState);
   if (deliveredBody !== body) {
