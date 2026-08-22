@@ -34,25 +34,7 @@ export function makeTitle(branch, subject = '') {
 export function makeBody(branch, sha) {
   const safeBranch = cleanText(branch).replace(/`/g, "'");
   const safeSha = cleanText(sha).replace(/[^a-f0-9]/gi, '').slice(0, 40);
-  return `## Auto-created Lumensia PR
-
-This PR was created automatically from Codex branch:
-\`${safeBranch}\`
-
-HEAD:
-\`${safeSha.slice(0, 7)}\`
-
-Base:
-\`main\`
-
-### Automated pipeline
-
-After PR creation, Lumensia PR safety gate, Vercel, Codex Review, Lumensia Merge Readiness, and Discord notifications will evaluate the PR.
-
-Manual merge only. P0/P1 and failed authoritative checks block merge. P2/P3 are non-blocking by project policy.
-
-${AUTO_PR_MARKER}
-${DISCORD_PENDING_MARKER}`;
+  return `## Auto-created Lumensia PR\n\nThis PR was created automatically from Codex branch:\n\`${safeBranch}\`\n\nHEAD:\n\`${safeSha.slice(0, 7)}\`\n\nBase:\n\`main\`\n\n### Automated pipeline\n\nAfter PR creation, Lumensia PR safety gate, Vercel, Codex Review, Lumensia Merge Readiness, and Discord notifications will evaluate the PR.\n\nManual merge only. P0/P1 and failed authoritative checks block merge. P2/P3 are non-blocking by project policy.\n\n${AUTO_PR_MARKER}\n${DISCORD_PENDING_MARKER}`;
 }
 
 export function isAlreadyExistsError(error) {
@@ -83,39 +65,35 @@ function trustedCodexReviewRequests(comments = [], prNumber, trustedActor = '') 
       && (!actor || String(comment.user?.login || '').toLowerCase() === actor));
 }
 
-export function findLatestCodexReviewRequest(comments = [], prNumber, trustedActor = '') {
-  return trustedCodexReviewRequests(comments, prNumber, trustedActor)
-    .sort((left, right) => Number(right.comment.id || 0) - Number(left.comment.id || 0))[0] || null;
+export function sameCodexReviewTarget(request = {}, head = '', baseSha = '') {
+  return request.head === head && Boolean(request.baseSha) && request.baseSha === baseSha;
+}
+
+export function findLatestCodexReviewRequest(comments = [], prNumber, trustedActor = '', head = '', baseSha = '') {
+  const requests = trustedCodexReviewRequests(comments, prNumber, trustedActor)
+    .filter(({ request }) => !head || sameCodexReviewTarget(request, head, baseSha));
+  return requests.sort((left, right) => Number(right.comment.id || 0) - Number(left.comment.id || 0))[0] || null;
 }
 
 export function makeCodexReviewRequestBody({
   prNumber,
   head,
+  baseSha,
   generationKey,
   baselineReviewIds = [],
   baselineReviewCommentIds = [],
   baselineIssueCommentIds = [],
-  requireCycleEcho = false,
-  cycleToken = '',
 }) {
   const request = {
     pr: Number(prNumber),
     head: String(head || ''),
+    baseSha: String(baseSha || ''),
     generationKey: String(generationKey || ''),
     baselineReviewIds: baselineReviewIds.map(String),
     baselineReviewCommentIds: baselineReviewCommentIds.map(String),
     baselineIssueCommentIds: baselineIssueCommentIds.map(String),
-    requireCycleEcho: Boolean(requireCycleEcho),
-    cycleToken: requireCycleEcho ? String(cycleToken || '') : '',
   };
-  const echoInstruction = request.requireCycleEcho
-    ? `. In your final top-level review result, include this exact line: \`Lumensia-Review-Cycle: ${request.cycleToken}\``
-    : '';
-  return `<!-- ${CODEX_REVIEW_REQUEST_MARKER}
-${JSON.stringify(request)}
--->
-
-@codex review${echoInstruction}`;
+  return `<!-- ${CODEX_REVIEW_REQUEST_MARKER}\n${JSON.stringify(request)}\n-->\n\n@codex review`;
 }
 
 export function createGitHubClient({ token, owner, repo, fetchImpl = fetch }) {
@@ -208,9 +186,9 @@ export async function ensureCodexReviewRequest({ api, pull, owner, logger = cons
   }
 
   let issueComments = await api.listIssueComments(pull.number);
-  let latestRequest = findLatestCodexReviewRequest(issueComments, pull.number, owner);
-  if (latestRequest?.request?.head === pull.head.sha) {
-    return { created: false, reason: 'current', comment: latestRequest.comment, request: latestRequest.request };
+  let currentTargetRequest = findLatestCodexReviewRequest(issueComments, pull.number, owner, pull.head.sha, pull.base?.sha || '');
+  if (currentTargetRequest) {
+    return { created: false, reason: 'current', comment: currentTargetRequest.comment, request: currentTargetRequest.request };
   }
 
   const [currentPull, reviews, reviewComments, freshIssueComments] = await Promise.all([
@@ -222,29 +200,28 @@ export async function ensureCodexReviewRequest({ api, pull, owner, logger = cons
   if (currentPull?.state !== 'open' || currentPull?.draft || currentPull?.head?.sha !== pull.head.sha) {
     return { created: false, reason: 'race' };
   }
+  const baseSha = currentPull.base?.sha || pull.base?.sha || '';
+  if (!baseSha) return { created: false, reason: 'missing-base' };
 
   issueComments = freshIssueComments;
-  latestRequest = findLatestCodexReviewRequest(issueComments, pull.number, owner);
-  if (latestRequest?.request?.head === currentPull.head.sha) {
-    return { created: false, reason: 'current', comment: latestRequest.comment, request: latestRequest.request };
+  currentTargetRequest = findLatestCodexReviewRequest(issueComments, pull.number, owner, currentPull.head.sha, baseSha);
+  if (currentTargetRequest) {
+    return { created: false, reason: 'current', comment: currentTargetRequest.comment, request: currentTargetRequest.request };
   }
 
-  const priorRequests = trustedCodexReviewRequests(issueComments, pull.number, owner);
-  const repeatedHead = priorRequests.some(({ request }) => request.head === currentPull.head.sha);
+  const latestRequest = findLatestCodexReviewRequest(issueComments, pull.number, owner);
   const generationKey = `after-${latestRequest?.comment?.id || 0}`;
-  const cycleToken = `pr-${pull.number}-${generationKey}`;
   const body = makeCodexReviewRequestBody({
     prNumber: pull.number,
     head: currentPull.head.sha,
+    baseSha,
     generationKey,
     baselineReviewIds: reviews.map((review) => review.id),
     baselineReviewCommentIds: reviewComments.map((comment) => comment.id),
     baselineIssueCommentIds: issueComments.map((comment) => comment.id),
-    requireCycleEcho: repeatedHead,
-    cycleToken,
   });
   const comment = await api.createIssueComment(pull.number, body);
-  logger.log(`CODEX REVIEW REQUESTED: PR #${pull.number} ${currentPull.head.sha.slice(0, 7)} (${generationKey}${repeatedHead ? ', repeated-head echo required' : ''})`);
+  logger.log(`CODEX REVIEW REQUESTED: PR #${pull.number} ${currentPull.head.sha.slice(0, 7)} base ${baseSha.slice(0, 7)} (${generationKey})`);
   return {
     created: true,
     comment,
@@ -344,20 +321,8 @@ export async function scanAutoPulls({ token, owner, repo, api, webhook = '', now
 }
 
 export function logSummary(summary, logger = console) {
-  logger.log(`AUTO PR SCAN
-
-Branches scanned: ${summary.scanned}
-Eligible: ${summary.eligible}
-Skipped existing PR: ${summary.skipped.existing}
-Skipped stale: ${summary.skipped.stale}
-Skipped opt-out: ${summary.skipped.optOut}
-Codex review requests: ${summary.reviewRequests.length}
-Errors: ${summary.errors.length}`);
-  for (const pull of summary.created) logger.log(`
-CREATED:
-PR #${pull.number}
-${pull.branch}
-${pull.sha.slice(0, 7)}`);
+  logger.log(`AUTO PR SCAN\n\nBranches scanned: ${summary.scanned}\nEligible: ${summary.eligible}\nSkipped existing PR: ${summary.skipped.existing}\nSkipped stale: ${summary.skipped.stale}\nSkipped opt-out: ${summary.skipped.optOut}\nCodex review requests: ${summary.reviewRequests.length}\nErrors: ${summary.errors.length}`);
+  for (const pull of summary.created) logger.log(`\nCREATED:\nPR #${pull.number}\n${pull.branch}\n${pull.sha.slice(0, 7)}`);
 }
 
 async function main() {
