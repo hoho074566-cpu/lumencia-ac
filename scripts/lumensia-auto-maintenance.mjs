@@ -70,6 +70,7 @@ export function protectedMergeReason(path = '') {
   if (PROTECTED_EXACT_PATHS.has(normalized)) return 'core-or-config';
   if (/(^|\/)\.env[^/]*$/i.test(normalized) || /(^|\/)[^/]+\.env$/i.test(normalized)) return 'environment-config';
   if (lower.startsWith('.github/')) return 'automation';
+  if (lower.startsWith('scripts/tests/') && lower.endsWith('.test.mjs')) return 'automation-safety-test';
   if (lower.startsWith('scripts/lumensia-') || lower.startsWith('scripts/tests/lumensia-')) return 'automation';
   if (lower.startsWith('api/')) return 'api';
   if (/(^|\/)(?:auth|security|secrets?|tokens?)(?:[.\/_-]|$)/i.test(normalized)) return 'auth-security';
@@ -435,6 +436,19 @@ export async function maintainAutoPulls({
         else summary.waiting += 1;
         continue;
       }
+
+      const validatedHead = pull.head.sha;
+      const validatedBase = pull.base.sha;
+      const mergeCandidate = await api.getPull(pull.number);
+      if (!isAutoManagedPull(mergeCandidate, owner, repo)
+        || mergeCandidate.head?.sha !== validatedHead
+        || mergeCandidate.base?.sha !== validatedBase
+        || mergeCandidate.mergeable !== true
+        || mergeCandidate.mergeable_state !== 'clean') {
+        summary.waiting += 1;
+        continue;
+      }
+      pull = mergeCandidate;
 
       let result;
       try {
