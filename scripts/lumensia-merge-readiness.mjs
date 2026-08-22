@@ -48,7 +48,9 @@ export function reconcileCodexCleanReaction({ head, reactions = [], configuredAc
   if (!previous.headSha) {
     return { headSha: head, seenReactionIds: reactionIds, ...(headEventReactionId ? { reactionId: headEventReactionId } : {}) };
   }
-  if (previous.headSha !== head) return { headSha: head, seenReactionIds: reactionIds };
+  if (previous.headSha !== head) {
+    return { headSha: head, seenReactionIds: reactionIds, ...(headEventReactionId ? { reactionId: headEventReactionId } : {}) };
+  }
   const seen = new Set(Array.isArray(previous.seenReactionIds) ? previous.seenReactionIds.map(String) : []);
   const newReactionId = reactionIds.find((id) => !seen.has(id));
   const retainedReactionId = reactionIds.includes(String(previous.reactionId)) ? String(previous.reactionId) : undefined;

@@ -120,6 +120,42 @@ test('check-run baseline followed by synchronize recovers only the new-HEAD reac
   assert.equal(evaluateReview({ head: HEAD, cleanReaction: recovered }).state, 'PASS');
 });
 
+test('synchronize transition directly binds a trusted reaction created after new HEAD activation', () => {
+  const transitioned = reconcileCodexCleanReaction({
+    head: HEAD,
+    reactions: [reaction(2, 'trusted-codex[bot]', '2026-01-01T00:01:00Z')],
+    configuredActors: ACTORS,
+    previous: { headSha: 'old-head', seenReactionIds: ['1'], reactionId: '1' },
+    headActivatedAt: '2026-01-01T00:00:00Z',
+  });
+  assert.deepEqual(transitioned, { headSha: HEAD, seenReactionIds: ['2'], reactionId: '2' });
+  assert.equal(evaluateReview({ head: HEAD, cleanReaction: transitioned }).state, 'PASS');
+});
+
+test('synchronize transition rejects old-HEAD and untrusted reactions', () => {
+  const reactions = [
+    reaction(1, 'trusted-codex[bot]', '2025-12-31T23:59:00Z'),
+    reaction(2, 'ordinary-user', '2026-01-01T00:01:00Z'),
+  ];
+  const transitioned = reconcileCodexCleanReaction({
+    head: HEAD,
+    reactions,
+    configuredActors: ACTORS,
+    previous: { headSha: 'old-head', seenReactionIds: ['1'], reactionId: '1' },
+    headActivatedAt: '2026-01-01T00:00:00Z',
+  });
+  assert.deepEqual(transitioned, { headSha: HEAD, seenReactionIds: ['1'] });
+  assert.equal(evaluateReview({ head: HEAD, cleanReaction: transitioned }).state, 'PENDING');
+});
+
+test('scheduled scan preserves a synchronize-transition reaction binding', () => {
+  const reactions = [reaction(2, 'trusted-codex[bot]', '2026-01-01T00:01:00Z')];
+  const transitioned = reconcileCodexCleanReaction({ head: HEAD, reactions, configuredActors: ACTORS, previous: { headSha: 'old-head' }, headActivatedAt: '2026-01-01T00:00:00Z' });
+  const scheduled = reconcileCodexCleanReaction({ head: HEAD, reactions, configuredActors: ACTORS, previous: transitioned });
+  assert.deepEqual(scheduled, transitioned);
+  assert.equal(evaluateReview({ head: HEAD, cleanReaction: scheduled }).state, 'PASS');
+});
+
 test('opened-event race recovery still rejects untrusted reactions', () => {
   const baseline = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1, 'ordinary-user')], configuredActors: ACTORS });
   const attempted = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1, 'ordinary-user')], configuredActors: ACTORS, previous: baseline, headActivatedAt: '2026-01-01T00:00:00Z' });
