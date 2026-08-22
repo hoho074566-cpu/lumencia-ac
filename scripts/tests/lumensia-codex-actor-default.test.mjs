@@ -1,14 +1,16 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { isCodexActor } from '../lumensia-merge-readiness.mjs';
 
-test('official Codex connector actors are trusted without repo variable configuration', () => {
-  assert.equal(isCodexActor({ login: 'chatgpt-codex-connector[bot]' }, ''), true);
-  assert.equal(isCodexActor({ login: 'chatgpt-codex-connector' }, ''), true);
+const workflow = readFileSync(new URL('../../.github/workflows/lumensia-merge-readiness.yml', import.meta.url), 'utf8');
+
+test('Merge Readiness always supplies both official Codex connector actors', () => {
+  const expected = 'CODEX_ACTORS: ${{ vars.CODEX_REVIEW_ACTORS }},chatgpt-codex-connector[bot],chatgpt-codex-connector';
+  assert.equal(workflow.split(expected).length - 1, 2);
 });
 
-test('configured actors extend built-in Codex actors without broad matching', () => {
-  assert.equal(isCodexActor({ login: 'trusted-codex[bot]' }, 'trusted-codex[bot]'), true);
-  assert.equal(isCodexActor({ login: 'helpful-codex-reviewer' }, ''), false);
-  assert.equal(isCodexActor({ login: 'chatgpt-codex-connector-evil' }, ''), false);
+test('issue-comment runner gate remains exact for official Codex actors', () => {
+  assert.match(workflow, /github\.actor == 'chatgpt-codex-connector\[bot\]'/);
+  assert.match(workflow, /github\.actor == 'chatgpt-codex-connector'/);
+  assert.doesNotMatch(workflow, /startsWith\(github\.actor, 'chatgpt-codex-connector'/);
 });
