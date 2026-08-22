@@ -6,6 +6,7 @@ export const AUTO_PR_MARKER = '<!-- lumensia-auto-pr:v1 -->';
 export const DISCORD_PENDING_MARKER = '<!-- lumensia-auto-pr-discord:pending -->';
 export const DISCORD_DELIVERED_MARKER = '<!-- lumensia-auto-pr-discord:delivered -->';
 export const CODEX_REVIEW_REQUEST_MARKER = 'lumensia-codex-review-request:v4';
+const DEFAULT_CODEX_ACTORS = ['chatgpt-codex-connector[bot]', 'chatgpt-codex-connector'];
 
 export function isCandidateBranch(name, defaultBranch = 'main') {
   return typeof name === 'string'
@@ -73,6 +74,42 @@ export function findLatestCodexReviewRequest(comments = [], prNumber, trustedAct
   const requests = trustedCodexReviewRequests(comments, prNumber, trustedActor)
     .filter(({ request }) => !head || sameCodexReviewTarget(request, head, baseSha));
   return requests.sort((left, right) => Number(right.comment.id || 0) - Number(left.comment.id || 0))[0] || null;
+}
+
+function codexActorAllowed(user = {}, configuredActors = '') {
+  const configured = String(configuredActors || '').split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
+  const allowed = new Set([...DEFAULT_CODEX_ACTORS, ...configured]);
+  return allowed.has(String(user.login || '').toLowerCase());
+}
+
+function codexReviewedCommit(body = '') {
+  const match = String(body).match(/\*\*Reviewed commit:\*\*\s*`([a-f0-9]{7,40})`/i)
+    || String(body).match(/Reviewed commit:\s*`([a-f0-9]{7,40})`/i);
+  return match?.[1]?.toLowerCase() || '';
+}
+
+function afterRequest(value, requestCreatedAt = '') {
+  const requestTime = Date.parse(requestCreatedAt);
+  const resultTime = Date.parse(value);
+  return Number.isFinite(requestTime) && Number.isFinite(resultTime) && resultTime > requestTime;
+}
+
+export function hasCodexCompletionForRequest({ requestEntry, reviews = [], issueComments = [], configuredActors = '' }) {
+  if (!requestEntry?.request?.head || !requestEntry?.comment?.created_at) return false;
+  const head = String(requestEntry.request.head).toLowerCase();
+  const requestCreatedAt = requestEntry.comment.created_at;
+  const reviewComplete = reviews.some((review) => String(review.commit_id || '').toLowerCase() === head
+    && review.submitted_at
+    && review.state?.toUpperCase() !== 'DISMISSED'
+    && codexActorAllowed(review.user, configuredActors)
+    && afterRequest(review.submitted_at, requestCreatedAt));
+  if (reviewComplete) return true;
+  return issueComments.some((comment) => {
+    if (!codexActorAllowed(comment.user, configuredActors)) return false;
+    if (!afterRequest(comment.created_at || comment.updated_at, requestCreatedAt)) return false;
+    const reviewed = codexReviewedCommit(comment.body);
+    return Boolean(reviewed) && head.startsWith(reviewed);
+  });
 }
 
 export function makeCodexReviewRequestBody({
@@ -177,7 +214,7 @@ async function notifyCreatedPull({ api, webhook, pull, branch, sha, fetchImpl, l
   return { retried: true, delivered: true };
 }
 
-export async function ensureCodexReviewRequest({ api, pull, owner, logger = console }) {
+export async function ensureCodexReviewRequest({ api, pull, owner, logger = console, configuredActors = '' }) {
   if (!pull || pull.state !== 'open' || pull.draft || !pull.head?.sha) {
     return { created: false, reason: 'ineligible' };
   }
@@ -210,6 +247,20 @@ export async function ensureCodexReviewRequest({ api, pull, owner, logger = cons
     return { created: false, reason: 'current', comment: currentTargetRequest.comment, request: currentTargetRequest.request };
   }
 
+  const priorSameHeadTargets = trustedCodexReviewRequests(issueComments, pull.number, owner)
+    .filter(({ request }) => request.head === currentPull.head.sha && request.baseSha !== baseSha)
+    .sort((left, right) => Number(right.comment.id || 0) - Number(left.comment.id || 0));
+  const unfinishedPrior = priorSameHeadTargets.find((entry) => !hasCodexCompletionForRequest({
+    requestEntry: entry,
+    reviews,
+    issueComments,
+    configuredActors,
+  }));
+  if (unfinishedPrior) {
+    logger.log(`CODEX REVIEW DEFERRED: PR #${pull.number} ${currentPull.head.sha.slice(0, 7)} base ${baseSha.slice(0, 7)}; prior same-head target is still running.`);
+    return { created: false, reason: 'prior-same-head-pending', request: unfinishedPrior.request, comment: unfinishedPrior.comment };
+  }
+
   const latestRequest = findLatestCodexReviewRequest(issueComments, pull.number, owner);
   const generationKey = `after-${latestRequest?.comment?.id || 0}`;
   const body = makeCodexReviewRequestBody({
@@ -230,14 +281,14 @@ export async function ensureCodexReviewRequest({ api, pull, owner, logger = cons
   };
 }
 
-export async function reconcileOpenPullReviewRequests({ api, owner, summary, logger = console }) {
+export async function reconcileOpenPullReviewRequests({ api, owner, summary, logger = console, configuredActors = '' }) {
   if (typeof api?.listOpenPulls !== 'function') return { scanned: 0, created: 0 };
   const pulls = await api.listOpenPulls();
   let created = 0;
   for (const pull of pulls) {
     if (!pull || pull.state !== 'open') continue;
     try {
-      const request = await ensureCodexReviewRequest({ api, pull, owner, logger });
+      const request = await ensureCodexReviewRequest({ api, pull, owner, logger, configuredActors });
       if (!request.created) continue;
       created += 1;
       const entry = {
@@ -270,7 +321,7 @@ function initialSummary() {
   };
 }
 
-export async function scanAutoPulls({ token, owner, repo, api, webhook = '', now = new Date(), freshnessHours = DEFAULT_FRESHNESS_HOURS, logger = console, discordFetch = fetch }) {
+export async function scanAutoPulls({ token, owner, repo, api, webhook = '', now = new Date(), freshnessHours = DEFAULT_FRESHNESS_HOURS, logger = console, discordFetch = fetch, configuredActors = '' }) {
   const summary = initialSummary();
   if (!token) {
     summary.disabled = true;
@@ -301,7 +352,7 @@ export async function scanAutoPulls({ token, owner, repo, api, webhook = '', now
         const retryPull = existingPulls.find((pull) => pull.state === 'open' && pull.body?.includes(AUTO_PR_MARKER) && pull.body.includes(DISCORD_PENDING_MARKER));
         if (retryPull) await notifyCreatedPull({ api, webhook, pull: retryPull, branch, sha: retryPull.head?.sha || '', fetchImpl: discordFetch, logger });
         if (openPull) {
-          const request = await ensureCodexReviewRequest({ api, pull: openPull, owner, logger });
+          const request = await ensureCodexReviewRequest({ api, pull: openPull, owner, logger, configuredActors });
           if (request.created) summary.reviewRequests.push({ number: openPull.number, branch, sha: openPull.head?.sha || '', commentId: request.comment?.id || null });
         }
         summary.skipped.existing += 1;
@@ -334,7 +385,7 @@ export async function scanAutoPulls({ token, owner, repo, api, webhook = '', now
       pull = { ...pull, title, body: pull.body || makeBody(branch, sha) };
       summary.created.push({ number: pull.number, branch, sha, url: pull.html_url });
       await notifyCreatedPull({ api, webhook, pull, branch, sha, fetchImpl: discordFetch, logger });
-      const request = await ensureCodexReviewRequest({ api, pull, owner, logger });
+      const request = await ensureCodexReviewRequest({ api, pull, owner, logger, configuredActors });
       if (request.created) summary.reviewRequests.push({ number: pull.number, branch, sha: pull.head?.sha || sha, commentId: request.comment?.id || null });
     } catch (error) {
       if ([401, 403].includes(error?.status)) {
@@ -348,7 +399,7 @@ export async function scanAutoPulls({ token, owner, repo, api, webhook = '', now
   }
 
   try {
-    await reconcileOpenPullReviewRequests({ api, owner, summary, logger });
+    await reconcileOpenPullReviewRequests({ api, owner, summary, logger, configuredActors });
   } catch (error) {
     if ([401, 403].includes(error?.status)) {
       logger.error('AUTO PR DISABLED / TOKEN PERMISSION ERROR');
@@ -372,7 +423,15 @@ async function main() {
   if (!owner || !repo) throw new Error('GITHUB_REPOSITORY must be set to owner/repository.');
   const freshnessHours = Number(process.env.LUMENSIA_AUTO_PR_FRESHNESS_HOURS || DEFAULT_FRESHNESS_HOURS);
   const api = createGitHubClient({ token, owner, repo });
-  const summary = await scanAutoPulls({ token, owner, repo, api, webhook: process.env.DISCORD_WEBHOOK_URL || '', freshnessHours: Number.isFinite(freshnessHours) && freshnessHours > 0 ? freshnessHours : DEFAULT_FRESHNESS_HOURS });
+  const summary = await scanAutoPulls({
+    token,
+    owner,
+    repo,
+    api,
+    webhook: process.env.DISCORD_WEBHOOK_URL || '',
+    freshnessHours: Number.isFinite(freshnessHours) && freshnessHours > 0 ? freshnessHours : DEFAULT_FRESHNESS_HOURS,
+    configuredActors: process.env.CODEX_ACTORS || '',
+  });
   logSummary(summary);
   if (summary.errors.length) process.exitCode = 1;
 }
