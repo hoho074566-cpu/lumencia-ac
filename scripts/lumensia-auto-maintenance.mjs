@@ -26,6 +26,7 @@ const PROTECTED_EXACT_PATHS = new Set([
   'app.js',
   'app-runtime.js',
   'lib/event-progress.js',
+  'lib/scene-continuity.js',
   'sw.js',
   'index.html',
   'vercel.json',
@@ -73,6 +74,7 @@ export function protectedMergeReason(path = '') {
   const normalized = String(path || '').replace(/^\.\//, '');
   const lower = normalized.toLowerCase();
   if (PROTECTED_EXACT_PATHS.has(normalized)) return 'core-or-config';
+  if (/(^|\/)AGENTS\.md$/i.test(normalized)) return 'automation-policy';
   if (/(^|\/)\.env[^/]*$/i.test(normalized) || /(^|\/)[^/]+\.env$/i.test(normalized)) return 'environment-config';
   if (lower.startsWith('.github/')) return 'automation';
   if (lower.startsWith('scripts/tests/') && lower.endsWith('.test.mjs')) return 'automation-safety-test';
