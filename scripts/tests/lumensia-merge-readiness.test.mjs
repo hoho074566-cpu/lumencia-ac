@@ -6,7 +6,9 @@ import {
   deliverDiscord,
   evaluateChecks,
   evaluateCodex,
-  reconcileCodexCleanReaction,
+  codexReviewCycle,
+  codexReviewRequestMarker,
+  ensureCodexReviewRequest,
   evaluateReadiness,
   findReadinessCheck,
   hydratePulls,
@@ -61,159 +63,72 @@ test('new head without a current review waits', () => {
 
 test('clean current review passes', () => assert.equal(evaluateReview({ head: HEAD, reviews: [review(HEAD)] }).state, 'PASS'));
 
-test('trusted clean reaction before the first evaluator snapshot passes', () => {
-  const cleanReaction = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1)], configuredActors: ACTORS, headActivatedAt: '2026-01-01T00:00:00Z' });
-  assert.deepEqual(cleanReaction, { headSha: HEAD, seenReactionIds: ['1'], reactionId: '1' });
-  assert.equal(evaluateReview({ head: HEAD, cleanReaction }).state, 'PASS');
-});
-
-test('initial clean reaction remains bound without duplicate processing on later scans', () => {
-  const initial = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1)], configuredActors: ACTORS, headActivatedAt: '2026-01-01T00:00:00Z' });
-  const repeated = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1)], configuredActors: ACTORS, previous: initial });
-  assert.deepEqual(repeated, initial);
-  assert.equal(evaluateReview({ head: HEAD, cleanReaction: repeated }).state, 'PASS');
-});
-
-test('newly observed trusted Codex clean signal explicitly bound to current HEAD passes', () => {
-  const cleanReaction = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(2)], configuredActors: ACTORS, previous: { headSha: HEAD, seenReactionIds: ['1'] } });
-  const result = evaluateReview({ head: HEAD, cleanReaction });
+test('HEAD A request reaction passes only through its scoped request', () => {
+  const result = evaluateReview({ head: 'head-a', requestReactions: [reaction(1)] });
   assert.equal(result.state, 'PASS');
-  assert.equal(cleanReaction.reactionId, '2');
 });
 
-test('arbitrary user clean reaction remains pending', () => {
-  const cleanReaction = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1, 'ordinary-user')], configuredActors: ACTORS, headActivatedAt: '2026-01-01T00:00:00Z' });
-  const result = evaluateReview({ head: HEAD, cleanReaction });
-  assert.equal(result.state, 'PENDING');
+test('HEAD A request reaction cannot satisfy HEAD B request', () => {
+  assert.equal(evaluateReview({ head: 'head-a', requestReactions: [reaction(1)] }).state, 'PASS');
+  assert.equal(evaluateReview({ head: 'head-b', requestReactions: [] }).state, 'PENDING');
+  assert.equal(evaluateReview({ head: 'head-b', requestReactions: [reaction(2)] }).state, 'PASS');
 });
 
-test('ambiguous old reaction without stored HEAD is baselined and remains pending', () => {
-  const cleanReaction = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1)], configuredActors: ACTORS });
-  assert.deepEqual(cleanReaction, { headSha: HEAD, seenReactionIds: ['1'] });
-  assert.equal(evaluateReview({ head: HEAD, cleanReaction }).state, 'PENDING');
+test('A to B to A transition creates a new request cycle and cannot resurrect old completion', () => {
+  const a1 = { codexReviewRequest: { headSha: 'head-a', cycle: 1, commentId: 10 } };
+  assert.equal(codexReviewCycle(a1, 'head-a'), 1);
+  const bCycle = codexReviewCycle(a1, 'head-b');
+  assert.equal(bCycle, 2);
+  const b = { codexReviewRequest: { headSha: 'head-b', cycle: bCycle, commentId: 11 } };
+  const a2Cycle = codexReviewCycle(b, 'head-a');
+  assert.equal(a2Cycle, 3);
+  assert.notEqual(codexReviewRequestMarker('head-a', 1), codexReviewRequestMarker('head-a', a2Cycle));
+  assert.equal(evaluateReview({ head: 'head-a', requestReactions: [] }).state, 'PENDING');
 });
 
-test('check-run baseline followed by opened event recovers same-HEAD clean reaction', () => {
-  const baseline = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1)], configuredActors: ACTORS });
-  const recovered = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1)], configuredActors: ACTORS, previous: baseline, headActivatedAt: '2026-01-01T00:00:00Z' });
-  assert.deepEqual(recovered, { headSha: HEAD, seenReactionIds: ['1'], reactionId: '1' });
-  assert.equal(evaluateReview({ head: HEAD, cleanReaction: recovered }).state, 'PASS');
+test('untrusted reaction on current HEAD request remains pending', () => {
+  assert.equal(evaluateReview({ head: HEAD, requestReactions: [reaction(1, 'ordinary-user')] }).state, 'PENDING');
 });
 
-test('synchronize event cannot recover a prior-HEAD reaction from before activation', () => {
-  const oldReaction = reaction(1, 'trusted-codex[bot]', '2025-12-31T23:59:00Z');
-  const transitioned = reconcileCodexCleanReaction({ head: HEAD, reactions: [oldReaction], configuredActors: ACTORS, previous: { headSha: 'old-head', seenReactionIds: ['1'], reactionId: '1' } });
-  const attempted = reconcileCodexCleanReaction({ head: HEAD, reactions: [oldReaction], configuredActors: ACTORS, previous: transitioned, headActivatedAt: '2026-01-01T00:00:00Z' });
-  assert.deepEqual(attempted, { headSha: HEAD, seenReactionIds: ['1'] });
-  assert.equal(evaluateReview({ head: HEAD, cleanReaction: attempted }).state, 'PENDING');
+test('reaction removal before READY revalidation returns Codex to pending', () => {
+  assert.equal(evaluateReview({ head: HEAD, requestReactions: [reaction(1)] }).state, 'PASS');
+  const revalidated = evaluateReview({ head: HEAD, requestReactions: [] });
+  assert.equal(revalidated.state, 'PENDING');
+  assert.equal(evaluateReadiness({ ...readyInput(), codex: revalidated }).state, 'WAITING');
 });
 
-test('check-run baseline followed by synchronize recovers only the new-HEAD reaction', () => {
-  const reactions = [
-    reaction(1, 'trusted-codex[bot]', '2025-12-31T23:59:00Z'),
-    reaction(2, 'trusted-codex[bot]', '2026-01-01T00:01:00Z'),
-  ];
-  const baseline = reconcileCodexCleanReaction({ head: HEAD, reactions, configuredActors: ACTORS, previous: { headSha: 'old-head', seenReactionIds: ['1'], reactionId: '1' } });
-  assert.deepEqual(baseline, { headSha: HEAD, seenReactionIds: ['1', '2'] });
-  const recovered = reconcileCodexCleanReaction({ head: HEAD, reactions, configuredActors: ACTORS, previous: baseline, headActivatedAt: '2026-01-01T00:00:00Z' });
-  assert.equal(recovered.reactionId, '2');
-  assert.equal(evaluateReview({ head: HEAD, cleanReaction: recovered }).state, 'PASS');
-});
-
-test('synchronize transition directly binds a trusted reaction created after new HEAD activation', () => {
-  const transitioned = reconcileCodexCleanReaction({
-    head: HEAD,
-    reactions: [reaction(2, 'trusted-codex[bot]', '2026-01-01T00:01:00Z')],
-    configuredActors: ACTORS,
-    previous: { headSha: 'old-head', seenReactionIds: ['1'], reactionId: '1' },
-    headActivatedAt: '2026-01-01T00:00:00Z',
-  });
-  assert.deepEqual(transitioned, { headSha: HEAD, seenReactionIds: ['2'], reactionId: '2' });
-  assert.equal(evaluateReview({ head: HEAD, cleanReaction: transitioned }).state, 'PASS');
-});
-
-test('synchronize transition rejects old-HEAD and untrusted reactions', () => {
-  const reactions = [
-    reaction(1, 'trusted-codex[bot]', '2025-12-31T23:59:00Z'),
-    reaction(2, 'ordinary-user', '2026-01-01T00:01:00Z'),
-  ];
-  const transitioned = reconcileCodexCleanReaction({
-    head: HEAD,
-    reactions,
-    configuredActors: ACTORS,
-    previous: { headSha: 'old-head', seenReactionIds: ['1'], reactionId: '1' },
-    headActivatedAt: '2026-01-01T00:00:00Z',
-  });
-  assert.deepEqual(transitioned, { headSha: HEAD, seenReactionIds: ['1'] });
-  assert.equal(evaluateReview({ head: HEAD, cleanReaction: transitioned }).state, 'PENDING');
-});
-
-test('same-second old-HEAD reaction is ambiguous and cannot satisfy synchronize', () => {
-  const sameSecond = reaction(1, 'trusted-codex[bot]', '2026-01-01T00:00:00Z');
-  const transitioned = reconcileCodexCleanReaction({ head: HEAD, reactions: [sameSecond], configuredActors: ACTORS, previous: { headSha: 'old-head', reactionId: '1' }, headActivatedAt: '2026-01-01T00:00:00Z' });
-  assert.deepEqual(transitioned, { headSha: HEAD, seenReactionIds: ['1'] });
-  assert.equal(evaluateReview({ head: HEAD, cleanReaction: transitioned }).state, 'PENDING');
-});
-
-test('equal-timestamp reaction remains pending until a later valid clean signal arrives', () => {
-  const sameSecond = reaction(1, 'trusted-codex[bot]', '2026-01-01T00:00:00Z');
-  const transitioned = reconcileCodexCleanReaction({ head: HEAD, reactions: [sameSecond], configuredActors: ACTORS, previous: { headSha: 'old-head' }, headActivatedAt: '2026-01-01T00:00:00Z' });
-  assert.equal(evaluateReview({ head: HEAD, cleanReaction: transitioned }).state, 'PENDING');
-  const laterReactions = [sameSecond, reaction(2, 'trusted-codex[bot]', '2026-01-01T00:00:01Z')];
-  const resolved = reconcileCodexCleanReaction({ head: HEAD, reactions: laterReactions, configuredActors: ACTORS, previous: transitioned });
-  assert.equal(resolved.reactionId, '2');
-  assert.equal(evaluateReview({ head: HEAD, cleanReaction: resolved }).state, 'PASS');
-});
-
-test('scheduled scan preserves a synchronize-transition reaction binding', () => {
-  const reactions = [reaction(2, 'trusted-codex[bot]', '2026-01-01T00:01:00Z')];
-  const transitioned = reconcileCodexCleanReaction({ head: HEAD, reactions, configuredActors: ACTORS, previous: { headSha: 'old-head' }, headActivatedAt: '2026-01-01T00:00:00Z' });
-  const scheduled = reconcileCodexCleanReaction({ head: HEAD, reactions, configuredActors: ACTORS, previous: transitioned });
-  assert.deepEqual(scheduled, transitioned);
-  assert.equal(evaluateReview({ head: HEAD, cleanReaction: scheduled }).state, 'PASS');
-});
-
-test('opened-event race recovery still rejects untrusted reactions', () => {
-  const baseline = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1, 'ordinary-user')], configuredActors: ACTORS });
-  const attempted = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1, 'ordinary-user')], configuredActors: ACTORS, previous: baseline, headActivatedAt: '2026-01-01T00:00:00Z' });
-  assert.equal(evaluateReview({ head: HEAD, cleanReaction: attempted }).state, 'PENDING');
-});
-
-test('scheduled scans preserve an opened-event recovered binding', () => {
-  const baseline = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1)], configuredActors: ACTORS });
-  const recovered = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1)], configuredActors: ACTORS, previous: baseline, headActivatedAt: '2026-01-01T00:00:00Z' });
-  const scheduled = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1)], configuredActors: ACTORS, previous: recovered });
-  assert.deepEqual(scheduled, recovered);
-  assert.equal(evaluateReview({ head: HEAD, cleanReaction: scheduled }).state, 'PASS');
-});
-
-test('new HEAD with an already-existing old reaction remains pending', () => {
-  const cleanReaction = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1)], configuredActors: ACTORS, previous: { headSha: 'old-head', seenReactionIds: [], reactionId: '1' } });
-  const result = evaluateReview({ head: HEAD, cleanReaction });
-  assert.equal(result.state, 'PENDING');
-  assert.deepEqual(cleanReaction, { headSha: HEAD, seenReactionIds: ['1'] });
-});
-
-test('stale reaction remains pending when force-pushed back to an older existing SHA', () => {
-  const cleanReaction = reconcileCodexCleanReaction({ head: 'previously-reviewed-sha', reactions: [reaction(1)], configuredActors: ACTORS, previous: { headSha: 'newer-sha', seenReactionIds: ['1'] } });
-  assert.equal(evaluateReview({ head: 'previously-reviewed-sha', cleanReaction }).state, 'PENDING');
-});
-
-test('current-head P1 blocks even when a trusted clean reaction exists', () => {
-  const result = evaluateReview({ head: HEAD, reviews: [review(HEAD, 'P1: blocking finding')], cleanReaction: { headSha: HEAD, reactionId: '1' } });
+test('current-head P1 blocks even with trusted request reaction', () => {
+  const result = evaluateReview({ head: HEAD, reviews: [review(HEAD, 'P1: blocking finding')], requestReactions: [reaction(1)] });
   assert.equal(result.state, 'BLOCK');
   assert.equal(result.P1, 1);
 });
 
-test('current-head P2-only review passes with clean reaction support enabled', () => {
-  const result = evaluateReview({ head: HEAD, reviews: [review(HEAD, 'P2: non-blocking suggestion')], cleanReaction: { headSha: HEAD, reactionId: '1' } });
+test('current-head P2-only review remains non-blocking', () => {
+  const result = evaluateReview({ head: HEAD, reviews: [review(HEAD, 'P2: non-blocking suggestion')], requestReactions: [reaction(1)] });
   assert.equal(result.state, 'PASS');
   assert.equal(result.P2, 1);
 });
 
-test('prior-head clean association never satisfies a new HEAD', () => {
-  const result = evaluateReview({ head: HEAD, cleanReaction: { headSha: 'old-head', reactionId: '1' } });
-  assert.equal(result.state, 'PENDING');
+test('duplicate evaluator runs reuse one HEAD-scoped Codex request comment', async () => {
+  const comments = [];
+  let creates = 0;
+  const args = {
+    head: HEAD,
+    cycle: 1,
+    refreshComments: async () => comments,
+    createComment: async (body) => {
+      creates += 1;
+      const created = { id: 99, body, user: { login: 'github-actions[bot]' } };
+      comments.push(created);
+      return created;
+    },
+  };
+  const first = await ensureCodexReviewRequest({ ...args, comments });
+  const second = await ensureCodexReviewRequest({ ...args, comments });
+  assert.equal(creates, 1);
+  assert.equal(first.id, second.id);
+  assert.match(first.body, /@codex review/);
+  assert.match(first.body, new RegExp(codexReviewRequestMarker(HEAD, 1)));
 });
 
 test('old Vercel success cannot satisfy a new head', () => {

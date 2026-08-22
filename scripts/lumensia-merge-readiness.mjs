@@ -37,35 +37,32 @@ export function parseCodexSeverities(body = '') {
   return counts;
 }
 
-export function reconcileCodexCleanReaction({ head, reactions = [], configuredActors = '', previous = {}, headActivatedAt }) {
-  const trustedReactions = reactions.filter((reaction) => reaction.content === '+1' && reaction.id != null && isCodexActor(reaction.user, configuredActors));
-  const reactionIds = trustedReactions.map((reaction) => String(reaction.id));
-  const activationTimestamp = Date.parse(headActivatedAt);
-  const eventReactionId = Number.isFinite(activationTimestamp)
-    ? trustedReactions.filter((reaction) => (Date.parse(reaction.created_at) || 0) > activationTimestamp).at(-1)?.id
-    : undefined;
-  const headEventReactionId = eventReactionId != null ? String(eventReactionId) : undefined;
-  if (!previous.headSha) {
-    return { headSha: head, seenReactionIds: reactionIds, ...(headEventReactionId ? { reactionId: headEventReactionId } : {}) };
-  }
-  if (previous.headSha !== head) {
-    return { headSha: head, seenReactionIds: reactionIds, ...(headEventReactionId ? { reactionId: headEventReactionId } : {}) };
-  }
-  const seen = new Set(Array.isArray(previous.seenReactionIds) ? previous.seenReactionIds.map(String) : []);
-  const newReactionId = reactionIds.find((id) => !seen.has(id));
-  const retainedReactionId = reactionIds.includes(String(previous.reactionId)) ? String(previous.reactionId) : undefined;
-  return {
-    headSha: head,
-    seenReactionIds: [...new Set([...seen, ...reactionIds])],
-    ...(retainedReactionId || headEventReactionId || newReactionId ? { reactionId: retainedReactionId || headEventReactionId || newReactionId } : {}),
-  };
+export function codexReviewRequestMarker(head, cycle) {
+  return `<!-- lumensia-codex-review-request:${head}:${cycle} -->`;
 }
 
-export function evaluateCodex({ head, reviews = [], comments = [], cleanReaction, configuredActors = '' }) {
+export function findCodexReviewRequest(comments = [], head, cycle) {
+  const marker = codexReviewRequestMarker(head, cycle);
+  return comments.find((comment) => comment.body?.includes(marker) && /github-actions\[bot\]/i.test(comment.user?.login || ''));
+}
+
+export function codexReviewCycle(storedState = {}, head) {
+  if (storedState.codexReviewRequest?.headSha === head) return storedState.codexReviewRequest.cycle;
+  return Number(storedState.codexReviewRequest?.cycle || 0) + 1;
+}
+
+export async function ensureCodexReviewRequest({ comments = [], head, cycle, refreshComments, createComment }) {
+  let request = findCodexReviewRequest(comments, head, cycle);
+  if (!request) request = findCodexReviewRequest(await refreshComments(), head, cycle);
+  if (request) return request;
+  return createComment(`${codexReviewRequestMarker(head, cycle)}\n@codex review`);
+}
+
+export function evaluateCodex({ head, reviews = [], comments = [], requestReactions = [], configuredActors = '' }) {
   const trustedReviews = reviews.filter((review) => isCodexActor(review.user, configuredActors));
   const currentReviews = trustedReviews.filter((review) => review.commit_id === head && review.submitted_at && review.state?.toUpperCase() !== 'DISMISSED');
   if (currentReviews.length === 0) {
-    const trustedCleanReaction = cleanReaction?.headSha === head && cleanReaction.reactionId != null;
+    const trustedCleanReaction = requestReactions.some((reaction) => reaction.content === '+1' && isCodexActor(reaction.user, configuredActors));
     return { state: trustedCleanReaction ? 'PASS' : 'PENDING', P0: 0, P1: 0, P2: 0, P3: 0, unknown: 0 };
   }
   const latestReview = currentReviews.reduce((latest, review) => {
@@ -258,31 +255,47 @@ export function findReadinessCheck(checkRuns, prNumber, head) {
 
 async function evaluatePull(owner, repo, pr, event = {}) {
   const head = pr.head.sha;
-  const [reviews, comments, reactions, runs, combined, issueComments] = await Promise.all([
+  let [reviews, comments, runs, combined, issueComments] = await Promise.all([
     github(`/repos/${owner}/${repo}/pulls/${pr.number}/reviews?per_page=100`),
     github(`/repos/${owner}/${repo}/pulls/${pr.number}/comments?per_page=100`),
-    github(`/repos/${owner}/${repo}/issues/${pr.number}/reactions?per_page=100`),
     github(`/repos/${owner}/${repo}/commits/${head}/check-runs?per_page=100`),
     github(`/repos/${owner}/${repo}/commits/${head}/status`),
     github(`/repos/${owner}/${repo}/issues/${pr.number}/comments?per_page=100`),
   ]);
+  let currentPr = await github(`/repos/${owner}/${repo}/pulls/${pr.number}`);
+  if (!isCurrentPull(pr, currentPr)) { console.log(`PR #${pr.number} changed or closed during evaluation; skipping mutations.`); return; }
   const priorComment = issueComments.find((comment) => comment.body?.includes(MARKER) && /github-actions\[bot\]/i.test(comment.user?.login || ''));
   const storedState = decodeMachineState(priorComment?.body);
   const priorState = storedState.head === head ? storedState : { head };
-  const headEventForCurrentHead = ['opened', 'synchronize'].includes(event.action) && event.pull_request?.head?.sha === head;
-  const headActivatedAt = headEventForCurrentHead ? event.pull_request.updated_at || event.pull_request.created_at : undefined;
-  const codexCleanReaction = reconcileCodexCleanReaction({ head, reactions, configuredActors: process.env.CODEX_ACTORS, previous: storedState.codexCleanReaction, headActivatedAt });
-  const codex = evaluateCodex({ head, reviews, comments, cleanReaction: codexCleanReaction, configuredActors: process.env.CODEX_ACTORS });
+  const cycle = codexReviewCycle(storedState, head);
+  const reviewRequest = await ensureCodexReviewRequest({
+    comments: issueComments,
+    head,
+    cycle,
+    refreshComments: () => github(`/repos/${owner}/${repo}/issues/${pr.number}/comments?per_page=100`),
+    createComment: (body) => github(`/repos/${owner}/${repo}/issues/${pr.number}/comments`, { method: 'POST', body: JSON.stringify({ body }) }),
+  });
+  let requestReactions = await github(`/repos/${owner}/${repo}/issues/comments/${reviewRequest.id}/reactions?per_page=100`);
+  let codex = evaluateCodex({ head, reviews, comments, requestReactions, configuredActors: process.env.CODEX_ACTORS });
   const requiredCheckNames = (process.env.REQUIRED_CHECKS || '').split(',');
   const checkRuns = applyCheckRunTransition(runs.check_runs, event, head);
   const checks = evaluateChecks({ head, baseSha: pr.base.sha, prNumber: pr.number, checkRuns, statuses: combined.statuses, requiredCheckNames });
-  const readiness = evaluateReadiness({ codex, checks, mergeable: pr.mergeable, mergeableState: pr.mergeable_state, draft: pr.draft });
-  const currentPr = await github(`/repos/${owner}/${repo}/pulls/${pr.number}`);
-  if (!isCurrentPull(pr, currentPr)) { console.log(`PR #${pr.number} changed or closed during evaluation; skipping mutations.`); return; }
+  let readiness = evaluateReadiness({ codex, checks, mergeable: currentPr.mergeable, mergeableState: currentPr.mergeable_state, draft: currentPr.draft });
+  if (readiness.state === 'READY') {
+    [currentPr, reviews, comments, requestReactions] = await Promise.all([
+      github(`/repos/${owner}/${repo}/pulls/${pr.number}`),
+      github(`/repos/${owner}/${repo}/pulls/${pr.number}/reviews?per_page=100`),
+      github(`/repos/${owner}/${repo}/pulls/${pr.number}/comments?per_page=100`),
+      github(`/repos/${owner}/${repo}/issues/comments/${reviewRequest.id}/reactions?per_page=100`),
+    ]);
+    if (!isCurrentPull(pr, currentPr)) { console.log(`PR #${pr.number} changed or closed before READY publication; skipping mutations.`); return; }
+    codex = evaluateCodex({ head, reviews, comments, requestReactions, configuredActors: process.env.CODEX_ACTORS });
+    readiness = evaluateReadiness({ codex, checks, mergeable: currentPr.mergeable, mergeableState: currentPr.mergeable_state, draft: currentPr.draft });
+  }
   const result = { number: pr.number, url: pr.html_url, head, codex, checks, readiness };
   const notifications = plannedNotifications(priorState, result);
   const notificationPhases = partitionNotifications(notifications.events);
-  let notificationState = { ...notifications.state, codexCleanReaction };
+  let notificationState = { ...notifications.state, codexReviewRequest: { headSha: head, cycle, commentId: reviewRequest.id } };
   for (const event of notificationPhases.beforePublish) {
     const delivery = await deliverDiscord(process.env.DISCORD_WEBHOOK_URL, discordMessage(event, result));
     if (delivery.delivered) notificationState = recordDeliveredNotification(notificationState, event, result);
