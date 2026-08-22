@@ -18,9 +18,9 @@ export function parseCodexSeverities(body = '') {
     const line = original.trim();
     const fenceMatch = line.match(/^(`{3,}|~{3,})/);
     if (fenceMatch) {
-      const marker = fenceMatch[1][0];
-      if (!fence) fence = marker;
-      else if (fence === marker) fence = null;
+      const delimiter = fenceMatch[1];
+      if (!fence) fence = { character: delimiter[0], length: delimiter.length };
+      else if (fence.character === delimiter[0] && delimiter.length >= fence.length) fence = null;
       continue;
     }
     if (fence || !line || line.startsWith('>')) continue;

@@ -332,3 +332,17 @@ test('stale or closed PR snapshots abort before readiness mutations', () => {
   const source = readFileSync(new URL('../lumensia-merge-readiness.mjs', import.meta.url), 'utf8');
   assert.ok(source.indexOf('if (!isCurrentPull(pr, currentPr))') < source.indexOf('deliverDiscord(process.env.DISCORD_WEBHOOK_URL'));
 });
+
+test('triple-backtick fenced P1 example is ignored', () => {
+  assert.equal(parseCodexSeverities('```\nP1: example only\n```').P1, 0);
+});
+
+test('four-backtick fence is not closed by an inner triple-backtick fence', () => {
+  const body = '````markdown\n```\nP0: nested example\n```\nP1: still an example\n````';
+  assert.deepEqual(parseCodexSeverities(body), { P0: 0, P1: 0, P2: 0, P3: 0, unknown: 0 });
+});
+
+test('severity after the matching closing fence is detected normally', () => {
+  const body = '````\n```\nP1: example only\n```\n````\nP1: real finding';
+  assert.equal(parseCodexSeverities(body).P1, 1);
+});
