@@ -28,6 +28,7 @@ const PROTECTED_EXACT_PATHS = new Set([
   'sw.js',
   'index.html',
   'vercel.json',
+  '.vercelignore',
   'package.json',
   'package-lock.json',
   'npm-shrinkwrap.json',
@@ -398,6 +399,16 @@ export async function maintainAutoPulls({
 
       if (decision.action === 'FIX') {
         if (!signals.requestEntry) { summary.waiting += 1; continue; }
+        const fixCandidate = await api.getPull(pull.number);
+        if (!isAutoManagedPull(fixCandidate, owner, repo)
+          || fixCandidate.head?.sha !== pull.head.sha
+          || fixCandidate.base?.sha !== pull.base.sha
+          || signals.requestEntry.request?.head !== pull.head.sha
+          || signals.requestEntry.request?.baseSha !== pull.base.sha) {
+          summary.waiting += 1;
+          continue;
+        }
+        pull = fixCandidate;
         await api.createIssueComment(pull.number, makeAutoFixRequestBody({
           prNumber: pull.number,
           head: pull.head.sha,
@@ -453,7 +464,7 @@ export async function maintainAutoPulls({
 
       const validatedHead = pull.head.sha;
       const validatedBase = pull.base.sha;
-      const mergeCandidate = await api.getPull(pull.number);
+      let mergeCandidate = await api.getPull(pull.number);
       if (!isAutoManagedPull(mergeCandidate, owner, repo)
         || mergeCandidate.head?.sha !== validatedHead
         || mergeCandidate.base?.sha !== validatedBase
@@ -462,7 +473,42 @@ export async function maintainAutoPulls({
         summary.waiting += 1;
         continue;
       }
-      pull = mergeCandidate;
+
+      // Re-read every authoritative signal after the final PR snapshot.
+      const finalSignals = await evaluatePull(api, mergeCandidate, owner, configuredActors);
+      if (findTrustedHumanCheck(finalSignals.issueComments, mergeCandidate.number, mergeCandidate.head.sha, owner)) {
+        summary.humanRequired += 1;
+        continue;
+      }
+      const finalFixRequests = trustedAutoFixRequests(finalSignals.issueComments, mergeCandidate.number, owner);
+      const finalDecision = decideMaintenanceAction({
+        pull: mergeCandidate,
+        codex: finalSignals.codex,
+        checks: finalSignals.checks,
+        readiness: finalSignals.readiness,
+        files: finalSignals.files,
+        fixRequests: finalFixRequests,
+        now,
+        mergeTokenAvailable: Boolean(mergeToken && mergeApi),
+      });
+      if (finalDecision.action !== 'MERGE') {
+        if (finalDecision.action === 'HUMAN' && await ensureHumanCheck({ api, webhook, pull: mergeCandidate, signals: finalSignals, reason: finalDecision.reason, details: finalDecision.details || [], owner, logger, discordFetch })) summary.humanRequired += 1;
+        else summary.waiting += 1;
+        continue;
+      }
+
+      // One last PR snapshot ensures the hosted-signal read did not race a head/base retarget.
+      const lastCandidate = await api.getPull(mergeCandidate.number);
+      if (!isAutoManagedPull(lastCandidate, owner, repo)
+        || lastCandidate.head?.sha !== mergeCandidate.head?.sha
+        || lastCandidate.base?.sha !== mergeCandidate.base?.sha
+        || lastCandidate.mergeable !== true
+        || lastCandidate.mergeable_state !== 'clean') {
+        summary.waiting += 1;
+        continue;
+      }
+      pull = lastCandidate;
+      signals = finalSignals;
 
       let result;
       try {
