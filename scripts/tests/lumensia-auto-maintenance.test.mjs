@@ -231,6 +231,7 @@ test('HTTP merge rejection creates a persistent human hold and is not retried ne
   const p = pull();
   const api = {
     validate: async () => true,
+    compare: async () => ({ head_commit: { sha: HEAD }, base_commit: { sha: BASE }, merge_base_commit: { sha: BASE } }),
     listOpenPulls: async () => [p],
     getPull: async () => p,
     listIssueComments: async () => [...issueComments],
