@@ -60,6 +60,7 @@ export function isAutoManagedPull(pull = {}, owner = '', repo = '') {
     && String(pull?.user?.login || '').toLowerCase() === expectedOwner
     && repoFullName(pull?.head?.repo) === expectedRepo
     && repoFullName(pull?.base?.repo) === expectedRepo
+    && String(pull?.base?.ref || '') === 'main'
     && String(pull?.head?.ref || '').startsWith('codex/')
     && !String(pull?.head?.ref || '').toLowerCase().includes('-no-pr')
     && String(pull?.body || '').includes(AUTO_PR_MARKER)
