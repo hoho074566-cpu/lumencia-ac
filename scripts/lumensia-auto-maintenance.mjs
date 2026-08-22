@@ -556,8 +556,21 @@ export async function maintainAutoPulls({
           else summary.waiting += 1;
           continue;
         }
+
+        // The post-snapshot signal read can itself race a head/base update. Bind the
+        // mutation to the exact snapshot evaluated above with one final PR fetch.
+        const mutationCandidate = await api.getPull(lastCandidate.number);
+        if (!isAutoManagedPull(mutationCandidate, owner, repo)
+          || mutationCandidate.head?.sha !== lastCandidate.head?.sha
+          || mutationCandidate.base?.sha !== lastCandidate.base?.sha
+          || !autoMergeStateAllowed(mutationCandidate, postSnapshotSignals.checks)) {
+          summary.waiting += 1;
+          continue;
+        }
+        pull = mutationCandidate;
+      } else {
+        pull = lastCandidate;
       }
-      pull = lastCandidate;
       signals = postSnapshotSignals;
 
       let result;
