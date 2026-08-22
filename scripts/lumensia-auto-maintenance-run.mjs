@@ -4,6 +4,7 @@ import { createGitHubClient } from './lumensia-auto-pr.mjs';
 import { logMaintenanceSummary, maintainAutoPulls } from './lumensia-auto-maintenance.mjs';
 
 const API_ROOT = 'https://api.github.com';
+const MAX_PULL_FILE_PAGES = 30;
 
 export function createMaintenanceGitHubClient({ token, owner, repo, fetchImpl = fetch }) {
   const base = createGitHubClient({ token, owner, repo, fetchImpl });
@@ -29,19 +30,19 @@ export function createMaintenanceGitHubClient({ token, owner, repo, fetchImpl = 
     return data;
   }
 
-  async function paginate(path) {
+  async function paginatePullFiles(number) {
     const items = [];
-    for (let page = 1; ; page += 1) {
-      const separator = path.includes('?') ? '&' : '?';
-      const batch = await request('GET', `${path}${separator}per_page=100&page=${page}`);
+    for (let page = 1; page <= MAX_PULL_FILE_PAGES; page += 1) {
+      const batch = await request('GET', `/pulls/${number}/files?per_page=100&page=${page}`);
       items.push(...batch);
-      if (batch.length < 100) return items;
+      if (batch.length < 100) break;
     }
+    return items;
   }
 
   return {
     ...base,
-    listPullFiles: (number) => paginate(`/pulls/${number}/files`),
+    listPullFiles: paginatePullFiles,
     listCheckRuns: (sha) => request('GET', `/commits/${encodeURIComponent(sha)}/check-runs?per_page=100`),
     getCombinedStatus: (sha) => request('GET', `/commits/${encodeURIComponent(sha)}/status`),
     mergePull: (number, sha, mergeMethod = 'merge') => request('PUT', `/pulls/${number}/merge`, {
