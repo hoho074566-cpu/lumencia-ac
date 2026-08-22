@@ -23,6 +23,7 @@ const PROTECTED_EXACT_PATHS = new Set([
   'AGENTS.md',
   'app.js',
   'app-runtime.js',
+  'sw.js',
   'index.html',
   'vercel.json',
   'package.json',
@@ -75,11 +76,25 @@ export function protectedMergeReason(path = '') {
 }
 
 export function protectedMergePaths(files = []) {
-  return files
-    .map((file) => typeof file === 'string' ? file : file?.filename)
-    .filter(Boolean)
-    .map((path) => ({ path, reason: protectedMergeReason(path) }))
-    .filter((item) => item.reason);
+  const seen = new Set();
+  const protectedPaths = [];
+  for (const file of files) {
+    const paths = typeof file === 'string'
+      ? [{ path: file, source: 'filename' }]
+      : [
+        { path: file?.filename, source: 'filename' },
+        { path: file?.previous_filename, source: 'previous_filename' },
+      ];
+    for (const item of paths) {
+      if (!item.path) continue;
+      const key = `${item.source}:${item.path}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const reason = protectedMergeReason(item.path);
+      if (reason) protectedPaths.push({ path: item.path, source: item.source, reason });
+    }
+  }
+  return protectedPaths;
 }
 
 function parseHiddenJsonMarker(body = '', marker = '') {
@@ -124,16 +139,16 @@ export function makeHumanCheckBody({ prNumber, head, reason, details = [] }) {
   return `<!-- ${HUMAN_CHECK_MARKER}\n${JSON.stringify(state)}\n-->\n\n## Lumensia V1.2 human check required\n\nReason: \`${cleanText(reason)}\`\nHEAD: \`${String(head || '').slice(0, 10)}\`${details.length ? `\n\n${details.map((item) => `- ${cleanText(item)}`).join('\n')}` : ''}`;
 }
 
-function matchingHumanCheck(issueComments, prNumber, head, reason, owner) {
+export function findTrustedHumanCheck(issueComments = [], prNumber, head, owner = '', reason = '') {
   const actor = String(owner || '').toLowerCase();
-  return issueComments.some((comment) => {
+  return issueComments.find((comment) => {
     if (String(comment.user?.login || '').toLowerCase() !== actor) return false;
     const state = parseHiddenJsonMarker(comment.body, HUMAN_CHECK_MARKER);
     return state
       && Number(state.pr) === Number(prNumber)
       && state.head === head
-      && state.reason === reason;
-  });
+      && (!reason || state.reason === reason);
+  }) || null;
 }
 
 function ageMinutes(value, now = new Date()) {
@@ -157,15 +172,15 @@ export function decideMaintenanceAction({
 
   const blockers = Number(codex?.P0 || 0) + Number(codex?.P1 || 0);
   if (codex?.state === 'BLOCK' && blockers > 0) {
-    if (fixRequests.length >= MAX_AUTO_FIX_ATTEMPTS) {
-      return { action: 'HUMAN', reason: 'max-fix-attempts', details: [`P0/P1 still present after ${MAX_AUTO_FIX_ATTEMPTS} attempts.`] };
-    }
     const currentHeadRequest = [...fixRequests].reverse().find(({ request }) => request?.head === pull?.head?.sha);
     if (currentHeadRequest) {
       if (ageMinutes(currentHeadRequest.comment?.created_at, now) >= FIX_STALL_MINUTES) {
         return { action: 'HUMAN', reason: 'fix-stalled', details: [`Auto-fix request did not move HEAD within ${FIX_STALL_MINUTES} minutes.`] };
       }
       return { action: 'WAIT', reason: 'fix-in-flight' };
+    }
+    if (fixRequests.length >= MAX_AUTO_FIX_ATTEMPTS) {
+      return { action: 'HUMAN', reason: 'max-fix-attempts', details: [`P0/P1 still present after ${MAX_AUTO_FIX_ATTEMPTS} attempts.`] };
     }
     return { action: 'FIX', attempt: fixRequests.length + 1 };
   }
@@ -178,7 +193,7 @@ export function decideMaintenanceAction({
     return {
       action: 'HUMAN',
       reason: 'protected-paths',
-      details: protectedPaths.map((item) => `${item.path} (${item.reason})`),
+      details: protectedPaths.map((item) => `${item.path}${item.source === 'previous_filename' ? ' [renamed source]' : ''} (${item.reason})`),
     };
   }
   if (!mergeTokenAvailable) return { action: 'HUMAN', reason: 'merge-token-unavailable' };
@@ -248,7 +263,7 @@ async function evaluatePull(api, pull, owner, configuredActors) {
 }
 
 async function ensureHumanCheck({ api, webhook, pull, signals, reason, details, owner, logger, discordFetch }) {
-  if (matchingHumanCheck(signals.issueComments, pull.number, pull.head.sha, reason, owner)) return false;
+  if (findTrustedHumanCheck(signals.issueComments, pull.number, pull.head.sha, owner, reason)) return false;
   await api.createIssueComment(pull.number, makeHumanCheckBody({ prNumber: pull.number, head: pull.head.sha, reason, details }));
   await deliverDiscord(
     webhook,
@@ -300,6 +315,13 @@ export async function maintainAutoPulls({
       if (!isAutoManagedPull(pull, owner, repo)) continue;
       pull = await syncAutoPrPolicy(api, pull);
       let signals = await evaluatePull(api, pull, owner, configuredActors);
+
+      // Any trusted current-head human marker is a persistent automation hold.
+      if (findTrustedHumanCheck(signals.issueComments, pull.number, pull.head.sha, owner)) {
+        summary.humanRequired += 1;
+        continue;
+      }
+
       let fixRequests = trustedAutoFixRequests(signals.issueComments, pull.number, owner);
       let decision = decideMaintenanceAction({
         pull,
@@ -346,6 +368,10 @@ export async function maintainAutoPulls({
       pull = await api.getPull(pull.number);
       if (!isAutoManagedPull(pull, owner, repo)) { summary.waiting += 1; continue; }
       signals = await evaluatePull(api, pull, owner, configuredActors);
+      if (findTrustedHumanCheck(signals.issueComments, pull.number, pull.head.sha, owner)) {
+        summary.humanRequired += 1;
+        continue;
+      }
       fixRequests = trustedAutoFixRequests(signals.issueComments, pull.number, owner);
       decision = decideMaintenanceAction({
         pull,
@@ -363,7 +389,14 @@ export async function maintainAutoPulls({
         continue;
       }
 
-      const result = await mergeApi.mergePull(pull.number, pull.head.sha, 'merge');
+      let result;
+      try {
+        result = await mergeApi.mergePull(pull.number, pull.head.sha, 'merge');
+      } catch (error) {
+        const details = [`HTTP ${error?.status || 'error'}: ${cleanText(error?.data?.message || error?.message || 'GitHub rejected the merge.')}`];
+        if (await ensureHumanCheck({ api, webhook, pull, signals, reason: 'merge-rejected', details, owner, logger, discordFetch })) summary.humanRequired += 1;
+        continue;
+      }
       if (!result?.merged) {
         if (await ensureHumanCheck({ api, webhook, pull, signals, reason: 'merge-rejected', details: [result?.message || 'GitHub rejected the merge.'], owner, logger, discordFetch })) summary.humanRequired += 1;
         continue;
