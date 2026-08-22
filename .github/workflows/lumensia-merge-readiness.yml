@@ -1,0 +1,141 @@
+name: Lumensia Merge Readiness
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, edited, ready_for_review]
+  pull_request_review:
+    types: [submitted, dismissed]
+  workflow_run:
+    workflows: ['Lumensia PR safety gate']
+    types: [requested, in_progress, completed]
+  check_run:
+    types: [created, rerequested, completed]
+  status:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  checks: write
+  actions: read
+  statuses: read
+  deployments: read
+
+jobs:
+  discover:
+    if: >-
+      github.event_name == 'schedule' ||
+      github.event_name == 'status' ||
+      github.event_name == 'workflow_run' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'check_run' && !startsWith(github.event.check_run.name, 'Lumensia Merge Readiness') && github.event.check_run.pull_requests[0].number == null)
+    runs-on: ubuntu-latest
+    outputs:
+      pulls: ${{ steps.list.outputs.result }}
+      has_pulls: ${{ steps.list.outputs.has_pulls }}
+    steps:
+      - name: List open pull request numbers
+        id: list
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pulls = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 50,
+            });
+            core.setOutput('has_pulls', pulls.data.length > 0 ? 'true' : 'false');
+            return pulls.data.map((pull) => pull.number);
+
+  evaluate-scan:
+    needs: discover
+    if: needs.discover.result == 'success' && needs.discover.outputs.has_pulls == 'true'
+    strategy:
+      matrix:
+        pr: ${{ fromJSON(needs.discover.outputs.pulls) }}
+      max-parallel: 10
+    concurrency:
+      group: lumensia-readiness-pr-${{ matrix.pr }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out trusted default-branch evaluator only
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: refs/heads/${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: scripts/lumensia-merge-readiness.mjs
+          sparse-checkout-cone-mode: false
+      - name: Detect trusted evaluator bootstrap state
+        id: evaluator
+        shell: bash
+        run: |
+          if [[ -f scripts/lumensia-merge-readiness.mjs ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Merge Readiness bootstrap: trusted evaluator is not on default branch yet; it will become active after this PR is merged."
+          fi
+      - name: Set up Node.js 22
+        if: steps.evaluator.outputs.available == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+      - name: Evaluate current PR head and notify on transitions
+        if: steps.evaluator.outputs.available == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ matrix.pr }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          CODEX_ACTORS: ${{ vars.CODEX_REVIEW_ACTORS }}
+          REQUIRED_CHECKS: ${{ vars.LUMENSIA_REQUIRED_CHECKS }}
+        run: node scripts/lumensia-merge-readiness.mjs
+
+  evaluate-pr:
+    if: >-
+      (github.event.pull_request.number != null || github.event.check_run.pull_requests[0].number != null) &&
+      (github.event_name != 'check_run' || !startsWith(github.event.check_run.name, 'Lumensia Merge Readiness'))
+    concurrency:
+      group: lumensia-readiness-pr-${{ github.event.pull_request.number || github.event.check_run.pull_requests[0].number }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out trusted default-branch evaluator only
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: refs/heads/${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: scripts/lumensia-merge-readiness.mjs
+          sparse-checkout-cone-mode: false
+      - name: Detect trusted evaluator bootstrap state
+        id: evaluator
+        shell: bash
+        run: |
+          if [[ -f scripts/lumensia-merge-readiness.mjs ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Merge Readiness bootstrap: trusted evaluator is not on default branch yet; it will become active after this PR is merged."
+          fi
+      - name: Set up Node.js 22
+        if: steps.evaluator.outputs.available == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+      - name: Evaluate current PR head and notify on transitions
+        if: steps.evaluator.outputs.available == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.check_run.pull_requests[0].number }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          CODEX_ACTORS: ${{ vars.CODEX_REVIEW_ACTORS }}
+          REQUIRED_CHECKS: ${{ vars.LUMENSIA_REQUIRED_CHECKS }}
+        run: node scripts/lumensia-merge-readiness.mjs
