@@ -7,8 +7,8 @@ const SUCCESSFUL = new Set(['success', 'neutral', 'skipped']);
 
 export function isCodexActor(actor = {}, configured = '') {
   const allowed = configured.split(',').map((item) => item.trim().toLowerCase()).filter(Boolean);
-  const names = [actor.login, actor.slug, actor.name].filter(Boolean).map((item) => String(item).toLowerCase());
-  return names.some((name) => allowed.includes(name) || /(^|[-_])(codex|chatgpt)(\[bot\])?($|[-_])/.test(name));
+  const login = String(actor.login || '').toLowerCase();
+  return Boolean(login) && allowed.includes(login);
 }
 
 export function parseCodexSeverities(body = '') {
@@ -30,8 +30,10 @@ export function parseCodexSeverities(body = '') {
 }
 
 export function evaluateCodex({ head, reviews = [], comments = [], configuredActors = '' }) {
-  const currentReviews = reviews.filter((review) => review.commit_id === head && review.submitted_at && isCodexActor(review.user, configuredActors));
-  const currentComments = comments.filter((comment) => comment.commit_id === head && isCodexActor(comment.user, configuredActors));
+  const trustedReviews = reviews.filter((review) => isCodexActor(review.user, configuredActors));
+  const dismissedReviewIds = new Set(trustedReviews.filter((review) => review.state?.toUpperCase() === 'DISMISSED').map((review) => review.id));
+  const currentReviews = trustedReviews.filter((review) => review.commit_id === head && review.submitted_at && review.state?.toUpperCase() !== 'DISMISSED');
+  const currentComments = comments.filter((comment) => comment.commit_id === head && isCodexActor(comment.user, configuredActors) && !dismissedReviewIds.has(comment.pull_request_review_id));
   if (currentReviews.length === 0) return { state: 'PENDING', P0: 0, P1: 0, P2: 0, P3: 0, unknown: 0 };
   const totals = { P0: 0, P1: 0, P2: 0, P3: 0, unknown: 0 };
   for (const item of [...currentReviews, ...currentComments]) {
@@ -46,7 +48,7 @@ function normalizeCheck(check) {
   return conclusion ? (TERMINAL_FAILURES.has(conclusion) ? 'FAIL' : SUCCESSFUL.has(conclusion) ? 'PASS' : 'PENDING') : 'PENDING';
 }
 
-export function evaluateChecks({ head, checkRuns = [], statuses = [] }) {
+export function evaluateChecks({ head, checkRuns = [], statuses = [], requiredCheckNames = [] }) {
   const currentChecks = checkRuns.filter((check) => !check.head_sha || check.head_sha === head);
   const safetyItems = currentChecks.filter((check) => /^(repository checks|lumensia pr safety gate)$/i.test(check.name));
   const vercelChecks = currentChecks.filter((check) => /vercel/i.test(`${check.name} ${check.app?.name || ''}`));
@@ -57,13 +59,15 @@ export function evaluateChecks({ head, checkRuns = [], statuses = [] }) {
     ...vercelChecks.map(normalizeCheck),
     ...vercelStatuses.map((status) => status.state === 'success' ? 'PASS' : ['failure', 'error'].includes(status.state) ? 'FAIL' : 'PENDING'),
   ], 'NOT_PRESENT');
-  const repositoryChecks = currentChecks.filter((check) => !/vercel|lumensia merge readiness/i.test(`${check.name} ${check.app?.name || ''}`));
-  const required = summarize(repositoryChecks.map(normalizeCheck));
+  const requiredNames = new Set(requiredCheckNames.map((name) => name.trim().toLowerCase()).filter(Boolean));
+  const repositoryChecks = currentChecks.filter((check) => requiredNames.has(check.name.toLowerCase()));
+  const required = requiredNames.size === 0 ? 'PASS' : summarize(repositoryChecks.map(normalizeCheck));
   return { safety, vercel, required };
 }
 
-export function evaluateReadiness({ codex, checks, mergeable, mergeableState }) {
+export function evaluateReadiness({ codex, checks, mergeable, mergeableState, draft = false }) {
   const conflict = mergeable === false || mergeableState === 'dirty';
+  if (draft) return { state: 'WAITING', conflict: conflict ? 'CONFLICT' : 'NONE' };
   const blocked = conflict || codex.state === 'BLOCK' || checks.safety === 'FAIL' || checks.vercel === 'FAIL' || checks.required === 'FAIL';
   if (blocked) return { state: 'BLOCKED', conflict: conflict ? 'CONFLICT' : 'NONE' };
   const waiting = mergeable == null || codex.state === 'PENDING' || checks.safety === 'PENDING' || checks.vercel !== 'PASS' || checks.required === 'PENDING';
@@ -83,11 +87,20 @@ export function parseMachineState(body = '', head = '') {
 export function plannedNotifications(previous, current) {
   const next = previous.head === current.head ? { ...previous } : { head: current.head };
   const events = [];
-  if (current.codex.state !== 'PENDING' && !next.codexNotified) { events.push('codex'); next.codexNotified = current.codex.state.toLowerCase(); }
-  if (['PASS', 'FAIL'].includes(current.checks.vercel) && !next.vercelNotified) { events.push('vercel'); next.vercelNotified = current.checks.vercel.toLowerCase(); }
-  if (current.readiness.state === 'BLOCKED' && !next.blockedNotified) { events.push('blocked'); next.blockedNotified = true; }
-  if (current.readiness.state === 'READY' && !next.readyNotified) { events.push('ready'); next.readyNotified = true; }
+  if (current.codex.state !== 'PENDING' && !next.codexNotified) events.push('codex');
+  if (['PASS', 'FAIL'].includes(current.checks.vercel) && !next.vercelNotified) events.push('vercel');
+  if (current.readiness.state === 'BLOCKED' && !next.blockedNotified) events.push('blocked');
+  if (current.readiness.state === 'READY' && !next.readyNotified) events.push('ready');
   return { events, state: next };
+}
+
+export function recordDeliveredNotification(state, event, current) {
+  const next = { ...state };
+  if (event === 'codex') next.codexNotified = current.codex.state.toLowerCase();
+  else if (event === 'vercel') next.vercelNotified = current.checks.vercel.toLowerCase();
+  else if (event === 'blocked') next.blockedNotified = true;
+  else if (event === 'ready') next.readyNotified = true;
+  return next;
 }
 
 const icon = (state) => state === 'PASS' || state === 'READY' ? '✅' : state === 'FAIL' || state === 'BLOCK' || state === 'CONFLICT' ? '❌' : '⏳';
@@ -96,6 +109,10 @@ export function renderComment(result, machineState) {
   const heading = result.readiness.state === 'READY' ? '### READY TO MERGE 🚀' : result.readiness.state === 'BLOCKED' ? '### ACTION REQUIRED 🛠️' : '### WAITING ⏳';
   const codexStatus = result.codex.state === 'PENDING' ? 'PENDING' : result.codex.state === 'BLOCK' ? 'COMPLETE / BLOCK' : 'COMPLETE';
   return `${MARKER}\n## Lumensia Merge Readiness\n\n| Check | Status |\n|---|---|\n| Safety Gate | ${icon(result.checks.safety)} ${result.checks.safety} |\n| Vercel | ${icon(result.checks.vercel)} ${result.checks.vercel} |\n| Codex Review | ${icon(result.codex.state)} ${codexStatus} |\n| Current P0/P1 | ${result.codex.P0 + result.codex.P1 ? '❌' : result.codex.state === 'PENDING' ? '⏳' : '✅'} ${result.codex.P0 + result.codex.P1} |\n| Merge Conflict | ${icon(result.readiness.conflict === 'NONE' ? 'PASS' : 'FAIL')} ${result.readiness.conflict} |\n\n${heading}\n\nHEAD: \`${result.head.slice(0, 7)}\`\n\nP2/P3 are non-blocking by project policy. Prior-head findings are ignored.${result.codex.unknown ? '\n\n⚠️ An unparseable current-head Codex finding was observed.' : ''}\n\n<!--\n${STATE_PREFIX}\n${JSON.stringify(machineState)}\n-->`;
+}
+
+export function renderCheckSummary(commentBody) {
+  return String(commentBody).replace(`${MARKER}\n`, '').replace(/\n\n<!--\nlumensia-readiness-state:[^]*$/, '').trim();
 }
 
 export async function deliverDiscord(webhook, message, fetchImpl = fetch, logger = console) {
@@ -134,21 +151,26 @@ async function evaluatePull(owner, repo, pr) {
     github(`/repos/${owner}/${repo}/issues/${pr.number}/comments?per_page=100`),
   ]);
   const codex = evaluateCodex({ head, reviews, comments, configuredActors: process.env.CODEX_ACTORS });
-  const checks = evaluateChecks({ head, checkRuns: runs.check_runs, statuses: combined.statuses });
-  const readiness = evaluateReadiness({ codex, checks, mergeable: pr.mergeable, mergeableState: pr.mergeable_state });
+  const requiredCheckNames = (process.env.REQUIRED_CHECKS || '').split(',');
+  const checks = evaluateChecks({ head, checkRuns: runs.check_runs, statuses: combined.statuses, requiredCheckNames });
+  const readiness = evaluateReadiness({ codex, checks, mergeable: pr.mergeable, mergeableState: pr.mergeable_state, draft: pr.draft });
   const priorComment = issueComments.find((comment) => comment.body?.includes(MARKER) && /github-actions\[bot\]/i.test(comment.user?.login || ''));
   const result = { number: pr.number, url: pr.html_url, head, codex, checks, readiness };
   const notifications = plannedNotifications(parseMachineState(priorComment?.body, head), result);
-  const body = renderComment(result, notifications.state);
+  let notificationState = notifications.state;
+  for (const event of notifications.events) {
+    const delivery = await deliverDiscord(process.env.DISCORD_WEBHOOK_URL, discordMessage(event, result));
+    if (delivery.delivered) notificationState = recordDeliveredNotification(notificationState, event, result);
+  }
+  const body = renderComment(result, notificationState);
   if (!priorComment) await github(`/repos/${owner}/${repo}/issues/${pr.number}/comments`, { method: 'POST', body: JSON.stringify({ body }) });
   else if (priorComment.body !== body) await github(`/repos/${owner}/${repo}/issues/comments/${priorComment.id}`, { method: 'PATCH', body: JSON.stringify({ body }) });
   const existing = runs.check_runs.find((run) => run.name === 'Lumensia Merge Readiness' && run.head_sha === head);
   const checkPayload = readiness.state === 'WAITING'
-    ? { name: 'Lumensia Merge Readiness', head_sha: head, status: 'in_progress', output: { title: 'Waiting for current-head results', summary: body.replace(/<!--[^]*$/m, '') } }
-    : { name: 'Lumensia Merge Readiness', head_sha: head, status: 'completed', conclusion: readiness.state === 'READY' ? 'success' : 'failure', output: { title: readiness.state === 'READY' ? 'Ready for manual merge' : 'Action required', summary: body.replace(/<!--[^]*$/m, '') } };
+    ? { name: 'Lumensia Merge Readiness', head_sha: head, status: 'in_progress', output: { title: 'Waiting for current-head results', summary: renderCheckSummary(body) } }
+    : { name: 'Lumensia Merge Readiness', head_sha: head, status: 'completed', conclusion: readiness.state === 'READY' ? 'success' : 'failure', output: { title: readiness.state === 'READY' ? 'Ready for manual merge' : 'Action required', summary: renderCheckSummary(body) } };
   const checkRequest = existing ? (({ head_sha: _head, ...update }) => update)(checkPayload) : checkPayload;
   await github(existing ? `/repos/${owner}/${repo}/check-runs/${existing.id}` : `/repos/${owner}/${repo}/check-runs`, { method: existing ? 'PATCH' : 'POST', body: JSON.stringify(checkRequest) });
-  for (const event of notifications.events) await deliverDiscord(process.env.DISCORD_WEBHOOK_URL, discordMessage(event, result));
   console.log(`PR #${pr.number} ${head.slice(0, 7)}: ${readiness.state}; Discord events: ${notifications.events.join(', ') || 'none'}`);
 }
 

@@ -50,4 +50,5 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           CODEX_ACTORS: ${{ vars.CODEX_REVIEW_ACTORS }}
+          REQUIRED_CHECKS: ${{ vars.LUMENSIA_REQUIRED_CHECKS }}
         run: node scripts/lumensia-merge-readiness.mjs

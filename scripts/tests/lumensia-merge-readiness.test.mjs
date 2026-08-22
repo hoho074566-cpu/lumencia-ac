@@ -8,39 +8,43 @@ import {
   parseCodexSeverities,
   parseMachineState,
   plannedNotifications,
+  recordDeliveredNotification,
   renderComment,
+  renderCheckSummary,
 } from '../lumensia-merge-readiness.mjs';
 
 const HEAD = 'new-head-sha';
+const ACTORS = 'trusted-codex[bot]';
 const codex = (state = 'PASS', extra = {}) => ({ state, P0: 0, P1: 0, P2: 0, P3: 0, unknown: 0, ...extra });
 const checks = (extra = {}) => ({ safety: 'PASS', vercel: 'PASS', required: 'PASS', ...extra });
-const review = (commit_id, body = 'No findings.') => ({ commit_id, body, submitted_at: '2026-01-01T00:00:00Z', user: { login: 'codex-bot' } });
-const comment = (commit_id, body) => ({ commit_id, body, user: { login: 'codex-bot' } });
+const review = (commit_id, body = 'No findings.', extra = {}) => ({ id: 1, commit_id, body, state: 'COMMENTED', submitted_at: '2026-01-01T00:00:00Z', user: { login: 'trusted-codex[bot]' }, ...extra });
+const comment = (commit_id, body, extra = {}) => ({ commit_id, body, user: { login: 'trusted-codex[bot]' }, ...extra });
+const evaluateReview = (input) => evaluateCodex({ configuredActors: ACTORS, ...input });
 const readyInput = (extra = {}) => ({ codex: codex(), checks: checks(), mergeable: true, mergeableState: 'clean', ...extra });
 
 test('old P1 plus current clean review ignores the previous SHA', () => {
-  const result = evaluateCodex({ head: HEAD, reviews: [review('old'), review(HEAD)], comments: [comment('old', 'P1: stale')] });
+  const result = evaluateReview({ head: HEAD, reviews: [review('old'), review(HEAD)], comments: [comment('old', 'P1: stale')] });
   assert.equal(result.state, 'PASS'); assert.equal(result.P1, 0);
 });
 
 test('current-head P1 blocks', () => {
-  const result = evaluateCodex({ head: HEAD, reviews: [review(HEAD, 'P1: fix this')] });
+  const result = evaluateReview({ head: HEAD, reviews: [review(HEAD, 'P1: fix this')] });
   assert.equal(result.state, 'BLOCK'); assert.equal(result.P1, 1);
   assert.equal(evaluateReadiness({ ...readyInput(), codex: result }).state, 'BLOCKED');
 });
 
 test('P2 and P3 are non-blocking', () => {
-  const result = evaluateCodex({ head: HEAD, reviews: [review(HEAD, '### P2 - suggestion\n- P3: polish')] });
+  const result = evaluateReview({ head: HEAD, reviews: [review(HEAD, '### P2 - suggestion\n- P3: polish')] });
   assert.equal(result.state, 'PASS'); assert.deepEqual([result.P2, result.P3], [1, 1]);
 });
 
 test('new head without a current review waits', () => {
-  const result = evaluateCodex({ head: HEAD, reviews: [review('old')] });
+  const result = evaluateReview({ head: HEAD, reviews: [review('old')] });
   assert.equal(result.state, 'PENDING');
   assert.equal(evaluateReadiness({ ...readyInput(), codex: result }).state, 'WAITING');
 });
 
-test('clean current review passes', () => assert.equal(evaluateCodex({ head: HEAD, reviews: [review(HEAD)] }).state, 'PASS'));
+test('clean current review passes', () => assert.equal(evaluateReview({ head: HEAD, reviews: [review(HEAD)] }).state, 'PASS'));
 
 test('old Vercel success cannot satisfy a new head', () => {
   const result = evaluateChecks({ head: HEAD, checkRuns: [{ name: 'Vercel', head_sha: 'old', conclusion: 'success' }, { name: 'Vercel', head_sha: HEAD, conclusion: null }], statuses: [] });
@@ -64,7 +68,9 @@ test('all required signals passing is ready', () => assert.equal(evaluateReadine
 test('same state and head does not duplicate Discord', () => {
   const current = { head: HEAD, codex: codex(), checks: checks(), readiness: { state: 'READY' } };
   const first = plannedNotifications({ head: HEAD }, current);
-  const second = plannedNotifications(first.state, current);
+  let delivered = first.state;
+  for (const event of first.events) delivered = recordDeliveredNotification(delivered, event, current);
+  const second = plannedNotifications(delivered, current);
   assert.deepEqual(first.events, ['codex', 'vercel', 'ready']); assert.deepEqual(second.events, []);
 });
 
@@ -94,13 +100,13 @@ test('webhook failure is sanitized', async () => {
 
 test('unparseable Codex finding warns without crashing or blocking', () => {
   assert.equal(parseCodexSeverities('Finding: investigate this').unknown, 1);
-  const result = evaluateCodex({ head: HEAD, reviews: [review(HEAD, 'Finding: investigate this')] });
+  const result = evaluateReview({ head: HEAD, reviews: [review(HEAD, 'Finding: investigate this')] });
   assert.equal(result.unknown, 1); assert.equal(result.state, 'PASS');
 });
 
 test('quoted and previous-commit severity text is ignored', () => {
   assert.equal(parseCodexSeverities('> P1: quoted example\nNormal prose mentions P1 in passing.').P1, 0);
-  assert.equal(evaluateCodex({ head: HEAD, reviews: [review(HEAD)], comments: [comment('old', 'P0: outdated')] }).P0, 0);
+  assert.equal(evaluateReview({ head: HEAD, reviews: [review(HEAD)], comments: [comment('old', 'P0: outdated')] }).P0, 0);
 });
 
 test('safety and Vercel are detected from current repository check names', () => {
@@ -112,3 +118,51 @@ test('safety and Vercel are detected from current repository check names', () =>
 });
 
 test('malformed hidden state is rebuilt safely', () => assert.deepEqual(parseMachineState('lumensia-readiness-state: {broken} -->', HEAD), { head: HEAD }));
+
+test('only an exact configured Codex actor can complete review', () => {
+  const impostor = review(HEAD, 'No findings.', { user: { login: 'helpful-codex-reviewer' } });
+  assert.equal(evaluateReview({ head: HEAD, reviews: [impostor] }).state, 'PENDING');
+  assert.equal(evaluateReview({ head: HEAD, reviews: [review(HEAD)] }).state, 'PASS');
+});
+
+test('notification flags persist only after successful delivery', async () => {
+  const current = { head: HEAD, codex: codex(), checks: checks(), readiness: { state: 'READY' } };
+  const planned = plannedNotifications({ head: HEAD }, current);
+  const silent = { warn() {} };
+  const missing = await deliverDiscord('', 'ready', undefined, silent);
+  const failed = await deliverDiscord('secret', 'ready', async () => ({ ok: false, status: 503 }), silent);
+  assert.equal(missing.delivered, false); assert.equal(failed.delivered, false);
+  assert.deepEqual(plannedNotifications(planned.state, current).events, planned.events);
+  const succeeded = await deliverDiscord('secret', 'ready', async () => ({ ok: true }), silent);
+  assert.equal(succeeded.delivered, true);
+  const delivered = recordDeliveredNotification(planned.state, 'ready', current);
+  assert.equal(plannedNotifications(delivered, current).events.includes('ready'), false);
+});
+
+test('unrelated failed check-run is not treated as required', () => {
+  const result = evaluateChecks({ head: HEAD, checkRuns: [
+    { name: 'Repository checks', head_sha: HEAD, conclusion: 'success' },
+    { name: 'Optional screenshot job', head_sha: HEAD, conclusion: 'failure' },
+  ] });
+  assert.equal(result.required, 'PASS');
+  assert.equal(evaluateChecks({ head: HEAD, checkRuns: [{ name: 'Lint', head_sha: HEAD, conclusion: 'failure' }], requiredCheckNames: ['Lint'] }).required, 'FAIL');
+});
+
+test('dismissed Codex review and its comments are excluded', () => {
+  const dismissed = review(HEAD, 'P1: dismissed', { id: 42, state: 'DISMISSED' });
+  const result = evaluateReview({ head: HEAD, reviews: [dismissed, review(HEAD)], comments: [comment(HEAD, 'P1: dismissed comment', { pull_request_review_id: 42 })] });
+  assert.equal(result.state, 'PASS'); assert.equal(result.P1, 0);
+});
+
+test('custom check summary retains visible readiness content', () => {
+  const body = renderComment({ head: HEAD, codex: codex(), checks: checks(), readiness: { state: 'READY', conflict: 'NONE' } }, { head: HEAD });
+  const summary = renderCheckSummary(body);
+  assert.match(summary, /Lumensia Merge Readiness/); assert.match(summary, /READY TO MERGE/); assert.doesNotMatch(summary, /readiness-state/);
+});
+
+test('draft PR remains waiting and never plans ready notification', () => {
+  const readiness = evaluateReadiness({ ...readyInput(), draft: true });
+  assert.equal(readiness.state, 'WAITING');
+  const current = { head: HEAD, codex: codex(), checks: checks(), readiness };
+  assert.equal(plannedNotifications({ head: HEAD }, current).events.includes('ready'), false);
+});
