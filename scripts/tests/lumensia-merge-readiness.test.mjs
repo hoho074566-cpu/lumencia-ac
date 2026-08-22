@@ -346,3 +346,19 @@ test('severity after the matching closing fence is detected normally', () => {
   const body = '````\n```\nP1: example only\n```\n````\nP1: real finding';
   assert.equal(parseCodexSeverities(body).P1, 1);
 });
+
+test('language-tagged delimiter inside a fence is content, not a close', () => {
+  const body = '```markdown\n```javascript\nP1: example only\n```';
+  assert.equal(parseCodexSeverities(body).P1, 0);
+});
+
+test('whitespace-only matching delimiter closes the fence', () => {
+  const body = '```markdown\nP1: example only\n```   \nP2: real finding';
+  const result = parseCodexSeverities(body);
+  assert.equal(result.P1, 0); assert.equal(result.P2, 1);
+});
+
+test('real P1 after a valid whitespace-only closing fence is detected', () => {
+  const body = '```markdown\n```javascript\nP1: example only\n```   \nP1: real finding';
+  assert.equal(parseCodexSeverities(body).P1, 1);
+});

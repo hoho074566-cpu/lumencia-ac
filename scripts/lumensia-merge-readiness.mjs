@@ -20,7 +20,7 @@ export function parseCodexSeverities(body = '') {
     if (fenceMatch) {
       const delimiter = fenceMatch[1];
       if (!fence) fence = { character: delimiter[0], length: delimiter.length };
-      else if (fence.character === delimiter[0] && delimiter.length >= fence.length) fence = null;
+      else if (fence.character === delimiter[0] && delimiter.length >= fence.length && line.slice(delimiter.length).trim() === '') fence = null;
       continue;
     }
     if (fence || !line || line.startsWith('>')) continue;
