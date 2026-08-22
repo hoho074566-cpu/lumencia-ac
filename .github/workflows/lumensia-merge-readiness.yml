@@ -7,9 +7,9 @@ on:
     types: [submitted, dismissed]
   workflow_run:
     workflows: ['Lumensia PR safety gate']
-    types: [completed]
+    types: [requested, in_progress, completed]
   check_run:
-    types: [completed]
+    types: [created, rerequested, completed]
   status:
   schedule:
     - cron: '*/5 * * * *'

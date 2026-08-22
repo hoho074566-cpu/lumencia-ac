@@ -68,6 +68,12 @@ export function newestAttempts(items, identity) {
   return [...newest.values()];
 }
 
+export function applyCheckRunTransition(checkRuns, event, head) {
+  if (!['created', 'rerequested'].includes(event?.action) || event.check_run?.head_sha !== head) return checkRuns;
+  const pending = { ...event.check_run, status: 'queued', conclusion: null, completed_at: null };
+  return [...checkRuns.filter((check) => check.id !== pending.id), pending];
+}
+
 export function isAuthoritativeVercelSignal(signal, isStatus = false) {
   const name = String(isStatus ? signal.context : signal.name || '');
   const deploymentName = /^vercel(?:\s*[–—-]\s*.+)?$/i.test(name);
@@ -200,7 +206,7 @@ export function reusableReadinessCheck(check, readinessState) {
   return readinessState === 'WAITING' && check?.status === 'completed' ? undefined : check;
 }
 
-async function evaluatePull(owner, repo, pr) {
+async function evaluatePull(owner, repo, pr, event = {}) {
   const head = pr.head.sha;
   const [reviews, comments, runs, combined, issueComments] = await Promise.all([
     github(`/repos/${owner}/${repo}/pulls/${pr.number}/reviews?per_page=100`),
@@ -211,7 +217,8 @@ async function evaluatePull(owner, repo, pr) {
   ]);
   const codex = evaluateCodex({ head, reviews, comments, configuredActors: process.env.CODEX_ACTORS });
   const requiredCheckNames = (process.env.REQUIRED_CHECKS || '').split(',');
-  const checks = evaluateChecks({ head, baseSha: pr.base.sha, prNumber: pr.number, checkRuns: runs.check_runs, statuses: combined.statuses, requiredCheckNames });
+  const checkRuns = applyCheckRunTransition(runs.check_runs, event, head);
+  const checks = evaluateChecks({ head, baseSha: pr.base.sha, prNumber: pr.number, checkRuns, statuses: combined.statuses, requiredCheckNames });
   const readiness = evaluateReadiness({ codex, checks, mergeable: pr.mergeable, mergeableState: pr.mergeable_state, draft: pr.draft });
   const currentPr = await github(`/repos/${owner}/${repo}/pulls/${pr.number}`);
   if (!isCurrentPull(pr, currentPr)) { console.log(`PR #${pr.number} changed or closed during evaluation; skipping mutations.`); return; }
@@ -259,7 +266,7 @@ async function main() {
     : await hydratePulls(await github(`/repos/${owner}/${repo}/pulls?state=open&per_page=50`), (pullNumber) => github(`/repos/${owner}/${repo}/pulls/${pullNumber}`));
   for (const pull of pulls) {
     if (!isOpenPull(pull)) { console.log(`PR #${pull.number} is no longer open; skipping.`); continue; }
-    await evaluatePull(owner, repo, pull);
+    await evaluatePull(owner, repo, pull, event);
   }
 }
 

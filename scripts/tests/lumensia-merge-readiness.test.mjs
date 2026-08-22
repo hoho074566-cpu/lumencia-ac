@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
+  applyCheckRunTransition,
   deliverDiscord,
   evaluateChecks,
   evaluateCodex,
@@ -381,4 +382,43 @@ test('READY notification is deferred until comment and check publication', () =>
   const checkPublish = source.indexOf("await github(existing ? `/repos/${owner}/${repo}/check-runs/${existing.id}`");
   const readyDelivery = source.indexOf('for (const event of notificationPhases.afterPublish)');
   assert.ok(checkPublish >= 0 && readyDelivery > checkPublish);
+});
+
+test('same-head authoritative rerun returns READY to WAITING until success', () => {
+  const app = { id: 8, name: 'Vercel' };
+  const safetyApp = { id: 7, name: 'GitHub Actions' };
+  const successful = [
+    { id: 1, name: 'Repository checks', head_sha: HEAD, conclusion: 'success', completed_at: '2026-01-01T00:00:00Z', app: safetyApp },
+    { id: 2, name: 'Vercel', head_sha: HEAD, conclusion: 'success', completed_at: '2026-01-01T00:00:00Z', app },
+  ];
+  const passing = evaluateChecks({ head: HEAD, checkRuns: successful });
+  assert.equal(evaluateReadiness({ ...readyInput(), checks: passing }).state, 'READY');
+
+  const rerunning = [
+    ...successful,
+    { id: 3, name: 'Repository checks', head_sha: HEAD, conclusion: null, status: 'in_progress', started_at: '2026-01-01T00:01:00Z', app: safetyApp },
+    { id: 4, name: 'Vercel', head_sha: HEAD, conclusion: null, status: 'in_progress', started_at: '2026-01-01T00:01:00Z', app },
+  ];
+  const pending = evaluateChecks({ head: HEAD, checkRuns: rerunning });
+  assert.deepEqual([pending.safety, pending.vercel], ['PENDING', 'PENDING']);
+  assert.equal(evaluateReadiness({ ...readyInput(), checks: pending }).state, 'WAITING');
+
+  const succeeded = rerunning.map((check) => check.id >= 3
+    ? { ...check, status: 'completed', conclusion: 'success', completed_at: '2026-01-01T00:02:00Z' }
+    : check);
+  const repassing = evaluateChecks({ head: HEAD, checkRuns: succeeded });
+  assert.equal(evaluateReadiness({ ...readyInput(), checks: repassing }).state, 'READY');
+});
+
+test('workflow subscribes to authoritative rerun start transitions', () => {
+  const workflow = readFileSync(new URL('../../.github/workflows/lumensia-merge-readiness.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /types: \[requested, in_progress, completed\]/);
+  assert.match(workflow, /types: \[created, rerequested, completed\]/);
+});
+
+test('rerequested check event overrides stale completed API attempt', () => {
+  const completed = { id: 9, name: 'Vercel', head_sha: HEAD, status: 'completed', conclusion: 'success', completed_at: '2026-01-01T00:00:00Z', app: { name: 'Vercel' } };
+  const checkRuns = applyCheckRunTransition([completed], { action: 'rerequested', check_run: completed }, HEAD);
+  const result = evaluateChecks({ head: HEAD, checkRuns });
+  assert.equal(result.vercel, 'PENDING');
 });
