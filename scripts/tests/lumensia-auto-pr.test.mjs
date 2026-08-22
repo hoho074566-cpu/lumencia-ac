@@ -94,6 +94,20 @@ test('not-ahead and empty comparisons are ignored', async () => {
   assert.equal((await h.run()).skipped.notAhead, 1);
 });
 
+test('a diverged branch with commits not in main remains eligible', async () => {
+  const h = harness({ comparisons: { 'codex/feature': comparison('feature', { status: 'diverged', ahead: 2 }) } });
+  const result = await h.run();
+  assert.equal(result.eligible, 1);
+  assert.equal(result.created.length, 1);
+});
+
+test('a diverged branch without unique commits remains ineligible', async () => {
+  const h = harness({ comparisons: { 'codex/feature': comparison('feature', { status: 'diverged', ahead: 0 }) } });
+  const result = await h.run();
+  assert.equal(result.skipped.notAhead, 1);
+  assert.equal(result.created.length, 0);
+});
+
 test('a repeated scan cannot duplicate a PR', async () => {
   const h = harness();
   await h.run();
@@ -184,6 +198,20 @@ test('Discord network errors expose only the error type', async () => {
   await deliverDiscord('secret-webhook', { number: 1, title: 'title', html_url: 'https://example.test/1' }, 'codex/test', 'abcdef1', async () => { throw Object.assign(new Error('secret-webhook'), { name: 'TypeError' }); }, { warn: (value) => logs.push(value) });
   assert.match(logs.join('\n'), /TypeError/);
   assert.doesNotMatch(logs.join('\n'), /secret-webhook/);
+});
+
+test('Discord disables mention parsing for untrusted title and branch text', async () => {
+  let payload;
+  const response = await deliverDiscord(
+    'secret-webhook',
+    { number: 1, title: '@everyone @here', html_url: 'https://example.test/1' },
+    'codex/@everyone-@here',
+    'abcdef1',
+    async (_url, options) => { payload = JSON.parse(options.body); return { ok: true }; },
+  );
+  assert.equal(response.delivered, true);
+  assert.match(payload.content, /@everyone @here/);
+  assert.deepEqual(payload.allowed_mentions, { parse: [] });
 });
 
 test('workflow statically checks out and executes only the trusted main script', async () => {

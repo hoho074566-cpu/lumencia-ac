@@ -108,7 +108,7 @@ export async function deliverDiscord(webhook, pull, branch, sha, fetchImpl = fet
     const response = await fetchImpl(webhook, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, allowed_mentions: { parse: [] } }),
     });
     if (!response.ok) {
       logger.warn(`Discord PR-created notification failed with HTTP ${response.status}.`);
@@ -155,7 +155,7 @@ export async function scanAutoPulls({ token, owner, repo, api, webhook = '', now
       const commit = comparison.commits?.at(-1) || branchData.commit;
       const sha = comparison.head_commit?.sha || commit?.sha || branchData.commit?.sha || '';
       const date = comparison.head_commit?.commit?.committer?.date || commit?.commit?.committer?.date || commit?.commit?.author?.date;
-      const hasChanges = comparison.status === 'ahead' && Number(comparison.ahead_by) > 0
+      const hasChanges = ['ahead', 'diverged'].includes(comparison.status) && Number(comparison.ahead_by) > 0
         && Number(comparison.total_commits ?? comparison.commits?.length ?? 0) > 0;
       if (!hasChanges) { summary.skipped.notAhead += 1; continue; }
       if (!isFresh(date, now, freshnessHours)) { summary.skipped.stale += 1; continue; }
