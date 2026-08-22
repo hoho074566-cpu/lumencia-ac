@@ -73,14 +73,18 @@ export function parseCodexReviewRequest(body = '') {
   }
 }
 
-export function findLatestCodexReviewRequest(comments = [], prNumber, trustedActor = '') {
+function trustedCodexReviewRequests(comments = [], prNumber, trustedActor = '') {
   const actor = String(trustedActor || '').toLowerCase();
   return comments
     .map((comment) => ({ comment, request: parseCodexReviewRequest(comment.body) }))
     .filter(({ comment, request }) =>
       request
       && Number(request.pr) === Number(prNumber)
-      && (!actor || String(comment.user?.login || '').toLowerCase() === actor))
+      && (!actor || String(comment.user?.login || '').toLowerCase() === actor));
+}
+
+export function findLatestCodexReviewRequest(comments = [], prNumber, trustedActor = '') {
+  return trustedCodexReviewRequests(comments, prNumber, trustedActor)
     .sort((left, right) => Number(right.comment.id || 0) - Number(left.comment.id || 0))[0] || null;
 }
 
@@ -91,6 +95,8 @@ export function makeCodexReviewRequestBody({
   baselineReviewIds = [],
   baselineReviewCommentIds = [],
   baselineIssueCommentIds = [],
+  requireCycleEcho = false,
+  cycleToken = '',
 }) {
   const request = {
     pr: Number(prNumber),
@@ -99,12 +105,17 @@ export function makeCodexReviewRequestBody({
     baselineReviewIds: baselineReviewIds.map(String),
     baselineReviewCommentIds: baselineReviewCommentIds.map(String),
     baselineIssueCommentIds: baselineIssueCommentIds.map(String),
+    requireCycleEcho: Boolean(requireCycleEcho),
+    cycleToken: requireCycleEcho ? String(cycleToken || '') : '',
   };
+  const echoInstruction = request.requireCycleEcho
+    ? `. In your final top-level review result, include this exact line: \`Lumensia-Review-Cycle: ${request.cycleToken}\``
+    : '';
   return `<!-- ${CODEX_REVIEW_REQUEST_MARKER}
 ${JSON.stringify(request)}
 -->
 
-@codex review`;
+@codex review${echoInstruction}`;
 }
 
 export function createGitHubClient({ token, owner, repo, fetchImpl = fetch }) {
@@ -218,7 +229,10 @@ export async function ensureCodexReviewRequest({ api, pull, owner, logger = cons
     return { created: false, reason: 'current', comment: latestRequest.comment, request: latestRequest.request };
   }
 
+  const priorRequests = trustedCodexReviewRequests(issueComments, pull.number, owner);
+  const repeatedHead = priorRequests.some(({ request }) => request.head === currentPull.head.sha);
   const generationKey = `after-${latestRequest?.comment?.id || 0}`;
+  const cycleToken = `pr-${pull.number}-${generationKey}`;
   const body = makeCodexReviewRequestBody({
     prNumber: pull.number,
     head: currentPull.head.sha,
@@ -226,9 +240,11 @@ export async function ensureCodexReviewRequest({ api, pull, owner, logger = cons
     baselineReviewIds: reviews.map((review) => review.id),
     baselineReviewCommentIds: reviewComments.map((comment) => comment.id),
     baselineIssueCommentIds: issueComments.map((comment) => comment.id),
+    requireCycleEcho: repeatedHead,
+    cycleToken,
   });
   const comment = await api.createIssueComment(pull.number, body);
-  logger.log(`CODEX REVIEW REQUESTED: PR #${pull.number} ${currentPull.head.sha.slice(0, 7)} (${generationKey})`);
+  logger.log(`CODEX REVIEW REQUESTED: PR #${pull.number} ${currentPull.head.sha.slice(0, 7)} (${generationKey}${repeatedHead ? ', repeated-head echo required' : ''})`);
   return {
     created: true,
     comment,
