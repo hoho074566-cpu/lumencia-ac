@@ -68,6 +68,13 @@ export function newestAttempts(items, identity) {
   return [...newest.values()];
 }
 
+export function isAuthoritativeVercelSignal(signal, isStatus = false) {
+  const name = String(isStatus ? signal.context : signal.name || '');
+  const deploymentName = /^vercel(?:\s*[–—-]\s*.+)?$/i.test(name);
+  if (!deploymentName) return false;
+  return isStatus || /^vercel$/i.test(String(signal.app?.name || signal.app?.slug || ''));
+}
+
 export function safetyMatchesPull(check, { head, baseSha, prNumber }) {
   if (!baseSha) return true;
   return Array.isArray(check.pull_requests) && check.pull_requests.some((pull) =>
@@ -78,8 +85,8 @@ export function evaluateChecks({ head, baseSha, prNumber, checkRuns = [], status
   const currentChecks = checkRuns.filter((check) => !check.head_sha || check.head_sha === head);
   const checkIdentity = (check) => `${check.app?.id || check.app?.slug || check.app?.name || 'unknown'}:${check.name}`.toLowerCase();
   const safetyItems = newestAttempts(currentChecks.filter((check) => /^(repository checks|lumensia pr safety gate)$/i.test(check.name) && safetyMatchesPull(check, { head, baseSha, prNumber })), checkIdentity);
-  const vercelChecks = newestAttempts(currentChecks.filter((check) => /vercel/i.test(`${check.name} ${check.app?.name || ''}`)), checkIdentity);
-  const vercelStatuses = newestAttempts(statuses.filter((status) => (!status.sha || status.sha === head) && /vercel/i.test(status.context || '')), (status) => status.context.toLowerCase());
+  const vercelChecks = newestAttempts(currentChecks.filter((check) => isAuthoritativeVercelSignal(check)), checkIdentity);
+  const vercelStatuses = newestAttempts(statuses.filter((status) => (!status.sha || status.sha === head) && isAuthoritativeVercelSignal(status, true)), (status) => status.context.toLowerCase());
   const summarize = (states, absent = 'PENDING') => states.length === 0 ? absent : states.some((state) => state === 'FAIL') ? 'FAIL' : states.some((state) => state === 'PENDING') ? 'PENDING' : 'PASS';
   const safety = summarize(safetyItems.map(normalizeAuthoritativeCheck));
   const vercel = summarize([
@@ -133,6 +140,10 @@ export function recordDeliveredNotification(state, event, current) {
   else if (event === 'blocked') next.readinessNotified = 'blocked';
   else if (event === 'ready') next.readinessNotified = 'ready';
   return next;
+}
+
+export function partitionNotifications(events) {
+  return { beforePublish: events.filter((event) => event !== 'ready'), afterPublish: events.filter((event) => event === 'ready') };
 }
 
 const icon = (state) => state === 'PASS' || state === 'READY' ? '✅' : state === 'FAIL' || state === 'BLOCK' || state === 'CONFLICT' ? '❌' : '⏳';
@@ -207,14 +218,16 @@ async function evaluatePull(owner, repo, pr) {
   const priorComment = issueComments.find((comment) => comment.body?.includes(MARKER) && /github-actions\[bot\]/i.test(comment.user?.login || ''));
   const result = { number: pr.number, url: pr.html_url, head, codex, checks, readiness };
   const notifications = plannedNotifications(parseMachineState(priorComment?.body, head), result);
+  const notificationPhases = partitionNotifications(notifications.events);
   let notificationState = notifications.state;
-  for (const event of notifications.events) {
+  for (const event of notificationPhases.beforePublish) {
     const delivery = await deliverDiscord(process.env.DISCORD_WEBHOOK_URL, discordMessage(event, result));
     if (delivery.delivered) notificationState = recordDeliveredNotification(notificationState, event, result);
   }
-  const body = renderComment(result, notificationState);
-  if (!priorComment) await github(`/repos/${owner}/${repo}/issues/${pr.number}/comments`, { method: 'POST', body: JSON.stringify({ body }) });
-  else if (priorComment.body !== body) await github(`/repos/${owner}/${repo}/issues/comments/${priorComment.id}`, { method: 'PATCH', body: JSON.stringify({ body }) });
+  let body = renderComment(result, notificationState);
+  let readinessComment = priorComment;
+  if (!readinessComment) readinessComment = await github(`/repos/${owner}/${repo}/issues/${pr.number}/comments`, { method: 'POST', body: JSON.stringify({ body }) });
+  else if (readinessComment.body !== body) readinessComment = await github(`/repos/${owner}/${repo}/issues/comments/${readinessComment.id}`, { method: 'PATCH', body: JSON.stringify({ body }) });
   const existing = reusableReadinessCheck(newestAttempts(
     runs.check_runs.filter((run) => run.name === 'Lumensia Merge Readiness' && run.head_sha === head),
     () => 'lumensia-merge-readiness',
@@ -224,6 +237,15 @@ async function evaluatePull(owner, repo, pr) {
     : { name: 'Lumensia Merge Readiness', head_sha: head, status: 'completed', conclusion: readiness.state === 'READY' ? 'success' : 'failure', output: { title: readiness.state === 'READY' ? 'Ready for manual merge' : 'Action required', summary: renderCheckSummary(body) } };
   const checkRequest = existing ? (({ head_sha: _head, ...update }) => update)(checkPayload) : checkPayload;
   await github(existing ? `/repos/${owner}/${repo}/check-runs/${existing.id}` : `/repos/${owner}/${repo}/check-runs`, { method: existing ? 'PATCH' : 'POST', body: JSON.stringify(checkRequest) });
+  for (const event of notificationPhases.afterPublish) {
+    const delivery = await deliverDiscord(process.env.DISCORD_WEBHOOK_URL, discordMessage(event, result));
+    if (delivery.delivered) notificationState = recordDeliveredNotification(notificationState, event, result);
+  }
+  const deliveredBody = renderComment(result, notificationState);
+  if (deliveredBody !== body) {
+    body = deliveredBody;
+    await github(`/repos/${owner}/${repo}/issues/comments/${readinessComment.id}`, { method: 'PATCH', body: JSON.stringify({ body }) });
+  }
   console.log(`PR #${pr.number} ${head.slice(0, 7)}: ${readiness.state}; Discord events: ${notifications.events.join(', ') || 'none'}`);
 }
 

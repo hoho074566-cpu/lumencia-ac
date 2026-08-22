@@ -8,10 +8,12 @@ import {
   evaluateReadiness,
   hydratePulls,
   isCurrentPull,
+  isAuthoritativeVercelSignal,
   isOpenPull,
   newestAttempts,
   parseCodexSeverities,
   parseMachineState,
+  partitionNotifications,
   plannedNotifications,
   recordDeliveredNotification,
   reusableReadinessCheck,
@@ -54,7 +56,8 @@ test('new head without a current review waits', () => {
 test('clean current review passes', () => assert.equal(evaluateReview({ head: HEAD, reviews: [review(HEAD)] }).state, 'PASS'));
 
 test('old Vercel success cannot satisfy a new head', () => {
-  const result = evaluateChecks({ head: HEAD, checkRuns: [{ name: 'Vercel', head_sha: 'old', conclusion: 'success' }, { name: 'Vercel', head_sha: HEAD, conclusion: null }], statuses: [] });
+  const app = { name: 'Vercel' };
+  const result = evaluateChecks({ head: HEAD, checkRuns: [{ name: 'Vercel', head_sha: 'old', conclusion: 'success', app }, { name: 'Vercel', head_sha: HEAD, conclusion: null, app }], statuses: [] });
   assert.equal(result.vercel, 'PENDING');
 });
 
@@ -119,7 +122,7 @@ test('quoted and previous-commit severity text is ignored', () => {
 test('safety and Vercel are detected from current repository check names', () => {
   const result = evaluateChecks({ head: HEAD, checkRuns: [
     { name: 'Repository checks', head_sha: HEAD, conclusion: 'success' },
-    { name: 'Vercel Preview Comments', head_sha: HEAD, conclusion: 'success', app: { name: 'Vercel' } },
+    { name: 'Vercel', head_sha: HEAD, conclusion: 'success', app: { name: 'Vercel' } },
   ], statuses: [] });
   assert.deepEqual(result, { safety: 'PASS', vercel: 'PASS', required: 'PASS' });
 });
@@ -250,7 +253,7 @@ test('Safety Gate and Vercel pass only on actual success conclusions', () => {
   for (const conclusion of ['neutral', 'skipped']) {
     const result = evaluateChecks({ head: HEAD, checkRuns: [
       { name: 'Repository checks', head_sha: HEAD, conclusion },
-      { name: 'Vercel', head_sha: HEAD, conclusion },
+      { name: 'Vercel', head_sha: HEAD, conclusion, app: { name: 'Vercel' } },
     ] });
     assert.equal(result.safety, 'PENDING');
     assert.equal(result.vercel, 'PENDING');
@@ -258,7 +261,7 @@ test('Safety Gate and Vercel pass only on actual success conclusions', () => {
   }
   const cancelled = evaluateChecks({ head: HEAD, checkRuns: [
     { name: 'Repository checks', head_sha: HEAD, conclusion: 'cancelled' },
-    { name: 'Vercel', head_sha: HEAD, conclusion: 'cancelled' },
+    { name: 'Vercel', head_sha: HEAD, conclusion: 'cancelled', app: { name: 'Vercel' } },
   ] });
   assert.equal(cancelled.safety, 'FAIL'); assert.equal(cancelled.vercel, 'FAIL');
   assert.equal(evaluateReadiness({ ...readyInput(), checks: cancelled }).state, 'BLOCKED');
@@ -361,4 +364,21 @@ test('whitespace-only matching delimiter closes the fence', () => {
 test('real P1 after a valid whitespace-only closing fence is detected', () => {
   const body = '```markdown\n```javascript\nP1: example only\n```   \nP1: real finding';
   assert.equal(parseCodexSeverities(body).P1, 1);
+});
+
+test('Vercel helper checks cannot satisfy the deployment signal', () => {
+  const helper = { name: 'Vercel Preview Comments', head_sha: HEAD, conclusion: 'success', app: { name: 'Vercel' } };
+  assert.equal(isAuthoritativeVercelSignal(helper), false);
+  assert.equal(evaluateChecks({ head: HEAD, checkRuns: [helper] }).vercel, 'NOT_PRESENT');
+  const deployment = { name: 'Vercel', head_sha: HEAD, conclusion: 'success', app: { name: 'Vercel' } };
+  assert.equal(isAuthoritativeVercelSignal(deployment), true);
+  assert.equal(evaluateChecks({ head: HEAD, checkRuns: [helper, deployment] }).vercel, 'PASS');
+});
+
+test('READY notification is deferred until comment and check publication', () => {
+  assert.deepEqual(partitionNotifications(['codex', 'vercel', 'ready']), { beforePublish: ['codex', 'vercel'], afterPublish: ['ready'] });
+  const source = readFileSync(new URL('../lumensia-merge-readiness.mjs', import.meta.url), 'utf8');
+  const checkPublish = source.indexOf("await github(existing ? `/repos/${owner}/${repo}/check-runs/${existing.id}`");
+  const readyDelivery = source.indexOf('for (const event of notificationPhases.afterPublish)');
+  assert.ok(checkPublish >= 0 && readyDelivery > checkPublish);
 });
