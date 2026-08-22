@@ -520,8 +520,45 @@ export async function maintainAutoPulls({
         summary.waiting += 1;
         continue;
       }
+
+      // GitHub may report `unstable` after checks move. Bind authoritative PASS evidence to
+      // this final snapshot by rereading every hosted/Codex signal after the snapshot.
+      let postSnapshotSignals = finalSignals;
+      if (lastCandidate.mergeable_state === 'unstable') {
+        postSnapshotSignals = await evaluatePull(api, lastCandidate, owner, configuredActors);
+        if (findTrustedHumanCheck(postSnapshotSignals.issueComments, lastCandidate.number, lastCandidate.head.sha, owner)) {
+          summary.humanRequired += 1;
+          continue;
+        }
+        const postSnapshotFixRequests = trustedAutoFixRequests(postSnapshotSignals.issueComments, lastCandidate.number, owner);
+        const postSnapshotDecision = decideMaintenanceAction({
+          pull: lastCandidate,
+          codex: postSnapshotSignals.codex,
+          checks: postSnapshotSignals.checks,
+          readiness: postSnapshotSignals.readiness,
+          files: postSnapshotSignals.files,
+          fixRequests: postSnapshotFixRequests,
+          now,
+          mergeTokenAvailable: Boolean(mergeToken && mergeApi),
+        });
+        if (postSnapshotDecision.action !== 'MERGE') {
+          if (postSnapshotDecision.action === 'HUMAN' && await ensureHumanCheck({
+            api,
+            webhook,
+            pull: lastCandidate,
+            signals: postSnapshotSignals,
+            reason: postSnapshotDecision.reason,
+            details: postSnapshotDecision.details || [],
+            owner,
+            logger,
+            discordFetch,
+          })) summary.humanRequired += 1;
+          else summary.waiting += 1;
+          continue;
+        }
+      }
       pull = lastCandidate;
-      signals = finalSignals;
+      signals = postSnapshotSignals;
 
       let result;
       try {
