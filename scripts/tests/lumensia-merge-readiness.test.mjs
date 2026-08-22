@@ -450,3 +450,24 @@ test('latest review selection continues to ignore prior-head findings', () => {
   const result = evaluateReview({ head: HEAD, reviews: [current, stale], comments: [comment('old-head', 'P1: stale inline', { pull_request_review_id: 40 })] });
   assert.equal(result.state, 'PASS'); assert.deepEqual([result.P0, result.P1], [0, 0]);
 });
+
+test('privileged workflow bootstraps only from the trusted default branch', () => {
+  const workflow = readFileSync(new URL('../../.github/workflows/lumensia-merge-readiness.yml', import.meta.url), 'utf8');
+  assert.equal((workflow.match(/uses: actions\/checkout@v4/g) || []).length, 2);
+  assert.equal((workflow.match(/ref: refs\/heads\/\$\{\{ github\.event\.repository\.default_branch \}\}/g) || []).length, 2);
+  assert.equal((workflow.match(/persist-credentials: false/g) || []).length, 2);
+  assert.doesNotMatch(workflow, /pull_request\.head|github\.head_ref|refs\/pull/);
+});
+
+test('missing trusted evaluator is a clean bootstrap no-op', () => {
+  const workflow = readFileSync(new URL('../../.github/workflows/lumensia-merge-readiness.yml', import.meta.url), 'utf8');
+  assert.equal((workflow.match(/if \[\[ -f scripts\/lumensia-merge-readiness\.mjs \]\]/g) || []).length, 2);
+  assert.equal((workflow.match(/Merge Readiness bootstrap: trusted evaluator is not on default branch yet; it will become active after this PR is merged\./g) || []).length, 2);
+  assert.equal((workflow.match(/if: steps\.evaluator\.outputs\.available == 'true'/g) || []).length, 4);
+});
+
+test('present trusted evaluator follows the normal runtime path', () => {
+  const workflow = readFileSync(new URL('../../.github/workflows/lumensia-merge-readiness.yml', import.meta.url), 'utf8');
+  assert.equal((workflow.match(/echo "available=true" >> "\$GITHUB_OUTPUT"/g) || []).length, 2);
+  assert.equal((workflow.match(/run: node scripts\/lumensia-merge-readiness\.mjs/g) || []).length, 2);
+});
