@@ -246,7 +246,8 @@ test('Discord disables mention parsing for untrusted title and branch text', asy
 test('workflow statically checks out and executes only the trusted main script', async () => {
   const workflow = await readFile(new URL('../../.github/workflows/lumensia-auto-pr.yml', import.meta.url), 'utf8');
   assert.match(workflow, /schedule:/);
-  assert.match(workflow, /workflow_dispatch:/);
+  assert.doesNotMatch(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /environment: lumensia-trusted-auto-pr/);
   assert.match(workflow, /ref: refs\/heads\/main/);
   assert.match(workflow, /sparse-checkout: scripts\/lumensia-auto-pr\.mjs/);
   assert.match(workflow, /persist-credentials: false/);

@@ -3,7 +3,6 @@ name: Lumensia Auto PR
 on:
   schedule:
     - cron: '*/5 * * * *'
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -14,6 +13,7 @@ concurrency:
 
 jobs:
   reconcile:
+    environment: lumensia-trusted-auto-pr
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

@@ -37,24 +37,25 @@ export function parseCodexSeverities(body = '') {
   return counts;
 }
 
-export function reconcileCodexCleanReaction({ head, reactions = [], configuredActors = '', previous = {}, allowInitialBinding = false }) {
-  const reactionIds = reactions
-    .filter((reaction) => reaction.content === '+1' && reaction.id != null && isCodexActor(reaction.user, configuredActors))
-    .map((reaction) => String(reaction.id));
+export function reconcileCodexCleanReaction({ head, reactions = [], configuredActors = '', previous = {}, headActivatedAt }) {
+  const trustedReactions = reactions.filter((reaction) => reaction.content === '+1' && reaction.id != null && isCodexActor(reaction.user, configuredActors));
+  const reactionIds = trustedReactions.map((reaction) => String(reaction.id));
+  const activationTimestamp = Date.parse(headActivatedAt);
+  const eventReactionId = Number.isFinite(activationTimestamp)
+    ? trustedReactions.filter((reaction) => (Date.parse(reaction.created_at) || 0) >= activationTimestamp).at(-1)?.id
+    : undefined;
+  const headEventReactionId = eventReactionId != null ? String(eventReactionId) : undefined;
   if (!previous.headSha) {
-    const reactionId = allowInitialBinding ? reactionIds.at(-1) : undefined;
-    return { headSha: head, seenReactionIds: reactionIds, ...(reactionId ? { reactionId } : { awaitingOpenedEvent: true }) };
+    return { headSha: head, seenReactionIds: reactionIds, ...(headEventReactionId ? { reactionId: headEventReactionId } : {}) };
   }
   if (previous.headSha !== head) return { headSha: head, seenReactionIds: reactionIds };
   const seen = new Set(Array.isArray(previous.seenReactionIds) ? previous.seenReactionIds.map(String) : []);
   const newReactionId = reactionIds.find((id) => !seen.has(id));
   const retainedReactionId = reactionIds.includes(String(previous.reactionId)) ? String(previous.reactionId) : undefined;
-  const openedEventReactionId = allowInitialBinding && previous.awaitingOpenedEvent ? reactionIds.at(-1) : undefined;
   return {
     headSha: head,
     seenReactionIds: [...new Set([...seen, ...reactionIds])],
-    ...(retainedReactionId || openedEventReactionId || newReactionId ? { reactionId: retainedReactionId || openedEventReactionId || newReactionId } : {}),
-    ...(!allowInitialBinding && previous.awaitingOpenedEvent ? { awaitingOpenedEvent: true } : {}),
+    ...(retainedReactionId || headEventReactionId || newReactionId ? { reactionId: retainedReactionId || headEventReactionId || newReactionId } : {}),
   };
 }
 
@@ -266,8 +267,9 @@ async function evaluatePull(owner, repo, pr, event = {}) {
   const priorComment = issueComments.find((comment) => comment.body?.includes(MARKER) && /github-actions\[bot\]/i.test(comment.user?.login || ''));
   const storedState = decodeMachineState(priorComment?.body);
   const priorState = storedState.head === head ? storedState : { head };
-  const openedForCurrentHead = event.action === 'opened' && event.pull_request?.head?.sha === head;
-  const codexCleanReaction = reconcileCodexCleanReaction({ head, reactions, configuredActors: process.env.CODEX_ACTORS, previous: storedState.codexCleanReaction, allowInitialBinding: openedForCurrentHead });
+  const headEventForCurrentHead = ['opened', 'synchronize'].includes(event.action) && event.pull_request?.head?.sha === head;
+  const headActivatedAt = headEventForCurrentHead ? event.pull_request.updated_at || event.pull_request.created_at : undefined;
+  const codexCleanReaction = reconcileCodexCleanReaction({ head, reactions, configuredActors: process.env.CODEX_ACTORS, previous: storedState.codexCleanReaction, headActivatedAt });
   const codex = evaluateCodex({ head, reviews, comments, cleanReaction: codexCleanReaction, configuredActors: process.env.CODEX_ACTORS });
   const requiredCheckNames = (process.env.REQUIRED_CHECKS || '').split(',');
   const checkRuns = applyCheckRunTransition(runs.check_runs, event, head);
