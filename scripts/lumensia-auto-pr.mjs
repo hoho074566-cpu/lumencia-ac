@@ -3,6 +3,8 @@
 const API_ROOT = 'https://api.github.com';
 export const DEFAULT_FRESHNESS_HOURS = 24;
 export const AUTO_PR_MARKER = '<!-- lumensia-auto-pr:v1 -->';
+export const DISCORD_PENDING_MARKER = '<!-- lumensia-auto-pr-discord:pending -->';
+export const DISCORD_DELIVERED_MARKER = '<!-- lumensia-auto-pr-discord:delivered -->';
 
 export function isCandidateBranch(name, defaultBranch = 'main') {
   return typeof name === 'string'
@@ -48,7 +50,8 @@ After PR creation, Lumensia PR safety gate, Vercel, Codex Review, Lumensia Merge
 
 Manual merge only. P0/P1 and failed authoritative checks block merge. P2/P3 are non-blocking by project policy.
 
-${AUTO_PR_MARKER}`;
+${AUTO_PR_MARKER}
+${DISCORD_PENDING_MARKER}`;
 }
 
 export function isAlreadyExistsError(error) {
@@ -95,6 +98,7 @@ export function createGitHubClient({ token, owner, repo, fetchImpl = fetch }) {
     compare: (base, head) => request('GET', `/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}`),
     listPulls: (head) => paginate(`/pulls?state=all&head=${encodeURIComponent(`${owner}:${head}`)}`),
     createPull: (payload) => request('POST', '/pulls', payload),
+    updatePull: (number, payload) => request('PATCH', `/pulls/${number}`, payload),
   };
 }
 
@@ -119,6 +123,16 @@ export async function deliverDiscord(webhook, pull, branch, sha, fetchImpl = fet
     logger.warn(`Discord PR-created notification failed: ${error?.name || 'network error'}.`);
     return { delivered: false, reason: 'network' };
   }
+}
+
+async function notifyCreatedPull({ api, webhook, pull, branch, sha, fetchImpl, logger }) {
+  if (!pull.body?.includes(AUTO_PR_MARKER) || !pull.body.includes(DISCORD_PENDING_MARKER)) return { retried: false };
+  const delivery = await deliverDiscord(webhook, pull, branch, sha, fetchImpl, logger);
+  if (!delivery.delivered) return { retried: true, delivered: false };
+  const body = pull.body.replace(DISCORD_PENDING_MARKER, DISCORD_DELIVERED_MARKER);
+  await api.updatePull(pull.number, { body });
+  pull.body = body;
+  return { retried: true, delivered: true };
 }
 
 function initialSummary() {
@@ -150,7 +164,13 @@ export async function scanAutoPulls({ token, owner, repo, api, webhook = '', now
     if (String(branch).toLowerCase().includes('-no-pr')) { summary.skipped.optOut += 1; continue; }
     if (!isCandidateBranch(branch)) { summary.skipped.scope += 1; continue; }
     try {
-      if ((await api.listPulls(branch)).length > 0) { summary.skipped.existing += 1; continue; }
+      const existingPulls = await api.listPulls(branch);
+      if (existingPulls.length > 0) {
+        const retryPull = existingPulls.find((pull) => pull.state === 'open' && pull.body?.includes(AUTO_PR_MARKER) && pull.body.includes(DISCORD_PENDING_MARKER));
+        if (retryPull) await notifyCreatedPull({ api, webhook, pull: retryPull, branch, sha: retryPull.head?.sha || '', fetchImpl: discordFetch, logger });
+        summary.skipped.existing += 1;
+        continue;
+      }
       const comparison = await api.compare('main', branch);
       const commit = comparison.commits?.at(-1) || branchData.commit;
       const sha = comparison.head_commit?.sha || commit?.sha || branchData.commit?.sha || '';
@@ -175,8 +195,9 @@ export async function scanAutoPulls({ token, owner, repo, api, webhook = '', now
         }
         throw error;
       }
+      pull = { ...pull, title, body: pull.body || makeBody(branch, sha) };
       summary.created.push({ number: pull.number, branch, sha, url: pull.html_url });
-      await deliverDiscord(webhook, { ...pull, title }, branch, sha, discordFetch, logger);
+      await notifyCreatedPull({ api, webhook, pull, branch, sha, fetchImpl: discordFetch, logger });
     } catch (error) {
       if ([401, 403].includes(error?.status)) {
         logger.error('AUTO PR DISABLED / TOKEN PERMISSION ERROR');

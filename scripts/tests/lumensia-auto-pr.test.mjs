@@ -27,7 +27,7 @@ function comparison(name, { date = recent, status = 'ahead', ahead = 1 } = {}) {
 
 function harness({ branches = ['codex/feature'], comparisons = {}, existing = {}, createError = {}, validateError, webhook = '', discordFetch } = {}) {
   const pulls = new Map(Object.entries(existing));
-  const calls = { create: [], pulls: [], discord: 0 };
+  const calls = { create: [], update: [], pulls: [], discord: 0 };
   const api = {
     validate: async () => { if (validateError) throw validateError; },
     listBranches: async () => branches.map((name) => ({ name, commit: { sha: `${name}sha` } })),
@@ -40,9 +40,16 @@ function harness({ branches = ['codex/feature'], comparisons = {}, existing = {}
     createPull: async (payload) => {
       calls.create.push(payload);
       if (createError[payload.head]) throw createError[payload.head];
-      const pull = { number: calls.create.length, html_url: `https://example.test/pull/${calls.create.length}` };
+      const pull = { number: calls.create.length, html_url: `https://example.test/pull/${calls.create.length}`, state: 'open', title: payload.title, body: payload.body, head: { sha: `${payload.head}-sha` } };
       pulls.set(payload.head, [pull]);
       return pull;
+    },
+    updatePull: async (number, payload) => {
+      calls.update.push({ number, payload });
+      for (const branchPulls of pulls.values()) {
+        const pull = branchPulls.find((item) => item.number === number);
+        if (pull) Object.assign(pull, payload);
+      }
     },
   };
   const logs = [];
@@ -191,6 +198,28 @@ test('Discord failure is sanitized and does not undo PR success', async () => {
   assert.equal(h.calls.discord, 1);
   assert.match(h.logs.join('\n'), /HTTP 500/);
   assert.doesNotMatch(h.logs.join('\n'), /WEBHOOK-SECRET/);
+});
+
+test('failed creation notification is retried once and stops after successful delivery', async () => {
+  let successfulDeliveries = 0;
+  let attempts = 0;
+  const h = harness({
+    webhook: 'https://discord.test/webhook',
+    discordFetch: async () => {
+      attempts += 1;
+      if (attempts === 1) return { ok: false, status: 503 };
+      successfulDeliveries += 1;
+      return { ok: true };
+    },
+  });
+  await h.run();
+  await h.run();
+  await h.run();
+  assert.equal(h.calls.create.length, 1);
+  assert.equal(h.calls.discord, 2);
+  assert.equal(successfulDeliveries, 1);
+  assert.equal(h.calls.update.length, 1);
+  assert.match(h.calls.update[0].payload.body, /lumensia-auto-pr-discord:delivered/);
 });
 
 test('Discord network errors expose only the error type', async () => {
