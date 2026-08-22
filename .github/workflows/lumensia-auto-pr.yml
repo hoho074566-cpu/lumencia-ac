@@ -52,7 +52,7 @@ jobs:
         run: node scripts/lumensia-auto-pr.mjs
 
       - name: Check out trusted default-branch V1.2 controller only
-        if: steps.script.outputs.available == 'true'
+        if: ${{ !cancelled() && steps.script.outputs.available == 'true' }}
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository }}
@@ -66,7 +66,7 @@ jobs:
           sparse-checkout-cone-mode: false
       - name: Detect trusted V1.2 controller bootstrap state
         id: maintenance
-        if: steps.script.outputs.available == 'true'
+        if: ${{ !cancelled() && steps.script.outputs.available == 'true' }}
         shell: bash
         run: |
           if [[ -f scripts/lumensia-auto-maintenance-run.mjs ]]; then
@@ -76,7 +76,7 @@ jobs:
             echo "Auto maintenance bootstrap: V1.2 controller is not on main yet."
           fi
       - name: Maintain Auto-PRs and conditionally auto-merge
-        if: steps.script.outputs.available == 'true' && steps.maintenance.outputs.available == 'true'
+        if: ${{ !cancelled() && steps.script.outputs.available == 'true' && steps.maintenance.outputs.available == 'true' }}
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
           LUMENSIA_PR_CREATOR_TOKEN: ${{ secrets.LUMENSIA_PR_CREATOR_TOKEN }}
