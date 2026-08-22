@@ -15,6 +15,8 @@ export const AUTO_FIX_MARKER = 'lumensia-auto-fix:v1';
 export const HUMAN_CHECK_MARKER = 'lumensia-human-check:v1';
 export const MAX_AUTO_FIX_ATTEMPTS = 5;
 export const FIX_STALL_MINUTES = 30;
+export const MAX_AUTO_MERGE_CODE_FILES = 12;
+export const MAX_AUTO_MERGE_LINE_CHANGES = 500;
 const OFFICIAL_CODEX_ACTORS = ['chatgpt-codex-connector[bot]', 'chatgpt-codex-connector'];
 const OLD_AUTO_PR_POLICY = 'Manual merge only. P0/P1 and failed authoritative checks block merge. P2/P3 are non-blocking by project policy.';
 const V12_AUTO_PR_POLICY = 'V1.2: guarded low-risk PRs may auto-merge after authoritative checks pass. Protected/high-risk changes require human merge. P0/P1 may trigger up to five focused auto-fix attempts; P2/P3 remain non-blocking.';
@@ -66,6 +68,7 @@ export function protectedMergeReason(path = '') {
   const normalized = String(path || '').replace(/^\.\//, '');
   const lower = normalized.toLowerCase();
   if (PROTECTED_EXACT_PATHS.has(normalized)) return 'core-or-config';
+  if (/(^|\/)\.env[^/]*$/i.test(normalized) || /(^|\/)[^/]+\.env$/i.test(normalized)) return 'environment-config';
   if (lower.startsWith('.github/')) return 'automation';
   if (lower.startsWith('scripts/lumensia-') || lower.startsWith('scripts/tests/lumensia-')) return 'automation';
   if (lower.startsWith('api/')) return 'api';
@@ -95,6 +98,33 @@ export function protectedMergePaths(files = []) {
     }
   }
   return protectedPaths;
+}
+
+export function isDocumentationOrAssetPath(path = '') {
+  const normalized = String(path || '').replace(/^\.\//, '').toLowerCase();
+  return normalized.startsWith('docs/') || normalized.startsWith('assets/');
+}
+
+export function autoMergeBreadth(files = []) {
+  let codeFiles = 0;
+  let lineChanges = 0;
+  for (const file of files) {
+    if (!file || typeof file === 'string') {
+      if (typeof file === 'string' && !isDocumentationOrAssetPath(file)) codeFiles += 1;
+      continue;
+    }
+    const currentPath = file.filename || '';
+    const previousPath = file.previous_filename || '';
+    const lowRiskOnly = Boolean(currentPath)
+      && isDocumentationOrAssetPath(currentPath)
+      && (!previousPath || isDocumentationOrAssetPath(previousPath));
+    if (lowRiskOnly) continue;
+    codeFiles += 1;
+    const explicitChanges = Number(file.changes);
+    const fallbackChanges = Number(file.additions || 0) + Number(file.deletions || 0);
+    lineChanges += Number.isFinite(explicitChanges) ? Math.max(0, explicitChanges) : Math.max(0, fallbackChanges);
+  }
+  return { codeFiles, lineChanges };
 }
 
 function parseHiddenJsonMarker(body = '', marker = '') {
@@ -185,6 +215,10 @@ export function decideMaintenanceAction({
     return { action: 'FIX', attempt: fixRequests.length + 1 };
   }
 
+  if (Number(codex?.unknown || 0) > 0) {
+    return { action: 'HUMAN', reason: 'codex-unknown', details: [`Codex returned ${Number(codex.unknown)} unclassified finding(s).`] };
+  }
+
   if (readiness?.state !== 'READY') return { action: 'WAIT', reason: 'not-ready' };
   if (pull?.mergeable !== true || pull?.mergeable_state !== 'clean') return { action: 'WAIT', reason: 'merge-state-not-clean' };
 
@@ -196,6 +230,19 @@ export function decideMaintenanceAction({
       details: protectedPaths.map((item) => `${item.path}${item.source === 'previous_filename' ? ' [renamed source]' : ''} (${item.reason})`),
     };
   }
+
+  const breadth = autoMergeBreadth(files);
+  if (breadth.codeFiles > MAX_AUTO_MERGE_CODE_FILES || breadth.lineChanges > MAX_AUTO_MERGE_LINE_CHANGES) {
+    return {
+      action: 'HUMAN',
+      reason: 'high-risk-breadth',
+      details: [
+        `Non-doc/asset files=${breadth.codeFiles} (max ${MAX_AUTO_MERGE_CODE_FILES})`,
+        `Non-doc/asset line changes=${breadth.lineChanges} (max ${MAX_AUTO_MERGE_LINE_CHANGES})`,
+      ],
+    };
+  }
+
   if (!mergeTokenAvailable) return { action: 'HUMAN', reason: 'merge-token-unavailable' };
   return { action: 'MERGE' };
 }
