@@ -3,9 +3,14 @@ name: Lumensia Auto PR
 on:
   schedule:
     - cron: '*/5 * * * *'
+  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
+  issues: read
+  checks: read
+  statuses: read
 
 concurrency:
   group: lumensia-auto-pr-scan
@@ -17,13 +22,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Check out trusted default-branch auto-PR script only
+      - name: Check out trusted default-branch automation only
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository }}
           ref: refs/heads/main
           persist-credentials: false
-          sparse-checkout: scripts/lumensia-auto-pr.mjs
+          sparse-checkout: |
+            scripts/lumensia-auto-pr.mjs
+            scripts/lumensia-auto-maintenance.mjs
+            scripts/lumensia-auto-maintenance-run.mjs
+            scripts/lumensia-merge-readiness.mjs
           sparse-checkout-cone-mode: false
       - name: Detect trusted script bootstrap state
         id: script
@@ -34,6 +43,12 @@ jobs:
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
             echo "Auto PR bootstrap: trusted script is not on main yet."
+          fi
+          if [[ -f scripts/lumensia-auto-maintenance-run.mjs ]]; then
+            echo "maintenance=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "maintenance=false" >> "$GITHUB_OUTPUT"
+            echo "Auto maintenance bootstrap: V1.2 controller is not on main yet."
           fi
       - name: Set up Node.js 22
         if: steps.script.outputs.available == 'true'
@@ -48,3 +63,13 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           CODEX_ACTORS: ${{ vars.CODEX_REVIEW_ACTORS }}
         run: node scripts/lumensia-auto-pr.mjs
+      - name: Maintain Auto-PRs and conditionally auto-merge
+        if: steps.script.outputs.available == 'true' && steps.script.outputs.maintenance == 'true'
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          LUMENSIA_PR_CREATOR_TOKEN: ${{ secrets.LUMENSIA_PR_CREATOR_TOKEN }}
+          LUMENSIA_AUTO_MERGE_TOKEN: ${{ github.token }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          CODEX_ACTORS: ${{ vars.CODEX_REVIEW_ACTORS }}
+          REQUIRED_CHECKS: ${{ vars.LUMENSIA_REQUIRED_CHECKS }}
+        run: node scripts/lumensia-auto-maintenance-run.mjs
