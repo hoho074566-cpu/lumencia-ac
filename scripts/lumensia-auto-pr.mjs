@@ -55,6 +55,12 @@ ${AUTO_PR_MARKER}
 ${DISCORD_PENDING_MARKER}`;
 }
 
+export function isAlreadyExistsError(error) {
+  if (error?.status !== 422) return false;
+  const text = JSON.stringify(error.data || error.message || '').toLowerCase();
+  return text.includes('pull request already exists') || (text.includes('head') && text.includes('already exists'));
+}
+
 export function parseCodexReviewRequest(body = '') {
   const match = String(body).match(/<!--\s*lumensia-codex-review-request:v4\s*\n(\{[^]*?\})\s*\n?-->/);
   if (!match) return null;
