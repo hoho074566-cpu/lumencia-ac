@@ -118,9 +118,17 @@ export function codexReviewedCommit(body = '') {
   return match?.[1]?.toLowerCase() || '';
 }
 
-export function isCurrentCleanCodexComment(comment, head, baselineIssueCommentIds = [], configuredActors = '') {
+export function isAfterRequestTimestamp(value, requestCreatedAt = '') {
+  const requestTime = Date.parse(requestCreatedAt);
+  if (!Number.isFinite(requestTime)) return true;
+  const resultTime = Date.parse(value);
+  return Number.isFinite(resultTime) && resultTime > requestTime;
+}
+
+export function isCurrentCleanCodexComment(comment, head, baselineIssueCommentIds = [], configuredActors = '', requestCreatedAt = '') {
   if (!comment || !isCodexActor(comment.user, configuredActors)) return false;
   if (new Set(baselineIssueCommentIds.map(String)).has(String(comment.id))) return false;
+  if (!isAfterRequestTimestamp(comment.created_at || comment.updated_at, requestCreatedAt)) return false;
   if (!/^Codex Review:\s*Didn't find any major issues\./im.test(String(comment.body || ''))) return false;
   const reviewed = codexReviewedCommit(comment.body);
   return Boolean(reviewed) && String(head || '').toLowerCase().startsWith(reviewed);
@@ -136,6 +144,7 @@ export function evaluateCodex({
   baselineReviewCommentIds = [],
   baselineIssueCommentIds = [],
   configuredActors = '',
+  requestCreatedAt = '',
 }) {
   const baselineReviews = new Set(baselineReviewIds.map(String));
   const baselineComments = new Set(baselineReviewCommentIds.map(String));
@@ -143,7 +152,8 @@ export function evaluateCodex({
   const currentReviews = trustedReviews.filter((review) => review.commit_id === head
     && review.submitted_at
     && review.state?.toUpperCase() !== 'DISMISSED'
-    && !baselineReviews.has(String(review.id)));
+    && !baselineReviews.has(String(review.id))
+    && isAfterRequestTimestamp(review.submitted_at, requestCreatedAt));
 
   if (currentReviews.length === 0) {
     const trustedCleanComment = issueComments.some((comment) => isCurrentCleanCodexComment(
@@ -151,6 +161,7 @@ export function evaluateCodex({
       head,
       baselineIssueCommentIds,
       configuredActors,
+      requestCreatedAt,
     ));
     if (trustedCleanComment) return { state: 'PASS', P0: 0, P1: 0, P2: 0, P3: 0, unknown: 0 };
 
@@ -167,7 +178,8 @@ export function evaluateCodex({
   const currentComments = comments.filter((comment) => comment.commit_id === head
     && comment.pull_request_review_id === latestReview.id
     && !baselineComments.has(String(comment.id))
-    && isCodexActor(comment.user, configuredActors));
+    && isCodexActor(comment.user, configuredActors)
+    && isAfterRequestTimestamp(comment.created_at || comment.updated_at, requestCreatedAt));
   const totals = { P0: 0, P1: 0, P2: 0, P3: 0, unknown: 0 };
   for (const item of [latestReview, ...currentComments]) {
     const parsed = parseCodexSeverities(item.body);
@@ -368,6 +380,7 @@ function requestCycleSnapshot(activeRequest, head, baseSha) {
     baselineReviewCommentIds: (activeRequest.request.baselineReviewCommentIds || []).map(String),
     baselineIssueCommentIds: (activeRequest.request.baselineIssueCommentIds || []).map(String),
     commentId: activeRequest.comment.id,
+    requestCreatedAt: String(activeRequest.comment.created_at || ''),
     source: 'trusted-pat-v4',
   };
 }
@@ -401,6 +414,7 @@ async function evaluatePull(owner, repo, pr, event = {}) {
       baselineReviewCommentIds: reviewCycle.baselineReviewCommentIds,
       baselineIssueCommentIds: reviewCycle.baselineIssueCommentIds,
       configuredActors: process.env.CODEX_ACTORS,
+      requestCreatedAt: reviewCycle.requestCreatedAt,
     })
     : pendingCodex();
 
@@ -425,7 +439,8 @@ async function evaluatePull(owner, repo, pr, event = {}) {
     const finalTrustedRequest = findLatestTrustedCodexReviewRequest(finalIssueComments, pr.number, owner, head, currentPr.base.sha);
     if (finalTrustedRequest?.comment?.id !== reviewCycle.commentId
       || finalTrustedRequest?.request?.head !== head
-      || finalTrustedRequest?.request?.baseSha !== currentPr.base.sha) {
+      || finalTrustedRequest?.request?.baseSha !== currentPr.base.sha
+      || String(finalTrustedRequest?.comment?.created_at || '') !== reviewCycle.requestCreatedAt) {
       console.log(`PR #${pr.number} trusted Codex review cycle changed before READY publication; skipping mutations.`);
       return;
     }
@@ -438,6 +453,7 @@ async function evaluatePull(owner, repo, pr, event = {}) {
       baselineReviewCommentIds: reviewCycle.baselineReviewCommentIds,
       baselineIssueCommentIds: reviewCycle.baselineIssueCommentIds,
       configuredActors: process.env.CODEX_ACTORS,
+      requestCreatedAt: reviewCycle.requestCreatedAt,
     });
     const finalChecks = evaluateChecks({ head, baseSha: currentPr.base.sha, prNumber: pr.number, checkRuns: finalRuns.check_runs, statuses: finalCombined.statuses, requiredCheckNames });
     readiness = evaluateReadiness({ codex, checks: finalChecks, mergeable: currentPr.mergeable, mergeableState: currentPr.mergeable_state, draft: currentPr.draft });
