@@ -7,6 +7,7 @@ import {
   evaluateChecks,
   evaluateCodex,
   evaluateReadiness,
+  findReadinessCheck,
   hydratePulls,
   isCurrentPull,
   isAuthoritativeVercelSignal,
@@ -17,6 +18,8 @@ import {
   partitionNotifications,
   plannedNotifications,
   recordDeliveredNotification,
+  readinessCheckIdentity,
+  readinessCheckName,
   reusableReadinessCheck,
   renderComment,
   renderCheckSummary,
@@ -480,4 +483,28 @@ test('overlapping rerun stays pending when older attempt finishes later', () => 
   const checks = evaluateChecks({ head: HEAD, checkRuns: [newSafety, oldSafety, newVercel, oldVercel] });
   assert.deepEqual([checks.safety, checks.vercel], ['PENDING', 'PENDING']);
   assert.equal(evaluateReadiness({ ...readyInput(), checks }).state, 'WAITING');
+});
+
+test('same-head PR readiness check identity is isolated by pull request', () => {
+  const sharedHead = HEAD;
+  const runs = [
+    { id: 1, name: readinessCheckName(14), external_id: readinessCheckIdentity(14), head_sha: sharedHead, status: 'completed', conclusion: 'success', created_at: '2026-01-01T00:00:00Z' },
+    { id: 2, name: readinessCheckName(15), external_id: readinessCheckIdentity(15), head_sha: sharedHead, status: 'completed', conclusion: 'failure', created_at: '2026-01-01T00:00:00Z' },
+  ];
+  assert.equal(findReadinessCheck(runs, 14, sharedHead).id, 1);
+  assert.equal(findReadinessCheck(runs, 15, sharedHead).id, 2);
+  assert.equal(findReadinessCheck(runs, 16, sharedHead), undefined);
+});
+
+test('same-head PRs can retain different base-specific readiness states', () => {
+  const prA = evaluateReadiness(readyInput());
+  const prB = evaluateReadiness({ ...readyInput(), mergeable: false, mergeableState: 'dirty' });
+  assert.equal(prA.state, 'READY'); assert.equal(prB.state, 'BLOCKED');
+  assert.notEqual(readinessCheckIdentity(14), readinessCheckIdentity(15));
+  assert.notEqual(readinessCheckName(14), readinessCheckName(15));
+});
+
+test('PR-specific readiness checks do not trigger recursive evaluation', () => {
+  const workflow = readFileSync(new URL('../../.github/workflows/lumensia-merge-readiness.yml', import.meta.url), 'utf8');
+  assert.equal((workflow.match(/!startsWith\(github\.event\.check_run\.name, 'Lumensia Merge Readiness'\)/g) || []).length, 2);
 });

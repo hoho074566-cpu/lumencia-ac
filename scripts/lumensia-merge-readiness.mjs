@@ -212,6 +212,19 @@ export function reusableReadinessCheck(check, readinessState) {
   return readinessState === 'WAITING' && check?.status === 'completed' ? undefined : check;
 }
 
+export function readinessCheckIdentity(prNumber) {
+  return `lumensia-merge-readiness:v1:pr:${prNumber}`;
+}
+
+export function readinessCheckName(prNumber) {
+  return `Lumensia Merge Readiness (PR #${prNumber})`;
+}
+
+export function findReadinessCheck(checkRuns, prNumber, head) {
+  const identity = readinessCheckIdentity(prNumber);
+  return newestAttempts(checkRuns.filter((run) => run.head_sha === head && run.external_id === identity), () => identity)[0];
+}
+
 async function evaluatePull(owner, repo, pr, event = {}) {
   const head = pr.head.sha;
   const [reviews, comments, runs, combined, issueComments] = await Promise.all([
@@ -241,13 +254,12 @@ async function evaluatePull(owner, repo, pr, event = {}) {
   let readinessComment = priorComment;
   if (!readinessComment) readinessComment = await github(`/repos/${owner}/${repo}/issues/${pr.number}/comments`, { method: 'POST', body: JSON.stringify({ body }) });
   else if (readinessComment.body !== body) readinessComment = await github(`/repos/${owner}/${repo}/issues/comments/${readinessComment.id}`, { method: 'PATCH', body: JSON.stringify({ body }) });
-  const existing = reusableReadinessCheck(newestAttempts(
-    runs.check_runs.filter((run) => run.name === 'Lumensia Merge Readiness' && run.head_sha === head),
-    () => 'lumensia-merge-readiness',
-  )[0], readiness.state);
+  const checkName = readinessCheckName(pr.number);
+  const externalId = readinessCheckIdentity(pr.number);
+  const existing = reusableReadinessCheck(findReadinessCheck(runs.check_runs, pr.number, head), readiness.state);
   const checkPayload = readiness.state === 'WAITING'
-    ? { name: 'Lumensia Merge Readiness', head_sha: head, status: 'in_progress', output: { title: 'Waiting for current-head results', summary: renderCheckSummary(body) } }
-    : { name: 'Lumensia Merge Readiness', head_sha: head, status: 'completed', conclusion: readiness.state === 'READY' ? 'success' : 'failure', output: { title: readiness.state === 'READY' ? 'Ready for manual merge' : 'Action required', summary: renderCheckSummary(body) } };
+    ? { name: checkName, external_id: externalId, head_sha: head, status: 'in_progress', output: { title: 'Waiting for current-head results', summary: renderCheckSummary(body) } }
+    : { name: checkName, external_id: externalId, head_sha: head, status: 'completed', conclusion: readiness.state === 'READY' ? 'success' : 'failure', output: { title: readiness.state === 'READY' ? 'Ready for manual merge' : 'Action required', summary: renderCheckSummary(body) } };
   const checkRequest = existing ? (({ head_sha: _head, ...update }) => update)(checkPayload) : checkPayload;
   await github(existing ? `/repos/${owner}/${repo}/check-runs/${existing.id}` : `/repos/${owner}/${repo}/check-runs`, { method: existing ? 'PATCH' : 'POST', body: JSON.stringify(checkRequest) });
   for (const event of notificationPhases.afterPublish) {
