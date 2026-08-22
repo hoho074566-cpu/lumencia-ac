@@ -37,10 +37,17 @@ export function parseCodexSeverities(body = '') {
   return counts;
 }
 
-export function evaluateCodex({ head, reviews = [], comments = [], configuredActors = '' }) {
+export function evaluateCodex({ head, headCommittedAt, reviews = [], comments = [], reactions = [], configuredActors = '' }) {
   const trustedReviews = reviews.filter((review) => isCodexActor(review.user, configuredActors));
   const currentReviews = trustedReviews.filter((review) => review.commit_id === head && review.submitted_at && review.state?.toUpperCase() !== 'DISMISSED');
-  if (currentReviews.length === 0) return { state: 'PENDING', P0: 0, P1: 0, P2: 0, P3: 0, unknown: 0 };
+  if (currentReviews.length === 0) {
+    const headTimestamp = Date.parse(headCommittedAt);
+    const trustedCleanReaction = Number.isFinite(headTimestamp) && reactions.some((reaction) =>
+      reaction.content === '+1'
+      && isCodexActor(reaction.user, configuredActors)
+      && (Date.parse(reaction.created_at) || 0) >= headTimestamp);
+    return { state: trustedCleanReaction ? 'PASS' : 'PENDING', P0: 0, P1: 0, P2: 0, P3: 0, unknown: 0 };
+  }
   const latestReview = currentReviews.reduce((latest, review) => {
     const submitted = Date.parse(review.submitted_at) || 0;
     const latestSubmitted = Date.parse(latest.submitted_at) || 0;
@@ -227,14 +234,17 @@ export function findReadinessCheck(checkRuns, prNumber, head) {
 
 async function evaluatePull(owner, repo, pr, event = {}) {
   const head = pr.head.sha;
-  const [reviews, comments, runs, combined, issueComments] = await Promise.all([
+  const [reviews, comments, reactions, headCommit, runs, combined, issueComments] = await Promise.all([
     github(`/repos/${owner}/${repo}/pulls/${pr.number}/reviews?per_page=100`),
     github(`/repos/${owner}/${repo}/pulls/${pr.number}/comments?per_page=100`),
+    github(`/repos/${owner}/${repo}/issues/${pr.number}/reactions?per_page=100`),
+    github(`/repos/${owner}/${repo}/commits/${head}`),
     github(`/repos/${owner}/${repo}/commits/${head}/check-runs?per_page=100`),
     github(`/repos/${owner}/${repo}/commits/${head}/status`),
     github(`/repos/${owner}/${repo}/issues/${pr.number}/comments?per_page=100`),
   ]);
-  const codex = evaluateCodex({ head, reviews, comments, configuredActors: process.env.CODEX_ACTORS });
+  const headCommittedAt = headCommit.commit?.committer?.date || headCommit.commit?.author?.date;
+  const codex = evaluateCodex({ head, headCommittedAt, reviews, comments, reactions, configuredActors: process.env.CODEX_ACTORS });
   const requiredCheckNames = (process.env.REQUIRED_CHECKS || '').split(',');
   const checkRuns = applyCheckRunTransition(runs.check_runs, event, head);
   const checks = evaluateChecks({ head, baseSha: pr.base.sha, prNumber: pr.number, checkRuns, statuses: combined.statuses, requiredCheckNames });

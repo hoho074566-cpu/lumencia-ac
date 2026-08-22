@@ -31,6 +31,7 @@ const ACTORS = 'trusted-codex[bot]';
 const codex = (state = 'PASS', extra = {}) => ({ state, P0: 0, P1: 0, P2: 0, P3: 0, unknown: 0, ...extra });
 const checks = (extra = {}) => ({ safety: 'PASS', vercel: 'PASS', required: 'PASS', ...extra });
 const review = (commit_id, body = 'No findings.', extra = {}) => ({ id: 1, commit_id, body, state: 'COMMENTED', submitted_at: '2026-01-01T00:00:00Z', user: { login: 'trusted-codex[bot]' }, ...extra });
+const reaction = (login = 'trusted-codex[bot]', created_at = '2026-01-01T00:01:00Z') => ({ content: '+1', created_at, user: { login } });
 const comment = (commit_id, body, extra = {}) => ({ commit_id, body, pull_request_review_id: 1, user: { login: 'trusted-codex[bot]' }, ...extra });
 const evaluateReview = (input) => evaluateCodex({ configuredActors: ACTORS, ...input });
 const readyInput = (extra = {}) => ({ codex: codex(), checks: checks(), mergeable: true, mergeableState: 'clean', ...extra });
@@ -58,6 +59,33 @@ test('new head without a current review waits', () => {
 });
 
 test('clean current review passes', () => assert.equal(evaluateReview({ head: HEAD, reviews: [review(HEAD)] }).state, 'PASS'));
+
+test('current-head trusted Codex clean reaction passes', () => {
+  const result = evaluateReview({ head: HEAD, headCommittedAt: '2026-01-01T00:00:00Z', reactions: [reaction()] });
+  assert.equal(result.state, 'PASS');
+});
+
+test('arbitrary user clean reaction remains pending', () => {
+  const result = evaluateReview({ head: HEAD, headCommittedAt: '2026-01-01T00:00:00Z', reactions: [reaction('ordinary-user')] });
+  assert.equal(result.state, 'PENDING');
+});
+
+test('old-head Codex clean reaction cannot satisfy a newer head', () => {
+  const result = evaluateReview({ head: HEAD, headCommittedAt: '2026-01-01T00:02:00Z', reactions: [reaction('trusted-codex[bot]', '2026-01-01T00:01:00Z')] });
+  assert.equal(result.state, 'PENDING');
+});
+
+test('current-head P1 blocks even when a trusted clean reaction exists', () => {
+  const result = evaluateReview({ head: HEAD, headCommittedAt: '2026-01-01T00:00:00Z', reviews: [review(HEAD, 'P1: blocking finding')], reactions: [reaction()] });
+  assert.equal(result.state, 'BLOCK');
+  assert.equal(result.P1, 1);
+});
+
+test('current-head P2-only review passes with clean reaction support enabled', () => {
+  const result = evaluateReview({ head: HEAD, headCommittedAt: '2026-01-01T00:00:00Z', reviews: [review(HEAD, 'P2: non-blocking suggestion')], reactions: [reaction()] });
+  assert.equal(result.state, 'PASS');
+  assert.equal(result.P2, 1);
+});
 
 test('old Vercel success cannot satisfy a new head', () => {
   const app = { name: 'Vercel' };
