@@ -4,15 +4,22 @@ import {
   FIX_STALL_MINUTES,
   MAX_AUTO_FIX_ATTEMPTS,
   decideMaintenanceAction,
+  findTrustedHumanCheck,
   isAutoManagedPull,
+  maintainAutoPulls,
   makeAutoFixRequestBody,
+  makeHumanCheckBody,
   parseAutoFixRequest,
   protectedMergePaths,
   protectedMergeReason,
   trustedAutoFixRequests,
   trustedCodexActors,
 } from '../lumensia-auto-maintenance.mjs';
-import { AUTO_PR_MARKER, DISCORD_DELIVERED_MARKER } from '../lumensia-auto-pr.mjs';
+import {
+  AUTO_PR_MARKER,
+  DISCORD_DELIVERED_MARKER,
+  makeCodexReviewRequestBody,
+} from '../lumensia-auto-pr.mjs';
 
 const OWNER = 'hoho074566-cpu';
 const REPO = 'lumencia-ac';
@@ -27,6 +34,7 @@ const pull = (extra = {}) => ({
   mergeable: true,
   mergeable_state: 'clean',
   body: `test\n${AUTO_PR_MARKER}\n${DISCORD_DELIVERED_MARKER}`,
+  html_url: 'https://github.com/hoho074566-cpu/lumencia-ac/pull/21',
   user: { login: OWNER },
   head: { ref: 'codex/feature-test', sha: HEAD, repo: { full_name: FULL } },
   base: { ref: 'main', sha: BASE, repo: { full_name: FULL } },
@@ -75,6 +83,15 @@ test('auto-fix marker round-trips and trusted selection is owner-scoped', () => 
   assert.equal(trustedAutoFixRequests([{ ...entry.comment, user: { login: 'attacker' } }], 21, OWNER).length, 0);
 });
 
+test('human-check hold markers must be owner-authored and current-head scoped', () => {
+  const body = makeHumanCheckBody({ prNumber: 21, head: HEAD, reason: 'merge-rejected' });
+  const trusted = { id: 1, body, user: { login: OWNER } };
+  const spoofed = { id: 2, body, user: { login: 'attacker' } };
+  assert.equal(findTrustedHumanCheck([spoofed], 21, HEAD, OWNER), null);
+  assert.equal(findTrustedHumanCheck([spoofed, trusted], 21, HEAD, OWNER).id, 1);
+  assert.equal(findTrustedHumanCheck([trusted], 21, 'different-head', OWNER), null);
+});
+
 test('authoritative failure outranks P0/P1 auto-fix', () => {
   const decision = decideMaintenanceAction({
     pull: pull(), codex: codex('BLOCK', { P1: 1 }), checks: checks({ safety: 'FAIL' }), readiness: { state: 'BLOCKED' }, files: [], fixRequests: [],
@@ -98,6 +115,16 @@ test('same-head fix is never duplicated while in flight', () => {
   assert.deepEqual(decision, { action: 'WAIT', reason: 'fix-in-flight' });
 });
 
+test('fifth same-head fix gets its full stall window before escalation', () => {
+  const prior = Array.from({ length: MAX_AUTO_FIX_ATTEMPTS - 1 }, (_, index) => fixEntry(index + 1));
+  const fifth = fixEntry(MAX_AUTO_FIX_ATTEMPTS, HEAD, '2026-08-23T00:00:00Z');
+  const decision = decideMaintenanceAction({
+    pull: pull(), codex: codex('BLOCK', { P1: 1 }), checks: checks(), readiness: { state: 'BLOCKED' }, files: [],
+    fixRequests: [...prior, fifth], now: new Date('2026-08-23T00:10:00Z'),
+  });
+  assert.deepEqual(decision, { action: 'WAIT', reason: 'fix-in-flight' });
+});
+
 test('stalled same-head fix escalates instead of spamming Codex', () => {
   const decision = decideMaintenanceAction({
     pull: pull(), codex: codex('BLOCK', { P1: 1 }), checks: checks(), readiness: { state: 'BLOCKED' }, files: [],
@@ -107,7 +134,7 @@ test('stalled same-head fix escalates instead of spamming Codex', () => {
   assert.equal(decision.reason, 'fix-stalled');
 });
 
-test('P0/P1 loop stops after five requests', () => {
+test('P0/P1 loop stops after five completed prior-head requests', () => {
   const fixRequests = Array.from({ length: MAX_AUTO_FIX_ATTEMPTS }, (_, index) => fixEntry(index + 1));
   const decision = decideMaintenanceAction({
     pull: pull(), codex: codex('BLOCK', { P1: 1 }), checks: checks(), readiness: { state: 'BLOCKED' }, files: [], fixRequests,
@@ -136,10 +163,11 @@ test('low-risk ready Auto-PR may auto-merge only from clean merge state', () => 
   }), { action: 'WAIT', reason: 'merge-state-not-clean' });
 });
 
-test('protected core and automation paths always require human merge', () => {
+test('protected core, service-worker, automation, and renamed source paths require human merge', () => {
   const protectedFiles = [
     'api/chat.js',
     'app.js',
+    'sw.js',
     '.github/workflows/test.yml',
     'scripts/lumensia-auto-pr.mjs',
     'scripts/lumensia-auto-maintenance.mjs',
@@ -154,9 +182,14 @@ test('protected core and automation paths always require human merge', () => {
   assert.equal(protectedMergeReason('assets/characters-v2/a.webp'), '');
   assert.equal(protectedMergePaths(protectedFiles).length, protectedFiles.length);
 
+  const renamed = protectedMergePaths([{ filename: 'docs/old-agents.md', previous_filename: 'AGENTS.md', status: 'renamed' }]);
+  assert.equal(renamed.length, 1);
+  assert.equal(renamed[0].path, 'AGENTS.md');
+  assert.equal(renamed[0].source, 'previous_filename');
+
   const decision = decideMaintenanceAction({
     pull: pull(), codex: codex(), checks: checks(), readiness: ready,
-    files: [{ filename: 'scripts/lumensia-auto-maintenance-run.mjs' }], fixRequests: [], mergeTokenAvailable: true,
+    files: [{ filename: 'docs/old-agents.md', previous_filename: 'AGENTS.md', status: 'renamed' }], fixRequests: [], mergeTokenAvailable: true,
   });
   assert.equal(decision.action, 'HUMAN');
   assert.equal(decision.reason, 'protected-paths');
@@ -168,4 +201,79 @@ test('missing merge token never degrades to an unsafe merge', () => {
     files: [{ filename: 'docs/guide.md' }], fixRequests: [], mergeTokenAvailable: false,
   });
   assert.deepEqual(decision, { action: 'HUMAN', reason: 'merge-token-unavailable' });
+});
+
+test('HTTP merge rejection creates a persistent human hold and is not retried next scan', async () => {
+  const requestBody = makeCodexReviewRequestBody({
+    prNumber: 21,
+    head: HEAD,
+    baseSha: BASE,
+    generationKey: 'test-cycle',
+    baselineReviewIds: [],
+    baselineReviewCommentIds: [],
+    baselineIssueCommentIds: [],
+  });
+  const issueComments = [
+    { id: 10, body: requestBody, created_at: '2026-08-23T00:00:00Z', user: { login: OWNER } },
+    {
+      id: 11,
+      body: `Codex Review: Didn't find any major issues. Great.\n\n**Reviewed commit:** \`${HEAD.slice(0, 10)}\``,
+      created_at: '2026-08-23T00:01:00Z',
+      user: { login: 'chatgpt-codex-connector[bot]' },
+    },
+  ];
+  const p = pull();
+  const api = {
+    validate: async () => true,
+    listOpenPulls: async () => [p],
+    getPull: async () => p,
+    listIssueComments: async () => [...issueComments],
+    listReviews: async () => [],
+    listReviewComments: async () => [],
+    listCheckRuns: async () => ({ check_runs: [{
+      id: 100,
+      name: 'Repository checks',
+      head_sha: HEAD,
+      conclusion: 'success',
+      created_at: '2026-08-23T00:00:00Z',
+      pull_requests: [{ number: 21, head: { sha: HEAD }, base: { sha: BASE } }],
+    }] }),
+    getCombinedStatus: async () => ({ statuses: [{ context: 'Vercel', state: 'success', sha: HEAD, created_at: '2026-08-23T00:00:00Z' }] }),
+    listPullFiles: async () => [{ filename: 'docs/guide.md', status: 'modified' }],
+    updatePull: async () => p,
+    createIssueComment: async (_number, body) => {
+      const comment = { id: 1000 + issueComments.length, body, created_at: '2026-08-23T00:02:00Z', user: { login: OWNER } };
+      issueComments.push(comment);
+      return comment;
+    },
+  };
+  let mergeCalls = 0;
+  const mergeApi = {
+    mergePull: async () => {
+      mergeCalls += 1;
+      const error = new Error('GitHub API request returned HTTP 409.');
+      error.status = 409;
+      error.data = { message: 'Head branch was modified' };
+      throw error;
+    },
+  };
+  const silent = { log() {}, warn() {}, error() {} };
+
+  const first = await maintainAutoPulls({
+    token: 'pat', mergeToken: 'ephemeral', owner: OWNER, repo: REPO, api, mergeApi, logger: silent,
+    discordFetch: async () => ({ ok: true }), now: new Date('2026-08-23T00:03:00Z'),
+  });
+  assert.equal(first.humanRequired, 1);
+  assert.equal(first.merged, 0);
+  assert.equal(first.errors.length, 0);
+  assert.equal(mergeCalls, 1);
+  assert.ok(findTrustedHumanCheck(issueComments, 21, HEAD, OWNER, 'merge-rejected'));
+
+  const second = await maintainAutoPulls({
+    token: 'pat', mergeToken: 'ephemeral', owner: OWNER, repo: REPO, api, mergeApi, logger: silent,
+    discordFetch: async () => ({ ok: true }), now: new Date('2026-08-23T00:04:00Z'),
+  });
+  assert.equal(second.humanRequired, 1);
+  assert.equal(second.errors.length, 0);
+  assert.equal(mergeCalls, 1);
 });
