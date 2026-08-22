@@ -1,0 +1,49 @@
+name: Lumensia Auto PR
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lumensia-auto-pr-scan
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    environment: lumensia-trusted-auto-pr
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out trusted default-branch auto-PR script only
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: refs/heads/main
+          persist-credentials: false
+          sparse-checkout: scripts/lumensia-auto-pr.mjs
+          sparse-checkout-cone-mode: false
+      - name: Detect trusted script bootstrap state
+        id: script
+        shell: bash
+        run: |
+          if [[ -f scripts/lumensia-auto-pr.mjs ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Auto PR bootstrap: trusted script is not on main yet."
+          fi
+      - name: Set up Node.js 22
+        if: steps.script.outputs.available == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+      - name: Reconcile Codex branches
+        if: steps.script.outputs.available == 'true'
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          LUMENSIA_PR_CREATOR_TOKEN: ${{ secrets.LUMENSIA_PR_CREATOR_TOKEN }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: node scripts/lumensia-auto-pr.mjs

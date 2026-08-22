@@ -6,6 +6,10 @@ import {
   deliverDiscord,
   evaluateChecks,
   evaluateCodex,
+  planCodexReviewCycle,
+  codexReviewRequestMarker,
+  baselineCodexReviewCycle,
+  ensureCodexReviewRequest,
   evaluateReadiness,
   findReadinessCheck,
   hydratePulls,
@@ -24,6 +28,7 @@ import {
   renderComment,
   renderCheckSummary,
   safetyMatchesPull,
+  shouldRequestCodexReview,
 } from '../lumensia-merge-readiness.mjs';
 
 const HEAD = 'new-head-sha';
@@ -31,6 +36,7 @@ const ACTORS = 'trusted-codex[bot]';
 const codex = (state = 'PASS', extra = {}) => ({ state, P0: 0, P1: 0, P2: 0, P3: 0, unknown: 0, ...extra });
 const checks = (extra = {}) => ({ safety: 'PASS', vercel: 'PASS', required: 'PASS', ...extra });
 const review = (commit_id, body = 'No findings.', extra = {}) => ({ id: 1, commit_id, body, state: 'COMMENTED', submitted_at: '2026-01-01T00:00:00Z', user: { login: 'trusted-codex[bot]' }, ...extra });
+const reaction = (id, login = 'trusted-codex[bot]', created_at = '2026-01-01T00:01:00Z') => ({ id, content: '+1', created_at, user: { login } });
 const comment = (commit_id, body, extra = {}) => ({ commit_id, body, pull_request_review_id: 1, user: { login: 'trusted-codex[bot]' }, ...extra });
 const evaluateReview = (input) => evaluateCodex({ configuredActors: ACTORS, ...input });
 const readyInput = (extra = {}) => ({ codex: codex(), checks: checks(), mergeable: true, mergeableState: 'clean', ...extra });
@@ -58,6 +64,126 @@ test('new head without a current review waits', () => {
 });
 
 test('clean current review passes', () => assert.equal(evaluateReview({ head: HEAD, reviews: [review(HEAD)] }).state, 'PASS'));
+
+test('HEAD A request reaction passes only through its scoped request', () => {
+  const result = evaluateReview({ head: 'head-a', requestReactions: [reaction(1)] });
+  assert.equal(result.state, 'PASS');
+});
+
+test('HEAD A request reaction cannot satisfy HEAD B request', () => {
+  assert.equal(evaluateReview({ head: 'head-a', requestReactions: [reaction(1)] }).state, 'PASS');
+  assert.equal(evaluateReview({ head: 'head-b', requestReactions: [] }).state, 'PENDING');
+  assert.equal(evaluateReview({ head: 'head-b', requestReactions: [reaction(2)] }).state, 'PASS');
+});
+
+test('A to B to A transition creates a new request cycle and cannot resurrect old completion', () => {
+  const a1 = { codexReviewRequest: { headSha: 'head-a', cycle: 1, commentId: 10 } };
+  const a2 = planCodexReviewCycle(a1, 'head-a', '300');
+  assert.deepEqual(a2, { headSha: 'head-a', cycle: 2, generationKey: 'sync-300', transitionRunId: '300' });
+  assert.notEqual(codexReviewRequestMarker(15, 'head-a', 'cycle-1'), codexReviewRequestMarker(15, 'head-a', a2.generationKey));
+  assert.equal(evaluateReview({ head: 'head-a', requestReactions: [] }).state, 'PENDING');
+});
+
+test('reversed synchronize runs cannot overwrite a newer generation', () => {
+  const initial = { codexReviewRequest: { headSha: 'head-a', cycle: 1, commentId: 10 } };
+  const newest = planCodexReviewCycle(initial, 'head-a', '300');
+  const storedNewest = { codexReviewRequest: { ...newest, commentId: 12 } };
+  assert.deepEqual(planCodexReviewCycle(storedNewest, 'head-a', '200'), { stale: true });
+  assert.deepEqual(planCodexReviewCycle(storedNewest, 'head-a', '300'), storedNewest.codexReviewRequest);
+});
+
+test('ordinary A to B synchronize creates exactly one new cycle', () => {
+  const initial = { codexReviewRequest: { headSha: 'head-a', cycle: 1, commentId: 10, transitionRunId: '100' } };
+  const next = planCodexReviewCycle(initial, 'head-b', '200');
+  assert.deepEqual(next, { headSha: 'head-b', cycle: 2, generationKey: 'sync-200', transitionRunId: '200' });
+  assert.deepEqual(planCodexReviewCycle({ codexReviewRequest: next }, 'head-b', '200'), next);
+});
+
+test('old same-SHA cycle reaction never satisfies the later cycle', () => {
+  const initial = { codexReviewRequest: { headSha: 'head-a', cycle: 1, commentId: 10 } };
+  const later = planCodexReviewCycle(initial, 'head-a', '300');
+  assert.equal(later.cycle, 2);
+  assert.equal(evaluateReview({ head: 'head-a', requestReactions: [] }).state, 'PENDING');
+});
+
+test('same-SHA new cycle baselines old review and inline comment IDs', () => {
+  const oldReview = review('head-a', 'No findings.', { id: 41 });
+  const oldComment = comment('head-a', 'P1: historical', { id: 51, pull_request_review_id: 41 });
+  const cycle = baselineCodexReviewCycle(planCodexReviewCycle({ codexReviewRequest: { headSha: 'head-b', cycle: 2 } }, 'head-a', '300'), [oldReview], [oldComment]);
+  const result = evaluateReview({ head: 'head-a', reviews: [oldReview], comments: [oldComment], baselineReviewIds: cycle.baselineReviewIds, baselineReviewCommentIds: cycle.baselineReviewCommentIds });
+  assert.equal(result.state, 'PENDING');
+  assert.equal(result.P1, 0);
+});
+
+test('new review ID on repeated SHA may complete the new cycle', () => {
+  const oldReview = review('head-a', 'P1: historical', { id: 41 });
+  const newReview = review('head-a', 'P2: current suggestion', { id: 42 });
+  const result = evaluateReview({ head: 'head-a', reviews: [oldReview, newReview], baselineReviewIds: ['41'] });
+  assert.equal(result.state, 'PASS');
+  assert.equal(result.P1, 0);
+  assert.equal(result.P2, 1);
+});
+
+test('untrusted reaction on current HEAD request remains pending', () => {
+  assert.equal(evaluateReview({ head: HEAD, requestReactions: [reaction(1, 'ordinary-user')] }).state, 'PENDING');
+});
+
+test('reaction removal before READY revalidation returns Codex to pending', () => {
+  assert.equal(evaluateReview({ head: HEAD, requestReactions: [reaction(1)] }).state, 'PASS');
+  const revalidated = evaluateReview({ head: HEAD, requestReactions: [] });
+  assert.equal(revalidated.state, 'PENDING');
+  assert.equal(evaluateReadiness({ ...readyInput(), codex: revalidated }).state, 'WAITING');
+});
+
+test('active clean review dismissal before READY returns Codex to pending', () => {
+  const active = review(HEAD, 'No findings.', { id: 77 });
+  assert.equal(evaluateReview({ head: HEAD, reviews: [active] }).state, 'PASS');
+  const dismissed = { ...active, state: 'DISMISSED' };
+  assert.equal(evaluateReview({ head: HEAD, reviews: [dismissed] }).state, 'PENDING');
+});
+
+test('current-head P1 blocks even with trusted request reaction', () => {
+  const result = evaluateReview({ head: HEAD, reviews: [review(HEAD, 'P1: blocking finding')], requestReactions: [reaction(1)] });
+  assert.equal(result.state, 'BLOCK');
+  assert.equal(result.P1, 1);
+});
+
+test('current-head P2-only review remains non-blocking', () => {
+  const result = evaluateReview({ head: HEAD, reviews: [review(HEAD, 'P2: non-blocking suggestion')], requestReactions: [reaction(1)] });
+  assert.equal(result.state, 'PASS');
+  assert.equal(result.P2, 1);
+});
+
+test('duplicate evaluation of the same synchronize transition reuses one request comment', async () => {
+  const comments = [];
+  let creates = 0;
+  const transition = planCodexReviewCycle({ codexReviewRequest: { headSha: 'old', cycle: 1, transitionRunId: '100' } }, HEAD, '200');
+  const duplicate = planCodexReviewCycle({ codexReviewRequest: transition }, HEAD, '200');
+  assert.deepEqual(duplicate, transition);
+  const args = {
+    prNumber: 15,
+    head: HEAD,
+    generationKey: transition.generationKey,
+    refreshComments: async () => comments,
+    createComment: async (body) => {
+      creates += 1;
+      const created = { id: 99, body, user: { login: 'github-actions[bot]' } };
+      comments.push(created);
+      return created;
+    },
+  };
+  const first = await ensureCodexReviewRequest({ ...args, comments });
+  const second = await ensureCodexReviewRequest({ ...args, comments });
+  assert.equal(creates, 1);
+  assert.equal(first.id, second.id);
+  assert.match(first.body, /@codex review/);
+  assert.ok(first.body.includes(codexReviewRequestMarker(15, HEAD, transition.generationKey)));
+});
+
+test('draft waits without a request and ready_for_review permits one request', () => {
+  assert.equal(shouldRequestCodexReview({ draft: true }), false);
+  assert.equal(shouldRequestCodexReview({ draft: false }), true);
+});
 
 test('old Vercel success cannot satisfy a new head', () => {
   const app = { name: 'Vercel' };
