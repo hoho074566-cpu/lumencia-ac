@@ -3,7 +3,6 @@
 const MARKER = '<!-- lumensia-merge-readiness:v1 -->';
 const STATE_PREFIX = 'lumensia-readiness-state:';
 const TERMINAL_FAILURES = new Set(['failure', 'cancelled', 'timed_out', 'action_required', 'startup_failure', 'stale']);
-const SUCCESSFUL = new Set(['success', 'neutral', 'skipped']);
 
 export function isCodexActor(actor = {}, configured = '') {
   const allowed = configured.split(',').map((item) => item.trim().toLowerCase()).filter(Boolean);
@@ -52,11 +51,6 @@ export function evaluateCodex({ head, reviews = [], comments = [], configuredAct
   return { state: totals.P0 + totals.P1 > 0 ? 'BLOCK' : 'PASS', ...totals };
 }
 
-function normalizeCheck(check) {
-  const conclusion = check.conclusion?.toLowerCase() || null;
-  return conclusion ? (TERMINAL_FAILURES.has(conclusion) ? 'FAIL' : SUCCESSFUL.has(conclusion) ? 'PASS' : 'PENDING') : 'PENDING';
-}
-
 function normalizeAuthoritativeCheck(check) {
   const conclusion = check.conclusion?.toLowerCase() || null;
   return conclusion === 'success' ? 'PASS' : conclusion && TERMINAL_FAILURES.has(conclusion) ? 'FAIL' : 'PENDING';
@@ -74,10 +68,16 @@ export function newestAttempts(items, identity) {
   return [...newest.values()];
 }
 
-export function evaluateChecks({ head, checkRuns = [], statuses = [], requiredCheckNames = [] }) {
+export function safetyMatchesPull(check, { head, baseSha, prNumber }) {
+  if (!baseSha) return true;
+  return Array.isArray(check.pull_requests) && check.pull_requests.some((pull) =>
+    (!prNumber || pull.number === prNumber) && pull.head?.sha === head && pull.base?.sha === baseSha);
+}
+
+export function evaluateChecks({ head, baseSha, prNumber, checkRuns = [], statuses = [], requiredCheckNames = [] }) {
   const currentChecks = checkRuns.filter((check) => !check.head_sha || check.head_sha === head);
   const checkIdentity = (check) => `${check.app?.id || check.app?.slug || check.app?.name || 'unknown'}:${check.name}`.toLowerCase();
-  const safetyItems = newestAttempts(currentChecks.filter((check) => /^(repository checks|lumensia pr safety gate)$/i.test(check.name)), checkIdentity);
+  const safetyItems = newestAttempts(currentChecks.filter((check) => /^(repository checks|lumensia pr safety gate)$/i.test(check.name) && safetyMatchesPull(check, { head, baseSha, prNumber })), checkIdentity);
   const vercelChecks = newestAttempts(currentChecks.filter((check) => /vercel/i.test(`${check.name} ${check.app?.name || ''}`)), checkIdentity);
   const vercelStatuses = newestAttempts(statuses.filter((status) => (!status.sha || status.sha === head) && /vercel/i.test(status.context || '')), (status) => status.context.toLowerCase());
   const summarize = (states, absent = 'PENDING') => states.length === 0 ? absent : states.some((state) => state === 'FAIL') ? 'FAIL' : states.some((state) => state === 'PENDING') ? 'PENDING' : 'PASS';
@@ -87,8 +87,11 @@ export function evaluateChecks({ head, checkRuns = [], statuses = [], requiredCh
     ...vercelStatuses.map((status) => status.state === 'success' ? 'PASS' : ['failure', 'error'].includes(status.state) ? 'FAIL' : 'PENDING'),
   ], 'NOT_PRESENT');
   const requiredNames = new Set(requiredCheckNames.map((name) => name.trim().toLowerCase()).filter(Boolean));
-  const repositoryChecks = currentChecks.filter((check) => requiredNames.has(check.name.toLowerCase()));
-  const required = requiredNames.size === 0 ? 'PASS' : summarize(repositoryChecks.map(normalizeCheck));
+  const requiredStates = [...requiredNames].map((name) => {
+    const latest = newestAttempts(currentChecks.filter((check) => check.name.toLowerCase() === name), () => name)[0];
+    return latest ? normalizeAuthoritativeCheck(latest) : 'PENDING';
+  });
+  const required = requiredNames.size === 0 ? 'PASS' : summarize(requiredStates);
   return { safety, vercel, required };
 }
 
@@ -178,6 +181,10 @@ export function isOpenPull(pull) {
   return pull?.state === 'open' && !pull.merged && !pull.merged_at;
 }
 
+export function isCurrentPull(snapshot, current) {
+  return isOpenPull(current) && current.head?.sha === snapshot.head?.sha && current.base?.sha === snapshot.base?.sha;
+}
+
 export function reusableReadinessCheck(check, readinessState) {
   return readinessState === 'WAITING' && check?.status === 'completed' ? undefined : check;
 }
@@ -193,8 +200,10 @@ async function evaluatePull(owner, repo, pr) {
   ]);
   const codex = evaluateCodex({ head, reviews, comments, configuredActors: process.env.CODEX_ACTORS });
   const requiredCheckNames = (process.env.REQUIRED_CHECKS || '').split(',');
-  const checks = evaluateChecks({ head, checkRuns: runs.check_runs, statuses: combined.statuses, requiredCheckNames });
+  const checks = evaluateChecks({ head, baseSha: pr.base.sha, prNumber: pr.number, checkRuns: runs.check_runs, statuses: combined.statuses, requiredCheckNames });
   const readiness = evaluateReadiness({ codex, checks, mergeable: pr.mergeable, mergeableState: pr.mergeable_state, draft: pr.draft });
+  const currentPr = await github(`/repos/${owner}/${repo}/pulls/${pr.number}`);
+  if (!isCurrentPull(pr, currentPr)) { console.log(`PR #${pr.number} changed or closed during evaluation; skipping mutations.`); return; }
   const priorComment = issueComments.find((comment) => comment.body?.includes(MARKER) && /github-actions\[bot\]/i.test(comment.user?.login || ''));
   const result = { number: pr.number, url: pr.html_url, head, codex, checks, readiness };
   const notifications = plannedNotifications(parseMachineState(priorComment?.body, head), result);

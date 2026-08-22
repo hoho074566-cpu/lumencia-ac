@@ -7,6 +7,7 @@ import {
   evaluateCodex,
   evaluateReadiness,
   hydratePulls,
+  isCurrentPull,
   isOpenPull,
   newestAttempts,
   parseCodexSeverities,
@@ -16,6 +17,7 @@ import {
   reusableReadinessCheck,
   renderComment,
   renderCheckSummary,
+  safetyMatchesPull,
 } from '../lumensia-merge-readiness.mjs';
 
 const HEAD = 'new-head-sha';
@@ -296,4 +298,37 @@ test('closed or merged pulls are skipped before evaluation', () => {
   assert.equal(isOpenPull({ state: 'closed', merged_at: null }), false);
   assert.equal(isOpenPull({ state: 'closed', merged_at: '2026-01-01T00:00:00Z' }), false);
   assert.equal(isOpenPull({ state: 'open', merged: true, merged_at: '2026-01-01T00:00:00Z' }), false);
+});
+
+test('every configured required check must have a newest current result', () => {
+  const base = { head_sha: HEAD, app: { id: 5 }, completed_at: '2026-01-01T00:00:00Z' };
+  const missing = evaluateChecks({ head: HEAD, requiredCheckNames: ['Lint', 'Unit'], checkRuns: [
+    { ...base, id: 1, name: 'Lint', conclusion: 'success' },
+  ] });
+  assert.equal(missing.required, 'PENDING');
+  const complete = evaluateChecks({ head: HEAD, requiredCheckNames: ['Lint', 'Unit'], checkRuns: [
+    { ...base, id: 1, name: 'Lint', conclusion: 'failure' },
+    { ...base, id: 2, name: 'Lint', conclusion: 'success', completed_at: '2026-01-01T00:01:00Z' },
+    { ...base, id: 3, name: 'Unit', conclusion: 'success' },
+  ] });
+  assert.equal(complete.required, 'PASS');
+});
+
+test('Safety Gate result must match the current PR base and head', () => {
+  const pull = (base) => ({ number: 14, head: { sha: HEAD }, base: { sha: base } });
+  const safety = { id: 1, name: 'Repository checks', head_sha: HEAD, conclusion: 'success', completed_at: '2026-01-01T00:00:00Z', pull_requests: [pull('old-base')] };
+  assert.equal(safetyMatchesPull(safety, { head: HEAD, baseSha: 'new-base', prNumber: 14 }), false);
+  assert.equal(evaluateChecks({ head: HEAD, baseSha: 'new-base', prNumber: 14, checkRuns: [safety] }).safety, 'PENDING');
+  const current = { ...safety, id: 2, pull_requests: [pull('new-base')] };
+  assert.equal(evaluateChecks({ head: HEAD, baseSha: 'new-base', prNumber: 14, checkRuns: [safety, current] }).safety, 'PASS');
+});
+
+test('stale or closed PR snapshots abort before readiness mutations', () => {
+  const snapshot = { state: 'open', head: { sha: HEAD }, base: { sha: 'base-a' } };
+  assert.equal(isCurrentPull(snapshot, { ...snapshot }), true);
+  assert.equal(isCurrentPull(snapshot, { ...snapshot, state: 'closed' }), false);
+  assert.equal(isCurrentPull(snapshot, { ...snapshot, head: { sha: 'new-head' } }), false);
+  assert.equal(isCurrentPull(snapshot, { ...snapshot, base: { sha: 'base-b' } }), false);
+  const source = readFileSync(new URL('../lumensia-merge-readiness.mjs', import.meta.url), 'utf8');
+  assert.ok(source.indexOf('if (!isCurrentPull(pr, currentPr))') < source.indexOf('deliverDiscord(process.env.DISCORD_WEBHOOK_URL'));
 });
