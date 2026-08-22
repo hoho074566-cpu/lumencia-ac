@@ -51,14 +51,28 @@ export function createMaintenanceGitHubClient({ token, owner, repo, fetchImpl = 
   };
 }
 
+export function splitMaintenanceClients({ patApi, ephemeralApi }) {
+  if (!ephemeralApi) return { api: patApi, mergeApi: null };
+  return {
+    api: {
+      ...patApi,
+      listPullFiles: ephemeralApi.listPullFiles,
+      listCheckRuns: ephemeralApi.listCheckRuns,
+      getCombinedStatus: ephemeralApi.getCombinedStatus,
+    },
+    mergeApi: ephemeralApi,
+  };
+}
+
 async function main() {
   const [owner, repo] = String(process.env.GITHUB_REPOSITORY || '').split('/');
   if (!owner || !repo) throw new Error('GITHUB_REPOSITORY must be set to owner/repository.');
 
   const token = process.env.LUMENSIA_PR_CREATOR_TOKEN || '';
   const mergeToken = process.env.LUMENSIA_AUTO_MERGE_TOKEN || '';
-  const api = createMaintenanceGitHubClient({ token, owner, repo });
-  const mergeApi = mergeToken ? createMaintenanceGitHubClient({ token: mergeToken, owner, repo }) : null;
+  const patApi = createMaintenanceGitHubClient({ token, owner, repo });
+  const ephemeralApi = mergeToken ? createMaintenanceGitHubClient({ token: mergeToken, owner, repo }) : null;
+  const { api, mergeApi } = splitMaintenanceClients({ patApi, ephemeralApi });
   const summary = await maintainAutoPulls({
     token,
     mergeToken,
