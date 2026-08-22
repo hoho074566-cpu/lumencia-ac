@@ -17,7 +17,8 @@ export function parseCodexSeverities(body = '') {
   for (const original of String(body).split(/\r?\n/)) {
     const line = original.trim();
     if (!line || line.startsWith('>') || line.startsWith('```')) continue;
-    const match = line.match(/^(?:[-*]\s+)?(?:#{1,6}\s*)?(?:\*\*)?\[?(P[0-3])\]?(?:\*\*)?(?=\s|:|[-–—])/i);
+    const match = line.match(/^(?:[-*]\s+)?(?:#{1,6}\s*)?(?:\*\*)?\[?(P[0-3])\]?(?:\*\*)?(?=\s|:|[-–—])/i)
+      || line.match(/!\[(P[0-3])\s+Badge\]\([^\s)]+\)/i);
     if (match) {
       counts[match[1].toUpperCase()] += 1;
       findingLike = true;
@@ -70,7 +71,7 @@ export function evaluateReadiness({ codex, checks, mergeable, mergeableState, dr
   if (draft) return { state: 'WAITING', conflict: conflict ? 'CONFLICT' : 'NONE' };
   const blocked = conflict || codex.state === 'BLOCK' || checks.safety === 'FAIL' || checks.vercel === 'FAIL' || checks.required === 'FAIL';
   if (blocked) return { state: 'BLOCKED', conflict: conflict ? 'CONFLICT' : 'NONE' };
-  const waiting = mergeable == null || codex.state === 'PENDING' || checks.safety === 'PENDING' || checks.vercel !== 'PASS' || checks.required === 'PENDING';
+  const waiting = mergeable == null || mergeableState === 'blocked' || codex.state === 'PENDING' || checks.safety === 'PENDING' || checks.vercel !== 'PASS' || checks.required === 'PENDING';
   return { state: waiting ? 'WAITING' : 'READY', conflict: 'NONE' };
 }
 
@@ -87,10 +88,10 @@ export function parseMachineState(body = '', head = '') {
 export function plannedNotifications(previous, current) {
   const next = previous.head === current.head ? { ...previous } : { head: current.head };
   const events = [];
-  if (current.codex.state !== 'PENDING' && !next.codexNotified) events.push('codex');
-  if (['PASS', 'FAIL'].includes(current.checks.vercel) && !next.vercelNotified) events.push('vercel');
-  if (current.readiness.state === 'BLOCKED' && !next.blockedNotified) events.push('blocked');
-  if (current.readiness.state === 'READY' && !next.readyNotified) events.push('ready');
+  if (current.codex.state !== 'PENDING' && next.codexNotified !== current.codex.state.toLowerCase()) events.push('codex');
+  if (['PASS', 'FAIL'].includes(current.checks.vercel) && next.vercelNotified !== current.checks.vercel.toLowerCase()) events.push('vercel');
+  if (current.readiness.state === 'BLOCKED' && next.readinessNotified !== 'blocked') events.push('blocked');
+  if (current.readiness.state === 'READY' && next.readinessNotified !== 'ready') events.push('ready');
   return { events, state: next };
 }
 
@@ -98,8 +99,8 @@ export function recordDeliveredNotification(state, event, current) {
   const next = { ...state };
   if (event === 'codex') next.codexNotified = current.codex.state.toLowerCase();
   else if (event === 'vercel') next.vercelNotified = current.checks.vercel.toLowerCase();
-  else if (event === 'blocked') next.blockedNotified = true;
-  else if (event === 'ready') next.readyNotified = true;
+  else if (event === 'blocked') next.readinessNotified = 'blocked';
+  else if (event === 'ready') next.readinessNotified = 'ready';
   return next;
 }
 

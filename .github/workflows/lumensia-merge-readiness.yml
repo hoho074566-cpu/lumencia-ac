@@ -25,8 +25,8 @@ permissions:
   deployments: read
 
 concurrency:
-  group: lumensia-readiness-${{ github.event.pull_request.number || github.event.check_run.pull_requests[0].number || github.run_id }}
-  cancel-in-progress: true
+  group: lumensia-readiness-${{ github.event.pull_request.number || github.event.check_run.pull_requests[0].number || 'all-open-prs' }}
+  cancel-in-progress: false
 
 jobs:
   evaluate:

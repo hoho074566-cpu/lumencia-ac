@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
   deliverDiscord,
@@ -165,4 +166,33 @@ test('draft PR remains waiting and never plans ready notification', () => {
   assert.equal(readiness.state, 'WAITING');
   const current = { head: HEAD, codex: codex(), checks: checks(), readiness };
   assert.equal(plannedNotifications({ head: HEAD }, current).events.includes('ready'), false);
+});
+
+test('Codex badge-formatted inline P0/P1 findings block current head', () => {
+  const body = '**<sub><sub>![P1 Badge](https://img.shields.io/badge/P1-orange?style=flat)</sub></sub> Fix the unsafe transition**';
+  assert.equal(parseCodexSeverities(body).P1, 1);
+  const result = evaluateReview({ head: HEAD, reviews: [review(HEAD)], comments: [comment(HEAD, body)] });
+  assert.equal(result.P1, 1); assert.equal(result.state, 'BLOCK');
+});
+
+test('same-head Codex and Vercel state transitions notify once per new state', () => {
+  const blocked = { head: HEAD, codex: codex('BLOCK', { P1: 1 }), checks: checks({ vercel: 'FAIL' }), readiness: { state: 'BLOCKED' } };
+  let state = { head: HEAD };
+  for (const event of plannedNotifications(state, blocked).events) state = recordDeliveredNotification(state, event, blocked);
+  const passing = { head: HEAD, codex: codex('PASS'), checks: checks({ vercel: 'PASS' }), readiness: { state: 'READY' } };
+  const transitioned = plannedNotifications(state, passing);
+  assert.deepEqual(transitioned.events, ['codex', 'vercel', 'ready']);
+  for (const event of transitioned.events) state = recordDeliveredNotification(state, event, passing);
+  assert.deepEqual(plannedNotifications(state, passing).events, []);
+});
+
+test('all-open reconciliation uses one non-cancelling concurrency group', () => {
+  const workflow = readFileSync(new URL('../../.github/workflows/lumensia-merge-readiness.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /\|\| 'all-open-prs' \}\}/);
+  assert.match(workflow, /cancel-in-progress: false/);
+  assert.doesNotMatch(workflow, /github\.run_id/);
+});
+
+test('GitHub mergeable_state blocked cannot become ready', () => {
+  assert.equal(evaluateReadiness({ ...readyInput(), mergeableState: 'blocked' }).state, 'WAITING');
 });
