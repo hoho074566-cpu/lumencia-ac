@@ -43,16 +43,18 @@ export function reconcileCodexCleanReaction({ head, reactions = [], configuredAc
     .map((reaction) => String(reaction.id));
   if (!previous.headSha) {
     const reactionId = allowInitialBinding ? reactionIds.at(-1) : undefined;
-    return { headSha: head, seenReactionIds: reactionIds, ...(reactionId ? { reactionId } : {}) };
+    return { headSha: head, seenReactionIds: reactionIds, ...(reactionId ? { reactionId } : { awaitingOpenedEvent: true }) };
   }
   if (previous.headSha !== head) return { headSha: head, seenReactionIds: reactionIds };
   const seen = new Set(Array.isArray(previous.seenReactionIds) ? previous.seenReactionIds.map(String) : []);
   const newReactionId = reactionIds.find((id) => !seen.has(id));
   const retainedReactionId = reactionIds.includes(String(previous.reactionId)) ? String(previous.reactionId) : undefined;
+  const openedEventReactionId = allowInitialBinding && previous.awaitingOpenedEvent ? reactionIds.at(-1) : undefined;
   return {
     headSha: head,
     seenReactionIds: [...new Set([...seen, ...reactionIds])],
-    ...(retainedReactionId || newReactionId ? { reactionId: retainedReactionId || newReactionId } : {}),
+    ...(retainedReactionId || openedEventReactionId || newReactionId ? { reactionId: retainedReactionId || openedEventReactionId || newReactionId } : {}),
+    ...(!allowInitialBinding && previous.awaitingOpenedEvent ? { awaitingOpenedEvent: true } : {}),
   };
 }
 

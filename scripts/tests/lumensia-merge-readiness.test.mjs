@@ -89,8 +89,36 @@ test('arbitrary user clean reaction remains pending', () => {
 
 test('ambiguous old reaction without stored HEAD is baselined and remains pending', () => {
   const cleanReaction = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1)], configuredActors: ACTORS });
-  assert.deepEqual(cleanReaction, { headSha: HEAD, seenReactionIds: ['1'] });
+  assert.deepEqual(cleanReaction, { headSha: HEAD, seenReactionIds: ['1'], awaitingOpenedEvent: true });
   assert.equal(evaluateReview({ head: HEAD, cleanReaction }).state, 'PENDING');
+});
+
+test('check-run baseline followed by opened event recovers same-HEAD clean reaction', () => {
+  const baseline = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1)], configuredActors: ACTORS });
+  const recovered = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1)], configuredActors: ACTORS, previous: baseline, allowInitialBinding: true });
+  assert.deepEqual(recovered, { headSha: HEAD, seenReactionIds: ['1'], reactionId: '1' });
+  assert.equal(evaluateReview({ head: HEAD, cleanReaction: recovered }).state, 'PASS');
+});
+
+test('opened event cannot recover a reaction baselined during a prior-HEAD transition', () => {
+  const transitioned = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1)], configuredActors: ACTORS, previous: { headSha: 'old-head', seenReactionIds: ['1'], reactionId: '1' } });
+  const attempted = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1)], configuredActors: ACTORS, previous: transitioned, allowInitialBinding: true });
+  assert.deepEqual(attempted, { headSha: HEAD, seenReactionIds: ['1'] });
+  assert.equal(evaluateReview({ head: HEAD, cleanReaction: attempted }).state, 'PENDING');
+});
+
+test('opened-event race recovery still rejects untrusted reactions', () => {
+  const baseline = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1, 'ordinary-user')], configuredActors: ACTORS });
+  const attempted = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1, 'ordinary-user')], configuredActors: ACTORS, previous: baseline, allowInitialBinding: true });
+  assert.equal(evaluateReview({ head: HEAD, cleanReaction: attempted }).state, 'PENDING');
+});
+
+test('scheduled scans preserve an opened-event recovered binding', () => {
+  const baseline = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1)], configuredActors: ACTORS });
+  const recovered = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1)], configuredActors: ACTORS, previous: baseline, allowInitialBinding: true });
+  const scheduled = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1)], configuredActors: ACTORS, previous: recovered });
+  assert.deepEqual(scheduled, recovered);
+  assert.equal(evaluateReview({ head: HEAD, cleanReaction: scheduled }).state, 'PASS');
 });
 
 test('new HEAD with an already-existing old reaction remains pending', () => {
