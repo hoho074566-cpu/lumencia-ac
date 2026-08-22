@@ -189,11 +189,12 @@ test('same-head Codex and Vercel state transitions notify once per new state', (
   assert.deepEqual(plannedNotifications(state, passing).events, []);
 });
 
-test('all-open reconciliation uses one non-cancelling concurrency group', () => {
+test('scan and event evaluations share the same per-PR concurrency group', () => {
   const workflow = readFileSync(new URL('../../.github/workflows/lumensia-merge-readiness.yml', import.meta.url), 'utf8');
-  assert.match(workflow, /\|\| 'all-open-prs' \}\}/);
-  assert.match(workflow, /cancel-in-progress: false/);
-  assert.doesNotMatch(workflow, /github\.run_id/);
+  assert.match(workflow, /group: lumensia-readiness-pr-\$\{\{ matrix\.pr \}\}/);
+  assert.match(workflow, /group: lumensia-readiness-pr-\$\{\{ github\.event\.pull_request\.number \|\| github\.event\.check_run\.pull_requests\[0\]\.number \}\}/);
+  assert.equal((workflow.match(/cancel-in-progress: false/g) || []).length, 2);
+  assert.match(workflow, /PR_NUMBER: \$\{\{ matrix\.pr \}\}/);
 });
 
 test('GitHub mergeable_state blocked cannot become ready', () => {
@@ -238,4 +239,22 @@ test('WAITING resets terminal readiness transition dedupe', () => {
 test('Codex severity parser ignores entire fenced code blocks', () => {
   const body = '```markdown\nP0: example only\n![P1 Badge](https://img.shields.io/badge/P1-orange)\n```\nP2: real suggestion\n~~~\nP3: another example\n~~~';
   assert.deepEqual(parseCodexSeverities(body), { P0: 0, P1: 0, P2: 1, P3: 0, unknown: 0 });
+});
+
+test('Safety Gate and Vercel pass only on actual success conclusions', () => {
+  for (const conclusion of ['neutral', 'skipped']) {
+    const result = evaluateChecks({ head: HEAD, checkRuns: [
+      { name: 'Repository checks', head_sha: HEAD, conclusion },
+      { name: 'Vercel', head_sha: HEAD, conclusion },
+    ] });
+    assert.equal(result.safety, 'PENDING');
+    assert.equal(result.vercel, 'PENDING');
+    assert.equal(evaluateReadiness({ ...readyInput(), checks: result }).state, 'WAITING');
+  }
+  const cancelled = evaluateChecks({ head: HEAD, checkRuns: [
+    { name: 'Repository checks', head_sha: HEAD, conclusion: 'cancelled' },
+    { name: 'Vercel', head_sha: HEAD, conclusion: 'cancelled' },
+  ] });
+  assert.equal(cancelled.safety, 'FAIL'); assert.equal(cancelled.vercel, 'FAIL');
+  assert.equal(evaluateReadiness({ ...readyInput(), checks: cancelled }).state, 'BLOCKED');
 });

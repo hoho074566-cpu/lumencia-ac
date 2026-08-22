@@ -57,15 +57,20 @@ function normalizeCheck(check) {
   return conclusion ? (TERMINAL_FAILURES.has(conclusion) ? 'FAIL' : SUCCESSFUL.has(conclusion) ? 'PASS' : 'PENDING') : 'PENDING';
 }
 
+function normalizeAuthoritativeCheck(check) {
+  const conclusion = check.conclusion?.toLowerCase() || null;
+  return conclusion === 'success' ? 'PASS' : conclusion && TERMINAL_FAILURES.has(conclusion) ? 'FAIL' : 'PENDING';
+}
+
 export function evaluateChecks({ head, checkRuns = [], statuses = [], requiredCheckNames = [] }) {
   const currentChecks = checkRuns.filter((check) => !check.head_sha || check.head_sha === head);
   const safetyItems = currentChecks.filter((check) => /^(repository checks|lumensia pr safety gate)$/i.test(check.name));
   const vercelChecks = currentChecks.filter((check) => /vercel/i.test(`${check.name} ${check.app?.name || ''}`));
   const vercelStatuses = statuses.filter((status) => (!status.sha || status.sha === head) && /vercel/i.test(status.context || ''));
   const summarize = (states, absent = 'PENDING') => states.length === 0 ? absent : states.some((state) => state === 'FAIL') ? 'FAIL' : states.some((state) => state === 'PENDING') ? 'PENDING' : 'PASS';
-  const safety = summarize(safetyItems.map(normalizeCheck));
+  const safety = summarize(safetyItems.map(normalizeAuthoritativeCheck));
   const vercel = summarize([
-    ...vercelChecks.map(normalizeCheck),
+    ...vercelChecks.map(normalizeAuthoritativeCheck),
     ...vercelStatuses.map((status) => status.state === 'success' ? 'PASS' : ['failure', 'error'].includes(status.state) ? 'FAIL' : 'PENDING'),
   ], 'NOT_PRESENT');
   const requiredNames = new Set(requiredCheckNames.map((name) => name.trim().toLowerCase()).filter(Boolean));
@@ -193,7 +198,7 @@ async function main() {
   if (!process.env.GITHUB_TOKEN || !process.env.GITHUB_REPOSITORY) throw new Error('GITHUB_TOKEN and GITHUB_REPOSITORY are required.');
   const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
   const event = process.env.GITHUB_EVENT_PATH ? JSON.parse(await (await import('node:fs/promises')).readFile(process.env.GITHUB_EVENT_PATH, 'utf8')) : {};
-  const number = event.pull_request?.number || event.issue?.pull_request && event.issue.number || event.check_run?.pull_requests?.[0]?.number;
+  const number = Number(process.env.PR_NUMBER) || event.pull_request?.number || event.issue?.pull_request && event.issue.number || event.check_run?.pull_requests?.[0]?.number;
   const pulls = number
     ? [await github(`/repos/${owner}/${repo}/pulls/${number}`)]
     : await hydratePulls(await github(`/repos/${owner}/${repo}/pulls?state=open&per_page=50`), (pullNumber) => github(`/repos/${owner}/${repo}/pulls/${pullNumber}`));
