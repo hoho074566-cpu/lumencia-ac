@@ -9,6 +9,7 @@ import {
 import {
   evaluateCodex,
   findLatestTrustedCodexReviewRequest,
+  hasCodexCycleEcho,
   isCurrentCleanCodexComment,
   parseTrustedCodexReviewRequest,
 } from '../lumensia-merge-readiness.mjs';
@@ -19,7 +20,7 @@ const ACTORS = CODEX;
 const A = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const B = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
-function requestComment(id, head, baselineIssueCommentIds = []) {
+function requestComment(id, head, baselineIssueCommentIds = [], extra = {}) {
   const body = makeCodexReviewRequestBody({
     prNumber: 16,
     head,
@@ -27,14 +28,15 @@ function requestComment(id, head, baselineIssueCommentIds = []) {
     baselineReviewIds: [],
     baselineReviewCommentIds: [],
     baselineIssueCommentIds,
+    ...extra,
   });
   return { id, body, user: { login: OWNER } };
 }
 
-function cleanComment(id, head, login = CODEX) {
+function cleanComment(id, head, login = CODEX, extra = '') {
   return {
     id,
-    body: `Codex Review: Didn't find any major issues. Bravo.\n\n**Reviewed commit:** \`${head.slice(0, 10)}\``,
+    body: `Codex Review: Didn't find any major issues. Bravo.\n\n**Reviewed commit:** \`${head.slice(0, 10)}\`${extra ? `\n\n${extra}` : ''}`,
     user: { login },
   };
 }
@@ -70,7 +72,7 @@ test('current trusted P1 review blocks even if a clean timeline comment exists',
   assert.equal(result.P1, 1);
 });
 
-test('trusted scanner creates one request per HEAD occurrence and a fresh request on A-B-A', async () => {
+test('trusted scanner creates one request per HEAD occurrence and requires echo on repeated A-B-A head', async () => {
   let head = A;
   let nextId = 100;
   const issueComments = [];
@@ -89,16 +91,59 @@ test('trusted scanner creates one request per HEAD occurrence and a fresh reques
   const firstA = await ensureCodexReviewRequest({ api, pull: pull(), owner: OWNER, logger: { log() {} } });
   const duplicateA = await ensureCodexReviewRequest({ api, pull: pull(), owner: OWNER, logger: { log() {} } });
   assert.equal(firstA.created, true);
+  assert.equal(firstA.request.requireCycleEcho, false);
   assert.equal(duplicateA.created, false);
   assert.equal(issueComments.length, 1);
 
   head = B;
-  assert.equal((await ensureCodexReviewRequest({ api, pull: pull(), owner: OWNER, logger: { log() {} } })).created, true);
+  const firstB = await ensureCodexReviewRequest({ api, pull: pull(), owner: OWNER, logger: { log() {} } });
+  assert.equal(firstB.created, true);
+  assert.equal(firstB.request.requireCycleEcho, false);
+
   head = A;
-  assert.equal((await ensureCodexReviewRequest({ api, pull: pull(), owner: OWNER, logger: { log() {} } })).created, true);
+  const secondA = await ensureCodexReviewRequest({ api, pull: pull(), owner: OWNER, logger: { log() {} } });
+  assert.equal(secondA.created, true);
   assert.equal(issueComments.length, 3);
-  assert.equal(parseCodexReviewRequest(issueComments.at(-1).body).head, A);
-  assert.notEqual(parseCodexReviewRequest(issueComments[0].body).generationKey, parseCodexReviewRequest(issueComments.at(-1).body).generationKey);
+  assert.equal(secondA.request.head, A);
+  assert.equal(secondA.request.requireCycleEcho, true);
+  assert.equal(secondA.request.cycleToken, 'pr-16-after-101');
+  assert.ok(secondA.comment.body.includes('Lumensia-Review-Cycle: pr-16-after-101'));
+  assert.notEqual(parseCodexReviewRequest(issueComments[0].body).generationKey, secondA.request.generationKey);
+});
+
+test('repeated HEAD cannot PASS on a late old clean result without current cycle echo', () => {
+  const token = 'pr-16-after-101';
+  const lateOld = cleanComment(200, A);
+  const current = cleanComment(201, A, CODEX, `Lumensia-Review-Cycle: ${token}`);
+  assert.equal(hasCodexCycleEcho(lateOld.body, token), false);
+  assert.equal(hasCodexCycleEcho(current.body, token), true);
+  assert.equal(evaluateCodex({
+    head: A,
+    issueComments: [lateOld],
+    configuredActors: ACTORS,
+    requireCycleEcho: true,
+    cycleToken: token,
+  }).state, 'PENDING');
+  assert.equal(evaluateCodex({
+    head: A,
+    issueComments: [lateOld, current],
+    configuredActors: ACTORS,
+    requireCycleEcho: true,
+    cycleToken: token,
+  }).state, 'PASS');
+});
+
+test('repeated HEAD still blocks on a trusted P1 even before the echo arrives', () => {
+  const reviews = [{ id: 70, commit_id: A, body: 'P1: blocker', state: 'COMMENTED', submitted_at: '2026-08-22T12:20:00Z', user: { login: CODEX } }];
+  const result = evaluateCodex({
+    head: A,
+    reviews,
+    configuredActors: ACTORS,
+    requireCycleEcho: true,
+    cycleToken: 'pr-16-after-101',
+  });
+  assert.equal(result.state, 'BLOCK');
+  assert.equal(result.P1, 1);
 });
 
 test('scanner request carries immutable baselines', async () => {
