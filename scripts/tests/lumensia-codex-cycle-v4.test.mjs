@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   ensureCodexReviewRequest,
   findLatestCodexReviewRequest,
+  hasCodexCompletionForRequest,
   makeCodexReviewRequestBody,
   parseCodexReviewRequest,
   reconcileOpenPullReviewRequests,
@@ -97,7 +98,7 @@ test('trusted scanner reuses the same head+base target across A-B-A and requests
     listReviews: async () => [],
     listReviewComments: async () => [],
     createIssueComment: async (_number, body) => {
-      const comment = { id: nextId++, body, user: { login: OWNER } };
+      const comment = { id: nextId++, body, user: { login: OWNER }, created_at: `2026-08-22T12:00:${nextId - 100}Z` };
       issueComments.push(comment);
       return comment;
     },
@@ -123,10 +124,46 @@ test('trusted scanner reuses the same head+base target across A-B-A and requests
   assert.equal(issueComments.length, 2);
 
   baseSha = BASE2;
-  const rebasedA = await ensureCodexReviewRequest({ api, pull: pull(), owner: OWNER, logger: { log() {} } });
-  assert.equal(rebasedA.created, true);
-  assert.equal(rebasedA.request.head, A);
-  assert.equal(rebasedA.request.baseSha, BASE2);
+  const deferredA = await ensureCodexReviewRequest({ api, pull: pull(), owner: OWNER, logger: { log() {} } });
+  assert.equal(deferredA.created, false);
+  assert.equal(deferredA.reason, 'prior-same-head-pending');
+  assert.equal(issueComments.length, 2);
+});
+
+test('same-head base change waits for prior result then creates one fresh request', async () => {
+  let nextId = 301;
+  const oldRequest = {
+    ...requestComment(300, A, BASE1),
+    created_at: '2026-08-22T12:00:00Z',
+  };
+  const issueComments = [oldRequest];
+  const reviews = [];
+  const pull = { number: 16, state: 'open', draft: false, head: { sha: A }, base: { sha: BASE2 } };
+  const api = {
+    getPull: async () => pull,
+    listIssueComments: async () => [...issueComments],
+    listReviews: async () => [...reviews],
+    listReviewComments: async () => [],
+    createIssueComment: async (_number, body) => {
+      const comment = { id: nextId++, body, user: { login: OWNER }, created_at: '2026-08-22T12:02:00Z' };
+      issueComments.push(comment);
+      return comment;
+    },
+  };
+
+  assert.equal(hasCodexCompletionForRequest({ requestEntry: { comment: oldRequest, request: parseCodexReviewRequest(oldRequest.body) }, reviews, issueComments, configuredActors: ACTORS }), false);
+  const deferred = await ensureCodexReviewRequest({ api, pull, owner: OWNER, logger: { log() {} }, configuredActors: ACTORS });
+  assert.equal(deferred.created, false);
+  assert.equal(deferred.reason, 'prior-same-head-pending');
+
+  const clean = { ...cleanComment(350, A), created_at: '2026-08-22T12:01:00Z' };
+  issueComments.push(clean);
+  assert.equal(hasCodexCompletionForRequest({ requestEntry: { comment: oldRequest, request: parseCodexReviewRequest(oldRequest.body) }, reviews, issueComments, configuredActors: ACTORS }), true);
+
+  const created = await ensureCodexReviewRequest({ api, pull, owner: OWNER, logger: { log() {} }, configuredActors: ACTORS });
+  assert.equal(created.created, true);
+  assert.equal(created.request.head, A);
+  assert.equal(created.request.baseSha, BASE2);
   assert.equal(issueComments.length, 3);
 });
 
@@ -149,7 +186,7 @@ test('scanner request carries immutable baselines and current base SHA', async (
     listIssueComments: async () => [...comments],
     listReviews: async () => [{ id: 11 }],
     listReviewComments: async () => [{ id: 12 }],
-    createIssueComment: async (_number, body) => (posted = { id: 13, body, user: { login: OWNER } }),
+    createIssueComment: async (_number, body) => (posted = { id: 13, body, user: { login: OWNER }, created_at: '2026-08-22T12:00:00Z' }),
   };
   await ensureCodexReviewRequest({ api, pull: { number: 16, state: 'open', draft: false, head: { sha: A }, base: { sha: BASE1 } }, owner: OWNER, logger: { log() {} } });
   const marker = parseCodexReviewRequest(posted.body);
@@ -176,7 +213,7 @@ test('trusted scheduled reconciliation requests Codex for non-codex open PRs and
     listReviews: async () => [],
     listReviewComments: async () => [],
     createIssueComment: async (_number, body) => {
-      const comment = { id: nextId++, body, user: { login: OWNER } };
+      const comment = { id: nextId++, body, user: { login: OWNER }, created_at: '2026-08-22T12:00:00Z' };
       issueComments.push(comment);
       return comment;
     },
