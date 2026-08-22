@@ -8,7 +8,7 @@ function fn(label) {
   return value;
 }
 
-test('PAT keeps PR/comment mutations while ephemeral token owns hosted-check reads and merge', () => {
+test('PAT owns PR data while ephemeral token owns hosted-check reads and merge', () => {
   const patApi = {
     createIssueComment: fn('pat-comment'),
     updatePull: fn('pat-update'),
@@ -32,7 +32,7 @@ test('PAT keeps PR/comment mutations while ephemeral token owns hosted-check rea
   assert.equal(api.listIssueComments.label, 'pat-issues');
   assert.equal(api.listReviews.label, 'pat-reviews');
   assert.equal(api.listReviewComments.label, 'pat-review-comments');
-  assert.equal(api.listPullFiles.label, 'ephemeral-files');
+  assert.equal(api.listPullFiles.label, 'pat-files');
   assert.equal(api.listCheckRuns.label, 'ephemeral-checks');
   assert.equal(api.getCombinedStatus.label, 'ephemeral-status');
   assert.equal(mergeApi.mergePull.label, 'ephemeral-merge');
