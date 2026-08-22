@@ -93,6 +93,7 @@ test('trusted scanner reuses the same head+base target across A-B-A and requests
   let nextId = 100;
   const issueComments = [];
   const api = {
+    compare: async () => ({ head_commit: { sha: head }, base_commit: { sha: baseSha }, merge_base_commit: { sha: baseSha } }),
     getPull: async () => ({ number: 16, state: 'open', draft: false, head: { sha: head }, base: { sha: baseSha } }),
     listIssueComments: async () => [...issueComments],
     listReviews: async () => [],
@@ -138,8 +139,10 @@ test('same-head base change waits for prior result then creates one fresh reques
   };
   const issueComments = [oldRequest];
   const reviews = [];
-  const pull = { number: 16, state: 'open', draft: false, head: { sha: A }, base: { sha: BASE2 } };
+  // GitHub can leave pull.base.sha stale after main advances. The compare base is authoritative.
+  const pull = { number: 16, state: 'open', draft: false, head: { sha: A, ref: 'codex/same-head' }, base: { sha: BASE1 } };
   const api = {
+    compare: async () => ({ head_commit: { sha: A }, base_commit: { sha: BASE2 }, merge_base_commit: { sha: BASE1 } }),
     getPull: async () => pull,
     listIssueComments: async () => [...issueComments],
     listReviews: async () => [...reviews],
@@ -182,6 +185,7 @@ test('scanner request carries immutable baselines and current base SHA', async (
   const comments = [{ id: 1, body: 'old', user: { login: CODEX } }];
   let posted;
   const api = {
+    compare: async () => ({ head_commit: { sha: A }, base_commit: { sha: BASE1 }, merge_base_commit: { sha: BASE1 } }),
     getPull: async () => ({ number: 16, state: 'open', draft: false, head: { sha: A }, base: { sha: BASE1 } }),
     listIssueComments: async () => [...comments],
     listReviews: async () => [{ id: 11 }],
@@ -207,6 +211,7 @@ test('trusted scheduled reconciliation requests Codex for non-codex open PRs and
     base: { sha: BASE1 },
   };
   const api = {
+    compare: async () => ({ head_commit: { sha: A }, base_commit: { sha: BASE1 }, merge_base_commit: { sha: BASE1 } }),
     listOpenPulls: async () => [pull],
     getPull: async () => pull,
     listIssueComments: async () => [...issueComments],
