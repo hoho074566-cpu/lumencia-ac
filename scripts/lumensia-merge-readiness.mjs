@@ -46,9 +46,21 @@ export function findCodexReviewRequest(comments = [], head, cycle) {
   return comments.find((comment) => comment.body?.includes(marker) && /github-actions\[bot\]/i.test(comment.user?.login || ''));
 }
 
-export function codexReviewCycle(storedState = {}, head) {
-  if (storedState.codexReviewRequest?.headSha === head) return storedState.codexReviewRequest.cycle;
-  return Number(storedState.codexReviewRequest?.cycle || 0) + 1;
+function runIdentity(value) {
+  try { return /^\d+$/.test(String(value || '')) ? BigInt(value) : null; } catch { return null; }
+}
+
+export function planCodexReviewCycle(storedState = {}, head, transitionRunId) {
+  const previous = storedState.codexReviewRequest || {};
+  const incomingRun = runIdentity(transitionRunId);
+  const storedRun = runIdentity(previous.transitionRunId);
+  if (incomingRun != null) {
+    if (storedRun != null && incomingRun < storedRun) return { stale: true };
+    if (storedRun != null && incomingRun === storedRun) return previous.headSha === head ? { ...previous } : { stale: true };
+    return { headSha: head, cycle: Number(previous.cycle || 0) + 1, transitionRunId: String(transitionRunId) };
+  }
+  if (previous.headSha === head) return { ...previous };
+  return { headSha: head, cycle: Number(previous.cycle || 0) + 1, ...(previous.transitionRunId ? { transitionRunId: previous.transitionRunId } : {}) };
 }
 
 export async function ensureCodexReviewRequest({ comments = [], head, cycle, refreshComments, createComment }) {
@@ -264,10 +276,14 @@ async function evaluatePull(owner, repo, pr, event = {}) {
   ]);
   let currentPr = await github(`/repos/${owner}/${repo}/pulls/${pr.number}`);
   if (!isCurrentPull(pr, currentPr)) { console.log(`PR #${pr.number} changed or closed during evaluation; skipping mutations.`); return; }
+  if (event.action === 'synchronize' && event.pull_request?.head?.sha !== head) { console.log(`PR #${pr.number} ignored synchronize event for a superseded HEAD.`); return; }
   const priorComment = issueComments.find((comment) => comment.body?.includes(MARKER) && /github-actions\[bot\]/i.test(comment.user?.login || ''));
   const storedState = decodeMachineState(priorComment?.body);
   const priorState = storedState.head === head ? storedState : { head };
-  const cycle = codexReviewCycle(storedState, head);
+  const synchronizeRunId = event.action === 'synchronize' && event.pull_request?.head?.sha === head ? process.env.GITHUB_RUN_ID : undefined;
+  const reviewCycle = planCodexReviewCycle(storedState, head, synchronizeRunId);
+  if (reviewCycle.stale) { console.log(`PR #${pr.number} ignored stale synchronize run ${synchronizeRunId}.`); return; }
+  const cycle = reviewCycle.cycle;
   const reviewRequest = await ensureCodexReviewRequest({
     comments: issueComments,
     head,
@@ -295,7 +311,7 @@ async function evaluatePull(owner, repo, pr, event = {}) {
   const result = { number: pr.number, url: pr.html_url, head, codex, checks, readiness };
   const notifications = plannedNotifications(priorState, result);
   const notificationPhases = partitionNotifications(notifications.events);
-  let notificationState = { ...notifications.state, codexReviewRequest: { headSha: head, cycle, commentId: reviewRequest.id } };
+  let notificationState = { ...notifications.state, codexReviewRequest: { ...reviewCycle, commentId: reviewRequest.id } };
   for (const event of notificationPhases.beforePublish) {
     const delivery = await deliverDiscord(process.env.DISCORD_WEBHOOK_URL, discordMessage(event, result));
     if (delivery.delivered) notificationState = recordDeliveredNotification(notificationState, event, result);
