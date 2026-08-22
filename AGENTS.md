@@ -76,10 +76,20 @@ Every implementation task must:
 - Inspect the final diff against the best available base.
 - Run `scripts/lumensia-pr-check.mjs`, syntax/static checks for changed files, and relevant repository-owned deterministic tests.
 - Perform a SECOND self-review for regressions, scope creep, regex/classifier edge cases, architecture invariants, and stale or unrelated files. This review may be brief for LOW-risk work, but must be substantive for MEDIUM/HIGH-risk work.
-- Fix blockers within the focused task and branch, then rerun tests and review. Allow at most two automatic fix/review iterations; if blockers remain, report `FAIL` and stop.
+- Fix blockers within the focused task and branch, then rerun tests and review. Codex-local implementation work allows at most two automatic fix/review iterations; if blockers remain, report `FAIL` and stop. The repository-owned trusted V1.2 Auto-PR controller is a separate automation path and may request at most five current-head P0/P1 remediation attempts before requiring a person.
 - Treat hosted GitHub Safety Gate and Vercel results as authoritative for hosted PR/base integration. Local inability to resolve `remote/main` alone is not a blocker when those hosted checks are available and green.
-- Report the highest applicable risk: LOW for docs, CI, or non-core presentation-only changes; MEDIUM for `api/chat.js`, context routing, prompts, Event Director, NPC behavior, combat, runtime synthesis, or ordinary persistence; HIGH for schema/save migration, auth/security, major API/core rewrites, large cross-cutting refactors, or save-corruption risk.
-- Never auto-merge. LOW/MEDIUM/HIGH work may be merged by the user only when `MERGE_GATE` is `PASS`, GitHub Safety Gate is green, and Vercel is green. The mandatory second review normally replaces a separate final-review prompt, including for MEDIUM/HIGH work.
+- Report the highest applicable risk: LOW for docs or non-core presentation-only changes; MEDIUM for `api/chat.js`, context routing, prompts, Event Director, NPC behavior, combat, runtime synthesis, or ordinary persistence; HIGH for schema/save migration, auth/security, automatic-merge/workflow security, major API/core rewrites, large cross-cutting refactors, or save-corruption risk.
+- Codex task environments must never merge directly into `main` and must never bypass hosted checks.
+- Exception: the repository-owned trusted V1.2 Auto-PR controller may auto-merge only when every condition below is true:
+  - the PR was created by Lumensia Auto-PR and contains the trusted Auto-PR marker;
+  - the same-repository head branch is `codex/*` and is not opted out with `-no-pr`;
+  - the exact current HEAD/base review cycle is authoritative and Codex P0/P1 is zero;
+  - GitHub Safety Gate, Vercel, and every configured required check are passing;
+  - GitHub reports the PR mergeable and current, with no conflict or behind/blocked state;
+  - no protected path is changed;
+  - the final decision is revalidated immediately before the merge mutation.
+- Protected-path PRs must remain human-merge only. Protected paths include `api/**`, canonical runtime entry files, CANON/canonical files, save/schema/migration/persistence/auth/security files, dependency/deployment configuration, `AGENTS.md`, `.github/**`, and Lumensia automation/safety controller scripts.
+- P2/P3 remain non-blocking. A failed authoritative check, a protected path, five exhausted P0/P1 fix attempts, a stalled fix request, missing merge capability, or a rejected merge must stop automation and require a person.
 
 Always end the implementation report with:
 
