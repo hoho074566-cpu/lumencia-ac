@@ -25,6 +25,7 @@ const PROTECTED_EXACT_PATHS = new Set([
   'AGENTS.md',
   'app.js',
   'app-runtime.js',
+  'lib/event-progress.js',
   'sw.js',
   'index.html',
   'vercel.json',
