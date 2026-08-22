@@ -56,7 +56,6 @@ export function splitMaintenanceClients({ patApi, ephemeralApi }) {
   return {
     api: {
       ...patApi,
-      listPullFiles: ephemeralApi.listPullFiles,
       listCheckRuns: ephemeralApi.listCheckRuns,
       getCombinedStatus: ephemeralApi.getCombinedStatus,
     },
