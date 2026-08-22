@@ -71,6 +71,10 @@ const vercelStatus = { context: 'Vercel', state: 'success', sha: HEAD, created_a
 const file = { filename: 'docs/guide.md', status: 'modified', additions: 1, deletions: 0, changes: 1 };
 const silent = { log() {}, warn() {}, error() {} };
 
+function currentComparison(head = HEAD, base = BASE, mergeBase = base) {
+  return { head_commit: { sha: head }, base_commit: { sha: base }, merge_base_commit: { sha: mergeBase } };
+}
+
 test('.vercelignore is protected deployment configuration', () => {
   assert.notEqual(protectedMergeReason('.vercelignore'), '');
 });
@@ -80,6 +84,7 @@ test('auto-fix is not posted after HEAD advances', async () => {
   let commentCalls = 0;
   const api = {
     validate: async () => true,
+    compare: async () => currentComparison(),
     listOpenPulls: async () => [pull()],
     getPull: async () => (++getPullCalls === 1 ? pull() : pull(NEW_HEAD)),
     listIssueComments: async () => [requestComment()],
@@ -122,6 +127,7 @@ test('hosted check failure on final signal reread prevents merge', async () => {
   let mergeCalls = 0;
   const api = {
     validate: async () => true,
+    compare: async () => currentComparison(),
     listOpenPulls: async () => [pull()],
     getPull: async () => pull(),
     listIssueComments: async () => [...issueComments],
@@ -152,6 +158,35 @@ test('hosted check failure on final signal reread prevents merge', async () => {
   assert.equal(summary.errors.length, 0);
 });
 
+test('stale pull base and old-base READY evidence cannot merge after main advances', async () => {
+  const currentBase = 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+  const issueComments = [requestComment(), cleanCodexComment()];
+  let mergeCalls = 0;
+  const api = {
+    validate: async () => true,
+    compare: async () => currentComparison(HEAD, currentBase, BASE),
+    listOpenPulls: async () => [pull()],
+    getPull: async () => pull(),
+    listIssueComments: async () => [...issueComments],
+    listReviews: async () => [],
+    listReviewComments: async () => [],
+    listCheckRuns: async () => ({ check_runs: [successCheck()] }),
+    getCombinedStatus: async () => ({ statuses: [vercelStatus] }),
+    listPullFiles: async () => [file],
+    updatePull: async () => pull(),
+    createIssueComment: async () => { throw new Error('unexpected comment'); },
+  };
+  const summary = await maintainAutoPulls({
+    token: 'pat', mergeToken: 'ephemeral', owner: OWNER, repo: REPO, api,
+    mergeApi: { mergePull: async () => { mergeCalls += 1; return { merged: true }; } },
+    logger: silent, now: new Date('2026-08-23T00:02:00Z'),
+  });
+  assert.equal(mergeCalls, 0);
+  assert.equal(summary.waiting, 1);
+  assert.equal(summary.merged, 0);
+  assert.equal(summary.errors.length, 0);
+});
+
 test('unstable final snapshot rereads authoritative signals and blocks stale PASS', async () => {
   const issueComments = [requestComment(), cleanCodexComment()];
   let getPullCalls = 0;
@@ -159,6 +194,7 @@ test('unstable final snapshot rereads authoritative signals and blocks stale PAS
   let mergeCalls = 0;
   const api = {
     validate: async () => true,
+    compare: async () => currentComparison(),
     listOpenPulls: async () => [pull()],
     getPull: async () => {
       getPullCalls += 1;
@@ -200,6 +236,7 @@ test('unstable final snapshot merges only after post-snapshot signals pass', asy
   let mergeCalls = 0;
   const api = {
     validate: async () => true,
+    compare: async () => currentComparison(),
     listOpenPulls: async () => [pull()],
     getPull: async () => {
       getPullCalls += 1;
@@ -242,6 +279,7 @@ test('base advance during unstable post-snapshot signal read prevents merge', as
   let mergeCalls = 0;
   const api = {
     validate: async () => true,
+    compare: async () => (getPullCalls >= 5 ? currentComparison(HEAD, newBase, BASE) : currentComparison()),
     listOpenPulls: async () => [pull()],
     getPull: async () => {
       getPullCalls += 1;
