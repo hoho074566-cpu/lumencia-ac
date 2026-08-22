@@ -6,6 +6,8 @@ on:
 
 permissions:
   contents: write
+  checks: read
+  statuses: read
 
 concurrency:
   group: lumensia-auto-pr-scan
