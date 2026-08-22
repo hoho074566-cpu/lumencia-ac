@@ -104,7 +104,7 @@ jobs:
       (github.event.pull_request.number != null || github.event.check_run.pull_requests[0].number != null || (github.event.issue.pull_request != null && github.event.issue.number != null)) &&
       (github.event_name != 'check_run' || !startsWith(github.event.check_run.name, 'Lumensia Merge Readiness'))
     concurrency:
-      group: lumensia-readiness-pr-${{ github.event.pull_request.number || github.event.check_run.pull_requests[0].number }}
+      group: lumensia-readiness-pr-${{ github.event.pull_request.number || github.event.check_run.pull_requests[0].number }}${{ github.event.issue.number || '' }}
       cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 5
