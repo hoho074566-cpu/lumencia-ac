@@ -3,6 +3,7 @@
 const MARKER = '<!-- lumensia-merge-readiness:v1 -->';
 const STATE_PREFIX = 'lumensia-readiness-state:';
 const TERMINAL_FAILURES = new Set(['failure', 'cancelled', 'timed_out', 'action_required', 'startup_failure', 'stale']);
+export const TRUSTED_CODEX_REQUEST_MARKER = 'lumensia-codex-review-request:v4';
 
 export function isCodexActor(actor = {}, configured = '') {
   const allowed = configured.split(',').map((item) => item.trim().toLowerCase()).filter(Boolean);
@@ -37,6 +38,8 @@ export function parseCodexSeverities(body = '') {
   return counts;
 }
 
+// Legacy v3 helpers are kept for deterministic regression tests and old machine-state decoding.
+// Live review requests are now issued by the trusted Auto-PR scanner with the repository-owner PAT.
 export function codexReviewRequestMarker(prNumber, head, generationKey) {
   return `<!-- lumensia-codex-review-cycle:v3\npr=${prNumber}\nhead=${head}\ngeneration=${generationKey}\n-->`;
 }
@@ -86,15 +89,70 @@ export function shouldRequestCodexReview(pull = {}) {
   return !pull.draft;
 }
 
-export function evaluateCodex({ head, reviews = [], comments = [], requestReactions = [], baselineReviewIds = [], baselineReviewCommentIds = [], configuredActors = '' }) {
+export function parseTrustedCodexReviewRequest(body = '') {
+  const match = String(body).match(/<!--\s*lumensia-codex-review-request:v4\s*\n(\{[^]*?\})\s*\n?-->/);
+  if (!match) return null;
+  try {
+    const value = JSON.parse(match[1]);
+    if (!value || typeof value !== 'object' || !value.head || !value.generationKey) return null;
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+export function findLatestTrustedCodexReviewRequest(issueComments = [], prNumber, trustedActor = '') {
+  const actor = String(trustedActor || '').toLowerCase();
+  return issueComments
+    .map((comment) => ({ comment, request: parseTrustedCodexReviewRequest(comment.body) }))
+    .filter(({ comment, request }) => request
+      && Number(request.pr) === Number(prNumber)
+      && (!actor || String(comment.user?.login || '').toLowerCase() === actor))
+    .sort((left, right) => Number(right.comment.id || 0) - Number(left.comment.id || 0))[0] || null;
+}
+
+export function codexReviewedCommit(body = '') {
+  const match = String(body).match(/\*\*Reviewed commit:\*\*\s*`([a-f0-9]{7,40})`/i)
+    || String(body).match(/Reviewed commit:\s*`([a-f0-9]{7,40})`/i);
+  return match?.[1]?.toLowerCase() || '';
+}
+
+export function isCurrentCleanCodexComment(comment, head, baselineIssueCommentIds = [], configuredActors = '') {
+  if (!comment || !isCodexActor(comment.user, configuredActors)) return false;
+  if (new Set(baselineIssueCommentIds.map(String)).has(String(comment.id))) return false;
+  if (!/^Codex Review:\s*Didn't find any major issues\./im.test(String(comment.body || ''))) return false;
+  const reviewed = codexReviewedCommit(comment.body);
+  return Boolean(reviewed) && String(head || '').toLowerCase().startsWith(reviewed);
+}
+
+export function evaluateCodex({
+  head,
+  reviews = [],
+  comments = [],
+  issueComments = [],
+  requestReactions = [],
+  baselineReviewIds = [],
+  baselineReviewCommentIds = [],
+  baselineIssueCommentIds = [],
+  configuredActors = '',
+}) {
   const baselineReviews = new Set(baselineReviewIds.map(String));
   const baselineComments = new Set(baselineReviewCommentIds.map(String));
   const trustedReviews = reviews.filter((review) => isCodexActor(review.user, configuredActors));
-  const currentReviews = trustedReviews.filter((review) => review.commit_id === head && review.submitted_at && review.state?.toUpperCase() !== 'DISMISSED' && !baselineReviews.has(String(review.id)));
+  const currentReviews = trustedReviews.filter((review) => review.commit_id === head
+    && review.submitted_at
+    && review.state?.toUpperCase() !== 'DISMISSED'
+    && !baselineReviews.has(String(review.id)));
+
   if (currentReviews.length === 0) {
+    const trustedCleanComment = issueComments.some((comment) => isCurrentCleanCodexComment(comment, head, baselineIssueCommentIds, configuredActors));
+    if (trustedCleanComment) return { state: 'PASS', P0: 0, P1: 0, P2: 0, P3: 0, unknown: 0 };
+
+    // Legacy fallback for deterministic v3 tests only. Live v4 evaluation does not fetch request reactions.
     const trustedCleanReaction = requestReactions.some((reaction) => reaction.content === '+1' && isCodexActor(reaction.user, configuredActors));
     return { state: trustedCleanReaction ? 'PASS' : 'PENDING', P0: 0, P1: 0, P2: 0, P3: 0, unknown: 0 };
   }
+
   const latestReview = currentReviews.reduce((latest, review) => {
     const submitted = Date.parse(review.submitted_at) || 0;
     const latestSubmitted = Date.parse(latest.submitted_at) || 0;
@@ -180,11 +238,7 @@ export function evaluateReadiness({ codex, checks, mergeable, mergeableState, dr
 
 function decodeMachineState(body = '') {
   const match = String(body).match(/lumensia-readiness-state:\s*(\{[^]*?\})\s*-->/);
-  try {
-    return match ? JSON.parse(match[1]) : {};
-  } catch {
-    return {};
-  }
+  try { return match ? JSON.parse(match[1]) : {}; } catch { return {}; }
 }
 
 export function parseMachineState(body = '', head = '') {
@@ -255,6 +309,16 @@ async function github(path, options = {}) {
   return response.status === 204 ? null : response.json();
 }
 
+async function githubAll(path) {
+  const items = [];
+  for (let page = 1; ; page += 1) {
+    const separator = path.includes('?') ? '&' : '?';
+    const batch = await github(`${path}${separator}per_page=100&page=${page}`);
+    items.push(...batch);
+    if (batch.length < 100) return items;
+  }
+}
+
 export async function hydratePulls(pulls, fetchPull) {
   return Promise.all(pulls.map((pull) => fetchPull(pull.number)));
 }
@@ -284,80 +348,112 @@ export function findReadinessCheck(checkRuns, prNumber, head) {
   return newestAttempts(checkRuns.filter((run) => run.head_sha === head && run.external_id === identity), () => identity)[0];
 }
 
+function pendingCodex() {
+  return { state: 'PENDING', P0: 0, P1: 0, P2: 0, P3: 0, unknown: 0 };
+}
+
+function requestCycleSnapshot(activeRequest, head) {
+  if (!activeRequest || activeRequest.request.head !== head) return null;
+  return {
+    headSha: activeRequest.request.head,
+    generationKey: activeRequest.request.generationKey,
+    baselineReviewIds: (activeRequest.request.baselineReviewIds || []).map(String),
+    baselineReviewCommentIds: (activeRequest.request.baselineReviewCommentIds || []).map(String),
+    baselineIssueCommentIds: (activeRequest.request.baselineIssueCommentIds || []).map(String),
+    commentId: activeRequest.comment.id,
+    source: 'trusted-pat-v4',
+  };
+}
+
 async function evaluatePull(owner, repo, pr, event = {}) {
   const head = pr.head.sha;
   let [reviews, comments, runs, combined, issueComments] = await Promise.all([
-    github(`/repos/${owner}/${repo}/pulls/${pr.number}/reviews?per_page=100`),
-    github(`/repos/${owner}/${repo}/pulls/${pr.number}/comments?per_page=100`),
+    githubAll(`/repos/${owner}/${repo}/pulls/${pr.number}/reviews`),
+    githubAll(`/repos/${owner}/${repo}/pulls/${pr.number}/comments`),
     github(`/repos/${owner}/${repo}/commits/${head}/check-runs?per_page=100`),
     github(`/repos/${owner}/${repo}/commits/${head}/status`),
-    github(`/repos/${owner}/${repo}/issues/${pr.number}/comments?per_page=100`),
+    githubAll(`/repos/${owner}/${repo}/issues/${pr.number}/comments`),
   ]);
   let currentPr = await github(`/repos/${owner}/${repo}/pulls/${pr.number}`);
   if (!isCurrentPull(pr, currentPr)) { console.log(`PR #${pr.number} changed or closed during evaluation; skipping mutations.`); return; }
   if (event.action === 'synchronize' && event.pull_request?.head?.sha !== head) { console.log(`PR #${pr.number} ignored synchronize event for a superseded HEAD.`); return; }
+
   const priorComment = issueComments.find((comment) => comment.body?.includes(MARKER) && /github-actions\[bot\]/i.test(comment.user?.login || ''));
   const storedState = decodeMachineState(priorComment?.body);
   const priorState = storedState.head === head ? storedState : { head };
-  const synchronizeRunId = event.action === 'synchronize' && event.pull_request?.head?.sha === head ? process.env.GITHUB_RUN_ID : undefined;
-  let reviewCycle = planCodexReviewCycle(storedState, head, synchronizeRunId);
-  if (reviewCycle.stale) { console.log(`PR #${pr.number} ignored stale synchronize run ${synchronizeRunId}.`); return; }
-  const cycleWasPersisted = sameCodexReviewCycle(storedState.codexReviewRequest, reviewCycle);
-  reviewCycle = baselineCodexReviewCycle(reviewCycle, reviews, comments);
-  let reviewRequest;
-  let requestReactions = [];
-  if (shouldRequestCodexReview(currentPr)) {
-    reviewRequest = await ensureCodexReviewRequest({
-      comments: issueComments,
-      prNumber: pr.number,
+  const latestTrustedRequest = findLatestTrustedCodexReviewRequest(issueComments, pr.number, owner);
+  const reviewCycle = requestCycleSnapshot(latestTrustedRequest, head);
+
+  let codex = reviewCycle
+    ? evaluateCodex({
       head,
-      generationKey: reviewCycle.generationKey,
-      refreshComments: () => github(`/repos/${owner}/${repo}/issues/${pr.number}/comments?per_page=100`),
-      createComment: (body) => github(`/repos/${owner}/${repo}/issues/${pr.number}/comments`, { method: 'POST', body: JSON.stringify({ body }) }),
-    });
-    requestReactions = await github(`/repos/${owner}/${repo}/issues/comments/${reviewRequest.id}/reactions?per_page=100`);
-  }
-  const evaluateCurrentCodex = () => evaluateCodex({ head, reviews, comments, requestReactions: cycleWasPersisted ? requestReactions : [], baselineReviewIds: reviewCycle.baselineReviewIds, baselineReviewCommentIds: reviewCycle.baselineReviewCommentIds, configuredActors: process.env.CODEX_ACTORS });
-  let codex = evaluateCurrentCodex();
+      reviews,
+      comments,
+      issueComments,
+      baselineReviewIds: reviewCycle.baselineReviewIds,
+      baselineReviewCommentIds: reviewCycle.baselineReviewCommentIds,
+      baselineIssueCommentIds: reviewCycle.baselineIssueCommentIds,
+      configuredActors: process.env.CODEX_ACTORS,
+    })
+    : pendingCodex();
+
   const requiredCheckNames = (process.env.REQUIRED_CHECKS || '').split(',');
   const checkRuns = applyCheckRunTransition(runs.check_runs, event, head);
   const checks = evaluateChecks({ head, baseSha: pr.base.sha, prNumber: pr.number, checkRuns, statuses: combined.statuses, requiredCheckNames });
   let readiness = evaluateReadiness({ codex, checks, mergeable: currentPr.mergeable, mergeableState: currentPr.mergeable_state, draft: currentPr.draft });
-  if (readiness.state === 'READY' && reviewRequest) {
+
+  if (readiness.state === 'READY' && reviewCycle) {
     let finalIssueComments;
     let finalRuns;
     let finalCombined;
-    [currentPr, reviews, comments, requestReactions, finalIssueComments, finalRuns, finalCombined] = await Promise.all([
+    [currentPr, reviews, comments, finalIssueComments, finalRuns, finalCombined] = await Promise.all([
       github(`/repos/${owner}/${repo}/pulls/${pr.number}`),
-      github(`/repos/${owner}/${repo}/pulls/${pr.number}/reviews?per_page=100`),
-      github(`/repos/${owner}/${repo}/pulls/${pr.number}/comments?per_page=100`),
-      github(`/repos/${owner}/${repo}/issues/comments/${reviewRequest.id}/reactions?per_page=100`),
-      github(`/repos/${owner}/${repo}/issues/${pr.number}/comments?per_page=100`),
+      githubAll(`/repos/${owner}/${repo}/pulls/${pr.number}/reviews`),
+      githubAll(`/repos/${owner}/${repo}/pulls/${pr.number}/comments`),
+      githubAll(`/repos/${owner}/${repo}/issues/${pr.number}/comments`),
       github(`/repos/${owner}/${repo}/commits/${head}/check-runs?per_page=100`),
       github(`/repos/${owner}/${repo}/commits/${head}/status`),
     ]);
     if (!isCurrentPull(pr, currentPr)) { console.log(`PR #${pr.number} changed or closed before READY publication; skipping mutations.`); return; }
-    const currentRequest = findCodexReviewRequest(finalIssueComments, pr.number, head, reviewCycle.generationKey);
-    const currentStateComment = finalIssueComments.find((comment) => comment.body?.includes(MARKER) && /github-actions\[bot\]/i.test(comment.user?.login || ''));
-    const currentStoredState = decodeMachineState(currentStateComment?.body);
-    if (currentRequest?.id !== reviewRequest.id || !sameCodexReviewCycle(currentStoredState.codexReviewRequest, reviewCycle)) { console.log(`PR #${pr.number} review cycle changed before READY publication; skipping mutations.`); return; }
-    codex = evaluateCodex({ head, reviews, comments, requestReactions, baselineReviewIds: reviewCycle.baselineReviewIds, baselineReviewCommentIds: reviewCycle.baselineReviewCommentIds, configuredActors: process.env.CODEX_ACTORS });
+    const finalTrustedRequest = findLatestTrustedCodexReviewRequest(finalIssueComments, pr.number, owner);
+    if (finalTrustedRequest?.comment?.id !== reviewCycle.commentId || finalTrustedRequest?.request?.head !== head) {
+      console.log(`PR #${pr.number} trusted Codex review cycle changed before READY publication; skipping mutations.`);
+      return;
+    }
+    codex = evaluateCodex({
+      head,
+      reviews,
+      comments,
+      issueComments: finalIssueComments,
+      baselineReviewIds: reviewCycle.baselineReviewIds,
+      baselineReviewCommentIds: reviewCycle.baselineReviewCommentIds,
+      baselineIssueCommentIds: reviewCycle.baselineIssueCommentIds,
+      configuredActors: process.env.CODEX_ACTORS,
+    });
     const finalChecks = evaluateChecks({ head, baseSha: currentPr.base.sha, prNumber: pr.number, checkRuns: finalRuns.check_runs, statuses: finalCombined.statuses, requiredCheckNames });
     readiness = evaluateReadiness({ codex, checks: finalChecks, mergeable: currentPr.mergeable, mergeableState: currentPr.mergeable_state, draft: currentPr.draft });
     Object.assign(checks, finalChecks);
+    issueComments = finalIssueComments;
   }
+
   const result = { number: pr.number, url: pr.html_url, head, codex, checks, readiness };
   const notifications = plannedNotifications(priorState, result);
   const notificationPhases = partitionNotifications(notifications.events);
-  let notificationState = { ...notifications.state, codexReviewRequest: { ...reviewCycle, ...(reviewRequest ? { commentId: reviewRequest.id } : {}), status: codex.state } };
-  for (const event of notificationPhases.beforePublish) {
-    const delivery = await deliverDiscord(process.env.DISCORD_WEBHOOK_URL, discordMessage(event, result));
-    if (delivery.delivered) notificationState = recordDeliveredNotification(notificationState, event, result);
+  const codexReviewRequest = reviewCycle
+    ? { ...reviewCycle, status: codex.state }
+    : { headSha: head, generationKey: 'awaiting-trusted-pat-v4', source: 'awaiting-trusted-pat-v4', status: 'PENDING' };
+  let notificationState = { ...notifications.state, codexReviewRequest };
+
+  for (const notificationEvent of notificationPhases.beforePublish) {
+    const delivery = await deliverDiscord(process.env.DISCORD_WEBHOOK_URL, discordMessage(notificationEvent, result));
+    if (delivery.delivered) notificationState = recordDeliveredNotification(notificationState, notificationEvent, result);
   }
+
   let body = renderComment(result, notificationState);
   let readinessComment = priorComment;
   if (!readinessComment) readinessComment = await github(`/repos/${owner}/${repo}/issues/${pr.number}/comments`, { method: 'POST', body: JSON.stringify({ body }) });
   else if (readinessComment.body !== body) readinessComment = await github(`/repos/${owner}/${repo}/issues/comments/${readinessComment.id}`, { method: 'PATCH', body: JSON.stringify({ body }) });
+
   const checkName = readinessCheckName(pr.number);
   const externalId = readinessCheckIdentity(pr.number);
   const existing = reusableReadinessCheck(findReadinessCheck(runs.check_runs, pr.number, head), readiness.state);
@@ -366,9 +462,10 @@ async function evaluatePull(owner, repo, pr, event = {}) {
     : { name: checkName, external_id: externalId, head_sha: head, status: 'completed', conclusion: readiness.state === 'READY' ? 'success' : 'failure', output: { title: readiness.state === 'READY' ? 'Ready for manual merge' : 'Action required', summary: renderCheckSummary(body) } };
   const checkRequest = existing ? (({ head_sha: _head, ...update }) => update)(checkPayload) : checkPayload;
   await github(existing ? `/repos/${owner}/${repo}/check-runs/${existing.id}` : `/repos/${owner}/${repo}/check-runs`, { method: existing ? 'PATCH' : 'POST', body: JSON.stringify(checkRequest) });
-  for (const event of notificationPhases.afterPublish) {
-    const delivery = await deliverDiscord(process.env.DISCORD_WEBHOOK_URL, discordMessage(event, result));
-    if (delivery.delivered) notificationState = recordDeliveredNotification(notificationState, event, result);
+
+  for (const notificationEvent of notificationPhases.afterPublish) {
+    const delivery = await deliverDiscord(process.env.DISCORD_WEBHOOK_URL, discordMessage(notificationEvent, result));
+    if (delivery.delivered) notificationState = recordDeliveredNotification(notificationState, notificationEvent, result);
   }
   const deliveredBody = renderComment(result, notificationState);
   if (deliveredBody !== body) {
