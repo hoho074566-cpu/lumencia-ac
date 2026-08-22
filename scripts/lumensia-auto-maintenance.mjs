@@ -30,6 +30,8 @@ const PROTECTED_EXACT_PATHS = new Set([
   'vercel.json',
   'package.json',
   'package-lock.json',
+  'npm-shrinkwrap.json',
+  '.npmrc',
   'pnpm-lock.yaml',
   'yarn.lock',
 ]);
@@ -222,6 +224,17 @@ export function decideMaintenanceAction({
 
   if (readiness?.state !== 'READY') return { action: 'WAIT', reason: 'not-ready' };
   if (pull?.mergeable !== true || pull?.mergeable_state !== 'clean') return { action: 'WAIT', reason: 'merge-state-not-clean' };
+
+  if (pull?.changed_files !== undefined && pull?.changed_files !== null) {
+    const expectedChangedFiles = Number(pull.changed_files);
+    if (!Number.isFinite(expectedChangedFiles) || expectedChangedFiles < 0 || files.length !== expectedChangedFiles) {
+      return {
+        action: 'HUMAN',
+        reason: 'file-inventory-incomplete',
+        details: [`GitHub reports ${pull.changed_files} changed file(s), but the controller received ${files.length}.`],
+      };
+    }
+  }
 
   const protectedPaths = protectedMergePaths(files);
   if (protectedPaths.length) {
