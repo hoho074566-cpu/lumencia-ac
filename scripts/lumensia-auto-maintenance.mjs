@@ -194,6 +194,18 @@ function ageMinutes(value, now = new Date()) {
   return Number.isFinite(stamp) ? Math.max(0, (now.getTime() - stamp) / 60000) : Infinity;
 }
 
+function authoritativeChecksPass(checks = {}) {
+  return checks?.safety === 'PASS'
+    && checks?.vercel === 'PASS'
+    && checks?.required === 'PASS';
+}
+
+export function autoMergeStateAllowed(pull = {}, checks = {}) {
+  if (pull?.mergeable !== true) return false;
+  if (pull?.mergeable_state === 'clean') return true;
+  return pull?.mergeable_state === 'unstable' && authoritativeChecksPass(checks);
+}
+
 export function decideMaintenanceAction({
   pull,
   codex,
@@ -228,7 +240,7 @@ export function decideMaintenanceAction({
   }
 
   if (readiness?.state !== 'READY') return { action: 'WAIT', reason: 'not-ready' };
-  if (pull?.mergeable !== true || pull?.mergeable_state !== 'clean') return { action: 'WAIT', reason: 'merge-state-not-clean' };
+  if (!autoMergeStateAllowed(pull, checks)) return { action: 'WAIT', reason: 'merge-state-not-safe' };
 
   if (pull?.changed_files !== undefined && pull?.changed_files !== null) {
     const expectedChangedFiles = Number(pull.changed_files);
@@ -471,8 +483,7 @@ export async function maintainAutoPulls({
       if (!isAutoManagedPull(mergeCandidate, owner, repo)
         || mergeCandidate.head?.sha !== validatedHead
         || mergeCandidate.base?.sha !== validatedBase
-        || mergeCandidate.mergeable !== true
-        || mergeCandidate.mergeable_state !== 'clean') {
+        || !autoMergeStateAllowed(mergeCandidate, signals.checks)) {
         summary.waiting += 1;
         continue;
       }
@@ -505,8 +516,7 @@ export async function maintainAutoPulls({
       if (!isAutoManagedPull(lastCandidate, owner, repo)
         || lastCandidate.head?.sha !== mergeCandidate.head?.sha
         || lastCandidate.base?.sha !== mergeCandidate.base?.sha
-        || lastCandidate.mergeable !== true
-        || lastCandidate.mergeable_state !== 'clean') {
+        || !autoMergeStateAllowed(lastCandidate, finalSignals.checks)) {
         summary.waiting += 1;
         continue;
       }
