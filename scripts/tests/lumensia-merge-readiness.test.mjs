@@ -148,6 +148,23 @@ test('synchronize transition rejects old-HEAD and untrusted reactions', () => {
   assert.equal(evaluateReview({ head: HEAD, cleanReaction: transitioned }).state, 'PENDING');
 });
 
+test('same-second old-HEAD reaction is ambiguous and cannot satisfy synchronize', () => {
+  const sameSecond = reaction(1, 'trusted-codex[bot]', '2026-01-01T00:00:00Z');
+  const transitioned = reconcileCodexCleanReaction({ head: HEAD, reactions: [sameSecond], configuredActors: ACTORS, previous: { headSha: 'old-head', reactionId: '1' }, headActivatedAt: '2026-01-01T00:00:00Z' });
+  assert.deepEqual(transitioned, { headSha: HEAD, seenReactionIds: ['1'] });
+  assert.equal(evaluateReview({ head: HEAD, cleanReaction: transitioned }).state, 'PENDING');
+});
+
+test('equal-timestamp reaction remains pending until a later valid clean signal arrives', () => {
+  const sameSecond = reaction(1, 'trusted-codex[bot]', '2026-01-01T00:00:00Z');
+  const transitioned = reconcileCodexCleanReaction({ head: HEAD, reactions: [sameSecond], configuredActors: ACTORS, previous: { headSha: 'old-head' }, headActivatedAt: '2026-01-01T00:00:00Z' });
+  assert.equal(evaluateReview({ head: HEAD, cleanReaction: transitioned }).state, 'PENDING');
+  const laterReactions = [sameSecond, reaction(2, 'trusted-codex[bot]', '2026-01-01T00:00:01Z')];
+  const resolved = reconcileCodexCleanReaction({ head: HEAD, reactions: laterReactions, configuredActors: ACTORS, previous: transitioned });
+  assert.equal(resolved.reactionId, '2');
+  assert.equal(evaluateReview({ head: HEAD, cleanReaction: resolved }).state, 'PASS');
+});
+
 test('scheduled scan preserves a synchronize-transition reaction binding', () => {
   const reactions = [reaction(2, 'trusted-codex[bot]', '2026-01-01T00:01:00Z')];
   const transitioned = reconcileCodexCleanReaction({ head: HEAD, reactions, configuredActors: ACTORS, previous: { headSha: 'old-head' }, headActivatedAt: '2026-01-01T00:00:00Z' });

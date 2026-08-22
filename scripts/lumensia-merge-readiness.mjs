@@ -42,7 +42,7 @@ export function reconcileCodexCleanReaction({ head, reactions = [], configuredAc
   const reactionIds = trustedReactions.map((reaction) => String(reaction.id));
   const activationTimestamp = Date.parse(headActivatedAt);
   const eventReactionId = Number.isFinite(activationTimestamp)
-    ? trustedReactions.filter((reaction) => (Date.parse(reaction.created_at) || 0) >= activationTimestamp).at(-1)?.id
+    ? trustedReactions.filter((reaction) => (Date.parse(reaction.created_at) || 0) > activationTimestamp).at(-1)?.id
     : undefined;
   const headEventReactionId = eventReactionId != null ? String(eventReactionId) : undefined;
   if (!previous.headSha) {
