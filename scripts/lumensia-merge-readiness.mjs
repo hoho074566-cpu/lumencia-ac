@@ -39,12 +39,18 @@ export function parseCodexSeverities(body = '') {
 
 export function evaluateCodex({ head, reviews = [], comments = [], configuredActors = '' }) {
   const trustedReviews = reviews.filter((review) => isCodexActor(review.user, configuredActors));
-  const dismissedReviewIds = new Set(trustedReviews.filter((review) => review.state?.toUpperCase() === 'DISMISSED').map((review) => review.id));
   const currentReviews = trustedReviews.filter((review) => review.commit_id === head && review.submitted_at && review.state?.toUpperCase() !== 'DISMISSED');
-  const currentComments = comments.filter((comment) => comment.commit_id === head && isCodexActor(comment.user, configuredActors) && !dismissedReviewIds.has(comment.pull_request_review_id));
   if (currentReviews.length === 0) return { state: 'PENDING', P0: 0, P1: 0, P2: 0, P3: 0, unknown: 0 };
+  const latestReview = currentReviews.reduce((latest, review) => {
+    const submitted = Date.parse(review.submitted_at) || 0;
+    const latestSubmitted = Date.parse(latest.submitted_at) || 0;
+    return submitted > latestSubmitted || submitted === latestSubmitted && Number(review.id || 0) >= Number(latest.id || 0) ? review : latest;
+  });
+  const currentComments = comments.filter((comment) => comment.commit_id === head
+    && comment.pull_request_review_id === latestReview.id
+    && isCodexActor(comment.user, configuredActors));
   const totals = { P0: 0, P1: 0, P2: 0, P3: 0, unknown: 0 };
-  for (const item of [...currentReviews, ...currentComments]) {
+  for (const item of [latestReview, ...currentComments]) {
     const parsed = parseCodexSeverities(item.body);
     for (const key of Object.keys(totals)) totals[key] += parsed[key];
   }

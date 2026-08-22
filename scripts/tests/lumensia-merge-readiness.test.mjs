@@ -28,7 +28,7 @@ const ACTORS = 'trusted-codex[bot]';
 const codex = (state = 'PASS', extra = {}) => ({ state, P0: 0, P1: 0, P2: 0, P3: 0, unknown: 0, ...extra });
 const checks = (extra = {}) => ({ safety: 'PASS', vercel: 'PASS', required: 'PASS', ...extra });
 const review = (commit_id, body = 'No findings.', extra = {}) => ({ id: 1, commit_id, body, state: 'COMMENTED', submitted_at: '2026-01-01T00:00:00Z', user: { login: 'trusted-codex[bot]' }, ...extra });
-const comment = (commit_id, body, extra = {}) => ({ commit_id, body, user: { login: 'trusted-codex[bot]' }, ...extra });
+const comment = (commit_id, body, extra = {}) => ({ commit_id, body, pull_request_review_id: 1, user: { login: 'trusted-codex[bot]' }, ...extra });
 const evaluateReview = (input) => evaluateCodex({ configuredActors: ACTORS, ...input });
 const readyInput = (extra = {}) => ({ codex: codex(), checks: checks(), mergeable: true, mergeableState: 'clean', ...extra });
 
@@ -421,4 +421,32 @@ test('rerequested check event overrides stale completed API attempt', () => {
   const checkRuns = applyCheckRunTransition([completed], { action: 'rerequested', check_run: completed }, HEAD);
   const result = evaluateChecks({ head: HEAD, checkRuns });
   assert.equal(result.vercel, 'PENDING');
+});
+
+test('newer clean same-head Codex review supersedes older P1', () => {
+  const old = review(HEAD, 'P1: old finding', { id: 10, submitted_at: '2026-01-01T00:00:00Z' });
+  const latest = review(HEAD, 'No findings.', { id: 11, submitted_at: '2026-01-01T00:01:00Z' });
+  const result = evaluateReview({ head: HEAD, reviews: [old, latest], comments: [comment(HEAD, 'P1: old inline', { pull_request_review_id: 10 })] });
+  assert.equal(result.state, 'PASS'); assert.equal(result.P1, 0);
+});
+
+test('newer P2-only same-head Codex review supersedes older P1', () => {
+  const old = review(HEAD, 'P1: old finding', { id: 20, submitted_at: '2026-01-01T00:00:00Z' });
+  const latest = review(HEAD, 'P2: non-blocking suggestion', { id: 21, submitted_at: '2026-01-01T00:01:00Z' });
+  const result = evaluateReview({ head: HEAD, reviews: [old, latest] });
+  assert.equal(result.state, 'PASS'); assert.deepEqual([result.P1, result.P2], [0, 1]);
+});
+
+test('latest same-head Codex review still containing P1 blocks', () => {
+  const old = review(HEAD, 'No findings.', { id: 30, submitted_at: '2026-01-01T00:00:00Z' });
+  const latest = review(HEAD, 'P1: current finding', { id: 31, submitted_at: '2026-01-01T00:01:00Z' });
+  const result = evaluateReview({ head: HEAD, reviews: [old, latest] });
+  assert.equal(result.state, 'BLOCK'); assert.equal(result.P1, 1);
+});
+
+test('latest review selection continues to ignore prior-head findings', () => {
+  const stale = review('old-head', 'P0: stale finding', { id: 40, submitted_at: '2026-01-01T00:02:00Z' });
+  const current = review(HEAD, 'No findings.', { id: 41, submitted_at: '2026-01-01T00:01:00Z' });
+  const result = evaluateReview({ head: HEAD, reviews: [current, stale], comments: [comment('old-head', 'P1: stale inline', { pull_request_review_id: 40 })] });
+  assert.equal(result.state, 'PASS'); assert.deepEqual([result.P0, result.P1], [0, 0]);
 });
