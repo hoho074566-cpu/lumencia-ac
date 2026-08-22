@@ -94,20 +94,21 @@ export function parseTrustedCodexReviewRequest(body = '') {
   if (!match) return null;
   try {
     const value = JSON.parse(match[1]);
-    if (!value || typeof value !== 'object' || !value.head || !value.generationKey) return null;
+    if (!value || typeof value !== 'object' || !value.head || !value.baseSha || !value.generationKey) return null;
     return value;
   } catch {
     return null;
   }
 }
 
-export function findLatestTrustedCodexReviewRequest(issueComments = [], prNumber, trustedActor = '') {
+export function findLatestTrustedCodexReviewRequest(issueComments = [], prNumber, trustedActor = '', head = '', baseSha = '') {
   const actor = String(trustedActor || '').toLowerCase();
   return issueComments
     .map((comment) => ({ comment, request: parseTrustedCodexReviewRequest(comment.body) }))
     .filter(({ comment, request }) => request
       && Number(request.pr) === Number(prNumber)
-      && (!actor || String(comment.user?.login || '').toLowerCase() === actor))
+      && (!actor || String(comment.user?.login || '').toLowerCase() === actor)
+      && (!head || request.head === head && request.baseSha === baseSha))
     .sort((left, right) => Number(right.comment.id || 0) - Number(left.comment.id || 0))[0] || null;
 }
 
@@ -117,17 +118,12 @@ export function codexReviewedCommit(body = '') {
   return match?.[1]?.toLowerCase() || '';
 }
 
-export function hasCodexCycleEcho(body = '', cycleToken = '') {
-  return Boolean(cycleToken) && String(body).includes(`Lumensia-Review-Cycle: ${cycleToken}`);
-}
-
-export function isCurrentCleanCodexComment(comment, head, baselineIssueCommentIds = [], configuredActors = '', requireCycleEcho = false, cycleToken = '') {
+export function isCurrentCleanCodexComment(comment, head, baselineIssueCommentIds = [], configuredActors = '') {
   if (!comment || !isCodexActor(comment.user, configuredActors)) return false;
   if (new Set(baselineIssueCommentIds.map(String)).has(String(comment.id))) return false;
   if (!/^Codex Review:\s*Didn't find any major issues\./im.test(String(comment.body || ''))) return false;
   const reviewed = codexReviewedCommit(comment.body);
-  if (!reviewed || !String(head || '').toLowerCase().startsWith(reviewed)) return false;
-  return !requireCycleEcho || hasCodexCycleEcho(comment.body, cycleToken);
+  return Boolean(reviewed) && String(head || '').toLowerCase().startsWith(reviewed);
 }
 
 export function evaluateCodex({
@@ -140,12 +136,9 @@ export function evaluateCodex({
   baselineReviewCommentIds = [],
   baselineIssueCommentIds = [],
   configuredActors = '',
-  requireCycleEcho = false,
-  cycleToken = '',
 }) {
   const baselineReviews = new Set(baselineReviewIds.map(String));
   const baselineComments = new Set(baselineReviewCommentIds.map(String));
-  const baselineIssues = new Set(baselineIssueCommentIds.map(String));
   const trustedReviews = reviews.filter((review) => isCodexActor(review.user, configuredActors));
   const currentReviews = trustedReviews.filter((review) => review.commit_id === head
     && review.submitted_at
@@ -158,13 +151,11 @@ export function evaluateCodex({
       head,
       baselineIssueCommentIds,
       configuredActors,
-      requireCycleEcho,
-      cycleToken,
     ));
     if (trustedCleanComment) return { state: 'PASS', P0: 0, P1: 0, P2: 0, P3: 0, unknown: 0 };
 
     // Legacy fallback for deterministic v3 tests only. Live v4 evaluation does not fetch request reactions.
-    const trustedCleanReaction = !requireCycleEcho && requestReactions.some((reaction) => reaction.content === '+1' && isCodexActor(reaction.user, configuredActors));
+    const trustedCleanReaction = requestReactions.some((reaction) => reaction.content === '+1' && isCodexActor(reaction.user, configuredActors));
     return { state: trustedCleanReaction ? 'PASS' : 'PENDING', P0: 0, P1: 0, P2: 0, P3: 0, unknown: 0 };
   }
 
@@ -182,16 +173,7 @@ export function evaluateCodex({
     const parsed = parseCodexSeverities(item.body);
     for (const key of Object.keys(totals)) totals[key] += parsed[key];
   }
-  if (totals.P0 + totals.P1 > 0) return { state: 'BLOCK', ...totals };
-
-  if (requireCycleEcho) {
-    const trustedEcho = [latestReview, ...currentComments].some((item) => hasCodexCycleEcho(item.body, cycleToken))
-      || issueComments.some((comment) => !baselineIssues.has(String(comment.id))
-        && isCodexActor(comment.user, configuredActors)
-        && hasCodexCycleEcho(comment.body, cycleToken));
-    if (!trustedEcho) return { state: 'PENDING', ...totals };
-  }
-  return { state: 'PASS', ...totals };
+  return { state: totals.P0 + totals.P1 > 0 ? 'BLOCK' : 'PASS', ...totals };
 }
 
 function normalizeAuthoritativeCheck(check) {
@@ -376,16 +358,15 @@ function pendingCodex() {
   return { state: 'PENDING', P0: 0, P1: 0, P2: 0, P3: 0, unknown: 0 };
 }
 
-function requestCycleSnapshot(activeRequest, head) {
-  if (!activeRequest || activeRequest.request.head !== head) return null;
+function requestCycleSnapshot(activeRequest, head, baseSha) {
+  if (!activeRequest || activeRequest.request.head !== head || activeRequest.request.baseSha !== baseSha) return null;
   return {
     headSha: activeRequest.request.head,
+    baseSha: activeRequest.request.baseSha,
     generationKey: activeRequest.request.generationKey,
     baselineReviewIds: (activeRequest.request.baselineReviewIds || []).map(String),
     baselineReviewCommentIds: (activeRequest.request.baselineReviewCommentIds || []).map(String),
     baselineIssueCommentIds: (activeRequest.request.baselineIssueCommentIds || []).map(String),
-    requireCycleEcho: Boolean(activeRequest.request.requireCycleEcho),
-    cycleToken: String(activeRequest.request.cycleToken || ''),
     commentId: activeRequest.comment.id,
     source: 'trusted-pat-v4',
   };
@@ -407,8 +388,8 @@ async function evaluatePull(owner, repo, pr, event = {}) {
   const priorComment = issueComments.find((comment) => comment.body?.includes(MARKER) && /github-actions\[bot\]/i.test(comment.user?.login || ''));
   const storedState = decodeMachineState(priorComment?.body);
   const priorState = storedState.head === head ? storedState : { head };
-  const latestTrustedRequest = findLatestTrustedCodexReviewRequest(issueComments, pr.number, owner);
-  const reviewCycle = requestCycleSnapshot(latestTrustedRequest, head);
+  const latestTrustedRequest = findLatestTrustedCodexReviewRequest(issueComments, pr.number, owner, head, pr.base.sha);
+  const reviewCycle = requestCycleSnapshot(latestTrustedRequest, head, pr.base.sha);
 
   let codex = reviewCycle
     ? evaluateCodex({
@@ -420,8 +401,6 @@ async function evaluatePull(owner, repo, pr, event = {}) {
       baselineReviewCommentIds: reviewCycle.baselineReviewCommentIds,
       baselineIssueCommentIds: reviewCycle.baselineIssueCommentIds,
       configuredActors: process.env.CODEX_ACTORS,
-      requireCycleEcho: reviewCycle.requireCycleEcho,
-      cycleToken: reviewCycle.cycleToken,
     })
     : pendingCodex();
 
@@ -443,8 +422,10 @@ async function evaluatePull(owner, repo, pr, event = {}) {
       github(`/repos/${owner}/${repo}/commits/${head}/status`),
     ]);
     if (!isCurrentPull(pr, currentPr)) { console.log(`PR #${pr.number} changed or closed before READY publication; skipping mutations.`); return; }
-    const finalTrustedRequest = findLatestTrustedCodexReviewRequest(finalIssueComments, pr.number, owner);
-    if (finalTrustedRequest?.comment?.id !== reviewCycle.commentId || finalTrustedRequest?.request?.head !== head) {
+    const finalTrustedRequest = findLatestTrustedCodexReviewRequest(finalIssueComments, pr.number, owner, head, currentPr.base.sha);
+    if (finalTrustedRequest?.comment?.id !== reviewCycle.commentId
+      || finalTrustedRequest?.request?.head !== head
+      || finalTrustedRequest?.request?.baseSha !== currentPr.base.sha) {
       console.log(`PR #${pr.number} trusted Codex review cycle changed before READY publication; skipping mutations.`);
       return;
     }
@@ -457,8 +438,6 @@ async function evaluatePull(owner, repo, pr, event = {}) {
       baselineReviewCommentIds: reviewCycle.baselineReviewCommentIds,
       baselineIssueCommentIds: reviewCycle.baselineIssueCommentIds,
       configuredActors: process.env.CODEX_ACTORS,
-      requireCycleEcho: reviewCycle.requireCycleEcho,
-      cycleToken: reviewCycle.cycleToken,
     });
     const finalChecks = evaluateChecks({ head, baseSha: currentPr.base.sha, prNumber: pr.number, checkRuns: finalRuns.check_runs, statuses: finalCombined.statuses, requiredCheckNames });
     readiness = evaluateReadiness({ codex, checks: finalChecks, mergeable: currentPr.mergeable, mergeableState: currentPr.mergeable_state, draft: currentPr.draft });
@@ -471,7 +450,7 @@ async function evaluatePull(owner, repo, pr, event = {}) {
   const notificationPhases = partitionNotifications(notifications.events);
   const codexReviewRequest = reviewCycle
     ? { ...reviewCycle, status: codex.state }
-    : { headSha: head, generationKey: 'awaiting-trusted-pat-v4', source: 'awaiting-trusted-pat-v4', status: 'PENDING' };
+    : { headSha: head, baseSha: pr.base.sha, generationKey: 'awaiting-trusted-pat-v4', source: 'awaiting-trusted-pat-v4', status: 'PENDING' };
   let notificationState = { ...notifications.state, codexReviewRequest };
 
   for (const notificationEvent of notificationPhases.beforePublish) {
