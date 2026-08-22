@@ -131,6 +131,7 @@ export function createGitHubClient({ token, owner, repo, fetchImpl = fetch }) {
   return {
     validate: () => Promise.all([request('GET', ''), request('GET', '/pulls?state=all&per_page=1')]),
     listBranches: () => paginate('/branches'),
+    listOpenPulls: () => paginate('/pulls?state=open'),
     compare: (base, head) => request('GET', `/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}`),
     listPulls: (head) => paginate(`/pulls?state=all&head=${encodeURIComponent(`${owner}:${head}`)}`),
     getPull: (number) => request('GET', `/pulls/${number}`),
@@ -229,6 +230,34 @@ export async function ensureCodexReviewRequest({ api, pull, owner, logger = cons
   };
 }
 
+export async function reconcileOpenPullReviewRequests({ api, owner, summary, logger = console }) {
+  if (typeof api?.listOpenPulls !== 'function') return { scanned: 0, created: 0 };
+  const pulls = await api.listOpenPulls();
+  let created = 0;
+  for (const pull of pulls) {
+    if (!pull || pull.state !== 'open') continue;
+    try {
+      const request = await ensureCodexReviewRequest({ api, pull, owner, logger });
+      if (!request.created) continue;
+      created += 1;
+      const entry = {
+        number: pull.number,
+        branch: pull.head?.ref || '',
+        sha: pull.head?.sha || '',
+        commentId: request.comment?.id || null,
+      };
+      if (!summary.reviewRequests.some((item) => item.commentId && item.commentId === entry.commentId)) {
+        summary.reviewRequests.push(entry);
+      }
+    } catch (error) {
+      if ([401, 403].includes(error?.status)) throw error;
+      summary.errors.push({ branch: `PR #${pull.number}`, status: error?.status || null });
+      logger.error(`Codex review reconciliation failed: PR #${pull.number} (${error?.status ? `HTTP ${error.status}` : error?.name || 'error'}).`);
+    }
+  }
+  return { scanned: pulls.length, created };
+}
+
 function initialSummary() {
   return {
     disabled: false,
@@ -317,6 +346,18 @@ export async function scanAutoPulls({ token, owner, repo, api, webhook = '', now
       logger.error(`Auto PR candidate failed: ${cleanText(branch)} (${error?.status ? `HTTP ${error.status}` : error?.name || 'error'}).`);
     }
   }
+
+  try {
+    await reconcileOpenPullReviewRequests({ api, owner, summary, logger });
+  } catch (error) {
+    if ([401, 403].includes(error?.status)) {
+      logger.error('AUTO PR DISABLED / TOKEN PERMISSION ERROR');
+      summary.disabled = true;
+      return summary;
+    }
+    throw error;
+  }
+
   return summary;
 }
 
