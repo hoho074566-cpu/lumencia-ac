@@ -61,6 +61,19 @@ test('new head without a current review waits', () => {
 
 test('clean current review passes', () => assert.equal(evaluateReview({ head: HEAD, reviews: [review(HEAD)] }).state, 'PASS'));
 
+test('trusted clean reaction before the first evaluator snapshot passes', () => {
+  const cleanReaction = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1)], configuredActors: ACTORS });
+  assert.deepEqual(cleanReaction, { headSha: HEAD, seenReactionIds: ['1'], reactionId: '1' });
+  assert.equal(evaluateReview({ head: HEAD, cleanReaction }).state, 'PASS');
+});
+
+test('initial clean reaction remains bound without duplicate processing on later scans', () => {
+  const initial = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1)], configuredActors: ACTORS });
+  const repeated = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1)], configuredActors: ACTORS, previous: initial });
+  assert.deepEqual(repeated, initial);
+  assert.equal(evaluateReview({ head: HEAD, cleanReaction: repeated }).state, 'PASS');
+});
+
 test('newly observed trusted Codex clean signal explicitly bound to current HEAD passes', () => {
   const cleanReaction = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(2)], configuredActors: ACTORS, previous: { headSha: HEAD, seenReactionIds: ['1'] } });
   const result = evaluateReview({ head: HEAD, cleanReaction });
@@ -69,7 +82,7 @@ test('newly observed trusted Codex clean signal explicitly bound to current HEAD
 });
 
 test('arbitrary user clean reaction remains pending', () => {
-  const cleanReaction = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1, 'ordinary-user')], configuredActors: ACTORS, previous: { headSha: HEAD, seenReactionIds: [] } });
+  const cleanReaction = reconcileCodexCleanReaction({ head: HEAD, reactions: [reaction(1, 'ordinary-user')], configuredActors: ACTORS });
   const result = evaluateReview({ head: HEAD, cleanReaction });
   assert.equal(result.state, 'PENDING');
 });

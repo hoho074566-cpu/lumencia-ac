@@ -41,6 +41,10 @@ export function reconcileCodexCleanReaction({ head, reactions = [], configuredAc
   const reactionIds = reactions
     .filter((reaction) => reaction.content === '+1' && reaction.id != null && isCodexActor(reaction.user, configuredActors))
     .map((reaction) => String(reaction.id));
+  if (!previous.headSha) {
+    const reactionId = reactionIds.at(-1);
+    return { headSha: head, seenReactionIds: reactionIds, ...(reactionId ? { reactionId } : {}) };
+  }
   if (previous.headSha !== head) return { headSha: head, seenReactionIds: reactionIds };
   const seen = new Set(Array.isArray(previous.seenReactionIds) ? previous.seenReactionIds.map(String) : []);
   const newReactionId = reactionIds.find((id) => !seen.has(id));
@@ -141,14 +145,18 @@ export function evaluateReadiness({ codex, checks, mergeable, mergeableState, dr
   return { state: waiting ? 'WAITING' : 'READY', conflict: 'NONE' };
 }
 
-export function parseMachineState(body = '', head = '') {
+function decodeMachineState(body = '') {
   const match = String(body).match(/lumensia-readiness-state:\s*(\{[^]*?\})\s*-->/);
   try {
-    const state = match ? JSON.parse(match[1]) : {};
-    return state.head === head ? state : { head };
+    return match ? JSON.parse(match[1]) : {};
   } catch {
-    return { head };
+    return {};
   }
+}
+
+export function parseMachineState(body = '', head = '') {
+  const state = decodeMachineState(body);
+  return state.head === head ? state : { head };
 }
 
 export function plannedNotifications(previous, current) {
@@ -254,8 +262,9 @@ async function evaluatePull(owner, repo, pr, event = {}) {
     github(`/repos/${owner}/${repo}/issues/${pr.number}/comments?per_page=100`),
   ]);
   const priorComment = issueComments.find((comment) => comment.body?.includes(MARKER) && /github-actions\[bot\]/i.test(comment.user?.login || ''));
-  const priorState = parseMachineState(priorComment?.body, head);
-  const codexCleanReaction = reconcileCodexCleanReaction({ head, reactions, configuredActors: process.env.CODEX_ACTORS, previous: priorState.codexCleanReaction });
+  const storedState = decodeMachineState(priorComment?.body);
+  const priorState = storedState.head === head ? storedState : { head };
+  const codexCleanReaction = reconcileCodexCleanReaction({ head, reactions, configuredActors: process.env.CODEX_ACTORS, previous: storedState.codexCleanReaction });
   const codex = evaluateCodex({ head, reviews, comments, cleanReaction: codexCleanReaction, configuredActors: process.env.CODEX_ACTORS });
   const requiredCheckNames = (process.env.REQUIRED_CHECKS || '').split(',');
   const checkRuns = applyCheckRunTransition(runs.check_runs, event, head);
