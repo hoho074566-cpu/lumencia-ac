@@ -471,3 +471,13 @@ test('present trusted evaluator follows the normal runtime path', () => {
   assert.equal((workflow.match(/echo "available=true" >> "\$GITHUB_OUTPUT"/g) || []).length, 2);
   assert.equal((workflow.match(/run: node scripts\/lumensia-merge-readiness\.mjs/g) || []).length, 2);
 });
+
+test('overlapping rerun stays pending when older attempt finishes later', () => {
+  const oldSafety = { id: 100, name: 'Repository checks', head_sha: HEAD, status: 'completed', conclusion: 'success', created_at: '2026-01-01T00:00:00Z', started_at: '2026-01-01T00:00:01Z', completed_at: '2026-01-01T00:03:00Z', app: { id: 7, name: 'GitHub Actions' } };
+  const newSafety = { id: 101, name: 'Repository checks', head_sha: HEAD, status: 'in_progress', conclusion: null, created_at: '2026-01-01T00:01:00Z', started_at: '2026-01-01T00:01:01Z', app: { id: 7, name: 'GitHub Actions' } };
+  const oldVercel = { id: 200, name: 'Vercel', head_sha: HEAD, status: 'completed', conclusion: 'success', created_at: '2026-01-01T00:00:00Z', completed_at: '2026-01-01T00:03:00Z', app: { id: 8, name: 'Vercel' } };
+  const newVercel = { id: 201, name: 'Vercel', head_sha: HEAD, status: 'queued', conclusion: null, created_at: '2026-01-01T00:01:00Z', app: { id: 8, name: 'Vercel' } };
+  const checks = evaluateChecks({ head: HEAD, checkRuns: [newSafety, oldSafety, newVercel, oldVercel] });
+  assert.deepEqual([checks.safety, checks.vercel], ['PENDING', 'PENDING']);
+  assert.equal(evaluateReadiness({ ...readyInput(), checks }).state, 'WAITING');
+});

@@ -67,8 +67,8 @@ export function newestAttempts(items, identity) {
   for (const item of items) {
     const key = identity(item);
     const previous = newest.get(key);
-    const stamp = Date.parse(item.completed_at || item.updated_at || item.started_at || item.created_at || 0) || 0;
-    const previousStamp = previous ? Date.parse(previous.completed_at || previous.updated_at || previous.started_at || previous.created_at || 0) || 0 : -1;
+    const stamp = Date.parse(item.created_at || item.started_at || 0) || 0;
+    const previousStamp = previous ? Date.parse(previous.created_at || previous.started_at || 0) || 0 : -1;
     if (!previous || stamp > previousStamp || stamp === previousStamp && Number(item.id || 0) > Number(previous.id || 0)) newest.set(key, item);
   }
   return [...newest.values()];
