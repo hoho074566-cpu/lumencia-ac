@@ -14,9 +14,17 @@ export function isCodexActor(actor = {}, configured = '') {
 export function parseCodexSeverities(body = '') {
   const counts = { P0: 0, P1: 0, P2: 0, P3: 0, unknown: 0 };
   let findingLike = false;
+  let fence = null;
   for (const original of String(body).split(/\r?\n/)) {
     const line = original.trim();
-    if (!line || line.startsWith('>') || line.startsWith('```')) continue;
+    const fenceMatch = line.match(/^(`{3,}|~{3,})/);
+    if (fenceMatch) {
+      const marker = fenceMatch[1][0];
+      if (!fence) fence = marker;
+      else if (fence === marker) fence = null;
+      continue;
+    }
+    if (fence || !line || line.startsWith('>')) continue;
     const match = line.match(/^(?:[-*]\s+)?(?:#{1,6}\s*)?(?:\*\*)?\[?(P[0-3])\]?(?:\*\*)?(?=\s|:|[-–—])/i)
       || line.match(/!\[(P[0-3])\s+Badge\]\([^\s)]+\)/i);
     if (match) {
@@ -71,7 +79,7 @@ export function evaluateReadiness({ codex, checks, mergeable, mergeableState, dr
   if (draft) return { state: 'WAITING', conflict: conflict ? 'CONFLICT' : 'NONE' };
   const blocked = conflict || codex.state === 'BLOCK' || checks.safety === 'FAIL' || checks.vercel === 'FAIL' || checks.required === 'FAIL';
   if (blocked) return { state: 'BLOCKED', conflict: conflict ? 'CONFLICT' : 'NONE' };
-  const waiting = mergeable == null || mergeableState === 'blocked' || codex.state === 'PENDING' || checks.safety === 'PENDING' || checks.vercel !== 'PASS' || checks.required === 'PENDING';
+  const waiting = mergeable == null || ['behind', 'blocked'].includes(mergeableState) || codex.state === 'PENDING' || checks.safety === 'PENDING' || checks.vercel !== 'PASS' || checks.required === 'PENDING';
   return { state: waiting ? 'WAITING' : 'READY', conflict: 'NONE' };
 }
 
@@ -88,10 +96,12 @@ export function parseMachineState(body = '', head = '') {
 export function plannedNotifications(previous, current) {
   const next = previous.head === current.head ? { ...previous } : { head: current.head };
   const events = [];
+  const readinessState = current.readiness.state.toLowerCase();
   if (current.codex.state !== 'PENDING' && next.codexNotified !== current.codex.state.toLowerCase()) events.push('codex');
   if (['PASS', 'FAIL'].includes(current.checks.vercel) && next.vercelNotified !== current.checks.vercel.toLowerCase()) events.push('vercel');
-  if (current.readiness.state === 'BLOCKED' && next.readinessNotified !== 'blocked') events.push('blocked');
-  if (current.readiness.state === 'READY' && next.readinessNotified !== 'ready') events.push('ready');
+  if (current.readiness.state === 'BLOCKED' && (next.readinessNotified !== 'blocked' || next.readinessObserved !== 'blocked')) events.push('blocked');
+  if (current.readiness.state === 'READY' && (next.readinessNotified !== 'ready' || next.readinessObserved !== 'ready')) events.push('ready');
+  next.readinessObserved = readinessState;
   return { events, state: next };
 }
 
@@ -142,6 +152,10 @@ async function github(path, options = {}) {
   return response.status === 204 ? null : response.json();
 }
 
+export async function hydratePulls(pulls, fetchPull) {
+  return Promise.all(pulls.map((pull) => fetchPull(pull.number)));
+}
+
 async function evaluatePull(owner, repo, pr) {
   const head = pr.head.sha;
   const [reviews, comments, runs, combined, issueComments] = await Promise.all([
@@ -180,7 +194,9 @@ async function main() {
   const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
   const event = process.env.GITHUB_EVENT_PATH ? JSON.parse(await (await import('node:fs/promises')).readFile(process.env.GITHUB_EVENT_PATH, 'utf8')) : {};
   const number = event.pull_request?.number || event.issue?.pull_request && event.issue.number || event.check_run?.pull_requests?.[0]?.number;
-  const pulls = number ? [await github(`/repos/${owner}/${repo}/pulls/${number}`)] : await github(`/repos/${owner}/${repo}/pulls?state=open&per_page=50`);
+  const pulls = number
+    ? [await github(`/repos/${owner}/${repo}/pulls/${number}`)]
+    : await hydratePulls(await github(`/repos/${owner}/${repo}/pulls?state=open&per_page=50`), (pullNumber) => github(`/repos/${owner}/${repo}/pulls/${pullNumber}`));
   for (const pull of pulls) await evaluatePull(owner, repo, pull);
 }
 

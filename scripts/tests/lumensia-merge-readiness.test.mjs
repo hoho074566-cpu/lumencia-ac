@@ -6,6 +6,7 @@ import {
   evaluateChecks,
   evaluateCodex,
   evaluateReadiness,
+  hydratePulls,
   parseCodexSeverities,
   parseMachineState,
   plannedNotifications,
@@ -177,11 +178,13 @@ test('Codex badge-formatted inline P0/P1 findings block current head', () => {
 
 test('same-head Codex and Vercel state transitions notify once per new state', () => {
   const blocked = { head: HEAD, codex: codex('BLOCK', { P1: 1 }), checks: checks({ vercel: 'FAIL' }), readiness: { state: 'BLOCKED' } };
-  let state = { head: HEAD };
-  for (const event of plannedNotifications(state, blocked).events) state = recordDeliveredNotification(state, event, blocked);
+  const blockedPlan = plannedNotifications({ head: HEAD }, blocked);
+  let state = blockedPlan.state;
+  for (const event of blockedPlan.events) state = recordDeliveredNotification(state, event, blocked);
   const passing = { head: HEAD, codex: codex('PASS'), checks: checks({ vercel: 'PASS' }), readiness: { state: 'READY' } };
   const transitioned = plannedNotifications(state, passing);
   assert.deepEqual(transitioned.events, ['codex', 'vercel', 'ready']);
+  state = transitioned.state;
   for (const event of transitioned.events) state = recordDeliveredNotification(state, event, passing);
   assert.deepEqual(plannedNotifications(state, passing).events, []);
 });
@@ -195,4 +198,44 @@ test('all-open reconciliation uses one non-cancelling concurrency group', () => 
 
 test('GitHub mergeable_state blocked cannot become ready', () => {
   assert.equal(evaluateReadiness({ ...readyInput(), mergeableState: 'blocked' }).state, 'WAITING');
+});
+
+test('all-open reconciliation hydrates every abbreviated pull', async () => {
+  const requested = [];
+  const pulls = await hydratePulls([{ number: 14 }, { number: 15 }], async (number) => {
+    requested.push(number);
+    return { number, mergeable: true, mergeable_state: number === 14 ? 'clean' : 'behind' };
+  });
+  assert.deepEqual(requested, [14, 15]);
+  assert.deepEqual(pulls.map((pull) => pull.mergeable_state), ['clean', 'behind']);
+});
+
+test('GitHub mergeable_state behind cannot become ready', () => {
+  assert.equal(evaluateReadiness({ ...readyInput(), mergeableState: 'behind' }).state, 'WAITING');
+});
+
+test('WAITING resets terminal readiness transition dedupe', () => {
+  const result = (state) => ({ head: HEAD, codex: codex(), checks: checks(), readiness: { state } });
+  let machine = { head: HEAD };
+  const deliver = (current) => {
+    const planned = plannedNotifications(machine, current);
+    machine = planned.state;
+    for (const event of planned.events.filter((event) => event === 'blocked' || event === 'ready')) {
+      machine = recordDeliveredNotification(machine, event, current);
+    }
+    return planned.events;
+  };
+  assert.equal(deliver(result('BLOCKED')).includes('blocked'), true);
+  assert.equal(deliver(result('BLOCKED')).includes('blocked'), false);
+  deliver(result('WAITING'));
+  assert.equal(deliver(result('BLOCKED')).includes('blocked'), true);
+  assert.equal(deliver(result('READY')).includes('ready'), true);
+  assert.equal(deliver(result('READY')).includes('ready'), false);
+  deliver(result('WAITING'));
+  assert.equal(deliver(result('READY')).includes('ready'), true);
+});
+
+test('Codex severity parser ignores entire fenced code blocks', () => {
+  const body = '```markdown\nP0: example only\n![P1 Badge](https://img.shields.io/badge/P1-orange)\n```\nP2: real suggestion\n~~~\nP3: another example\n~~~';
+  assert.deepEqual(parseCodexSeverities(body), { P0: 0, P1: 0, P2: 1, P3: 0, unknown: 0 });
 });
