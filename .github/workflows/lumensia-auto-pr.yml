@@ -3,7 +3,6 @@ name: Lumensia Auto PR
 on:
   schedule:
     - cron: '*/5 * * * *'
-  workflow_dispatch:
 
 permissions:
   contents: write
@@ -22,19 +21,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Check out trusted default-branch automation only
+      - name: Check out trusted default-branch Auto-PR script only
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository }}
           ref: refs/heads/main
           persist-credentials: false
-          sparse-checkout: |
-            scripts/lumensia-auto-pr.mjs
-            scripts/lumensia-auto-maintenance.mjs
-            scripts/lumensia-auto-maintenance-run.mjs
-            scripts/lumensia-merge-readiness.mjs
+          sparse-checkout: scripts/lumensia-auto-pr.mjs
           sparse-checkout-cone-mode: false
-      - name: Detect trusted script bootstrap state
+      - name: Detect trusted Auto-PR script bootstrap state
         id: script
         shell: bash
         run: |
@@ -43,12 +38,6 @@ jobs:
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
             echo "Auto PR bootstrap: trusted script is not on main yet."
-          fi
-          if [[ -f scripts/lumensia-auto-maintenance-run.mjs ]]; then
-            echo "maintenance=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "maintenance=false" >> "$GITHUB_OUTPUT"
-            echo "Auto maintenance bootstrap: V1.2 controller is not on main yet."
           fi
       - name: Set up Node.js 22
         if: steps.script.outputs.available == 'true'
@@ -63,8 +52,33 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           CODEX_ACTORS: ${{ vars.CODEX_REVIEW_ACTORS }}
         run: node scripts/lumensia-auto-pr.mjs
+
+      - name: Check out trusted default-branch V1.2 controller only
+        if: steps.script.outputs.available == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: refs/heads/main
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/lumensia-auto-pr.mjs
+            scripts/lumensia-auto-maintenance.mjs
+            scripts/lumensia-auto-maintenance-run.mjs
+            scripts/lumensia-merge-readiness.mjs
+          sparse-checkout-cone-mode: false
+      - name: Detect trusted V1.2 controller bootstrap state
+        id: maintenance
+        if: steps.script.outputs.available == 'true'
+        shell: bash
+        run: |
+          if [[ -f scripts/lumensia-auto-maintenance-run.mjs ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Auto maintenance bootstrap: V1.2 controller is not on main yet."
+          fi
       - name: Maintain Auto-PRs and conditionally auto-merge
-        if: steps.script.outputs.available == 'true' && steps.script.outputs.maintenance == 'true'
+        if: steps.script.outputs.available == 'true' && steps.maintenance.outputs.available == 'true'
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
           LUMENSIA_PR_CREATOR_TOKEN: ${{ secrets.LUMENSIA_PR_CREATOR_TOKEN }}
