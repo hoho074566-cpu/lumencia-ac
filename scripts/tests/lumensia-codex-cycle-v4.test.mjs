@@ -5,6 +5,7 @@ import {
   findLatestCodexReviewRequest,
   makeCodexReviewRequestBody,
   parseCodexReviewRequest,
+  reconcileOpenPullReviewRequests,
   sameCodexReviewTarget,
 } from '../lumensia-auto-pr.mjs';
 import {
@@ -156,4 +157,41 @@ test('scanner request carries immutable baselines and current base SHA', async (
   assert.deepEqual(marker.baselineReviewIds, ['11']);
   assert.deepEqual(marker.baselineReviewCommentIds, ['12']);
   assert.deepEqual(marker.baselineIssueCommentIds, ['1']);
+});
+
+test('trusted scheduled reconciliation requests Codex for non-codex open PRs and deduplicates the target', async () => {
+  const issueComments = [];
+  let nextId = 200;
+  const pull = {
+    number: 44,
+    state: 'open',
+    draft: false,
+    head: { sha: A, ref: 'feature/manual-pr' },
+    base: { sha: BASE1 },
+  };
+  const api = {
+    listOpenPulls: async () => [pull],
+    getPull: async () => pull,
+    listIssueComments: async () => [...issueComments],
+    listReviews: async () => [],
+    listReviewComments: async () => [],
+    createIssueComment: async (_number, body) => {
+      const comment = { id: nextId++, body, user: { login: OWNER } };
+      issueComments.push(comment);
+      return comment;
+    },
+  };
+  const summary = { reviewRequests: [], errors: [] };
+  const logger = { log() {}, error() {} };
+  const first = await reconcileOpenPullReviewRequests({ api, owner: OWNER, summary, logger });
+  const second = await reconcileOpenPullReviewRequests({ api, owner: OWNER, summary, logger });
+
+  assert.deepEqual(first, { scanned: 1, created: 1 });
+  assert.deepEqual(second, { scanned: 1, created: 0 });
+  assert.equal(issueComments.length, 1);
+  assert.equal(summary.reviewRequests.length, 1);
+  const marker = parseCodexReviewRequest(issueComments[0].body);
+  assert.equal(marker.pr, 44);
+  assert.equal(marker.head, A);
+  assert.equal(marker.baseSha, BASE1);
 });
