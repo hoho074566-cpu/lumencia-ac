@@ -23,15 +23,11 @@ for (const key of ASSETS.liveFolders) {
     if (url) urls.add(url);
   }
 }
-assert.equal(urls.size, 447, 'manifest must represent exactly 447 physical V2 files');
+assert.equal(urls.size, 448, 'manifest must represent exactly 448 physical V2 files');
 
-const anastasia = ASSETS.characters.anastasia;
-assert.equal(anastasia.default, null, 'Anastasia default portrait must not be synthesized');
-assert.equal(Object.keys(anastasia.expressions).length, 12);
-assert.ok(anastasia.fullbody.endsWith('/anastasia/fullbody/default.webp'));
-for (const key of physicalKeys.filter((value) => value !== 'anastasia')) {
+for (const key of physicalKeys) {
   const character = ASSETS.characters[key];
-  assert.ok(character.default.endsWith(`/${key}/portrait/default.webp`));
+  assert.ok(character.default.endsWith(`/${key}/portrait/default.webp`), `${key} default portrait missing`);
   assert.equal(Object.keys(character.expressions).length, 12, `${key} must expose all 12 expression portraits`);
   for (const expression of expressions.filter((value) => value !== 'default')) {
     assert.ok(character.expressions[expression].endsWith(`/${key}/portrait/${expression}.webp`));
@@ -44,8 +40,8 @@ const declaredAuditUrls = (character) => [
   ...expressions.filter((value) => value !== 'default').map((value) => character.expressions[value]).filter(Boolean),
   ...(character.fullbody ? [character.fullbody] : []),
 ];
-assert.equal(declaredAuditUrls(anastasia).length, 13, 'Anastasia audit must cover 12 expressions and fullbody');
-assert.ok(declaredAuditUrls(anastasia).every((url) => !url.endsWith('/portrait/default.webp')));
+assert.equal(declaredAuditUrls(ASSETS.characters.anastasia).length, 14, 'Anastasia audit must cover default + 12 expressions + fullbody');
+assert.ok(ASSETS.characters.anastasia.default.endsWith('/anastasia/portrait/default.webp'));
 assert.equal(declaredAuditUrls(ASSETS.characters.nemesis).length, 14, 'full-set characters must audit default + 12 expressions + fullbody');
 
 const chat = readFileSync('api/chat.js', 'utf8');
@@ -70,4 +66,4 @@ assert.match(app, /\.filter\(\(row\) => row\.url\)/, 'asset audit must probe onl
 assert.match(app, /char\.fullbody \? \[\{ expression: 'fullbody', url: char\.fullbody \}\]/, 'asset audit must probe declared fullbody images');
 assert.doesNotMatch(app, /const defaultOk = await probeImage/, 'asset audit must not require a default portrait for partial characters');
 
-console.log('PASS characters-v2 manifest and expression contract (32 characters, 447 URLs, 13 expressions)');
+console.log('PASS characters-v2 manifest and expression contract (32 characters, 448 URLs, 13 expressions)');
