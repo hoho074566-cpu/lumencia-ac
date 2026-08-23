@@ -5,8 +5,9 @@ import test from 'node:test';
 const workflow = readFileSync(new URL('../../.github/workflows/lumensia-merge-readiness.yml', import.meta.url), 'utf8');
 const job = workflow.split(/\n  maintain-after-pr:\n/)[1] || '';
 
-test('direct maintenance remains serialized and trusted', () => {
-  assert.match(job, /needs: evaluate-pr/);
+test('direct maintenance remains serialized and trusted after PR or scan evaluation', () => {
+  assert.match(job, /needs: \[evaluate-pr, evaluate-scan\]/);
+  assert.match(job, /needs\.evaluate-pr\.result == 'success' \|\| needs\.evaluate-scan\.result == 'success'/);
   assert.match(job, /group: lumensia-auto-pr-scan/);
   assert.match(job, /cancel-in-progress: false/);
   assert.match(job, /environment: lumensia-trusted-auto-pr/);
@@ -24,11 +25,12 @@ test('direct maintenance verifies its PAT and retries once after a short delay',
   assert.match(job, /direct maintenance revalidation/);
 });
 
-test('direct maintenance publishes a sticky sanitized execution summary', () => {
+test('direct maintenance publishes a sticky sanitized execution summary for direct or safety workflow events', () => {
   assert.match(job, /Publish direct maintenance status/);
   assert.match(job, /if: always\(\)/);
   assert.match(job, /uses: actions\/github-script@v7/);
   assert.match(job, /lumensia-auto-maintenance-status:v1/);
+  assert.match(job, /github\.event\.workflow_run\.pull_requests\[0\]\.number/);
   assert.match(job, /safeLog = log\.replace/);
   assert.match(job, /github\.rest\.issues\.updateComment/);
   assert.match(job, /github\.rest\.issues\.createComment/);
