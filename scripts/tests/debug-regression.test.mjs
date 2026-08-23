@@ -9,7 +9,8 @@ const images = runImageContractRegression();
 assert.equal(fast.some(row=>row.status==='FAIL'),false,'fast local console contracts must pass');
 assert.equal(images.some(row=>row.status==='FAIL'),false,'image console contracts must pass');
 assert.equal(fast.filter(row=>row.status==='WARN').length,4,'server/runtime-only checks must be honestly marked WARN');
-assert.equal(resolveManifestPortrait('anastasia','default').role,'fullbody','Anastasia default must fall back to declared fullbody');
+assert.equal(resolveManifestPortrait('anastasia','default').role,'portrait','Anastasia default must use its declared portrait');
+assert.ok(resolveManifestPortrait('anastasia','default').url.endsWith('/anastasia/portrait/default.webp'));
 assert.equal(resolveManifestPortrait('aria','angry').fallback,'none','full-set character must use its declared angry portrait');
 assert.ok(resolveManifestPortrait('aria','angry').url.endsWith('/aria/portrait/angry.webp'));
 assert.doesNotMatch(resolveManifestPortrait('nemesis','unknown').url,/unknown\.webp$/,'unknown expression must not become a URL');
@@ -20,7 +21,7 @@ delete missingPortrait.characters.nemesis.expressions.angry;
 const missingPortraitRows = runImageContractRegression(missingPortrait);
 assert.equal(missingPortraitRows.find(row=>row.id==='required-images').status,'FAIL','missing required portrait must fail availability');
 assert.match(missingPortraitRows.find(row=>row.id==='required-images').detail,/nemesis: angry/,'missing portrait failure must identify the character and expression');
-assert.equal(missingPortraitRows.find(row=>row.id==='urls').status,'FAIL','lower physical URL count must fail the 447 URL contract');
+assert.equal(missingPortraitRows.find(row=>row.id==='urls').status,'FAIL','lower physical URL count must fail the 448 URL contract');
 
 const missingCharacter = cloneAssets();
 delete missingCharacter.characters.lillia;
