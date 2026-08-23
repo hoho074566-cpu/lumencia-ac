@@ -30,6 +30,71 @@ const CONTINUE_DIRECTIVE = String.raw`[LUMENSIA V1.5.6 CONTINUE]
 시간·위치·관계·기억·성장·일정·훅·보상·감정 저장상태를 변경하지 않는다. 직전 state_delta를 절대 다시 적용하지 않는다.
 PC의 행동·대사·감정·생각·수락·거절을 새로 만들지 않는다.`;
 
+const GOAL_V2_RULES = String.raw`[NPC GOAL V2]
+npc_state_updates의 Goal V2 필드는 실제 턴 근거가 있을 때만 쓴다. goal_progress_delta는 -100..100 정수이며 0이 아닌 변화에는 goal_reason이 필수다. goal_state 전환에도 goal_reason이 필수다. 같은 목표의 표현만 다듬는 것은 goal_replace=false/null이고 기존 목표 ID·진행도·우선도·긴급도·시작 턴을 유지한다. 실제로 다른 목표로 교체할 때만 goal_replace=true로 보고한다. goal_next_action은 실제 다음 행동 근거가 있을 때만 쓴다. completed 목표를 active로 재개하려면 명시적 reason과 음수 delta로 100 미만이 되어야 한다. abandoned 목표는 명시적 active 재개 전까지 진행도를 바꾸지 않는다. 대화/등장만으로 목표 진행도를 올리지 않는다.`;
+
+function goalV2FieldSchema(){
+  return {
+    goal_progress_delta:{anyOf:[{type:'integer',minimum:-100,maximum:100},{type:'null'}]},
+    goal_state:{anyOf:[{type:'string',enum:['active','blocked','completed','abandoned']},{type:'null'}]},
+    goal_reason:{anyOf:[{type:'string',maxLength:280},{type:'null'}]},
+    goal_next_action:{anyOf:[{type:'string',maxLength:240},{type:'null'}]},
+    goal_replace:{anyOf:[{type:'boolean'},{type:'null'}]},
+  };
+}
+function extendGoalV2JsonSchema(schema){
+  if(!schema||typeof schema!=='object')return false;
+  let changed=false;
+  const visit=(node)=>{
+    if(!node||typeof node!=='object')return;
+    const rows=node?.properties?.npc_state_updates;
+    const item=rows?.items;
+    if(item?.properties?.npc_key&&item?.properties?.current_goal){
+      Object.assign(item.properties,goalV2FieldSchema());
+      item.required=[...new Set([...(Array.isArray(item.required)?item.required:[]),'goal_progress_delta','goal_state','goal_reason','goal_next_action','goal_replace'])];
+      changed=true;
+    }
+    for(const value of Object.values(node)){
+      if(Array.isArray(value))for(const child of value)visit(child);
+      else if(value&&typeof value==='object')visit(value);
+    }
+  };
+  visit(schema);
+  return changed;
+}
+function mergeRawGoalV2Fields(parsed,raw){
+  const parsedRows=parsed?.state_delta?.npc_state_updates;
+  const rawRows=raw?.state_delta?.npc_state_updates;
+  if(!Array.isArray(parsedRows)||!Array.isArray(rawRows))return parsed;
+  const byKey=new Map(rawRows.filter(x=>x&&typeof x==='object').map(x=>[String(x.npc_key||''),x]));
+  for(let i=0;i<parsedRows.length;i++){
+    const row=parsedRows[i];
+    if(!row||typeof row!=='object')continue;
+    const source=byKey.get(String(row.npc_key||''))||rawRows[i];
+    if(!source||typeof source!=='object')continue;
+    for(const field of ['goal_progress_delta','goal_state','goal_reason','goal_next_action','goal_replace']){
+      if(Object.prototype.hasOwnProperty.call(source,field))row[field]=source[field];
+    }
+  }
+  return parsed;
+}
+function patchGoalV2StructuredFormat(params){
+  const format=params?.text?.format;
+  if(!format||typeof format!=='object'||!format.schema)return params;
+  let schema;
+  try{schema=structuredClone(format.schema);}catch{schema=JSON.parse(JSON.stringify(format.schema));}
+  if(!extendGoalV2JsonSchema(schema))return params;
+  const originalParseRaw=format.$parseRaw;
+  const patchedFormat={...format,schema};
+  if(typeof originalParseRaw==='function'){
+    patchedFormat.$parseRaw=(content)=>{
+      const parsed=originalParseRaw(content);
+      try{return mergeRawGoalV2Fields(parsed,JSON.parse(content));}catch{return parsed;}
+    };
+  }
+  return {...params,instructions:`${String(params.instructions||'')}\n\n${GOAL_V2_RULES}`,text:{...(params.text||{}),format:patchedFormat}};
+}
+
 function installResponsesRouter() {
   const probe = new OpenAI({ apiKey:'sk-lumensia-router-probe' });
   const proto = Object.getPrototypeOf(probe.responses);
@@ -42,7 +107,8 @@ function installResponsesRouter() {
     if (!ctx?.enabled) return originalParse.call(this,params,options);
     const routed = routeOpenAIParams(params,{incoming:ctx.incoming,mode:ctx.mode});
     ctx.telemetry = routed.telemetry;
-    return originalParse.call(this,routed.params,options);
+    const nextParams=(ctx.mode==='game'||ctx.mode==='auto')?patchGoalV2StructuredFormat(routed.params):routed.params;
+    return originalParse.call(this,nextParams,options);
   };
 }
 installResponsesRouter();
@@ -408,3 +474,5 @@ export default async function handler(req,res){
     return res.status(Number.isInteger(error?.status)?error.status:500).json({error:error?.message||String(error),code:error?.code||'STABLE_ROUTER_V156_ERROR',server_version:ADAPTER_VERSION});
   }
 }
+
+export { goalRuntimeFor, patchGoalV2StructuredFormat };
