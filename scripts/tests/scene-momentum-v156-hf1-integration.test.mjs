@@ -27,7 +27,8 @@ assert.match(chat,/momentum,scene_delta:sceneDelta/);
 assert.match(chat,/scene_momentum_v1:true/);
 assert.match(chat,/const ADAPTER_VERSION = '0\.8\.3'/);
 assert.equal((chat.match(/coreHandler\(/g)||[]).length,1,'stable adapter must keep exactly one canonical coreHandler call site');
-for (const n of [1,2,3,8,10,30]) assert.ok(chat.includes(`minAdvanceMinutes`) || n >= 0);
+assert.match(chat,/const hasMeaningfulStop=array\(turn\?\.choices\)\.length>0/,'time-floor stop evidence must come from an explicit player decision');
+assert.doesNotMatch(chat,/hasMeaningfulStop[^;\n]*importance[^;\n]*critical/i,'critical scene severity must not suppress deterministic elapsed time');
 
 assert.match(health,/version: '0\.8\.3'/);
 assert.match(health,/appVersion: '1\.5\.6'/);
@@ -36,4 +37,4 @@ assert.match(runtime,/suppressDuplicateFlowControlsStable/);
 assert.match(runtime,/Scene Momentum Recovery HF1/);
 assert.match(runtime,/· MOM/);
 
-console.log('PASS Scene Momentum HF1 production wiring (router, runtime State Delta, one-call invariant, health/debug/UI)');
+console.log('PASS Scene Momentum HF1 production wiring (router, runtime State Delta, one-call invariant, time-floor stop evidence, health/debug/UI)');
