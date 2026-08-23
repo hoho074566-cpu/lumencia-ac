@@ -52,11 +52,19 @@ assert.equal(classifySceneIntent('주변을 자세히 살펴본다.', { location
 assert.equal(classifySceneIntent('restaurant로 간다.', { location:'중앙광장' }).kind,'travel','restaurant must not be parsed as rest');
 assert.notEqual(classifySceneIntent('waitress에게 묻는다.', { location:'식당' }).kind,'wait','waitress must not be parsed as wait');
 
+// Negated/hypothetical downtime must never force a rest or 30-minute floor.
+const negatedRestTravel=classifySceneIntent('휴식하지 않고 도서관에 간다.',{location:'A동'});
+assert.equal(negatedRestTravel.kind,'travel','negated rest must fall through to the committed travel');
+assert.equal(negatedRestTravel.semanticTarget,'도서관');
+const restQuestion=classifySceneIntent('좀 쉴까?',{location:'기숙사'});
+assert.equal(restQuestion.kind,'decision-sensitive','uncommitted rest deliberation must not execute downtime');
+assert.equal(restQuestion.deltaTarget,0);
+
 // TEST C — repeated static turns must create Scene Stall pressure. Scene title alone never counts.
 const staticTurn = {
   scene_title:'A동 복도의 느린 발걸음',
   scene:[{kind:'narration',text:'게시판과 정정 목록은 그대로였다.'}],
-  state_delta:{advance_minutes:0,new_location:null,relationship_changes:[],intimacy_changes:[],npc_state_updates:[],pc_knowledge_add:[],memories_add:[],hooks_add:[],hooks_update:[],active_events_add:[],active_events_remove:[],completed_events_add:[],scheduled_events_complete:[],items_add:[],items_remove:[]},
+  state_delta:{advance_minutes:0,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0,relationship_changes:[],relationship_milestones_add:[],intimacy_changes:[],stat_progress:[],skill_experience:[],skill_learning:[],awakening_progress:[],npc_state_updates:[],npc_schedule_updates:[],pc_knowledge_add:[],memories_add:[],hooks_add:[],hooks_update:[],active_events_add:[],active_events_remove:[],completed_events_add:[],scheduled_events_add:[],scheduled_events_remove:[],scheduled_events_complete:[],world_arcs_add:[],world_arcs_remove:[],rumors_add:[],delayed_consequences_add:[],items_add:[],items_remove:[]},
   event_progress:null,
 };
 const baseSave = { turnNumber:10, world:{location:'A동 복도'}, sceneRuntime:{participants:[]} };
@@ -71,11 +79,22 @@ const pressureDirective = buildSceneMomentumDirective({ action:'본다', saveSta
 assert.match(pressureDirective,/SCENE_STALL=true/);
 assert.match(pressureDirective,/scene_title만 바꾸는 것으로 통과할 수 없다/);
 
+// Committed consequential actions are already player choices: resolve them, but require actual progress.
+const committedAttack=classifySceneIntent('공격한다.',{location:'중앙광장'});
+assert.equal(committedAttack.kind,'committed-consequence');
+assert.ok(committedAttack.deltaTarget>=1,'committed combat must keep a positive State Delta target');
+const stalledAttackDelta=deriveSceneDelta({saveState:{...baseSave,sceneRuntime:{...baseSave.sceneRuntime,momentum:m}},previousRuntime:{...baseSave.sceneRuntime,momentum:m},turn:staticTurn,nextParticipants:[],action:'공격한다.'});
+assert.equal(stalledAttackDelta.target,committedAttack.deltaTarget);
+assert.equal(stalledAttackDelta.score,0);
+const attackMomentum=updateSceneMomentum({...baseSave.sceneRuntime,momentum:m},stalledAttackDelta,{turnNumber:13});
+assert.equal(attackMomentum.stall_streak,3,'a zero-delta committed attack must not reset an existing stall');
+assert.match(buildSceneMomentumDirective({action:'공격한다.',saveState:baseSave}),/COMMITTED ACTION 규칙/);
+
 // Repeated/no-op Goal V2 metadata must not fake world progress.
 const activeGoalSave = {
   ...baseSave,
   npcInnerStates:{isabel:{active_goal:{desire:'PC의 실력을 관찰한다.',state:'active',progress:20}}},
-  npcStates:{isabel:{current_goal:'PC의 실력을 관찰한다.'}},
+  npcStates:{isabel:{current_goal:'PC의 실력을 관찰한다.',location:'A동 복도',status:'관찰 중'}},
 };
 const noOpGoalTurn = {
   ...staticTurn,
@@ -83,6 +102,7 @@ const noOpGoalTurn = {
 };
 const noOpGoalDelta = deriveSceneDelta({saveState:activeGoalSave,previousRuntime:baseSave.sceneRuntime,turn:noOpGoalTurn,nextParticipants:[],action:'본다'});
 assert.equal(noOpGoalDelta.flags.objectiveChanged,false,'same active lifecycle metadata must not count as objective progress');
+assert.equal(noOpGoalDelta.flags.npcStateChanged,false,'same lifecycle metadata must not count as ordinary NPC state progress');
 assert.equal(noOpGoalDelta.flags.npcAction,false,'a no-op goal metadata row must not fake NPC action');
 const progressedGoalTurn = {
   ...staticTurn,
@@ -90,6 +110,38 @@ const progressedGoalTurn = {
 };
 const progressedGoalDelta=deriveSceneDelta({saveState:activeGoalSave,previousRuntime:baseSave.sceneRuntime,turn:progressedGoalTurn,nextParticipants:[],action:'본다'});
 assert.equal(progressedGoalDelta.flags.objectiveChanged,true,'real goal progress must count as State Delta');
+
+// Ordinary NPC-state updates count only when they differ from authoritative state.
+const noOpNpcStateTurn={...staticTurn,state_delta:{...staticTurn.state_delta,npc_state_updates:[{npc_key:'isabel',location:'A동 복도',status:'관찰 중'}]}};
+const noOpNpcStateDelta=deriveSceneDelta({saveState:activeGoalSave,previousRuntime:baseSave.sceneRuntime,turn:noOpNpcStateTurn,nextParticipants:[],action:'본다'});
+assert.equal(noOpNpcStateDelta.flags.npcStateChanged,false,'identical NPC state metadata must not fake progress');
+const movedNpcStateTurn={...staticTurn,state_delta:{...staticTurn.state_delta,npc_state_updates:[{npc_key:'isabel',location:'중앙광장',status:'이동 중'}]}};
+const movedNpcStateDelta=deriveSceneDelta({saveState:activeGoalSave,previousRuntime:baseSave.sceneRuntime,turn:movedNpcStateTurn,nextParticipants:[],action:'본다'});
+assert.equal(movedNpcStateDelta.flags.npcStateChanged,true,'real NPC location/status mutation must count');
+
+// Every persisted canonical state-delta family contributes to real progress.
+const deltaFamilies=[
+  ['resourceChanged',{fatigue_delta:2}],
+  ['resourceChanged',{gold_delta:-5}],
+  ['growthChanged',{stat_progress:[{stat:'신체',amount:1,reason:'훈련'}]}],
+  ['growthChanged',{skill_experience:[{skill:'대검술',amount:1,reason:'실전'}]}],
+  ['growthChanged',{skill_learning:[{skill:'새 기술',amount:1,reason:'교정'}]}],
+  ['growthChanged',{awakening_progress:[{kind:'trait',name:'감각',amount:1,milestone:false,description:'진전',limitation:'제한',reason:'경험'}]}],
+  ['scheduleChanged',{scheduled_events_add:['새 일정']}],
+  ['scheduleChanged',{scheduled_events_remove:['취소 일정']}],
+  ['scheduleChanged',{npc_schedule_updates:[{npc_key:'isabel',delay_minutes:10,location:'중앙광장',activity:'이동',reason:'일정'}]}],
+  ['worldThreadChanged',{world_arcs_add:['새 아크']}],
+  ['worldThreadChanged',{world_arcs_remove:['종료 아크']}],
+  ['worldThreadChanged',{rumors_add:[{fact:'소문',target_npc_keys:['isabel'],credibility:.5,delay_turns:1,reason:'전파'}]}],
+  ['worldThreadChanged',{delayed_consequences_add:[{event_name:'후속',target_bucket:'world',delay_minutes:30,reason:'결과',secret_level:0}]}],
+  ['relationshipChanged',{relationship_milestones_add:[{npc_key:'isabel',kind:'other',description:'계기',reason:'사건'}]}],
+];
+for(const [flag,patch] of deltaFamilies){
+  const turn={...staticTurn,state_delta:{...staticTurn.state_delta,...patch}};
+  const record=deriveSceneDelta({saveState:baseSave,previousRuntime:baseSave.sceneRuntime,turn,nextParticipants:[],action:'훈련한다.'});
+  assert.equal(record.flags[flag],true,`${flag} must count persisted delta ${Object.keys(patch)[0]}`);
+  assert.ok(record.score>0,`${Object.keys(patch)[0]} must prevent a false zero-delta stall`);
+}
 
 // Event completion represented by event_progress:null is still real progression.
 const priorEventRuntime={participants:[],eventProgress:{eventInstanceId:'entrance#1285',activeBeat:'ceremony_close',completedBeats:['welcome_address'],paused:false}};
@@ -100,7 +152,7 @@ assert.equal(eventCompletedDelta.flags.eventProgress,true,'event_progress -> nul
 const changedTurn = {
   scene_title:'중앙광장',
   scene:[{kind:'dialogue',speaker_key:'isabel',text:'여기 있었네.'}],
-  state_delta:{advance_minutes:12,new_location:'중앙광장',relationship_changes:[],intimacy_changes:[],npc_state_updates:[],pc_knowledge_add:['기량평가 대진표가 공개되었다.'],memories_add:[],hooks_add:[],hooks_update:[],active_events_add:[],active_events_remove:[],completed_events_add:[],scheduled_events_complete:[],items_add:[],items_remove:[]},
+  state_delta:{...staticTurn.state_delta,advance_minutes:12,new_location:'중앙광장',pc_knowledge_add:['기량평가 대진표가 공개되었다.']},
   event_progress:null,
 };
 const d3 = deriveSceneDelta({ saveState:{...baseSave,sceneRuntime:{...baseSave.sceneRuntime,momentum:m}}, previousRuntime:{...baseSave.sceneRuntime,momentum:m}, turn:changedTurn, nextParticipants:['isabel'], action:'돌아다닌다' });
@@ -131,4 +183,4 @@ assert.match(genericDirective,/STOP은 전투 돌입\/되돌리기 어려운 위
 // Internal naming leak guard.
 assert.match(genericDirective,/내부 명칭 "PC"나 자리표시자 "Aaa"를 주어로 출력하지 않는다/);
 
-console.log('PASS Scene Momentum HF1 acceptance A-F + intent/delta edge cases');
+console.log('PASS Scene Momentum HF1 acceptance A-F + committed-action/negation/full-delta edge cases');
