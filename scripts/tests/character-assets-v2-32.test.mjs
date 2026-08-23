@@ -17,8 +17,8 @@ test('characters-v2 manifest exposes the refreshed 32-character roster', () => {
   assert.equal(ASSETS.characters.Aaa, undefined, 'PC placeholder must never be treated as an NPC asset');
 });
 
-test('all non-Anastasia characters expose default plus all 12 expression portraits', () => {
-  for (const key of EXPECTED_CHARACTERS.filter((x) => x !== 'anastasia')) {
+test('all 32 characters expose default plus all 12 expression portraits', () => {
+  for (const key of EXPECTED_CHARACTERS) {
     const char = ASSETS.characters[key];
     assert.equal(char.available, true, `${key} should be V2-live`);
     assert.equal(char.default, `${ASSETS.base}/${key}/portrait/default.webp`);
@@ -29,15 +29,6 @@ test('all non-Anastasia characters expose default plus all 12 expression portrai
       assert.equal(char.expressions[expression], `${ASSETS.base}/${key}/portrait/${expression}.webp`);
     }
   }
-});
-
-test('Anastasia keeps the intentional missing-default exception without losing expressions', () => {
-  const char = ASSETS.characters.anastasia;
-  assert.equal(char.available, true);
-  assert.equal(char.default, null);
-  assert.equal(char.portraitDefault, null);
-  assert.equal(char.fullbody, `${ASSETS.base}/anastasia/fullbody/default.webp`);
-  assert.deepEqual(Object.keys(char.expressions).sort(), [...NON_DEFAULT].sort());
 });
 
 test('asset manifest uses only characters-v2 WEBP URLs', () => {
