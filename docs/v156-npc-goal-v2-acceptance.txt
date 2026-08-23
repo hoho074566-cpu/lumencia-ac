@@ -1,0 +1,9 @@
+V1.5.6 acceptance gate:
+- one canonical model call
+- evidence-based goal delta only
+- bounded progress 0..100
+- completed=100
+- new goal reset
+- bounded goal history
+- no Director guard bypass
+- Safety/Vercel/exact-current-head Codex P0/P1=0/no conflict/current-main revalidation
