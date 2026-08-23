@@ -22,13 +22,10 @@ export const CANONICAL_PORTRAIT_EXPRESSIONS = Object.freeze([
   'flustered',
 ]);
 
-const NON_DEFAULT_EXPRESSIONS = CANONICAL_PORTRAIT_EXPRESSIONS.filter(
-  (expression) => expression !== 'default'
-);
-
-// 2026-08-23 asset refresh: every characters-v2 folder except Anastasia now has
+// 2026-08-23 asset refresh: all 32 characters-v2 folders have
 // portrait/default.webp plus all 12 non-default portrait expressions.
 const FULL_V2_CHARACTERS = [
+  'anastasia',
   'aria',
   'arien',
   'aris',
@@ -62,12 +59,9 @@ const FULL_V2_CHARACTERS = [
   'veradin',
 ];
 
-// Anastasia intentionally has no portrait/default.webp, but all 12 expression
-// portraits and fullbody/default.webp are present.
-const V2_AVAILABILITY = Object.freeze({
-  ...Object.fromEntries(FULL_V2_CHARACTERS.map((key) => [key, CANONICAL_PORTRAIT_EXPRESSIONS])),
-  anastasia: NON_DEFAULT_EXPRESSIONS,
-});
+const V2_AVAILABILITY = Object.freeze(
+  Object.fromEntries(FULL_V2_CHARACTERS.map((key) => [key, CANONICAL_PORTRAIT_EXPRESSIONS]))
+);
 
 function portraitUrl(folder, expression = 'default') {
   return `${CHARACTER_V2_BASE}/${folder}/portrait/${expression}.webp`;
