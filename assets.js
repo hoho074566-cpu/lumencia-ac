@@ -4,7 +4,7 @@
 const CHARACTER_V2_BASE =
   'https://raw.githubusercontent.com/dudghl/test/main/assets/characters-v2';
 
-export const ASSET_MANIFEST_VERSION = 'characters-v2-availability-2026-08-21';
+export const ASSET_MANIFEST_VERSION = 'characters-v2-availability-2026-08-23';
 
 export const CANONICAL_PORTRAIT_EXPRESSIONS = Object.freeze([
   'default',
@@ -22,37 +22,46 @@ export const CANONICAL_PORTRAIT_EXPRESSIONS = Object.freeze([
   'flustered',
 ]);
 
-const NON_DEFAULT_EXPRESSIONS = CANONICAL_PORTRAIT_EXPRESSIONS.filter(
-  (expression) => expression !== 'default'
-);
-
+// 2026-08-23 asset refresh: all 32 characters-v2 folders have
+// portrait/default.webp plus all 12 non-default portrait expressions.
 const FULL_V2_CHARACTERS = [
+  'anastasia',
+  'aria',
+  'arien',
+  'aris',
+  'artemis',
+  'asmo',
   'beelzebub',
   'bellian',
+  'carne',
   'chloe',
   'delpirem',
+  'elena',
+  'elise',
+  'emily',
+  'etera',
+  'fria',
   'isabel',
+  'kartia',
   'laris',
   'lena',
   'levian',
   'lillia',
   'lily_lumina',
+  'lucia',
   'mirabelle',
   'nemesis',
   'sera',
   'serena',
+  'seriel',
+  'sia',
+  'sloth',
   'veradin',
 ];
 
-const DEFAULT_ONLY_V2_CHARACTERS = ['aria', 'artemis', 'elise', 'lucia', 'sia'];
-
-// This reviewed manifest describes physical files. Keep partial characters explicit:
-// Anastasia has no default portrait, while the default-only group has no expressions.
-const V2_AVAILABILITY = Object.freeze({
-  ...Object.fromEntries(FULL_V2_CHARACTERS.map((key) => [key, CANONICAL_PORTRAIT_EXPRESSIONS])),
-  anastasia: NON_DEFAULT_EXPRESSIONS,
-  ...Object.fromEntries(DEFAULT_ONLY_V2_CHARACTERS.map((key) => [key, ['default']])),
-});
+const V2_AVAILABILITY = Object.freeze(
+  Object.fromEntries(FULL_V2_CHARACTERS.map((key) => [key, CANONICAL_PORTRAIT_EXPRESSIONS]))
+);
 
 function portraitUrl(folder, expression = 'default') {
   return `${CHARACTER_V2_BASE}/${folder}/portrait/${expression}.webp`;

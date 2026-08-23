@@ -5,8 +5,7 @@ import { readFileSync } from 'node:fs';
 import { ASSETS, CANONICAL_PORTRAIT_EXPRESSIONS } from '../../assets.js';
 
 const expressions = ['default', 'smile', 'blush', 'serious', 'angry', 'sad', 'shock', 'smug', 'annoyed', 'worried', 'confused', 'laugh', 'flustered'];
-const physicalKeys = ['anastasia', 'aria', 'artemis', 'beelzebub', 'bellian', 'chloe', 'delpirem', 'elise', 'isabel', 'laris', 'lena', 'levian', 'lillia', 'lily_lumina', 'lucia', 'mirabelle', 'nemesis', 'sera', 'serena', 'sia', 'veradin'];
-const defaultOnly = ['aria', 'artemis', 'elise', 'lucia', 'sia'];
+const physicalKeys = ['anastasia', 'aria', 'arien', 'aris', 'artemis', 'asmo', 'beelzebub', 'bellian', 'carne', 'chloe', 'delpirem', 'elena', 'elise', 'emily', 'etera', 'fria', 'isabel', 'kartia', 'laris', 'lena', 'levian', 'lillia', 'lily_lumina', 'lucia', 'mirabelle', 'nemesis', 'sera', 'serena', 'seriel', 'sia', 'sloth', 'veradin'];
 const forbidden = ['Aaa', 'belian', 'karne', 'pria', 'mirabel', 'lilia'];
 
 assert.deepEqual(CANONICAL_PORTRAIT_EXPRESSIONS, expressions, 'frontend canonical expression set changed');
@@ -24,31 +23,26 @@ for (const key of ASSETS.liveFolders) {
     if (url) urls.add(url);
   }
 }
-assert.equal(urls.size, 233, 'manifest must represent exactly 233 physical V2 files');
+assert.equal(urls.size, 448, 'manifest must represent exactly 448 physical V2 files');
 
-const anastasia = ASSETS.characters.anastasia;
-assert.equal(anastasia.default, null, 'Anastasia default portrait must not be synthesized');
-assert.equal(Object.keys(anastasia.expressions).length, 12);
-assert.ok(anastasia.fullbody.endsWith('/anastasia/fullbody/default.webp'));
-for (const key of defaultOnly) {
+for (const key of physicalKeys) {
   const character = ASSETS.characters[key];
-  assert.ok(character.default.endsWith(`/${key}/portrait/default.webp`));
-  assert.deepEqual(character.expressions, {}, `${key} expressions must not be synthesized`);
+  assert.ok(character.default.endsWith(`/${key}/portrait/default.webp`), `${key} default portrait missing`);
+  assert.equal(Object.keys(character.expressions).length, 12, `${key} must expose all 12 expression portraits`);
+  for (const expression of expressions.filter((value) => value !== 'default')) {
+    assert.ok(character.expressions[expression].endsWith(`/${key}/portrait/${expression}.webp`));
+  }
   assert.ok(character.fullbody.endsWith(`/${key}/fullbody/default.webp`));
 }
-const nemesis = ASSETS.characters.nemesis;
-assert.ok(nemesis.default.endsWith('/nemesis/portrait/default.webp'));
-for (const expression of expressions.filter((value) => value !== 'default')) assert.ok(nemesis.expressions[expression].endsWith(`/nemesis/portrait/${expression}.webp`));
-assert.ok(nemesis.fullbody.endsWith('/nemesis/fullbody/default.webp'));
 
 const declaredAuditUrls = (character) => [
   ...(character.default ? [character.default] : []),
   ...expressions.filter((value) => value !== 'default').map((value) => character.expressions[value]).filter(Boolean),
   ...(character.fullbody ? [character.fullbody] : []),
 ];
-assert.equal(declaredAuditUrls(anastasia).length, 13, 'Anastasia audit must cover 12 expressions and fullbody');
-assert.ok(declaredAuditUrls(anastasia).every((url) => !url.endsWith('/portrait/default.webp')));
-assert.ok(declaredAuditUrls(nemesis).includes(nemesis.default), 'characters declaring default must audit it');
+assert.equal(declaredAuditUrls(ASSETS.characters.anastasia).length, 14, 'Anastasia audit must cover default + 12 expressions + fullbody');
+assert.ok(ASSETS.characters.anastasia.default.endsWith('/anastasia/portrait/default.webp'));
+assert.equal(declaredAuditUrls(ASSETS.characters.nemesis).length, 14, 'full-set characters must audit default + 12 expressions + fullbody');
 
 const chat = readFileSync('api/chat.js', 'utf8');
 const runtime = readFileSync('app-runtime.js', 'utf8');
@@ -72,4 +66,4 @@ assert.match(app, /\.filter\(\(row\) => row\.url\)/, 'asset audit must probe onl
 assert.match(app, /char\.fullbody \? \[\{ expression: 'fullbody', url: char\.fullbody \}\]/, 'asset audit must probe declared fullbody images');
 assert.doesNotMatch(app, /const defaultOk = await probeImage/, 'asset audit must not require a default portrait for partial characters');
 
-console.log('PASS characters-v2 manifest and expression contract (21 characters, 233 URLs, 13 expressions)');
+console.log('PASS characters-v2 manifest and expression contract (32 characters, 448 URLs, 13 expressions)');
