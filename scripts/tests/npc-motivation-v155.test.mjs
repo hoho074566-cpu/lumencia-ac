@@ -110,6 +110,14 @@ assert.equal(structuredGoal.telemetry.event_director_v2.goal_signals.p2.progress
 const structuredGoalContext = route('p2에게 직접 질문한다.', structuredGoalState);
 assert.ok(structuredGoalContext.params.input.includes('금서고 접근 단서를 확보한다.'), 'active goal must reach model context whenever that NPC is routed into the turn');
 
+const terminalGoal = route('기다린다.', {
+  npcStates: { p2:{ current_goal:'이미 끝난 자료 회수.' } },
+  npcInnerStates: {
+    p2: { active_goal:{ desire:'이미 끝난 자료 회수.', priority:5, urgency:5, progress:100, state:'completed', target_type:'event', target_key:'archive' } },
+  },
+});
+assert.equal(Boolean(terminalGoal.telemetry.event_director_v2.goal_signals.p2), false, 'completed goal must not re-enter Director weighting through stale current_goal fallback');
+
 const directFocus = route('p1에게 직접 질문한다.', {
   npcInnerStates: {
     p2: { active_goal:{ desire:'무조건 PC 앞에 나타난다.', priority:5, urgency:5, progress:0, state:'active', target_type:'pc', target_key:'pc' } },
@@ -133,6 +141,11 @@ const health = readFileSync('api/health.js','utf8');
 assert.match(chatRouter, /active_goal/, 'chat router must persist structured active_goal');
 assert.match(chatRouter, /relationship_reason/, 'chat router must persist structured relationship_reason');
 assert.match(chatRouter, /relationship_history/, 'chat router must retain recent relationship reason history');
+assert.match(chatRouter, /previousState=\['active','blocked','completed','abandoned'\]/, 'goal lifecycle must preserve terminal/blocked state for the same goal');
+assert.match(chatRouter, /priority=bounded\(same\?previous\.priority:null/, 'a new goal must not inherit the previous goal priority');
+assert.match(chatRouter, /urgency=due\?5:activeHook\?Math\.max\(4,bounded\(same\?previous\.urgency:null/, 'a new goal must not inherit the previous goal urgency');
+assert.match(chatRouter, /state=explicitState\|\|\(same\?previousState:'active'\)/, 'terminal goals must not silently reactivate without an explicit lifecycle transition');
+assert.match(chatRouter, /goalPlan=activeGoal\?\.state==='active'/, 'terminal goals must not remain as active short-term plans');
 assert.equal((chatRouter.match(/coreHandler\(/g)||[]).length, 1, 'V1.5.5 must keep exactly one canonical core call site');
 assert.match(runtime, /\[NPC MOTIVATION V1\]/, 'DEBUG must expose NPC goals');
 assert.match(runtime, /\[RECENT RELATIONSHIP REASONS\]/, 'DEBUG must expose persistent relationship reasons');
@@ -140,4 +153,4 @@ assert.match(runtime, /const PATCH_VERSION = '1\.5\.5'/, 'runtime version must b
 assert.match(health, /version: '0\.8\.1'/, 'health API version must be 0.8.1');
 assert.match(health, /appVersion: '1\.5\.5'/, 'health appVersion must be 1.5.5');
 
-console.log('PASS NPC Motivation + Relationship Reason V1 regressions (21 checks)');
+console.log('PASS NPC Motivation + Relationship Reason V1 regressions (27 checks)');

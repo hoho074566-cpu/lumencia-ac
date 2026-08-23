@@ -109,14 +109,20 @@ function activeGoalFor(incoming,turn,key,old,npc,rel,em){
   const desire=clampText(npc.current_goal||currentState.current_goal||previous.desire||old.short_term_plan||'',220).trim();
   if(!desire)return null;
   const same=String(previous.desire||'').trim()===desire;
+  const previousState=['active','blocked','completed','abandoned'].includes(String(previous.state||''))?String(previous.state):'active';
   const due=array(incoming.saveState?.scheduleContext?.due).some(ev=>array(ev?.participants).map(String).includes(key));
   const activeHook=array(incoming.saveState?.hooks).some(h=>!['resolved','expired','declined'].includes(h?.status)&&String(h?.source_npc_key||'')===key);
   const target=inferGoalTarget(desire,incoming,key);
   const cause=clampText(rel.cause||rel.reason||em.reason||'',140).trim();
   const follow=clampText(rel.followup||'',140).trim();
-  const priority=bounded(previous.priority,1,5,activeHook?4:3);
-  const urgency=due?5:activeHook?Math.max(4,bounded(previous.urgency,1,5,3)):bounded(previous.urgency,1,5,3);
-  const state=/목표\s*(?:완료|달성)|달성됨|완료됨/i.test(String(npc.status||''))?'completed':'active';
+  const priority=bounded(same?previous.priority:null,1,5,activeHook?4:3);
+  const urgency=due?5:activeHook?Math.max(4,bounded(same?previous.urgency:null,1,5,3)):bounded(same?previous.urgency:null,1,5,3);
+  const statusText=String(npc.status||'');
+  const explicitState=/목표\s*(?:완료|달성)|달성됨|완료됨/i.test(statusText)?'completed'
+    :/목표\s*(?:포기|폐기|중단)|포기함|폐기함/i.test(statusText)?'abandoned'
+      :/목표\s*(?:막힘|차단|보류)|진행\s*불가/i.test(statusText)?'blocked'
+        :/목표\s*(?:재개|활성)|다시\s*추진/i.test(statusText)?'active':null;
+  const state=explicitState||(same?previousState:'active');
   const progress=state==='completed'?100:same?bounded(previous.progress,0,100,0):0;
   return{
     id:same&&previous.id?String(previous.id):`goal:${key}:${tinyHash(desire)}`,
@@ -157,11 +163,13 @@ function localNpcUpdates(incoming,turn){
     const activeGoal=activeGoalFor(incoming,turn,key,old,npc,rel,em);
     const relationshipReason=relationshipReasonFor(incoming,turn,key,rel);
     const relationshipHistory=relationshipReason?[...array(old.relationship_history),relationshipReason].slice(-8):array(old.relationship_history).slice(-8);
+    const goalPlan=activeGoal?.state==='active'?clampText(activeGoal?.next_actions?.[0]||activeGoal?.desire||'',180):'';
+    const oldPlan=activeGoal&&activeGoal.state!=='active'&&String(old.short_term_plan||'').trim()===String(activeGoal.desire||'').trim()?'':old.short_term_plan;
     out[key]={
       mood:moodFromExpression(expression)||old.mood||'',
       social_stance:clampText(rel.status||old.social_stance||'',80),
       opinion_of_pc:cause?`최근 인상: ${cause}`:clampText(old.opinion_of_pc||'',180),
-      short_term_plan:follow||clampText(activeGoal?.next_actions?.[0]||activeGoal?.desire||old.short_term_plan||'',180),
+      short_term_plan:follow||goalPlan||clampText(oldPlan||'',180),
       concern:clampText(old.concern||'',180),
       wants_from_pc:clampText(old.wants_from_pc||'',180),
       unresolved_issue:clampText(old.unresolved_issue||'',180),
