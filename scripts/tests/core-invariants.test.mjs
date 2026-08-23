@@ -15,7 +15,8 @@ assert.match(chat, /prompt_cache_key\s*:/, 'prompt cache key is missing');
 assert.match(chat, /prompt_cache_retention:\s*['"]24h['"]/, 'prompt cache retention changed');
 assert.match(adapter, /if\(mode==='continue'\)\{[\s\S]*?lockContinueTurn\(data\.turn\)/, 'CONTINUE adapter freeze is missing');
 assert.match(adapter, /function lockContinueTurn\(turn\)[\s\S]*?state_delta\s*=\s*emptyStateDelta\(\)[\s\S]*?emotion_updates\s*=\s*\[\][\s\S]*?cg_id\s*=\s*null[\s\S]*?intervention:'none'/, 'CONTINUE state, emotion, CG, and Director freeze changed');
-assert.match(adapter, /pipeline:'continue-stable-v155',stages:1/, 'CONTINUE must retain its single-stage adapter pipeline');
+assert.match(adapter, /pipeline:'continue-stable-v156',stages:1/, 'CONTINUE must retain its single-stage adapter pipeline');
+assert.equal((adapter.match(/coreHandler\(/g) || []).length, 1, 'stable adapter must keep one canonical coreHandler call site');
 
 const expectedBudgets = [
   ['continue', 11000, 14000],
@@ -29,4 +30,4 @@ for (const [name, target, softMax] of expectedBudgets) {
   assert.match(router, profile, `${name} context budget changed`);
 }
 
-console.log(`PASS core invariants (${expectedBudgets.length + 6} checks)`);
+console.log(`PASS core invariants (${expectedBudgets.length + 7} checks)`);

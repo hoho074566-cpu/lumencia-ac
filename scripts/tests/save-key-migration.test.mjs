@@ -73,6 +73,6 @@ assertNoLegacyIdentity(migrateLegacyNpcKeys({}), 'new save');
 const app = readFileSync('app.js', 'utf8');
 const runtime = readFileSync('app-runtime.js', 'utf8');
 assert.match(app, /function normalizeSave\(raw\)[\s\S]*?migrateLegacyNpcKeys\(raw\)[\s\S]*?next\.relationships/, 'migration must run at the start of save normalization');
-assert.match(runtime, /save-migrations\.js\?v=155/, 'blob runtime must rewrite the migration import to a loadable URL');
+assert.match(runtime, /save-migrations\.js\?v=156/, 'blob runtime must rewrite the migration import to a loadable V1.5.6 URL');
 
 console.log('PASS legacy lilia save migration (legacy-only and conservative mixed merge)');

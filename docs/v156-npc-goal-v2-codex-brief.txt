@@ -1,0 +1,2 @@
+Codex implementation brief for PR V1.5.6:
+Implement the contract in docs/v156-npc-goal-v2-task.txt in production code and focused tests. Preserve one canonical model call, stable paths, HF1 budgets, prompt caching, and all Event Director eligibility guards. This is a protected core/runtime change and must remain manual-merge only. When implementation is complete, this brief may remain as trace documentation.
