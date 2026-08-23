@@ -152,8 +152,8 @@ assert.match(chatRouter, /const GOAL_STATES = new Set\(\['active','blocked','com
 assert.match(chatRouter, /requestedReplace=npc\.goal_replace===true/, 'Goal V2 must require an explicit replacement signal');
 assert.match(chatRouter, /previousState==='completed'[\s\S]*?requestedState==='active'[\s\S]*?requestedDelta<0/, 'completed goals must require an explicit negative-delta reopen');
 assert.match(chatRouter, /previousState==='abandoned'[\s\S]*?requestedState==='active'/, 'abandoned goals must remain frozen without explicit reopen');
-assert.match(chatRouter, /priority=bounded\(isNew\?null:previous\.priority/, 'a replacement goal must not inherit the previous priority');
-assert.match(chatRouter, /urgency=due\?5:activeHook\?Math\.max\(4,bounded\(isNew\?null:previous\.urgency/, 'a replacement goal must not inherit the previous urgency');
+assert.match(chatRouter, /priority=isNew\?\(activeHook\?4:3\):bounded\(previous\.priority,1,5,3\)/, 'a replacement goal must use new-goal defaults while same goals preserve priority');
+assert.match(chatRouter, /urgency=isNew\?\(due\?5:activeHook\?4:3\):bounded\(previous\.urgency,1,5,3\)/, 'a replacement goal must use environmental defaults while same goals preserve urgency');
 assert.match(chatRouter, /goalPlan=activeGoal\?\.state==='active'/, 'terminal goals must not remain as active short-term plans');
 assert.equal((chatRouter.match(/coreHandler\(/g)||[]).length, 1, 'V1.5.6 must keep exactly one canonical core call site');
 assert.match(runtime, /\[NPC GOAL V2\]/, 'DEBUG must expose NPC Goal V2');
