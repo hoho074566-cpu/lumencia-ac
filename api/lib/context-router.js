@@ -1,9 +1,10 @@
-// LUMENSIA V1.5.4 Stable Context Router + Event Director V2
+// LUMENSIA V1.5.5 Stable Context Router + Event Director V2.1
 // Preserves V1.5.3 HF1 15-20K relevance budgets.
+// V1.5.5: NPC Motivation + Relationship Reason V1 (goal-aware eligible-candidate weighting).
 // Stable path: api/lib/context-router.js
 
-const VERSION = '1.5.4';
-const DIRECTOR_V2_VERSION = '2.0';
+const VERSION = '1.5.5';
+const DIRECTOR_V2_VERSION = '2.1';
 const DIRECTOR_COOLDOWN_TURNS = 3;
 
 const IMPORTANT_RE = /(전투|공격|기습|결투|도망|추적|구출|협상|정치|황위|조사|잠입|권능|부상|치료|판정|대련|시험|고백|배신|의식|각성|성유물|마유물|던전|정령왕)/i;
@@ -56,12 +57,14 @@ const ROUTER_GM_RULES = String.raw`너는 판타지 아카데미 장기 RPG 「�
 13) USER ACTION의 긍정형 직접 선언은 이번 턴에 확정된 행동/대사다. 생각·의도로 되돌리지 말고 시도와 즉각적인 반응을 처리한다. 단, 명시적으로 부정·거절되었거나 하지 않겠다고 한 행동, 가정·질문·조건으로만 언급된 행동은 확정 행동이 아니므로 실행하지 않는다.
 14) USER ACTION 원문 전체를 반영한다. 서로 충돌하지 않는 선언을 생략하지 않되 성공 여부와 결과는 능력·상황·판정에 따른다.
 15) 제공된 구조화 JSON 스키마만 반환하고 내부 판정 메모/Router 설명은 출력하지 않는다.
-16) event_progress는 현재 논리적 이벤트 occurrence의 compact 진행 상태다. event_instance_id는 제공된 schedule/Event Director occurrence ID를 우선하고 event/beat ID는 안정된 짧은 영문 소문자로 쓴다. 명확히 끝난 beat만 completed_beats에 추가하고 최근 완료 ID를 최대 24개 반환한다. AUTHORITATIVE SAVE_STATE.sceneRuntime.eventProgress의 완료 beat는 언급·회상할 수 있지만 현재 행동으로 재실행하거나 active로 되돌리지 않는다. omittedCompletedCount가 1 이상이면 compact 목록에서 생략된 더 이른 beat도 전부 완료된 것이므로 설정/대기/실행 상태로 되돌리지 않는다. 같은 occurrence의 완료 상태를 의미상 지우지 말고 완료 뒤로 전진하며, 새 occurrence가 실제 시작되면 그 ID로 교체한다. 이벤트가 끝났거나 구조화할 활성 이벤트가 없으면 event_progress=null이다.`;
+16) event_progress는 현재 논리적 이벤트 occurrence의 compact 진행 상태다. event_instance_id는 제공된 schedule/Event Director occurrence ID를 우선하고 event/beat ID는 안정된 짧은 영문 소문자로 쓴다. 명확히 끝난 beat만 completed_beats에 추가하고 최근 완료 ID를 최대 24개 반환한다. AUTHORITATIVE SAVE_STATE.sceneRuntime.eventProgress의 완료 beat는 언급·회상할 수 있지만 현재 행동으로 재실행하거나 active로 되돌리지 않는다. omittedCompletedCount가 1 이상이면 compact 목록에서 생략된 더 이른 beat도 전부 완료된 것이므로 설정/대기/실행 상태로 되돌리지 않는다. 같은 occurrence의 완료 상태를 의미상 지우지 말고 완료 뒤로 전진하며, 새 occurrence가 실제 시작되면 그 ID로 교체한다. 이벤트가 끝났거나 구조화할 활성 이벤트가 없으면 event_progress=null이다.
+17) npc_state_updates.current_goal은 NPC가 실제로 추구하는 현재 목표가 새로 생기거나 의미 있게 바뀐 경우에만 짧고 구체적으로 갱신한다. 목표 대상은 PC일 필요가 없으며 다른 NPC·장소·조직·물건·수업·사건일 수 있다. 기존 현재 목표와 충돌하는 새 목표를 근거 없이 만들지 말고, 목표가 행동·거절·접근·회피·우선순위에 자연스럽게 영향을 주게 한다.`;
 
 const NATURAL_STYLE = String.raw`[NATURAL NPC / SCENE]
 - NPC 대사는 설정집 낭독이 아니라 직전 말/행동에 대한 실제 반응이어야 한다.
 - 모두가 같은 길이의 완벽한 설명문을 말하지 않는다. 단문, 끊김, 침묵, 반문, 말끝 흐림, 시선·손동작을 캐릭터에 맞게 섞는다.
 - 관계가 좋다고 자동 동의/친절, 나쁘다고 자동 적대하지 않는다. 목표·자존심·이해관계가 함께 작동한다.
+- 현재 목표가 있으면 그 목표가 말투·선택·접근/회피·다음 행동의 이유로 드러나야 하지만, 물리적 위치·일정·지식·관계보다 우선해 순간이동하거나 억지 등장하지 않는다.
 - 한 장면의 NPC가 PC에게 차례대로 한마디씩 설명하는 구조를 피하고 NPC-NPC 반응과 침묵도 허용한다.
 - 감정은 해설보다 거리·표정·어휘·행동으로 먼저 보여주고 narration/dialogue 중복을 줄인다.
 - '그렇군/흥미롭군/이해했다 → 설명 → 질문' 같은 정형 루프와 매번 질문으로 끝내는 습관을 피한다.
@@ -216,13 +219,49 @@ function eventStyleFor(seed,mode){
   const pool=mode==='scheduled-side-roll'?scheduled:roaming;
   return pool[Math.min(pool.length-1,Math.floor(rng01(`${seed}|style`)*pool.length))];
 }
+function boundedNumber(value,min,max,fallback){const n=Number(value);return Number.isFinite(n)?Math.max(min,Math.min(max,n)):fallback;}
+function goalSignalFor(save,key){
+  const inner=object(save?.npcInnerStates?.[key]);
+  const active=object(inner.active_goal);
+  if(active.state&&active.state!=='active')return null;
+  const fallback=clampText(save?.npcStates?.[key]?.current_goal||inner.short_term_plan||'',180).trim();
+  const desire=clampText(active.desire||fallback,180).trim();
+  if(!desire)return null;
+  const priority=boundedNumber(active.priority,1,5,3);
+  const urgency=boundedNumber(active.urgency,1,5,3);
+  const progress=boundedNumber(active.progress,0,100,0);
+  const targetType=String(active.target_type||'event');
+  const targetKey=clampText(active.target_key||'',100).trim()||null;
+  const currentLocation=norm(save?.world?.location||'');
+  const participants=new Set(array(save?.sceneRuntime?.participants).map(String));
+  const due=array(save?.scheduleContext?.due);
+  let relevance=1;
+  if(targetType==='pc')relevance=1.06;
+  else if(targetType==='npc'&&targetKey&&participants.has(targetKey))relevance=1.12;
+  else if(targetType==='place'&&targetKey&&currentLocation.includes(norm(targetKey)))relevance=1.16;
+  else if(targetType==='event'&&targetKey&&due.some(ev=>norm([ev?.id,ev?.title].filter(Boolean).join(' ')).includes(norm(targetKey))))relevance=1.15;
+  else if(targetType==='class'&&targetKey&&norm(save?.pc?.department||'').includes(norm(targetKey)))relevance=1.08;
+  const drive=1.08+(priority-3)*0.08+(urgency-3)*0.06;
+  const multiplier=Math.max(.84,Math.min(1.48,drive*relevance));
+  return{desire,priority,urgency,progress,state:'active',target_type:targetType,target_key:targetKey,multiplier:Number(multiplier.toFixed(3)),source:active.desire?'runtime-active-goal':'npc-state-current_goal'};
+}
+function compactInnerNpc(row={}){
+  const src=object(row),goal=object(src.active_goal),reason=object(src.relationship_reason);
+  const out={
+    mood:clampText(src.mood||'',80),social_stance:clampText(src.social_stance||'',80),opinion_of_pc:clampText(src.opinion_of_pc||'',180),
+    short_term_plan:clampText(src.short_term_plan||'',180),concern:clampText(src.concern||'',180),wants_from_pc:clampText(src.wants_from_pc||'',180),unresolved_issue:clampText(src.unresolved_issue||'',180),
+  };
+  if(goal.desire)out.active_goal={id:clampText(goal.id||'',80),target_type:goal.target_type||'event',target_key:goal.target_key||null,desire:clampText(goal.desire,180),priority:boundedNumber(goal.priority,1,5,3),urgency:boundedNumber(goal.urgency,1,5,3),progress:boundedNumber(goal.progress,0,100,0),state:goal.state||'active',reasons:array(goal.reasons).slice(-4).map(x=>clampText(x,120)),next_actions:array(goal.next_actions).slice(-4).map(x=>clampText(x,120)),obstacle:clampText(goal.obstacle||'',140)};
+  if(reason.cause||reason.followup)out.relationship_reason={turn:Number(reason.turn||0),dimensions:object(reason.dimensions),status:reason.status||null,cause:clampText(reason.cause||'',150),expression:clampText(reason.expression||'',150),followup:clampText(reason.followup||'',150),source_event:clampText(reason.source_event||'',120)};
+  return out;
+}
 function buildEventDirectorV2(incoming,originalInput,registry,mode='game'){
   const save=incoming.saveState||{}, plan=parseDirectorV2Guidance(originalInput), turn=Number(save.turnNumber||0);
   const seedRaw=String(save?.director?.rngSeed||save?.directorSeed||save?.id||`${save?.pc?.name||'pc'}|${save?.pc?.origin||''}|legacy`);
   const seedBase=`${seedRaw}|T${turn}|${save?.world?.date||''}|${save?.world?.time||''}|${save?.world?.location||''}`;
   const seedTag=hash32(seedRaw).toString(16).padStart(8,'0').slice(0,8);
-  const base={version:DIRECTOR_V2_VERSION,seed_tag:seedTag,cooldown_turns:DIRECTOR_COOLDOWN_TURNS,intervention:plan.intervention,routine_streak:plan.routineStreak,event_gap:plan.eventGap,selected_key:null,selected_name:null,event_style:'none',eligible_keys:[],roll:null,none_weight:null,result:'NO_ROLL',mode:'fixed-flow'};
-  const fixedDirective=(reason)=>({telemetry:{...base,result:reason},selectedKey:null,directive:`[EVENT DIRECTOR V2]\nMODE=FIXED_FLOW\n${reason}. 기존 일정·사용자 직접 행동·진행 중인 훅을 우선하고, 이 지시 때문에 새 우연 사건을 추가하지 마라.`});
+  const base={version:DIRECTOR_V2_VERSION,seed_tag:seedTag,cooldown_turns:DIRECTOR_COOLDOWN_TURNS,intervention:plan.intervention,routine_streak:plan.routineStreak,event_gap:plan.eventGap,selected_key:null,selected_name:null,event_style:'none',eligible_keys:[],roll:null,none_weight:null,result:'NO_ROLL',mode:'fixed-flow',goal_signals:{},selected_goal:null};
+  const fixedDirective=(reason)=>({telemetry:{...base,result:reason},selectedKey:null,directive:`[EVENT DIRECTOR V2.1]\nMODE=FIXED_FLOW\n${reason}. 기존 일정·사용자 직접 행동·진행 중인 훅을 우선하고, 이 지시 때문에 새 우연 사건을 추가하지 마라.`});
   if(['meta','continue','auto'].includes(mode))return fixedDirective(`RNG_DISABLED_${mode.toUpperCase()}`);
   const explicit=mentionedNpcKeys(incoming.action||'',registry);
   if(explicit.length||plan.focused.length)return fixedDirective('DIRECT_USER_FOCUS');
@@ -235,9 +274,9 @@ function buildEventDirectorV2(incoming,originalInput,registry,mode='game'){
   const exposure=object(save?.director?.npcExposure),recent=recentSpeakerCountsV2(incoming.recentTurns),present=new Set(array(save?.sceneRuntime?.participants).map(String));
   const dueFixed=new Set(array(save?.scheduleContext?.due).flatMap(ev=>array(ev?.participants)).map(String));
   let pool=plan.candidates.filter(c=>registry[c.key]);
-  // Surprise/cameo cooldown: no repeat within 3 turns unless that NPC is part of the fixed due schedule.
+  // Surprise/cameo cooldown and physical eligibility remain authoritative. Goals can weight only an already-eligible candidate.
   pool=pool.filter(c=>{
-    if(dueFixed.has(c.key))return false; // fixed schedule participants are handled by the schedule itself, never by the random side slot
+    if(dueFixed.has(c.key))return false;
     const last=Number(exposure?.[c.key]?.lastSeenTurn);
     const gap=Number.isFinite(last)?turn-last:99;
     if(gap<=DIRECTOR_COOLDOWN_TURNS)return false;
@@ -252,21 +291,26 @@ function buildEventDirectorV2(incoming,originalInput,registry,mode='game'){
     const scoreWeight=Math.pow(Math.max(3,c.score-minScore+5),0.82);
     const freshness=1+Math.min(1.2,gap/10);
     const penalty=1/(1+recentN*1.4);
-    return{...c,weight:scoreWeight*freshness*penalty};
+    const goalSignal=goalSignalFor(save,c.key);
+    const goalMultiplier=goalSignal?.multiplier||1;
+    return{...c,goal_signal:goalSignal,goal_multiplier:goalMultiplier,weight:scoreWeight*freshness*penalty*goalMultiplier};
   });
-  // "Nothing happens" is intentionally part of the weighted pool.
+  const goalSignals=Object.fromEntries(rows.filter(x=>x.goal_signal).map(x=>[x.key,x.goal_signal]));
+  // "Nothing happens" stays in the weighted pool: goals must not make the world spam encounters.
   const noneWeight=scheduled?Math.max(24,rows.reduce((n,x)=>n+x.weight,0)*1.15):Math.max(6,22-plan.eventGap*2-plan.routineStreak*2);
   const weighted=[{key:null,name:null,weight:noneWeight},...rows];
   const roll=rng01(`${seedBase}|pick`),picked=weightedChoice(weighted,roll);
   const eventMode=scheduled?'scheduled-side-roll':'weighted-random';
+  const weights=Object.fromEntries(rows.map(x=>[x.key,Number(x.weight.toFixed(2))]));
   if(!picked?.key){
-    const telemetry={...base,mode:eventMode,result:'NO_EVENT',eligible_keys:rows.map(x=>x.key),roll:Number(roll.toFixed(4)),none_weight:Number(noneWeight.toFixed(2))};
-    return{telemetry,selectedKey:null,directive:`[EVENT DIRECTOR V2 — SEEDED WEIGHTED VARIATION]\nMODE=${eventMode}\nRESULT=NO_EVENT\n이번 턴에는 새 우연 조우/마찰/카메오를 추가하지 마라. 고정 일정과 현재 장면만 자연스럽게 진행한다.`};
+    const telemetry={...base,mode:eventMode,result:'NO_EVENT',eligible_keys:rows.map(x=>x.key),roll:Number(roll.toFixed(4)),none_weight:Number(noneWeight.toFixed(2)),weights,goal_signals:goalSignals};
+    return{telemetry,selectedKey:null,directive:`[EVENT DIRECTOR V2.1 — SEEDED WEIGHTED VARIATION]\nMODE=${eventMode}\nRESULT=NO_EVENT\n이번 턴에는 새 우연 조우/마찰/카메오를 추가하지 마라. 고정 일정과 현재 장면만 자연스럽게 진행한다.`};
   }
   const style=eventStyleFor(seedBase,eventMode);
   const occurrenceId=`director:${save?.world?.date||'undated'}:t${turn}:${picked.key}`.toLowerCase();
-  const telemetry={...base,mode:eventMode,result:'NPC_EVENT',occurrence_id:occurrenceId,selected_key:picked.key,selected_name:registry[picked.key]||picked.name,event_style:style,eligible_keys:rows.map(x=>x.key),roll:Number(roll.toFixed(4)),none_weight:Number(noneWeight.toFixed(2)),weights:Object.fromEntries(rows.map(x=>[x.key,Number(x.weight.toFixed(2))]))};
-  const directive=`[EVENT DIRECTOR V2 — SEEDED WEIGHTED VARIATION]\nMODE=${eventMode}\nRESULT=NPC_EVENT\nEVENT_INSTANCE_ID=${occurrenceId}\nSELECTED=${picked.key}(${registry[picked.key]||picked.name})\nSTYLE=${style}\n- 고정 일정, 사용자의 직접 행동, 기존 훅이 항상 우선한다.\n- 물리적 위치/일정상 자연스러울 때만 선택 NPC를 작은 접점에 사용한다. 불가능하면 순간이동시키지 말고 NO_EVENT처럼 처리한다.\n- 이 랜덤 슬롯은 작은 조우·마찰·관찰·공개 정보·사소한 실무 문제 수준이다. 새 대형 사건, 새 비밀, 새 능력, 중상, 강제 관계변화는 만들지 않는다.\n- 선택 NPC가 등장해도 PC에게 자동 관심/호감을 주지 않는다.`;
+  const telemetry={...base,mode:eventMode,result:'NPC_EVENT',occurrence_id:occurrenceId,selected_key:picked.key,selected_name:registry[picked.key]||picked.name,event_style:style,eligible_keys:rows.map(x=>x.key),roll:Number(roll.toFixed(4)),none_weight:Number(noneWeight.toFixed(2)),weights,goal_signals:goalSignals,selected_goal:picked.goal_signal||null};
+  const goalLine=picked.goal_signal?`\nACTIVE_GOAL=${clampText(picked.goal_signal.desire,160)}\nGOAL_TARGET=${picked.goal_signal.target_type}:${picked.goal_signal.target_key||'-'} / P${picked.goal_signal.priority} U${picked.goal_signal.urgency}`:'';
+  const directive=`[EVENT DIRECTOR V2.1 — SEEDED WEIGHTED VARIATION]\nMODE=${eventMode}\nRESULT=NPC_EVENT\nEVENT_INSTANCE_ID=${occurrenceId}\nSELECTED=${picked.key}(${registry[picked.key]||picked.name})\nSTYLE=${style}${goalLine}\n- 고정 일정, 사용자의 직접 행동, 기존 훅이 항상 우선한다.\n- 물리적 위치/일정상 자연스러울 때만 선택 NPC를 작은 접점에 사용한다. 불가능하면 순간이동시키지 말고 NO_EVENT처럼 처리한다.\n- ACTIVE_GOAL이 있으면 왜 이 NPC가 지금 그런 선택을 하는지에 반영하되, 목표가 위치·일정·지식·관계 제약을 무시하는 면허가 아니다.\n- 이 랜덤 슬롯은 작은 조우·마찰·관찰·공개 정보·사소한 실무 문제 수준이다. 새 대형 사건, 새 비밀, 새 능력, 중상, 강제 관계변화는 만들지 않는다.\n- 선택 NPC가 등장해도 PC에게 자동 관심/호감을 주지 않는다.`;
   return{telemetry,selectedKey:picked.key,directive};
 }
 
@@ -280,10 +324,8 @@ function deriveKeys(incoming,registry,maxNpcs,directorV2=null){
   addExplicitKeys(set,incoming.action||'',registry,maxNpcs);
   for(const k of array(save?.scheduleContext?.due).flatMap(ev=>array(ev?.participants)))if(set.size<maxNpcs&&registry[k])set.add(String(k));
   for(const k of authoritative)if(set.size<maxNpcs&&registry[k])set.add(String(k));
-  // Once runtime presence exists it is authoritative; speaker history is context, not physical presence.
   if(!Object.hasOwn(object(save?.sceneRuntime),'participants'))for(const item of array(last?.scene).slice(-4)){if(set.size>=maxNpcs)break;if(item?.speaker_key&&registry[item.speaker_key])set.add(String(item.speaker_key));}
   for(const row of array(save?.director?.recentSpotlights).slice(-1)){for(const k of array(row?.keys).slice(0,2)){if(set.size>=maxNpcs)break;if(registry[k])set.add(String(k));}}
-  // Large ceremonies often list the whole class. Never treat every attendee as context-relevant.
   for(const ev of array(save?.scheduleContext?.due).slice(0,2)){
     const parts=array(ev?.participants).filter(k=>registry[k]);
     if(parts.length<=4){for(const k of parts){if(set.size>=maxNpcs)break;set.add(String(k));}}
@@ -309,7 +351,7 @@ function compactSchedule(save,keys){
 }
 function compactSave(incoming,keys,registry,profile,keywords){
   const save=incoming.saveState||{},names=keys.map(k=>registry[k]).filter(Boolean),rel={},intimacy={},npcStates={},emotions={},inner={},npcMem={};
-  for(const k of keys){if(save?.relationships?.[k]!=null)rel[k]=save.relationships[k];if(save?.intimacyStates?.[k]!=null)intimacy[k]=save.intimacyStates[k];if(save?.npcStates?.[k]!=null)npcStates[k]=save.npcStates[k];if(save?.emotionStates?.[k]!=null)emotions[k]=save.emotionStates[k];if(save?.npcInnerStates?.[k]!=null)inner[k]=save.npcInnerStates[k];if(save?.memories?.npc?.[k])npcMem[k]=selectMemories(save.memories.npc[k],keywords,names,profile.memoriesPerNpc);}
+  for(const k of keys){if(save?.relationships?.[k]!=null)rel[k]=save.relationships[k];if(save?.intimacyStates?.[k]!=null)intimacy[k]=save.intimacyStates[k];if(save?.npcStates?.[k]!=null)npcStates[k]=save.npcStates[k];if(save?.emotionStates?.[k]!=null)emotions[k]=save.emotionStates[k];if(save?.npcInnerStates?.[k]!=null)inner[k]=compactInnerNpc(save.npcInnerStates[k]);if(save?.memories?.npc?.[k])npcMem[k]=selectMemories(save.memories.npc[k],keywords,names,profile.memoriesPerNpc);}
   const globalMem=selectMemories(save?.memories?.global,keywords,names,profile.memoriesGlobal);
   const knowledge=selectMemories(array(save?.pcKnowledge).map(x=>typeof x==='string'?{fact:x,importance:2}:x),keywords,names,Math.max(6,profile.memoriesGlobal)).map(x=>x?.fact||x);
   const relevantEvents=array(save?.activeEvents).filter(ev=>{const t=norm(ev);return keywords.some(k=>k.length>=2&&t.includes(k));}).slice(0,6);
@@ -345,8 +387,8 @@ function cleanDirector(originalInput,limit){
   d=d.split('\n').filter(line=>!/candidate|후보|planCandidates|candidates=/i.test(line)).join('\n');return clampText(d,limit);
 }
 function buildInput(incoming,originalInput,profile,routed){
-  const save=compactSave(incoming,routed.keys,routed.registry,profile,routed.keywords),recent=compactRecent(incoming.recentTurns,profile.recentTurns),opts=clampText(sectionBetween(originalInput,'===== TURN OPTIONS =====','===== AUTHORITATIVE SAVE_STATE ====='),700),director=cleanDirector(originalInput,profile.name.includes('routine')?650:900),directorV2=clampText(routed.directorV2?.directive||'',850),schedule=compactSchedule(incoming.saveState||{},routed.keys),runtime={npcInnerStates:Object.fromEntries(routed.keys.filter(k=>incoming.saveState?.npcInnerStates?.[k]).map(k=>[k,incoming.saveState.npcInnerStates[k]])),sceneRuntime:incoming.saveState?.sceneRuntime||{},backgroundDigest:clampText(incoming.saveState?.backgroundDigest||'',350)},action=String(incoming.action||''),cg=array(incoming.availableCgIds).slice(0,60).join(', ');
-  const variableContext=`===== TURN OPTIONS =====\n${opts}\n\n===== AUTHORITATIVE SAVE_STATE (ROUTED) =====\n${safeJson(save)}\n\n===== ROLLING SUMMARY TAIL =====\n${clampText(incoming.rollingSummary||'아직 없음',1500)}\n\n===== RECENT TURNS =====\n${safeJson(recent)}\n\n===== CURRENT NPC/SCENE RUNTIME =====\n${clampText(runtime,1600)}\n\n===== AVAILABLE_CG_IDS =====\n${cg||'없음'}\n\n===== GM EVENT DIRECTOR (ROUTED) =====\n${director||'없음'}\n\n===== EVENT DIRECTOR V2 (ROUTED) =====\n${directorV2||'없음'}\n\n===== SCHEDULE ENGINE (ROUTED) =====\n${safeJson(schedule)}`;
+  const save=compactSave(incoming,routed.keys,routed.registry,profile,routed.keywords),recent=compactRecent(incoming.recentTurns,profile.recentTurns),opts=clampText(sectionBetween(originalInput,'===== TURN OPTIONS =====','===== AUTHORITATIVE SAVE_STATE ====='),700),director=cleanDirector(originalInput,profile.name.includes('routine')?650:900),directorV2=clampText(routed.directorV2?.directive||'',1000),schedule=compactSchedule(incoming.saveState||{},routed.keys),runtime={npcInnerStates:Object.fromEntries(routed.keys.filter(k=>incoming.saveState?.npcInnerStates?.[k]).map(k=>[k,compactInnerNpc(incoming.saveState.npcInnerStates[k])])),sceneRuntime:incoming.saveState?.sceneRuntime||{},backgroundDigest:clampText(incoming.saveState?.backgroundDigest||'',350)},action=String(incoming.action||''),cg=array(incoming.availableCgIds).slice(0,60).join(', ');
+  const variableContext=`===== TURN OPTIONS =====\n${opts}\n\n===== AUTHORITATIVE SAVE_STATE (ROUTED) =====\n${safeJson(save)}\n\n===== ROLLING SUMMARY TAIL =====\n${clampText(incoming.rollingSummary||'아직 없음',1500)}\n\n===== RECENT TURNS =====\n${safeJson(recent)}\n\n===== CURRENT NPC/SCENE RUNTIME =====\n${clampText(runtime,1800)}\n\n===== AVAILABLE_CG_IDS =====\n${cg||'없음'}\n\n===== GM EVENT DIRECTOR (ROUTED) =====\n${director||'없음'}\n\n===== EVENT DIRECTOR V2.1 (ROUTED) =====\n${directorV2||'없음'}\n\n===== SCHEDULE ENGINE (ROUTED) =====\n${safeJson(schedule)}`;
   const actionBlock=`===== USER ACTION =====\n${action}\n\n위 행동까지만 처리하고 PC의 다음 행동을 정하지 마라. ROUTINE은 빠르게 압축하고 주요 NPC 대사에는 감정 태그/강도/근거를 일치시켜라.`;
   const variableBudget=Math.max(0,profile.inputChars-actionBlock.length-2);
   return{text:`${clampText(variableContext,variableBudget)}\n\n${actionBlock}`};
@@ -358,7 +400,7 @@ export function routeOpenAIParams(params,{incoming={},mode='game'}={}){
   const required=['===== CHARACTER REGISTRY =====','===== WORLD CANON =====','===== NPC CANON =====','===== NPC SPEECH =====','===== PC SYSTEM ====='];
   if(!required.every(m=>originalInstructions.includes(m)))return{params,telemetry:{routerVersion:VERSION,enabled:false,profile:'fallback-full',target_input_tokens:null,soft_max_tokens:null,selected_npcs:[],reason:'core prompt markers changed',original_chars:originalInstructions.length+originalInput.length,routed_chars:originalInstructions.length+originalInput.length}};
   const routed=buildInstructions(originalInstructions,incoming,profile,originalInput,mode);if(!Object.keys(routed.registry||{}).length)return{params,telemetry:{routerVersion:VERSION,enabled:false,profile:'fallback-full',target_input_tokens:null,soft_max_tokens:null,selected_npcs:[],reason:'registry parse failed',original_chars:originalInstructions.length+originalInput.length,routed_chars:originalInstructions.length+originalInput.length}};
-  const built=buildInput(incoming,originalInput,profile,routed),newParams={...params,instructions:routed.text,input:built.text,prompt_cache_key:process.env.OPENAI_PROMPT_CACHE_KEY||'lumensia-stable-context-router-v154',prompt_cache_retention:'24h'},originalChars=originalInstructions.length+originalInput.length,routedChars=routed.text.length+built.text.length;
+  const built=buildInput(incoming,originalInput,profile,routed),newParams={...params,instructions:routed.text,input:built.text,prompt_cache_key:process.env.OPENAI_PROMPT_CACHE_KEY||'lumensia-stable-context-router-v155',prompt_cache_retention:'24h'},originalChars=originalInstructions.length+originalInput.length,routedChars=routed.text.length+built.text.length;
   return{params:newParams,telemetry:{routerVersion:VERSION,enabled:true,profile:profile.name,target_input_tokens:profile.targetTokens,soft_max_tokens:profile.softMaxTokens,adaptive_scale:Number((profile.scale||1).toFixed(3)),instructions_chars:routed.text.length,input_chars:built.text.length,routed_chars:routedChars,original_chars:originalChars,char_reduction_ratio:originalChars>0?Number((1-routedChars/originalChars).toFixed(4)):0,selected_npcs:routed.keys,selected_npc_names:routed.names,canon_modules:routed.moduleTitles,recent_turns:profile.recentTurns,secret_allowed:routed.secretAllowed,event_director_v2:routed.directorV2?.telemetry||null}};
 }
 export function routerVersion(){return VERSION;}

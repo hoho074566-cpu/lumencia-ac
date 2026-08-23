@@ -1,10 +1,11 @@
-// LUMENSIA MOBILE V1.5.4 stable runtime
-// V1.5.4 stable-path migration base head: hoho074566-cpu/lumencia-ac @ a9170d6dca82c613436dcc5b3bc6ba86b9f86ba4
+// LUMENSIA MOBILE V1.5.5 stable runtime
+// V1.5.5 NPC Motivation + Relationship Reason V1 on the proven V1.4.8 base app.
+// Stable-path migration base head: hoho074566-cpu/lumencia-ac @ a9170d6dca82c613436dcc5b3bc6ba86b9f86ba4
 // Reviewed app.js blob includes the canonical characters-v2 integration.
 // Why loader: preserve the large proven V1.4.8 app.js byte-for-byte in GitHub while applying
-// a stable-path V1.5.4 delta at boot. If required source markers disappear, boot stops visibly.
+// a stable-path V1.5.5 delta at boot. If required source markers disappear, boot stops visibly.
 
-const PATCH_VERSION = '1.5.4';
+const PATCH_VERSION = '1.5.5';
 const BASE_APP_SHA = 'b5ca1de1996361638b9e4f5d49a73101302a0a68';
 const LIVE_BASE_HEAD = 'a9170d6dca82c613436dcc5b3bc6ba86b9f86ba4';
 const AUTO_GESTURE_PX = 84;
@@ -29,7 +30,7 @@ function portraitCandidatesStable(key, expression = 'default') {
     rows.push({ state, url });
   }
 
-  // V1.5.4: portrait/default까지 실패했을 때만 전신 DEFAULT를 마지막 안전망으로 사용.
+  // portrait/default까지 실패했을 때만 전신 DEFAULT를 마지막 안전망으로 사용.
   if (char.fullbody && !seen.has(char.fullbody)) {
     rows.push({ state: 'fullbody', url: char.fullbody });
   }
@@ -277,7 +278,6 @@ function zeroStateDeltaStable() {
   };
 }
 
-
 function compactStateStable() {
   return {
     id: save.id || '',
@@ -379,7 +379,7 @@ async function sendActionStable(action, requestedMode = null) {
     let data;
     if (settings.demoMode) {
       data = demoResponse(apiAction, isMeta ? 'meta' : 'game');
-      data.route = { ...(data.route || {}), input_mode: inputMode, adapter_version: 'demo-stable-v154' };
+      data.route = { ...(data.route || {}), input_mode: inputMode, adapter_version: 'demo-stable-v155' };
       if (isContinue && data.turn) {
         data.turn.state_delta = zeroStateDeltaStable();
         data.turn.emotion_updates = [];
@@ -522,7 +522,7 @@ async function checkHealthStable() {
     const r = await fetch('/api/health', { cache: 'no-store' });
     const h = await r.json();
     $('apiHealth').textContent = h.apiConfigured
-      ? `API ${h.version || '?'} 연결 준비됨 · ${h.luna} / ${h.terra}${h.qualityPipeline ? ' · Q3' : ''}${h.contextRouter ? ' · CR' : ''}${h.accessTokenRequired ? ' · 접속 토큰 필요' : ''}`
+      ? `API ${h.version || '?'} 연결 준비됨 · ${h.luna} / ${h.terra}${h.qualityPipeline ? ' · Q3' : ''}${h.contextRouter ? ' · CR' : ''}${h.npcMotivation ? ' · MOT' : ''}${h.accessTokenRequired ? ' · 접속 토큰 필요' : ''}`
       : 'API 키 미설정. Vercel 환경변수 OPENAI_API_KEY를 추가하거나 데모 모드를 켜세요.';
   } catch {
     $('apiHealth').textContent = 'API 상태를 확인할 수 없음.';
@@ -535,28 +535,28 @@ function renameFunction(fn, fromName, toName) {
 
 function replaceOnce(source, needle, replacement, label) {
   const first = source.indexOf(needle);
-  if (first < 0) throw new Error(`V1.5.4 stable patch marker missing: ${label}`);
-  if (source.indexOf(needle, first + needle.length) >= 0) throw new Error(`V1.5.4 stable patch marker duplicated: ${label}`);
+  if (first < 0) throw new Error(`V1.5.5 stable patch marker missing: ${label}`);
+  if (source.indexOf(needle, first + needle.length) >= 0) throw new Error(`V1.5.5 stable patch marker duplicated: ${label}`);
   return source.slice(0, first) + replacement + source.slice(first + needle.length);
 }
 
 function replaceRegexOnce(source, regex, replacement, label) {
   const matches = [...source.matchAll(new RegExp(regex.source, regex.flags.includes('g') ? regex.flags : `${regex.flags}g`))];
-  if (matches.length !== 1) throw new Error(`V1.5.4 stable regex marker ${label}: expected 1, got ${matches.length}`);
+  if (matches.length !== 1) throw new Error(`V1.5.5 stable regex marker ${label}: expected 1, got ${matches.length}`);
   return source.replace(regex, replacement);
 }
 
 function showBootError(error, phase = 'patch') {
   const box = document.createElement('div');
   box.style.cssText = 'margin:16px;padding:14px;border:1px solid #ef4444;border-radius:12px;background:#2a1115;color:#fecaca;white-space:pre-wrap;font:12px/1.5 system-ui,sans-serif';
-  box.textContent = `LUMENSIA V1.5.4 ${phase} 실패\n${error?.message || error}\nBase ${BASE_APP_SHA.slice(0, 10)}`;
+  box.textContent = `LUMENSIA V1.5.5 ${phase} 실패\n${error?.message || error}\nBase ${BASE_APP_SHA.slice(0, 10)}`;
   document.body.prepend(box);
 }
 
 async function boot() {
   let source;
   try {
-    const response = await fetch(`/app.js?v=152-${BASE_APP_SHA.slice(0, 10)}`, { cache: 'no-store' });
+    const response = await fetch(`/app.js?v=155-${BASE_APP_SHA.slice(0, 10)}`, { cache: 'no-store' });
     if (!response.ok) throw new Error(`base app.js HTTP ${response.status}`);
     source = await response.text();
 
@@ -564,20 +564,20 @@ async function boot() {
     source = replaceOnce(
       source,
       "import { ASSETS } from './assets.js';",
-      `import { ASSETS } from '${location.origin}/assets.js?v=154';`,
+      `import { ASSETS } from '${location.origin}/assets.js?v=155';`,
       'ASSETS import'
     );
     source = replaceOnce(
       source,
       "import { migrateLegacyNpcKeys } from './save-migrations.js';",
-      `import { migrateLegacyNpcKeys } from '${location.origin}/save-migrations.js?v=154';`,
+      `import { migrateLegacyNpcKeys } from '${location.origin}/save-migrations.js?v=155';`,
       'save migration import'
     );
 
     source = replaceRegexOnce(
       source,
       /const APP_VERSION = '1\.4\.(?:7|8)';/,
-      "const APP_VERSION = '1.5.4';",
+      "const APP_VERSION = '1.5.5';",
       'APP_VERSION'
     );
 
@@ -601,7 +601,6 @@ async function boot() {
       "  next.usage = { ...base.usage, ...(next.usage || {}) };\n  next.director.rngSeed = String(next.director.rngSeed || next.id || (crypto.randomUUID?.() || Date.now()));\n  next.npcInnerStates = next.npcInnerStates && typeof next.npcInnerStates === 'object' ? next.npcInnerStates : {};\n  next.sceneRuntime = next.sceneRuntime && typeof next.sceneRuntime === 'object' ? next.sceneRuntime : {};\n  next.backgroundDigest = String(next.backgroundDigest || '');\n  next.qualityTelemetry = next.qualityTelemetry && typeof next.qualityTelemetry === 'object' ? next.qualityTelemetry : {};\n  return next;",
       'runtime save fields'
     );
-
 
     source = replaceRegexOnce(
       source,
@@ -677,10 +676,9 @@ async function boot() {
     if (source.includes(debugQualityNeedle)) {
       source = source.replace(
         debugQualityNeedle,
-        "\\n\\n[QUALITY PIPELINE]\\nmode=${save.qualityTelemetry?.pipeline||'-'} / qa=${save.qualityTelemetry?.qa_result||'-'} / rewrite=${save.qualityTelemetry?.rewrite_applied?'Y':'N'} / bg=${save.qualityTelemetry?.background_sim?'Y':'N'}\\ninnerNPC=${Object.keys(save.npcInnerStates||{}).length} / beats=${(save.sceneRuntime?.remaining_beats||[]).length}\\n\\n[CONTEXT ROUTER]\\nprofile=${save.qualityTelemetry?.context_router?.profile||'-'} / status=${save.qualityTelemetry?.context_router?.budget_status||'-'} / scale=${save.qualityTelemetry?.context_router?.adaptive_scale??'-'}\\ntarget=${save.qualityTelemetry?.context_router?.target_input_tokens??'-'} / softMax=${save.qualityTelemetry?.context_router?.soft_max_tokens??'-'} / actual=${save.qualityTelemetry?.context_router?.actual_input_tokens??'-'}\\nchars=${save.qualityTelemetry?.context_router?.routed_chars??'-'} / original=${save.qualityTelemetry?.context_router?.original_chars??'-'} / cut=${Math.round(Number(save.qualityTelemetry?.context_router?.char_reduction_ratio||0)*100)}%\\nnpcs=${(save.qualityTelemetry?.context_router?.selected_npcs||[]).join(', ')||'-'}\\nworld=${(save.qualityTelemetry?.context_router?.canon_modules?.world||[]).join(' | ')||'-'}\\nnpcCanon=${(save.qualityTelemetry?.context_router?.canon_modules?.npc||[]).join(' | ')||'-'}\\nspeech=${(save.qualityTelemetry?.context_router?.canon_modules?.speech||[]).join(' | ')||'-'}\\n\\n[EVENT DIRECTOR V2]\\nmode=${save.qualityTelemetry?.event_director_v2?.mode||'-'} / result=${save.qualityTelemetry?.event_director_v2?.result||'-'} / style=${save.qualityTelemetry?.event_director_v2?.event_style||'-'}\\nselected=${save.qualityTelemetry?.event_director_v2?.selected_key||'-'} / seed=${save.qualityTelemetry?.event_director_v2?.seed_tag||'-'} / cooldown=${save.qualityTelemetry?.event_director_v2?.cooldown_turns??'-'}\\nroll=${save.qualityTelemetry?.event_director_v2?.roll??'-'} / noneWeight=${save.qualityTelemetry?.event_director_v2?.none_weight??'-'} / eligible=${(save.qualityTelemetry?.event_director_v2?.eligible_keys||[]).join(', ')||'-'}\\n\\n[COUNTS]\\ntimeline ${save.timeline.length}"
+        "\\n\\n[QUALITY PIPELINE]\\nmode=${save.qualityTelemetry?.pipeline||'-'} / qa=${save.qualityTelemetry?.qa_result||'-'} / rewrite=${save.qualityTelemetry?.rewrite_applied?'Y':'N'} / bg=${save.qualityTelemetry?.background_sim?'Y':'N'} / motivation=${save.qualityTelemetry?.npc_motivation_v1?'Y':'N'}\\ninnerNPC=${Object.keys(save.npcInnerStates||{}).length} / beats=${(save.sceneRuntime?.remaining_beats||[]).length}\\n\\n[CONTEXT ROUTER]\\nprofile=${save.qualityTelemetry?.context_router?.profile||'-'} / status=${save.qualityTelemetry?.context_router?.budget_status||'-'} / scale=${save.qualityTelemetry?.context_router?.adaptive_scale??'-'}\\ntarget=${save.qualityTelemetry?.context_router?.target_input_tokens??'-'} / softMax=${save.qualityTelemetry?.context_router?.soft_max_tokens??'-'} / actual=${save.qualityTelemetry?.context_router?.actual_input_tokens??'-'}\\nchars=${save.qualityTelemetry?.context_router?.routed_chars??'-'} / original=${save.qualityTelemetry?.context_router?.original_chars??'-'} / cut=${Math.round(Number(save.qualityTelemetry?.context_router?.char_reduction_ratio||0)*100)}%\\nnpcs=${(save.qualityTelemetry?.context_router?.selected_npcs||[]).join(', ')||'-'}\\nworld=${(save.qualityTelemetry?.context_router?.canon_modules?.world||[]).join(' | ')||'-'}\\nnpcCanon=${(save.qualityTelemetry?.context_router?.canon_modules?.npc||[]).join(' | ')||'-'}\\nspeech=${(save.qualityTelemetry?.context_router?.canon_modules?.speech||[]).join(' | ')||'-'}\\n\\n[NPC MOTIVATION V1]\\n${Object.entries(save.npcInnerStates||{}).filter(([k,v])=>v?.active_goal?.desire||save.npcStates?.[k]?.current_goal).slice(-10).map(([k,v])=>{const g=v?.active_goal||{};return `- ${ASSETS.characters[k]?.name||k}: ${g.desire||save.npcStates?.[k]?.current_goal||'-'} [P${g.priority??'-'} U${g.urgency??'-'} ${g.state||'active'} ${g.progress??0}%]${g.obstacle?`\\n  obstacle=${g.obstacle}`:''}${(g.next_actions||[])[0]?`\\n  next=${g.next_actions[0]}`:''}`;}).join('\\n')||'-'}\\n\\n[RECENT RELATIONSHIP REASONS]\\n${Object.entries(save.npcInnerStates||{}).filter(([,v])=>v?.relationship_reason?.cause||v?.relationship_reason?.followup).slice(-10).map(([k,v])=>{const r=v.relationship_reason||{};return `- ${ASSETS.characters[k]?.name||k} T${r.turn??'-'}: ${r.cause||'-'}${r.expression?`\\n  expression=${r.expression}`:''}${r.followup?`\\n  followup=${r.followup}`:''}`;}).join('\\n')||'-'}\\n\\n[EVENT DIRECTOR V2.1]\\nmode=${save.qualityTelemetry?.event_director_v2?.mode||'-'} / result=${save.qualityTelemetry?.event_director_v2?.result||'-'} / style=${save.qualityTelemetry?.event_director_v2?.event_style||'-'}\\nselected=${save.qualityTelemetry?.event_director_v2?.selected_key||'-'} / seed=${save.qualityTelemetry?.event_director_v2?.seed_tag||'-'} / cooldown=${save.qualityTelemetry?.event_director_v2?.cooldown_turns??'-'}\\nroll=${save.qualityTelemetry?.event_director_v2?.roll??'-'} / noneWeight=${save.qualityTelemetry?.event_director_v2?.none_weight??'-'} / eligible=${(save.qualityTelemetry?.event_director_v2?.eligible_keys||[]).join(', ')||'-'}\\ngoal=${save.qualityTelemetry?.event_director_v2?.selected_goal?.desire||'-'} / goalMul=${save.qualityTelemetry?.event_director_v2?.selected_goal?.multiplier??'-'}\\n\\n[COUNTS]\\ntimeline ${save.timeline.length}"
       );
     }
-
 
     source = replaceOnce(
       source,
@@ -690,7 +688,6 @@ async function boot() {
     );
   } catch (error) {
     showBootError(error, 'patch 준비');
-    // Safe fallback: source was never executed, so the previous app remains usable.
     try { await import(`/app.js?v=fallback-${Date.now()}`); } catch (fallbackError) { showBootError(fallbackError, 'fallback'); }
     return;
   }
