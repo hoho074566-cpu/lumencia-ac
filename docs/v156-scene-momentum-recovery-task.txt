@@ -1,0 +1,38 @@
+Lumensia V1.5.6 Scene Momentum Recovery HF1 implementation contract
+
+Problem: current stable router interprets USER ACTION too literally and stops after one micro-step. Restore semantic action completion without inventing new PC choices.
+
+Required production integration:
+1) api/lib/context-router.js
+- import buildSceneMomentumDirective/classifySceneIntent from ../../lib/scene-momentum.js.
+- bump router identity/prompt cache for HF1 without changing protected stable path.
+- replace the current GM rule that says “사용자가 선언한 행동까지만 처리한다.” with: do not invent NEW PC volition, but automatically resolve decision-free instrumental steps necessary to complete the semantic intent already declared.
+- add explicit Scene Change > Scene Description, repeat suppression, stop-point, NPC initiative, event chaining, downtime compression, time progression, and no literal PC/Aaa narration rules.
+- buildInput must include buildSceneMomentumDirective({action: incoming.action, saveState: incoming.saveState}) adjacent to USER ACTION. Replace “위 행동까지만 처리” with semantic-intent completion wording.
+- current recent-turn summaries and sceneRuntime.momentum must be visible to the model.
+- Event Director: sceneRuntime.momentum.stall_streak >= 2 may create momentum pressure even when normal routine flow is stalled. It may only weight/select already physically/schedule-eligible candidates, keeps no-event possible, and never bypasses direct user focus/callback/cooldown/present-participant guards. Telemetry should expose stall/momentum state.
+
+2) api/chat-router.js
+- import deriveSceneDelta/updateSceneMomentum/classifySceneIntent from ../lib/scene-momentum.js.
+- keep EXACTLY ONE coreHandler/canonical model call.
+- AUTO flow should allow world/NPC/event progression that requires no PC choice; it must not freeze all new NPC/world motion merely because PC is idle.
+- localSceneRuntime must compute a deterministic Scene Delta after participant reconciliation, persist sceneRuntime.momentum, and retain recent 3 delta records. Scene-title wording alone must never count as progress.
+- enforce only safe deterministic minimum time for low-value broad intents when the model returned less: observe >=1m, exit >=2m, travel >=3m, explore >=8m, wait >=10m, downtime >=30m. Do NOT fabricate a location or bypass a meaningful stop point. A model-provided larger advance remains authoritative.
+- pipeline/route telemetry should expose momentum version, intent, delta score, target, stall streak/pressure.
+- do not add another model/QA/rewrite call.
+
+3) api/health.js
+- API patch bump is allowed (e.g. 0.8.3); app remains V1.5.6 hotfix.
+- expose sceneMomentum HF1 and acceptance concept.
+
+4) app-runtime.js (P2, no app.js rewrite)
+- keep proven base app.js untouched.
+- expose Scene Momentum score/stall in DEBUG if practical.
+- fix duplicate “자동 진행 / 이어서 생성” controls: only the stable active pair should be visible. Hide/remove any legacy duplicate controls at render/boot, without breaking the stable buttons.
+
+5) tests
+- permanent scripts/tests/scene-momentum-v156-hf1.test.mjs A-F must pass.
+- add integration/static assertions proving context-router uses buildSceneMomentumDirective, the old “위 행동까지만 처리” wording is gone from stable routed action block, chat-router persists momentum and minimum-time guard, one canonical core call remains, and health/debug labels are coherent.
+- preserve all existing deterministic tests.
+
+Do not touch app.js version. Do not create versioned stable filenames. Do not merge this PR automatically; protected core/runtime change requires exact-current-HEAD review and human merge.
