@@ -7,6 +7,7 @@ const PRICES = {
 };
 
 const EXPRESSIONS = new Set(['default', 'smile', 'blush', 'serious', 'angry', 'sad', 'shock', 'smug', 'annoyed', 'worried', 'confused', 'laugh', 'flustered']);
+const GOAL_STATES = new Set(['active','blocked','completed','abandoned']);
 const clamp = (n, min, max) => Math.min(max, Math.max(min, Number(n) || 0));
 const arrays = (value, max) => Array.isArray(value) ? value.slice(0, max) : [];
 const cleanText = (v, max) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
@@ -144,11 +145,22 @@ export function sanitizeTurn(turn, { allowedCgIds = [], allowedSkills = [], skil
     credibility: row?.credibility == null ? null : clamp(row.credibility, 0, 1),
   }));
 
-  d.npc_state_updates = arrays(d.npc_state_updates, 12).filter((row) => REGISTERED_SPEAKER_KEYS.has(row?.npc_key)).map((row) => ({
-    ...row,
-    goal_progress: row?.goal_progress == null ? null : clamp(row.goal_progress, 0, 100),
-    next_change_minutes: row?.next_change_minutes == null ? null : clamp(row.next_change_minutes, 0, 10080),
-  }));
+  d.npc_state_updates = arrays(d.npc_state_updates, 12).filter((row) => REGISTERED_SPEAKER_KEYS.has(row?.npc_key)).map((row) => {
+    const goalReason = cleanText(row?.goal_reason, 280) || null;
+    const rawDelta = row?.goal_progress_delta == null ? null : Math.trunc(clamp(row.goal_progress_delta, -100, 100));
+    const goalDelta = rawDelta && !goalReason ? null : rawDelta;
+    const goalState = GOAL_STATES.has(String(row?.goal_state || '')) && goalReason ? String(row.goal_state) : null;
+    return {
+      ...row,
+      goal_progress: row?.goal_progress == null ? null : clamp(row.goal_progress, 0, 100),
+      goal_progress_delta: goalDelta,
+      goal_state: goalState,
+      goal_reason: goalReason,
+      goal_next_action: cleanText(row?.goal_next_action, 240) || null,
+      goal_replace: row?.goal_replace === true && Boolean(goalReason),
+      next_change_minutes: row?.next_change_minutes == null ? null : clamp(row.next_change_minutes, 0, 10080),
+    };
+  });
 
   d.npc_schedule_updates = arrays(d.npc_schedule_updates, 8).filter((row) => REGISTERED_SPEAKER_KEYS.has(row?.npc_key)).map((row) => ({
     ...row, delay_minutes: clamp(row.delay_minutes, 1, 10080), location: cleanText(row.location,160), activity: cleanText(row.activity,240), reason: cleanText(row.reason,260),
