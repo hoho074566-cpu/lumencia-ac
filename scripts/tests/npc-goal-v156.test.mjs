@@ -52,11 +52,21 @@ test('setback clamps at zero and blocked preserves progress',()=>{
   assert.equal(blocked.goal.progress,33);
 });
 
-test('completion forces 100 and abandoned goals freeze until explicit reopen',()=>{
+test('completion and abandonment archive terminal history while abandoned progress freezes',()=>{
   const completed=apply(oldGoal({progress:72}), {goal_state:'completed',goal_reason:'목표를 달성했다'});
   assert.equal(completed.goal.state,'completed');
   assert.equal(completed.goal.progress,100);
-  const abandonedOld=oldGoal({progress:45,state:'abandoned'});
+  assert.equal(completed.history.at(-1).id,completed.goal.id);
+  assert.equal(completed.history.at(-1).final_state,'completed');
+  assert.equal(completed.history.at(-1).final_progress,100);
+
+  const abandoned=apply(oldGoal({progress:45}), {goal_state:'abandoned',goal_reason:'더는 추진하지 않기로 했다'});
+  assert.equal(abandoned.goal.state,'abandoned');
+  assert.equal(abandoned.goal.progress,45);
+  assert.equal(abandoned.history.at(-1).final_state,'abandoned');
+  assert.equal(abandoned.history.at(-1).final_progress,45);
+
+  const abandonedOld={...oldGoal({progress:45,state:'abandoned'}),goal_history:abandoned.history};
   const frozen=apply(abandonedOld,{goal_progress_delta:30,goal_reason:'새 정보가 생겼다'});
   assert.equal(frozen.goal.state,'abandoned');
   assert.equal(frozen.goal.progress,45);
@@ -65,14 +75,21 @@ test('completion forces 100 and abandoned goals freeze until explicit reopen',()
   assert.equal(reopened.goal.progress,50);
 });
 
-test('completed reopen requires a negative delta below 100',()=>{
-  const done=oldGoal({progress:100,state:'completed'});
+test('completed reopen requires a negative delta below 100 and same-id history is updated on re-completion',()=>{
+  const firstDone=apply(oldGoal({progress:70}),{goal_state:'completed',goal_reason:'첫 완료'});
+  const done={...oldGoal({progress:100,state:'completed'}),goal_history:firstDone.history};
   const rejected=apply(done,{goal_state:'active',goal_reason:'후속 문제가 생겼다'});
   assert.equal(rejected.goal.state,'completed');
   assert.equal(rejected.goal.progress,100);
   const accepted=apply(done,{goal_state:'active',goal_progress_delta:-25,goal_reason:'완료로 알았던 문제가 다시 열렸다'});
   assert.equal(accepted.goal.state,'active');
   assert.equal(accepted.goal.progress,75);
+  const reopenedOld={...done,active_goal:accepted.goal,goal_history:accepted.history};
+  const doneAgain=apply(reopenedOld,{goal_state:'completed',goal_reason:'재검증까지 마쳤다'},20);
+  assert.equal(doneAgain.goal.state,'completed');
+  assert.equal(doneAgain.goal.progress,100);
+  assert.equal(doneAgain.history.filter(x=>x.id===done.active_goal.id).length,1);
+  assert.equal(doneAgain.history.find(x=>x.id===done.active_goal.id).ended_turn,21);
 });
 
 test('rephrasing preserves identity while explicit replacement resets metadata and archives old goal',()=>{
@@ -95,6 +112,18 @@ test('rephrasing preserves identity while explicit replacement resets metadata a
   assert.equal(replaced.history.at(-1).final_progress,61);
 });
 
+test('invalid replacement evidence cannot archive or create a new goal identity',()=>{
+  const old=oldGoal({progress:61});
+  const noReason=apply(old,{current_goal:'이사벨의 움직임을 조사한다',goal_replace:true});
+  assert.equal(noReason.goal.id,old.active_goal.id);
+  assert.equal(noReason.goal.progress,61);
+  assert.equal(noReason.history.length,0);
+  const noDesire=apply(old,{goal_replace:true,goal_reason:'새 목표가 필요하다'});
+  assert.equal(noDesire.goal.id,old.active_goal.id);
+  assert.equal(noDesire.goal.progress,61);
+  assert.equal(noDesire.history.length,0);
+});
+
 test('goal history remains bounded to six entries',()=>{
   const history=Array.from({length:6},(_,i)=>({id:`old-${i}`,desire:`g${i}`,final_state:'completed',final_progress:100,ended_turn:i,end_reason:'done'}));
   const old={...oldGoal(),goal_history:history};
@@ -102,6 +131,15 @@ test('goal history remains bounded to six entries',()=>{
   assert.equal(replaced.history.length,6);
   assert.equal(replaced.history.at(-1).id,old.active_goal.id);
   assert.equal(replaced.history.some(x=>x.id==='old-0'),false);
+});
+
+test('mere dialogue/no goal evidence never changes goal progress',()=>{
+  const old=oldGoal({progress:52,state:'active'});
+  const result=apply(old,{});
+  assert.equal(result.goal.progress,52);
+  assert.equal(result.goal.state,'active');
+  assert.equal(result.goal.last_progress_delta,5);
+  assert.equal(result.goal.last_progress_reason,'이전 진전');
 });
 
 test('structured format exposes and preserves Goal V2 fields through the legacy parser',()=>{
