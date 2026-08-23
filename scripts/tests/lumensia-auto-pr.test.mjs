@@ -247,8 +247,13 @@ test('workflow statically checks out and executes only trusted main automation',
   const workflow = await readFile(new URL('../../.github/workflows/lumensia-auto-pr.yml', import.meta.url), 'utf8');
   assert.match(workflow, /schedule:\s*\n\s*- cron: '\*\/5 \* \* \* \*'/);
   assert.match(workflow, /workflow_run:\s*\n\s*workflows: \['Lumensia Merge Readiness'\]\s*\n\s*types: \[completed\]/);
+  assert.match(workflow, /issue_comment:\s*\n\s*types: \[created\]/);
   assert.match(workflow, /workflow_dispatch:/);
-  assert.match(workflow, /if: github\.event_name != 'workflow_run' \|\| github\.event\.workflow_run\.conclusion == 'success'/);
+  assert.match(workflow, /github\.event_name == 'workflow_run' && github\.event\.workflow_run\.conclusion == 'success'/);
+  assert.match(workflow, /github\.event_name == 'issue_comment'/);
+  assert.match(workflow, /github\.actor == 'chatgpt-codex-connector\[bot\]'/);
+  assert.match(workflow, /github\.actor == 'chatgpt-codex-connector'/);
+  assert.match(workflow, /github\.actor == github\.repository_owner && contains\(github\.event\.comment\.body, 'lumensia-maintenance-kick:v1'\)/);
   assert.match(workflow, /environment: lumensia-trusted-auto-pr/);
   assert.match(workflow, /ref: refs\/heads\/main/);
   assert.match(workflow, /sparse-checkout: scripts\/lumensia-auto-pr\.mjs/);
