@@ -6,7 +6,7 @@ export default async function handler(req, res) {
     terra: process.env.OPENAI_MODEL_TERRA || 'gpt-5.6-terra',
     accessTokenRequired: Boolean(process.env.LUMENSIA_ACCESS_TOKEN),
     promptCacheRetention: '24h',
-    version: '0.8.2',
+    version: '0.8.3',
     appVersion: '1.5.6',
     adapter: '/api/chat-router',
     canonicalCore: '/api/chat',
@@ -20,6 +20,7 @@ export default async function handler(req, res) {
     eventDirector: 'V2.1 seeded weighted variation + active NPC-goal weighting + 3-turn surprise cooldown + no-event outcome',
     npcMotivation: 'V2 evidence-gated active_goal lifecycle + progress/replacement/history + eligible-candidate Director weighting',
     relationshipReason: 'V1 cause/expression/followup + turn/source persistence',
+    sceneMomentum: 'HF1 semantic action compression + deterministic State Delta/stall + NPC initiative + meaningful-stop policy',
     tokenBudget: { routine: 17000, routineSoftMax: 20000, scheduled: 18000, important: 20000, critical: 24000 },
   });
 }

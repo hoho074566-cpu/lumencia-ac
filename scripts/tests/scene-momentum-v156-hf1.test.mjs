@@ -20,6 +20,7 @@ assert.ok(exitIntent.minAdvanceMinutes >= 2);
 const exitDirective = buildSceneMomentumDirective({ action:'밖으로 간다.', saveState:{ world:{location:'A동 개인실'}, sceneRuntime:{} } });
 assert.match(exitDirective, /복도 → 계단\/현관.*건물 외부/);
 assert.match(exitDirective, /복도에서 멈추려면 실제 방해\/사건\/중요 선택 근거/);
+assert.equal(classifySceneIntent('마법과 건물로 간다.', { location:'A동 복도' }).kind, 'travel', 'department travel must not be mistaken for magic ability use');
 
 // TEST B — 돌아다닌다: exploration needs multi-point compression + novelty.
 const exploreIntent = classifySceneIntent('돌아다닌다.', { location:'A동 복도' });

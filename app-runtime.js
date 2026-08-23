@@ -1,5 +1,5 @@
 // LUMENSIA MOBILE V1.5.6 stable runtime
-// V1.5.6 NPC Goal V2 + Relationship Reason V1 on the proven V1.4.8 base app.
+// V1.5.6 Scene Momentum Recovery HF1 + NPC Goal V2 + Relationship Reason V1 on the proven V1.4.8 base app.
 // Stable-path migration base head: hoho074566-cpu/lumencia-ac @ a9170d6dca82c613436dcc5b3bc6ba86b9f86ba4
 // Reviewed app.js blob includes the canonical characters-v2 integration.
 // Why loader: preserve the large proven V1.4.8 app.js byte-for-byte in GitHub while applying
@@ -54,7 +54,20 @@ function canContinueStable() {
   return Boolean(latest && !busy && !metaModeOnce);
 }
 
+function suppressDuplicateFlowControlsStable() {
+  const stable = $('flowControlsStable');
+  for (const button of story.querySelectorAll('button')) {
+    if (stable?.contains(button)) continue;
+    const label = String(button.textContent || '').replace(/\s+/g, ' ').trim();
+    if (!/^(?:▶\s*)?자동 진행(?:\s*·.*)?$|^(?:✦\s*)?이어서 생성(?:\s*·.*)?$/.test(label)) continue;
+    button.disabled = true;
+    button.hidden = true;
+    button.setAttribute('aria-hidden', 'true');
+  }
+}
+
 function renderFlowControlsStable() {
+  suppressDuplicateFlowControlsStable();
   let wrap = $('flowControlsStable');
   const latest = latestWorldRecordStable();
 
@@ -97,6 +110,7 @@ function renderFlowControlsStable() {
           ? '입력창에 작성 중인 내용이 있어 자동 진행이 잠겼습니다.'
           : 'PC 새 행동 없이 현재 장면의 비상호작용 구간만 진행합니다.';
   }
+  suppressDuplicateFlowControlsStable();
   if (cont) {
     cont.disabled = !canContinueStable();
     const beats = Array.isArray(save?.sceneRuntime?.remaining_beats) ? save.sceneRuntime.remaining_beats.length : 0;
@@ -521,7 +535,7 @@ async function checkHealthStable() {
     const r = await fetch('/api/health', { cache: 'no-store' });
     const h = await r.json();
     $('apiHealth').textContent = h.apiConfigured
-      ? `API ${h.version || '?'} 연결 준비됨 · ${h.luna} / ${h.terra}${h.qualityPipeline ? ' · Q3' : ''}${h.contextRouter ? ' · CR' : ''}${h.npcMotivation ? ' · MOT2' : ''}${h.accessTokenRequired ? ' · 접속 토큰 필요' : ''}`
+      ? `API ${h.version || '?'} 연결 준비됨 · ${h.luna} / ${h.terra}${h.qualityPipeline ? ' · Q3' : ''}${h.contextRouter ? ' · CR' : ''}${h.npcMotivation ? ' · MOT2' : ''}${h.sceneMomentum ? ' · MOM' : ''}${h.accessTokenRequired ? ' · 접속 토큰 필요' : ''}`
       : 'API 키 미설정. Vercel 환경변수 OPENAI_API_KEY를 추가하거나 데모 모드를 켜세요.';
   } catch {
     $('apiHealth').textContent = 'API 상태를 확인할 수 없음.';
@@ -642,6 +656,7 @@ async function boot() {
       latestWorldRecordStable.toString(),
       canAutoFlowStable.toString(),
       canContinueStable.toString(),
+      suppressDuplicateFlowControlsStable.toString(),
       renderFlowControlsStable.toString(),
       installAutoFlowGestureStable.toString(),
       continuationSceneTailStable.toString(),
