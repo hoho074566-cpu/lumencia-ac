@@ -143,24 +143,30 @@ test('P0/P1 loop stops after five completed prior-head requests', () => {
   assert.equal(decision.reason, 'max-fix-attempts');
 });
 
-test('low-risk ready Auto-PR may auto-merge only from clean merge state', () => {
+test('low-risk ready Auto-PR may auto-merge from clean or authoritative unstable merge state', () => {
   const merge = decideMaintenanceAction({
     pull: pull(), codex: codex(), checks: checks(), readiness: ready,
     files: [{ filename: 'docs/guide.md' }, { filename: 'assets/characters-v2/test.webp' }], fixRequests: [], mergeTokenAvailable: true,
   });
   assert.deepEqual(merge, { action: 'MERGE' });
 
-  for (const mergeable_state of ['unstable', 'behind', 'blocked', 'dirty']) {
+  const unstable = decideMaintenanceAction({
+    pull: pull({ mergeable_state: 'unstable' }), codex: codex(), checks: checks(), readiness: ready,
+    files: [{ filename: 'docs/guide.md' }], fixRequests: [], mergeTokenAvailable: true,
+  });
+  assert.deepEqual(unstable, { action: 'MERGE' });
+
+  for (const mergeable_state of ['behind', 'blocked', 'dirty']) {
     const decision = decideMaintenanceAction({
       pull: pull({ mergeable_state }), codex: codex(), checks: checks(), readiness: ready,
       files: [{ filename: 'docs/guide.md' }], fixRequests: [], mergeTokenAvailable: true,
     });
-    assert.deepEqual(decision, { action: 'WAIT', reason: 'merge-state-not-clean' });
+    assert.deepEqual(decision, { action: 'WAIT', reason: 'merge-state-not-safe' });
   }
   assert.deepEqual(decideMaintenanceAction({
     pull: pull({ mergeable: null }), codex: codex(), checks: checks(), readiness: ready,
     files: [{ filename: 'docs/guide.md' }], fixRequests: [], mergeTokenAvailable: true,
-  }), { action: 'WAIT', reason: 'merge-state-not-clean' });
+  }), { action: 'WAIT', reason: 'merge-state-not-safe' });
 });
 
 test('protected core, service-worker, automation, and renamed source paths require human merge', () => {
@@ -225,6 +231,7 @@ test('HTTP merge rejection creates a persistent human hold and is not retried ne
   const p = pull();
   const api = {
     validate: async () => true,
+    compare: async () => ({ head_commit: { sha: HEAD }, base_commit: { sha: BASE }, merge_base_commit: { sha: BASE } }),
     listOpenPulls: async () => [p],
     getPull: async () => p,
     listIssueComments: async () => [...issueComments],

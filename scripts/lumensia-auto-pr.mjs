@@ -76,6 +76,18 @@ export function findLatestCodexReviewRequest(comments = [], prNumber, trustedAct
   return requests.sort((left, right) => Number(right.comment.id || 0) - Number(left.comment.id || 0))[0] || null;
 }
 
+export async function resolveCurrentBaseTarget(api, pull = {}) {
+  const head = String(pull?.head?.sha || '');
+  const headRef = String(pull?.head?.ref || head);
+  if (!head || !headRef || typeof api?.compare !== 'function') return null;
+  const comparison = await api.compare('main', headRef);
+  const comparedHead = String(comparison?.head_commit?.sha || '');
+  const baseSha = String(comparison?.base_commit?.sha || '');
+  const mergeBaseSha = String(comparison?.merge_base_commit?.sha || '');
+  if (comparedHead !== head || !baseSha || !mergeBaseSha) return null;
+  return { head, baseSha, mergeBaseSha, comparison };
+}
+
 function codexActorAllowed(user = {}, configuredActors = '') {
   const configured = String(configuredActors || '').split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
   const allowed = new Set([...DEFAULT_CODEX_ACTORS, ...configured]);
@@ -218,13 +230,15 @@ export async function ensureCodexReviewRequest({ api, pull, owner, logger = cons
   if (!pull || pull.state !== 'open' || pull.draft || !pull.head?.sha) {
     return { created: false, reason: 'ineligible' };
   }
-  const required = ['getPull', 'listIssueComments', 'listReviews', 'listReviewComments', 'createIssueComment'];
+  const required = ['compare', 'getPull', 'listIssueComments', 'listReviews', 'listReviewComments', 'createIssueComment'];
   if (required.some((name) => typeof api?.[name] !== 'function')) {
     return { created: false, reason: 'unsupported' };
   }
 
+  const initialTarget = await resolveCurrentBaseTarget(api, pull);
+  if (!initialTarget) return { created: false, reason: 'race' };
   let issueComments = await api.listIssueComments(pull.number);
-  let currentTargetRequest = findLatestCodexReviewRequest(issueComments, pull.number, owner, pull.head.sha, pull.base?.sha || '');
+  let currentTargetRequest = findLatestCodexReviewRequest(issueComments, pull.number, owner, pull.head.sha, initialTarget.baseSha);
   if (currentTargetRequest) {
     return { created: false, reason: 'current', comment: currentTargetRequest.comment, request: currentTargetRequest.request };
   }
@@ -238,8 +252,9 @@ export async function ensureCodexReviewRequest({ api, pull, owner, logger = cons
   if (currentPull?.state !== 'open' || currentPull?.draft || currentPull?.head?.sha !== pull.head.sha) {
     return { created: false, reason: 'race' };
   }
-  const baseSha = currentPull.base?.sha || pull.base?.sha || '';
-  if (!baseSha) return { created: false, reason: 'missing-base' };
+  const currentTarget = await resolveCurrentBaseTarget(api, currentPull);
+  if (!currentTarget || currentTarget.baseSha !== initialTarget.baseSha) return { created: false, reason: 'race' };
+  const baseSha = currentTarget.baseSha;
 
   issueComments = freshIssueComments;
   currentTargetRequest = findLatestCodexReviewRequest(issueComments, pull.number, owner, currentPull.head.sha, baseSha);
