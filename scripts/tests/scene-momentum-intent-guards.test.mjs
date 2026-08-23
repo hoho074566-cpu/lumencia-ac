@@ -30,6 +30,9 @@ const travelQuestion=classifySceneIntent('도서관에 갈까?',{location:'기�
 assert.equal(travelQuestion.kind,'decision-sensitive','travel deliberation must not execute as a committed move');
 assert.equal(travelQuestion.minAdvanceMinutes,0,'travel deliberation must not receive a movement time floor');
 assert.equal(classifySceneIntent('도서관에 갈지 고민한다.',{location:'기숙사'}).kind,'decision-sensitive','travel deliberation statement must not execute as committed movement');
+for(const action of ['도서관에 갈까 말까?','도서관에 가야 할까?','도서관에 갈까요?']){
+  assert.equal(classifySceneIntent(action,{location:'기숙사'}).kind,'decision-sensitive',`${action} must remain an unresolved player decision`);
+}
 assert.equal(classifySceneIntent('기다린다.',{location:'광장'}).kind,'wait');
 assert.equal(classifySceneIntent('공격한다.',{location:'광장'}).kind,'committed-consequence');
 

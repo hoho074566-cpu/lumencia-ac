@@ -7,6 +7,7 @@ Post-merge Narrative Engine continuation — Scene Momentum Recovery HF1 is merg
 - Repo: `hoho074566-cpu/lumencia-ac`
 - Main: `8d378b532910dfecaf5226118bffabdddbe74289` (`Merge pull request #33`)
 - Working branch: `codex/narrative-live-play-acceptance`
+- PR #34: **open / non-draft**, protected-core manual merge only
 - PR #33: **merged** at 2026-08-23 23:07:00 UTC
 - Reviewed/merged PR HEAD: `216bef1d51b72f2edb6da3f06c69e02aa45b5b10`
 - Exact-head Safety: **Lumensia PR Safety Gate #263 PASS**
@@ -159,6 +160,13 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Focused intent/correctness/time-floor/HF1 tests: PASS.
 - Full `node scripts/lumensia-pr-check.mjs`: PASS.
 
+### Candidate hosted/review evidence
+- Published candidate `52819d3c31f30afe2a9b0e9d4ded03033b31d10b` on PR #34.
+- Safety Gate #264: **PASS**; Vercel: **PASS / Ready**; compare: ahead 1 / behind 0 with base commit and merge-base at current main `8d378b532910dfecaf5226118bffabdddbe74289`.
+- Fresh exact-head Codex review: direct P0/P1 = 0. Seven P2 findings identified acceptance false-PASS gaps plus common travel-deliberation endings.
+- Follow-up closes those P2s because acceptance accuracy is the purpose of this phase: explicit wait/rest durations are exact, pre-schedule no-op is rejected, CONTINUE checks scalar and array deltas, completed-event reactivation checks event arrays, all visible fields are scanned for internal names, repeated-known-fact paraphrases require a hook, and `갈까 말까` / `가야 할까` / `갈까요` remain decision-sensitive.
+- Exact preview live-play is externally blocked: both the harness and Cloud Browser reach Vercel SSO (HTTP 401/302), and no protection-bypass secret is available in the environment or repository. This is deployment access, not a runtime test failure.
+
 ## Permanent HF1 Test Suites
 - `scripts/tests/context-router-authority-tail.test.mjs`
 - `scripts/tests/context-router.test.mjs`
@@ -188,16 +196,17 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PR #33 manual merge safety.
 
 ## NEXT ACTION
-1. Publish the Live-play Round 1 candidate and require hosted Safety + Vercel on the exact head.
-2. Rerun all 12 real acceptance cases against that deployed exact candidate; do not use production main for candidate validation.
-3. If the rerun is green, request fresh exact-current-HEAD/current-main Codex review and resolve only P0/P1 blockers.
+1. Publish the acceptance-hardening follow-up and require new exact-head Safety + Vercel + fresh exact-current-HEAD/current-main Codex review.
+2. Once the Vercel Preview SSO is satisfied in the Cloud Browser (or a legitimate protection-bypass value is made available), rerun all 12 real acceptance cases against that exact deployment; production main is not candidate evidence.
+3. Resolve only reproduced P0/P1 blockers. P2/P3 remain non-blocking after their acceptance-harness false-PASS cases are covered.
 4. Stop at the protected-core manual merge gate; never auto-merge.
-5. After the acceptance fix is human-merged and production-smoked, implement **Scene Purpose** with bounded purpose state and no automatic player choice.
+5. After the acceptance fix is human-merged, rerun all 12 cases on production and smoke `/api/health`, then implement **Scene Purpose** with bounded purpose state and no automatic player choice.
 6. Then continue through Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence chaining/lifetime -> NPC Initiative/Goal Tick refinement.
 
 ## Stop Record
 - Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.
 - Completed after merge: first 12-case production Live-play run, four demonstrated classifier fixes, permanent regressions, full local PR check.
-- Unfinished: hosted candidate validation, 12-case exact-candidate rerun, fresh exact-head review, protected manual merge, Scene Purpose and subsequent Narrative Engine phases.
-- Blocker: none.
-- NEXT ACTION: publish/deploy the Live-play Round 1 candidate, then rerun the 12-case harness against that exact deployment.
+- Completed on PR #34 candidate `52819d3`: hosted Safety #264 PASS, Vercel Ready, fresh exact-head direct P0/P1=0; all seven P2 acceptance-hardening findings are addressed in the follow-up.
+- Unfinished: publish/final hosted verification of the follow-up, authenticated 12-case exact-candidate rerun, final exact-head review, protected manual merge, production 12-case acceptance, Scene Purpose and subsequent Narrative Engine phases.
+- Blocker: Vercel Preview Deployment Protection redirects the exact candidate to SSO; no bypass credential is available. Do not count the HTTP 401 as a gameplay failure and do not use production as candidate evidence.
+- NEXT ACTION: publish and fully gate the acceptance-hardening follow-up; then authenticate the Preview in Cloud Browser and rerun the 12 cases on the exact deployment.

@@ -90,12 +90,12 @@ function hasPlayerDialogue(turn) {
 
 function commonChecks(data) {
   const turn = object(data?.turn);
-  const text = sceneText(turn);
+  const visibleText = JSON.stringify({ title: turn.scene_title, scene: turn.scene, choices: turn.choices });
   return {
     http_contract: Boolean(turn.scene_title && array(turn.scene).length),
     one_stage: Number(data?.pipeline?.stages) === 1,
     stable_route: data?.route?.input_mode === 'game' || data?.route?.input_mode === 'continue',
-    no_internal_name_leak: !/(^|[^A-Za-z])(Aaa|PC)([^A-Za-z]|$)/.test(text),
+    no_internal_name_leak: !/(^|[^A-Za-z])(Aaa|PC)([^A-Za-z]|$)/.test(visibleText),
     no_invented_player_dialogue: !hasPlayerDialogue(turn),
     choice_shape: array(turn.choices).length === 0 || array(turn.choices).length === 3,
   };
@@ -160,7 +160,7 @@ const cases = [
       const momentum = object(data?.pipeline?.scene_momentum), delta = object(data.turn?.state_delta);
       return {
         intent_wait: momentum.intent === 'wait',
-        exact_floor_respected: Number(delta.advance_minutes) >= 10,
+        exact_duration_respected: Number(delta.advance_minutes) === 10,
         real_delta: Number(momentum.score) >= Number(momentum.target),
       };
     },
@@ -175,7 +175,7 @@ const cases = [
       const momentum = object(data?.pipeline?.scene_momentum), delta = object(data.turn?.state_delta);
       return {
         intent_downtime: momentum.intent === 'downtime',
-        full_hour_advanced: Number(delta.advance_minutes) >= 60,
+        exact_hour_advanced: Number(delta.advance_minutes) === 60,
         real_delta: Number(momentum.score) >= Number(momentum.target),
         no_microstep_stop: !/^(복도|침대 앞|의자 앞)$/.test(String(delta.new_location || '')),
       };
@@ -193,11 +193,12 @@ const cases = [
     rollingSummary: '카인은 기사과 게시판에서 기량평가 일정과 장소를 이미 확인했다.',
     evaluate(data) {
       const text = sceneText(data.turn), delta = object(data.turn?.state_delta);
+      const relistsKnownFact = [/3월\s*5일/, /(?:오전\s*)?10시/, /제1연병장/].every((pattern) => pattern.test(text));
       return {
         intent_observe: data?.pipeline?.scene_momentum?.intent === 'observe',
         time_advanced: Number(delta.advance_minutes) >= 1,
-        no_verbatim_relist: !text.includes('기량평가가 3월 5일 오전 10시 제1연병장에서 열린다'),
-        concise_or_changed: text.length <= 900 || hookPresent(data.turn),
+        no_bare_known_fact_relist: !relistsKnownFact || hookPresent(data.turn),
+        bounded_narration: text.length <= 900,
       };
     },
   },
@@ -251,13 +252,15 @@ const cases = [
     rollingSummary: '필수 오리엔테이션까지 10분 남았다.',
     evaluate(data) {
       const turn = object(data.turn), delta = object(turn.state_delta);
+      const advance = Number(delta.advance_minutes);
       const scheduled = turn.event_progress?.event_instance_id === 'combat-orientation' ||
         array(delta.scheduled_events_complete).includes('combat-orientation') ||
         /오리엔테이션|연병장/.test(sceneText(turn));
+      const meaningfulEarlyStop = advance > 0 && advance < 10 && hookPresent(turn);
       return {
         intent_downtime: data?.pipeline?.scene_momentum?.intent === 'downtime',
-        schedule_not_silently_skipped: Number(delta.advance_minutes) <= 10 || scheduled,
-        schedule_surface_if_crossed: Number(delta.advance_minutes) <= 10 || scheduled,
+        schedule_boundary_not_crossed: advance >= 0 && advance <= 10,
+        boundary_or_meaningful_stop: advance === 10 || scheduled || meaningfulEarlyStop,
       };
     },
   },
@@ -296,11 +299,12 @@ const cases = [
     evaluate(data) {
       const delta = object(data.turn?.state_delta);
       const zeroArrays = Object.entries(delta).filter(([, value]) => Array.isArray(value)).every(([, value]) => value.length === 0);
+      const zeroScalars = Number(delta.advance_minutes) === 0 && delta.new_location == null && delta.pc_status == null &&
+        Number(delta.fatigue_delta || 0) === 0 && Number(delta.gold_delta || 0) === 0;
       return {
         continue_mode: data?.route?.input_mode === 'continue',
         continue_freeze_intent: data?.route?.scene_momentum?.intent === 'continue-freeze' || data?.pipeline?.context_router?.profile === 'continue-11k-v154',
-        zero_time: Number(delta.advance_minutes) === 0,
-        zero_location: delta.new_location == null,
+        zero_scalar_state: zeroScalars,
         zero_state_arrays: zeroArrays,
       };
     },
@@ -320,11 +324,12 @@ const cases = [
     rollingSummary: '입학식은 완료됐다. 카인은 대강당 앞에서 첫 수업으로 이동하려 한다.',
     evaluate(data) {
       const turn = object(data.turn), text = sceneText(turn), delta = object(turn.state_delta);
+      const reactivated = array(delta.active_events_add).some((value) => String(value).includes('entrance-ceremony'));
       return {
         intent_travel: data?.pipeline?.scene_momentum?.intent === 'travel',
         destination_or_meaningful_stop: /강의실|기사과/.test(String(delta.new_location || '')) || array(turn.choices).length === 3,
         no_completed_event_replay: !/신입생 대표 연설|환영사|입학식이 시작/.test(text),
-        old_occurrence_not_reactivated: turn.event_progress?.event_instance_id !== 'entrance-ceremony',
+        old_occurrence_not_reactivated: turn.event_progress?.event_instance_id !== 'entrance-ceremony' && !reactivated,
       };
     },
   },
@@ -377,7 +382,10 @@ async function callCase(testCase) {
     let data;
     try { data = raw ? JSON.parse(raw) : {}; }
     catch { throw new Error(`${testCase.id}: HTTP ${response.status} returned non-JSON: ${raw.slice(0, 240)}`); }
-    if (!response.ok) throw new Error(`${testCase.id}: HTTP ${response.status}: ${data.error || raw.slice(0, 240)}`);
+    if (!response.ok) {
+      const detail = typeof data.error === 'string' ? data.error : JSON.stringify(data.error || data).slice(0, 240);
+      throw new Error(`${testCase.id}: HTTP ${response.status}: ${detail}`);
+    }
     const checks = { ...commonChecks(data), ...testCase.evaluate(data) };
     const failed = Object.entries(checks).filter(([, value]) => value !== true).map(([key]) => key);
     return {

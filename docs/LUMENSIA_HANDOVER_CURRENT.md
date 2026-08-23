@@ -389,6 +389,14 @@ Demonstrated defects fixed in the current branch:
 
 Focused regressions and the full local PR check pass. The next authority step is hosted deployment of the exact candidate, then the same 12-case live rerun against that deployment.
 
+PR #34 candidate authority:
+- hosted head `52819d3c31f30afe2a9b0e9d4ded03033b31d10b` passed Safety #264 and Vercel Ready;
+- compare was ahead 1 / behind 0, and base commit + merge-base were current main `8d378b532910dfecaf5226118bffabdddbe74289`;
+- fresh exact-head Codex review found direct P0/P1=0 and seven P2 acceptance-hardening issues;
+- the follow-up makes explicit durations exact, rejects pre-schedule no-op, verifies full CONTINUE state freeze and completed-event arrays, scans all player-visible fields, detects paraphrased known-fact relists without a hook, and covers `갈까 말까` / `가야 할까` / `갈까요`.
+
+Current blocker: the exact Vercel Preview is Ready but protected. The command-line harness receives HTTP 401 and Cloud Browser is redirected to Vercel login/SSO; there is no protection-bypass credential in the environment or repository. Do not call this a gameplay failure and do not substitute production main for exact-candidate evidence. The user can authenticate the Cloud Browser, after which the 12 stateless cases can run on the exact deployment.
+
 ---
 
 # 9. PERMANENT TEST COVERAGE
@@ -512,14 +520,14 @@ Gameplay roadmap discussed but not DONE:
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
 2. Confirm main still contains merge commit `8d378b532910dfecaf5226118bffabdddbe74289`; do **not** redo completed HF1 diagnosis.
-3. Publish the current Live-play Round 1 candidate and wait for exact-head Safety + Vercel.
-4. Rerun `scripts/qa/live-play-acceptance.mjs` against that exact candidate deployment; production main is not candidate evidence.
-5. Fix only reproduced P0/P1 failures, then run the full PR check and fresh exact-current-HEAD/current-main Codex review.
+3. Publish the current acceptance-hardening follow-up and wait for new exact-head Safety + Vercel + fresh Codex review.
+4. Authenticate the protected Vercel Preview in Cloud Browser, then rerun all 12 stateless cases against that exact deployment; production main is not candidate evidence.
+5. Fix only reproduced P0/P1 failures and repeat the full exact-head gates.
 6. Stop at protected-core manual merge readiness; do not auto-merge.
-7. After a human merge and production smoke, proceed to **Scene Purpose -> Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence**.
+7. After a human merge, run all 12 cases plus `/api/health` on production, then proceed to **Scene Purpose -> Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence**.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 긴빠이/Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. Scene Momentum Recovery HF1은 guarded merge commit `8d378b532910dfecaf5226118bffabdddbe74289`로 main에 반영되고 post-merge PASS했다. Live-play Round 1은 production에서 12건을 실행해 7 PASS / 5 flag를 냈고, 완료 이벤트 이동의 의미 있는 STOP은 올바른 동작으로 재분류했다. 실제 결함은 한글 수사 휴식 duration, `다시 확인한다` observe, `갈까?/갈지 고민한다` decision-sensitive 분류였으며 현재 브랜치에서 최소 수정과 영구 회귀가 green이다. 다음은 candidate publish -> exact-head Safety/Vercel -> 같은 12건을 candidate deployment에서 재실행 -> fresh exact-head/current-main Codex review -> protected manual merge gate다. 그 뒤 Scene Purpose -> Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence로 계속한다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 긴빠이/Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. Scene Momentum Recovery HF1은 guarded merge commit `8d378b532910dfecaf5226118bffabdddbe74289`로 main에 반영되고 post-merge PASS했다. Live-play Round 1은 production에서 12건을 실행해 7 PASS / 5 flag를 냈고, 실제 결함은 한글 수사 휴식 duration, `다시 확인한다` observe, travel deliberation 분류였다. PR #34의 hosted head `52819d3`은 Safety #264/Vercel/fresh P0/P1=0이나 review P2의 acceptance false-PASS와 일반 deliberation ending을 후속 보강했다. exact Preview는 Vercel SSO(HTTP 401)로 보호되어 있으므로, follow-up exact-head gates 후 Cloud Browser를 인증해 12건을 candidate에 재실행하고 protected manual merge gate에서 멈춰라. human merge 뒤 production 12-case smoke -> Scene Purpose -> Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence로 계속한다.`
