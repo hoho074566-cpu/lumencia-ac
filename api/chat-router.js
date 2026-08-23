@@ -155,7 +155,7 @@ function bounded(value,min,max,fallback){if(value==null||value==='')return fallb
 function applySceneMomentumTimeFloor(incoming,turn,mode='game'){
   const intent=classifySceneIntent(incoming?.action||'',{location:incoming?.saveState?.world?.location||''});
   if(mode!=='game'||!turn?.state_delta||!intent.compression||intent.minAdvanceMinutes<=0)return intent;
-  const hasMeaningfulStop=array(turn?.choices).length>0||String(turn?.importance||'').toLowerCase()==='critical';
+  const hasMeaningfulStop=array(turn?.choices).length>0;
   if(!hasMeaningfulStop){
     const current=Math.max(0,Number(turn.state_delta.advance_minutes||0));
     turn.state_delta.advance_minutes=Math.max(current,Number(intent.minAdvanceMinutes||0));
