@@ -274,6 +274,8 @@ function buildEventDirectorV2(incoming,originalInput,registry,mode='game'){
   const explicit=mentionedNpcKeys(incoming.action||'',registry);
   if(explicit.length||plan.focused.length)return fixedDirective('DIRECT_USER_FOCUS');
   if(plan.payoffDue||plan.callbacks)return fixedDirective('CALLBACK_PRIORITY');
+  if(plan.intervention==='aftermath')return fixedDirective('AFTERMATH_FIXED_FLOW');
+  if(plan.intervention==='combat'||plan.intervention==='critical'||hasAffirmedActionKeyword(incoming.action||'',COMBAT_RE))return fixedDirective('ACTIVE_COMBAT_FIXED_FLOW');
 
   const scheduled=plan.intervention==='scheduled';
   const medium=plan.intervention==='medium'&&(plan.routineStreak>=2||plan.eventGap>=3||plan.crossDue);
@@ -359,13 +361,13 @@ function compactSchedule(save,keys){
   return{due:array(sc.due).slice(0,4).map(clean),upcoming:array(sc.upcoming).slice(0,5).map(clean),npc_schedule:npc};
 }
 function compactScheduleAuthority(schedule,max=2400){
-  const compactEvent=(ev)=>{const src=object(ev);return{id:clampText(src.id||'',80),title:clampText(src.title||'',120),date:src.date||null,time:src.time||null,location:clampText(src.location||'',100),importance:src.importance??null,status:src.status||null,participants:array(src.participants).slice(0,4)};};
-  const compactNpc=(row)=>{const src=object(row);return{location:clampText(src.location||src.area||'',100),activity:clampText(src.activity||src.commitment||src.title||'',120),time:src.time||null,next_change_minutes:src.next_change_minutes??null};};
+  const compactEvent=(ev)=>{const src=object(ev);return{id:clampText(src.id||'',80),title:clampText(src.title||'',120),note:clampText(src.note||'',180),date:src.date||null,time:src.time||null,location:clampText(src.location||'',100),importance:src.importance??null,status:src.status||null,participants:array(src.participants).slice(0,4)};};
+  const compactNpc=(row)=>{const src=object(row);return{location:clampText(src.location||src.area||'',100),activity:clampText(src.activity||src.title||'',120),commitment:clampText(src.commitment||'',120),confidence:src.confidence??null,time:src.time||null,next_change_minutes:src.next_change_minutes??null};};
   const value={due:array(schedule?.due).slice(0,4).map(compactEvent),upcoming:array(schedule?.upcoming).slice(0,5).map(compactEvent),npc_schedule:Object.fromEntries(Object.entries(object(schedule?.npc_schedule)).slice(0,6).map(([key,row])=>[key,compactNpc(row)]))};
   let text=safeJson(value);if(text.length<=max)return text;
   const smaller={truncated:true,due:value.due.slice(0,3),upcoming:value.upcoming.slice(0,3),npc_schedule:Object.fromEntries(Object.entries(value.npc_schedule).slice(0,3))};
   text=safeJson(smaller);if(text.length<=max)return text;
-  return safeJson({truncated:true,due:smaller.due.map(({id,title,time,location,participants})=>({id,title,time,location,participants})),upcoming:smaller.upcoming.map(({id,title,time,location,participants})=>({id,title,time,location,participants}))});
+  return safeJson({truncated:true,due:smaller.due.slice(0,2).map(({id,title,note,time,location,participants})=>({id,title,note:clampText(note,100),time,location,participants})),upcoming:smaller.upcoming.slice(0,1).map(({id,title,note,time,location,participants})=>({id,title,note:clampText(note,100),time,location,participants})),npc_schedule:Object.fromEntries(Object.entries(smaller.npc_schedule).slice(0,2).map(([key,row])=>[key,{location:row.location,activity:clampText(row.activity,80),commitment:clampText(row.commitment,80),confidence:row.confidence,time:row.time}]))});
 }
 function compactSave(incoming,keys,registry,profile,keywords){
   const save=incoming.saveState||{},names=keys.map(k=>registry[k]).filter(Boolean),rel={},intimacy={},npcStates={},emotions={},inner={},npcMem={};
@@ -404,19 +406,24 @@ function cleanDirector(originalInput,limit){
   let d=sectionBetween(originalInput,'===== GM EVENT DIRECTOR (SERVER GUIDANCE) =====','===== SCHEDULE ENGINE (AUTHORITATIVE) =====');
   d=d.split('\n').filter(line=>!/candidate|후보|planCandidates|candidates=/i.test(line)).join('\n');return clampText(d,limit);
 }
-export function composeRoutedInput({optionalContext='',authorityTail='',actionBlock='',inputChars=9000}={}){
-  const headSource=String(optionalContext||''),tail=String(authorityTail||''),action=String(actionBlock||''),maxChars=Math.max(0,Number(inputChars)||0);
-  const headBudget=Math.max(0,maxChars-tail.length-action.length-4);
+export function composeRoutedInput({saveState='',optionalContext='',authorityTail='',actionBlock='',inputChars=9000}={}){
+  const save=String(saveState||''),headSource=String(optionalContext||''),tail=String(authorityTail||''),action=String(actionBlock||''),maxChars=Math.max(0,Number(inputChars)||0);
+  const fixed=[save,tail,action].filter(Boolean).join('\n\n');
+  const headBudget=Math.max(0,maxChars-fixed.length-(headSource?2:0));
   const head=headBudget>0?clampText(headSource,headBudget):'';
-  return [head,tail,action].filter(Boolean).join('\n\n');
+  return [save,head,tail,action].filter(Boolean).join('\n\n');
 }
 function buildInput(incoming,originalInput,profile,routed){
-  const save=compactSave(incoming,routed.keys,routed.registry,profile,routed.keywords),recent=compactRecent(incoming.recentTurns,profile.recentTurns),opts=clampText(sectionBetween(originalInput,'===== TURN OPTIONS =====','===== AUTHORITATIVE SAVE_STATE ====='),700),director=cleanDirector(originalInput,profile.name.includes('routine')?650:900),directorV2=clampText(routed.directorV2?.directive||'',1000),schedule=compactSchedule(incoming.saveState||{},routed.keys),runtime={npcInnerStates:Object.fromEntries(routed.keys.filter(k=>incoming.saveState?.npcInnerStates?.[k]).map(k=>[k,compactInnerNpc(incoming.saveState.npcInnerStates[k])])),sceneRuntime:incoming.saveState?.sceneRuntime||{},backgroundDigest:clampText(incoming.saveState?.backgroundDigest||'',350)},action=String(incoming.action||''),cg=array(incoming.availableCgIds).slice(0,60).join(', '),momentumDirective=clampText(buildSceneMomentumDirective({action,saveState:incoming.saveState||{}}),2800);
-  const optionalContext=`===== TURN OPTIONS =====\n${opts}\n\n===== AUTHORITATIVE SAVE_STATE (ROUTED) =====\n${safeJson(save)}\n\n===== ROLLING SUMMARY TAIL =====\n${clampText(incoming.rollingSummary||'아직 없음',1500)}\n\n===== RECENT TURNS =====\n${safeJson(recent)}\n\n===== CURRENT NPC/SCENE RUNTIME =====\n${clampText(runtime,1800)}\n\n===== SCENE MOMENTUM HF1 =====\n${momentumDirective}\n\n===== AVAILABLE_CG_IDS =====\n${cg||'없음'}`;
-  const scheduleText=compactScheduleAuthority(schedule,Math.min(2400,Math.max(1600,Math.floor(profile.inputChars*.24))));
+  const routine=profile.name.includes('routine'),save=compactSave(incoming,routed.keys,routed.registry,profile,routed.keywords),recent=compactRecent(incoming.recentTurns,profile.recentTurns),opts=clampText(sectionBetween(originalInput,'===== TURN OPTIONS =====','===== AUTHORITATIVE SAVE_STATE ====='),700),director=cleanDirector(originalInput,routine?400:900),directorV2=clampText(routed.directorV2?.directive||'',routine?600:1000),schedule=compactSchedule(incoming.saveState||{},routed.keys),runtime={npcInnerStates:Object.fromEntries(routed.keys.filter(k=>incoming.saveState?.npcInnerStates?.[k]).map(k=>[k,compactInnerNpc(incoming.saveState.npcInnerStates[k])])),sceneRuntime:incoming.saveState?.sceneRuntime||{},backgroundDigest:clampText(incoming.saveState?.backgroundDigest||'',350)},action=String(incoming.action||''),cg=array(incoming.availableCgIds).slice(0,60).join(', '),momentumDirective=clampText(buildSceneMomentumDirective({action,saveState:incoming.saveState||{}}),2800);
+  const world=object(save.world),pc=object(save.pc),scene=object(save.sceneRuntime);
+  const momentum=object(scene.momentum),eventProgress=object(scene.eventProgress);
+  const essentialSave={version:save.version,turnNumber:save.turnNumber,world:{date:world.date||null,time:world.time||null,location:clampText(world.location||'',140)},pc:{name:clampText(pc.name||'',80),department:clampText(pc.department||'',100),status:clampText(pc.status||'',160)},relevantNpcKeys:array(save.relevantNpcKeys).slice(0,4),npcStates:Object.fromEntries(Object.entries(object(save.npcStates)).slice(0,4).map(([key,row])=>[key,{location:clampText(row?.location||'',100),status:clampText(row?.status||row?.state||'',120)}])),sceneRuntime:{participants:array(scene.participants).slice(0,6),momentum:{stall_streak:Number(momentum.stall_streak||0),last_intent:clampText(momentum.last_intent||'',60)},eventProgress:scene.eventProgress==null?null:{eventInstanceId:clampText(eventProgress.eventInstanceId||'',100),activeBeat:clampText(eventProgress.activeBeat||'',100)}}};
+  const saveState=`===== AUTHORITATIVE SAVE_STATE (ROUTED MINIMUM) =====\n${safeJson(essentialSave)}`;
+  const optionalContext=`===== TURN OPTIONS =====\n${opts}\n\n===== AUTHORITATIVE SAVE_STATE (ROUTED DETAIL) =====\n${safeJson(save)}\n\n===== ROLLING SUMMARY TAIL =====\n${clampText(incoming.rollingSummary||'아직 없음',1500)}\n\n===== RECENT TURNS =====\n${safeJson(recent)}\n\n===== CURRENT NPC/SCENE RUNTIME =====\n${clampText(runtime,1800)}\n\n===== SCENE MOMENTUM HF1 =====\n${momentumDirective}\n\n===== AVAILABLE_CG_IDS =====\n${cg||'없음'}`;
+  const scheduleText=compactScheduleAuthority(schedule,routine?1300:Math.min(2400,Math.max(1600,Math.floor(profile.inputChars*.24))));
   const authorityTail=`===== GM EVENT DIRECTOR (ROUTED) =====\n${director||'없음'}\n\n===== EVENT DIRECTOR V2.1 (ROUTED) =====\n${directorV2||'없음'}\n\n===== SCHEDULE ENGINE (ROUTED) =====\n${scheduleText}`;
-  const actionBlock=`===== USER ACTION =====\n${action}\n\nUSER ACTION이 이미 선언한 의미적 목표는 결정 가치 없는 중간 단계를 압축해 완료하되, 그 이후의 새로운 PC 선택·대사·감정은 만들지 마라. 플레이어 판단이 실제로 필요한 첫 지점에서 멈춰라. ROUTINE은 빠르고 변화 중심으로 진행하고 주요 NPC 대사에는 감정 태그/강도/근거를 일치시켜라.`;
-  return{text:composeRoutedInput({optionalContext,authorityTail,actionBlock,inputChars:profile.inputChars})};
+  const actionBlock=`===== USER ACTION =====\n${clampText(action,5200)}\n\nUSER ACTION이 이미 선언한 의미적 목표는 결정 가치 없는 중간 단계를 압축해 완료하되, 그 이후의 새로운 PC 선택·대사·감정은 만들지 마라. 플레이어 판단이 실제로 필요한 첫 지점에서 멈춰라. ROUTINE은 빠르고 변화 중심으로 진행하고 주요 NPC 대사에는 감정 태그/강도/근거를 일치시켜라.`;
+  return{text:composeRoutedInput({saveState,optionalContext,authorityTail,actionBlock,inputChars:profile.inputChars})};
 }
 
 export function routeOpenAIParams(params,{incoming={},mode='game'}={}){

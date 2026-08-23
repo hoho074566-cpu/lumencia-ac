@@ -67,7 +67,8 @@ for (const [name, action, expectedProfile] of cases) {
 
 const oversizedAction = `나는 북문으로 이동한다. ${'계속 전진한다. '.repeat(1800)}`;
 const oversized = route(oversizedAction, { rollingSummary: 'old context '.repeat(3000) });
-assert.ok(oversized.params.input.includes(oversizedAction), 'oversized USER ACTION must be retained verbatim');
+assert.ok(oversized.params.input.length<=9000, 'oversized USER ACTION must respect the routine input budget');
+assert.match(oversized.params.input,/===== AUTHORITATIVE SAVE_STATE \(ROUTED MINIMUM\) =====/,'oversized USER ACTION must retain minimum authoritative state');
 assert.ok(oversized.params.input.indexOf('===== USER ACTION =====') > 0, 'variable context should precede USER ACTION');
 const routedContract=route('주변을 살핀다.').params.instructions;
 assert.match(routedContract,/event_progress는 현재 논리적 이벤트 occurrence의 compact 진행 상태/, 'routed GAME prompt is missing event progress contract');

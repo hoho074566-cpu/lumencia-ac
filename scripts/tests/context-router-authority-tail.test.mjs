@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { composeRoutedInput } from '../../api/lib/context-router.js';
+import { composeRoutedInput, routeOpenAIParams } from '../../api/lib/context-router.js';
 
 const optionalContext=`===== AUTHORITATIVE SAVE_STATE (ROUTED) =====\n${'OPTIONAL_CONTEXT_'.repeat(1400)}`;
 const authorityTail=[
@@ -31,7 +31,44 @@ assert.ok(text.endsWith(actionBlock),'USER ACTION must remain the final authorit
 const source=readFileSync('api/lib/context-router.js','utf8');
 assert.match(source,/function compactScheduleAuthority\(/,'schedule authority must be structurally compacted before reservation');
 assert.match(source,/const authorityTail=`===== GM EVENT DIRECTOR \(ROUTED\) =====/,'buildInput must create a reserved authority tail');
-assert.match(source,/composeRoutedInput\(\{optionalContext,authorityTail,actionBlock,inputChars:profile\.inputChars\}\)/,'buildInput must use the reserved-tail composer');
+assert.match(source,/composeRoutedInput\(\{saveState,optionalContext,authorityTail,actionBlock,inputChars:profile\.inputChars\}\)/,'buildInput must use the reserved-state-and-tail composer');
 assert.doesNotMatch(source,/clampText\(variableContext,variableBudget\)/,'legacy prefix-only clamp must stay removed');
+
+const divider='='.repeat(20);
+const instructions=`===== CHARACTER REGISTRY =====
+guide=Guide
+===== WORLD CANON =====
+${divider}\nAcademy\n${divider}\nPublic facts.
+===== NPC CANON =====
+${divider}\nGuide\n${divider}\nHelpful.
+===== NPC SPEECH =====
+${divider}\nGuide\n${divider}\nBrief.
+===== PC SYSTEM =====
+${divider}\nRules\n${divider}\nResolve actions.`;
+const longAction=`도서관으로 이동한다. ${'긴 행동 설명 '.repeat(620)}`.slice(0,5000);
+const originalInput=`===== TURN OPTIONS =====\nnormal
+===== AUTHORITATIVE SAVE_STATE =====\n{}
+===== GM EVENT DIRECTOR (SERVER GUIDANCE) =====
+INTERVENTION: light\nDIRECTOR_SENTINEL=KEEP
+===== SCHEDULE ENGINE (AUTHORITATIVE) =====\nSCHEDULE_SENTINEL`;
+const routed=routeOpenAIParams({instructions,input:originalInput},{mode:'game',incoming:{action:longAction,rollingSummary:'old '.repeat(5000),recentTurns:[],saveState:{turnNumber:8,world:{date:'1285-03-01',time:'09:00',location:'SAVE_WORLD_SENTINEL'},pc:{name:'SAVE_PC_SENTINEL'},npcStates:{guide:{location:'hall'}},sceneRuntime:{participants:['guide'],momentum:{stall_streak:2}},scheduleContext:{due:[{id:'SCHEDULE_SENTINEL',title:'ceremony',note:'NOTE_SENTINEL',time:'09:10',participants:['guide']}],npc_schedule:{guide:{location:'hall',activity:'class',commitment:'fixed class',confidence:'fixed',time:'09:10'}}}}}});
+assert.ok(routed.params.input.length<=9000,`long-action routine input exceeded budget: ${routed.params.input.length}`);
+assert.match(routed.params.input,/AUTHORITATIVE SAVE_STATE \(ROUTED MINIMUM\)/);
+assert.match(routed.params.input,/SAVE_WORLD_SENTINEL/);
+assert.match(routed.params.input,/SAVE_PC_SENTINEL/);
+assert.match(routed.params.input,/GM EVENT DIRECTOR \(ROUTED\)/);
+assert.match(routed.params.input,/EVENT DIRECTOR V2\.1 \(ROUTED\)/);
+assert.match(routed.params.input,/SCHEDULE ENGINE \(ROUTED\)/);
+assert.match(routed.params.input,/SCHEDULE_SENTINEL/);
+assert.match(routed.params.input,/NOTE_SENTINEL/);
+assert.match(routed.params.input,/"commitment":"fixed class"/);
+assert.match(routed.params.input,/"confidence":"fixed"/);
+assert.ok(routed.params.input.lastIndexOf('===== USER ACTION =====')>routed.params.input.lastIndexOf('===== SCHEDULE ENGINE (ROUTED) ====='),'USER ACTION marker must remain final');
+
+const aftermath=source.indexOf("AFTERMATH_FIXED_FLOW");
+const combat=source.indexOf("ACTIVE_COMBAT_FIXED_FLOW");
+const momentum=source.indexOf('const momentumDue=momentumPressure');
+assert.ok(aftermath>=0&&aftermath<momentum,'aftermath fixed-flow guard must precede momentum random selection');
+assert.ok(combat>=0&&combat<momentum,'active-combat fixed-flow guard must precede momentum random selection');
 
 console.log('PASS Context Router authority-tail reservation (9k budget preserves director + schedule payload)');
