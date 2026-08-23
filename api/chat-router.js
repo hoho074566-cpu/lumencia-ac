@@ -149,7 +149,7 @@ function moodFromExpression(expression='') {
 function relationChangeFor(turn,key){return array(turn?.state_delta?.relationship_changes).find(x=>String(x?.npc_key||x?.key||'')===key)||null;}
 function npcStateUpdateFor(turn,key){return array(turn?.state_delta?.npc_state_updates).find(x=>String(x?.npc_key||x?.key||'')===key)||null;}
 function emotionFor(turn,key){return array(turn?.emotion_updates).find(x=>String(x?.npc_key||x?.key||x?.speaker_key||'')===key)||null;}
-function bounded(value,min,max,fallback){const n=Number(value);return Number.isFinite(n)?Math.max(min,Math.min(max,n)):fallback;}
+function bounded(value,min,max,fallback){if(value==null||value==='')return fallback;const n=Number(value);return Number.isFinite(n)?Math.max(min,Math.min(max,n)):fallback;}
 function uniqText(rows,limit=4){return [...new Set(array(rows).map(x=>clampText(x,140).trim()).filter(Boolean))].slice(-limit);}
 function tinyHash(text=''){let h=0x811c9dc5;for(const ch of String(text)){h^=ch.charCodeAt(0);h=Math.imul(h,0x01000193);}return(h>>>0).toString(16).padStart(8,'0');}
 function containsName(text,value){const a=String(text||'').toLowerCase(),b=String(value||'').trim().toLowerCase();return b.length>=2&&a.includes(b);}
@@ -330,149 +330,57 @@ function localSceneRuntime(incoming,turn,directorTelemetry=null){
   const pauseOnNull=Boolean(scheduledStillActive||unscheduledStillActive);
   const progressState=mergeRoutedEventProgressState(priorProgress,previous.eventProgressByInstance,turn?.event_progress,{dueEventIds:dueIds,directorOccurrenceId:directorOccurrence,startedOccurrenceId:startedOccurrence,startedResumeKey:startedEvidence,pauseOnNull});
   return {
-    scene_key:clampText(turn?.scene_title||previous.scene_key||'scene',120),
-    participants,
-    objects:array(previous.objects).slice(0,10),
-    positions:Object.fromEntries(Object.entries(object(previous.positions)).slice(0,10)),
-    ongoing_topic:clampText(turn?.scene_summary||previous.ongoing_topic||'',280),
-    unresolved_question:hasDecision?clampText(choices.join(' / '),300):'',
-    immediate_pressure:clampText(previous.immediate_pressure||'',220),
-    tone:clampText(turn?.importance||previous.tone||'routine',80),
-    remaining_beats:hasDecision?[]:array(previous.remaining_beats).slice(0,1),
-    ...progressState,
+    scene_key:clampText(turn?.scene_title||previous.scene_key||'scene',120),participants,objects:array(previous.objects).slice(0,10),
+    positions:Object.fromEntries(Object.entries(object(previous.positions)).slice(0,10)),ongoing_topic:clampText(turn?.scene_summary||previous.ongoing_topic||'',280),
+    unresolved_question:hasDecision?clampText(choices.join(' / '),300):'',immediate_pressure:clampText(previous.immediate_pressure||'',220),
+    tone:clampText(turn?.importance||previous.tone||'routine',80),remaining_beats:hasDecision?[]:array(previous.remaining_beats).slice(0,1),...progressState,
   };
 }
 function clone(value){try{return structuredClone(value);}catch{return JSON.parse(JSON.stringify(value??null));}}
 function consumeContinuationRuntime(incoming,turn){const prev=clone(object(incoming.saveState?.sceneRuntime));prev.remaining_beats=array(prev.remaining_beats).slice(1);Object.assign(prev,mergeContinuationEventProgressState(prev.eventProgress,prev.eventProgressByInstance,turn?.event_progress));return{npc_updates:{},scene_runtime:prev};}
 
 function localBackgroundDigest(incoming,turn,participants){
-  const prior=String(incoming.saveState?.backgroundDigest||'').slice(-1100);
-  if(incoming.backgroundSim===false)return prior;
-  const turnNo=Number(incoming.saveState?.turnNumber||0); const advance=Number(turn?.state_delta?.advance_minutes||0);
-  if(turnNo%4!==0&&advance<30)return prior;
-  const schedule=object(incoming.saveState?.scheduleContext?.npc_schedule); const present=new Set(array(participants).map(String)); const rows=[];
-  for(const [key,info] of Object.entries(schedule)){
-    if(present.has(key)||!info||typeof info!=='object')continue;
-    const commitment=clampText(info.commitment||info.title||'',100); const area=clampText(info.area||info.location||'',80);
-    if(!commitment&&!area)continue; rows.push(`${key}: ${commitment}${area?` @ ${area}`:''}`); if(rows.length>=2)break;
-  }
-  if(!rows.length)return prior;
-  const stamp=`${clampText(incoming.saveState?.world?.date||'',20)} ${clampText(incoming.saveState?.world?.time||'',10)}`.trim();
-  return `${prior}${prior?'\n':''}[${stamp}] ${rows.join(' / ')}`.slice(-1800);
+  const prior=String(incoming.saveState?.backgroundDigest||'').slice(-1100);if(incoming.backgroundSim===false)return prior;
+  const turnNo=Number(incoming.saveState?.turnNumber||0),advance=Number(turn?.state_delta?.advance_minutes||0);if(turnNo%4!==0&&advance<30)return prior;
+  const schedule=object(incoming.saveState?.scheduleContext?.npc_schedule),present=new Set(array(participants).map(String)),rows=[];
+  for(const [key,info] of Object.entries(schedule)){if(present.has(key)||!info||typeof info!=='object')continue;const commitment=clampText(info.commitment||info.title||'',100),area=clampText(info.area||info.location||'',80);if(!commitment&&!area)continue;rows.push(`${key}: ${commitment}${area?` @ ${area}`:''}`);if(rows.length>=2)break;}
+  if(!rows.length)return prior;const stamp=`${clampText(incoming.saveState?.world?.date||'',20)} ${clampText(incoming.saveState?.world?.time||'',10)}`.trim();return`${prior}${prior?'\n':''}[${stamp}] ${rows.join(' / ')}`.slice(-1800);
 }
 
 function textBag(item,saveState){const inner=object(saveState?.npcInnerStates)?.[item?.speaker_key]||{};return[item?.text,item?.emotion_reason,item?.emotion_transition,inner?.mood,inner?.social_stance].filter(Boolean).join(' ');}
 function classifyExtendedExpression(item,saveState){
-  if(!item||item.kind!=='dialogue')return null;
-  const base=String(item.display_expression||item.detected_expression||item.expression||'default').toLowerCase(); const bag=textBag(item,saveState); const has=re=>re.test(bag);
-  const strongAngry=base==='angry'&&has(/격노|분노|노기|고함|으르렁|죽여|닥쳐|이를\s*악물/i); const strongShock=base==='shock'&&has(/경악|충격|소스라|화들짝|눈을\s*크게|믿을\s*수/i);
+  if(!item||item.kind!=='dialogue')return null;const base=String(item.display_expression||item.detected_expression||item.expression||'default').toLowerCase(),bag=textBag(item,saveState),has=re=>re.test(bag);
+  const strongAngry=base==='angry'&&has(/격노|분노|노기|고함|으르렁|죽여|닥쳐|이를\s*악물/i),strongShock=base==='shock'&&has(/경악|충격|소스라|화들짝|눈을\s*크게|믿을\s*수/i);
   if(has(/ㅋㅋ|하하|하핫|후후|후훗|키득|깔깔|풉|푸핫|웃음을?\s*(?:터뜨|참지\s*못)|폭소/i))return'laugh';
   if(has(/비웃|우쭐|의기양양|자신만만|능글|얄밉게\s*웃|씨익|깔보|도발적\s*미소|승리감|잘난\s*척/i))return'smug';
   if(!strongShock&&has(/당황|허둥|말을\s*더듬|말문이\s*막|얼굴.{0,8}(?:붉|빨개)|귀.{0,8}(?:붉|빨개)|시선을?\s*피하|쩔쩔/i))return'flustered';
   if(!strongAngry&&has(/짜증|성가|귀찮|신경질|못마땅|질린|진절머리|한숨|미간을\s*찌푸/i))return'annoyed';
   if(has(/걱정|불안|초조|염려|안절부절|조마조마|근심|신경\s*쓰|괜찮(?:아|냐|은지)/i))return'worried';
-  if(!strongShock&&has(/혼란|의아|갸웃|어리둥절|이해(?:가|를)\s*(?:안|못)|무슨\s*뜻|영문을\s*모르|당혹/i))return'confused';
-  return base;
+  if(!strongShock&&has(/혼란|의아|갸웃|어리둥절|이해(?:가|를)\s*(?:안|못)|무슨\s*뜻|영문을\s*모르|당혹/i))return'confused';return base;
 }
 function applyExtendedExpressions(turn,saveState){if(!turn||!Array.isArray(turn.scene))return turn;turn.scene=turn.scene.map(item=>item?.kind==='dialogue'?{...item,display_expression:classifyExtendedExpression(item,saveState),stable_extended_expression:true}:item);return turn;}
-
 function isCombatLike(action=''){return /(전투|공격|베어|베고|찌르|쏘|회피|막아|막고|패링|결투|대련|검기|오러|마법을?\s*쏘|주먹|발차기|기습|제압|죽이|살해)/i.test(String(action));}
-
-function makeCaptureResponse(){
-  return {
-    statusCode:200,payload:null,headers:{},
-    status(code){this.statusCode=Number(code)||200;return this;},
-    json(payload){this.payload=payload;return this;},
-    setHeader(name,value){this.headers[String(name).toLowerCase()]=value;return this;},
-    getHeader(name){return this.headers[String(name).toLowerCase()];},
-  };
-}
-
-function setAdapterRoute(data,mode,pipeline,telemetry){
-  data.route={
-    ...(data.route||{}),input_mode:mode,adapter_version:ADAPTER_VERSION,app_version:APP_VERSION,
-    core_server_version:data.server_version||data.route?.server_version||'0.5.6',
-    quality_pipeline:pipeline?.pipeline||'legacy',qa_result:pipeline?.qa_result||'SKIP',rewrite_applied:false,
-    context_router:telemetry||null,
-  };
-  data.server_version=ADAPTER_VERSION;
-  return data;
-}
-
-async function runCore(req,incoming,mode){
-  const capture=makeCaptureResponse();
-  const routedReq={method:req.method,headers:req.headers||{},body:incoming};
-  const ctx={enabled:true,incoming,mode,telemetry:null};
-  await ROUTER_CONTEXT.run(ctx,()=>coreHandler(routedReq,capture));
-  return {status:capture.statusCode,data:capture.payload||{},telemetry:ctx.telemetry};
-}
+function makeCaptureResponse(){return{statusCode:200,payload:null,headers:{},status(code){this.statusCode=Number(code)||200;return this;},json(payload){this.payload=payload;return this;},setHeader(name,value){this.headers[String(name).toLowerCase()]=value;return this;},getHeader(name){return this.headers[String(name).toLowerCase()];}};}
+function setAdapterRoute(data,mode,pipeline,telemetry){data.route={...(data.route||{}),input_mode:mode,adapter_version:ADAPTER_VERSION,app_version:APP_VERSION,core_server_version:data.server_version||data.route?.server_version||'0.5.6',quality_pipeline:pipeline?.pipeline||'legacy',qa_result:pipeline?.qa_result||'SKIP',rewrite_applied:false,context_router:telemetry||null};data.server_version=ADAPTER_VERSION;return data;}
+async function runCore(req,incoming,mode){const capture=makeCaptureResponse();const routedReq={method:req.method,headers:req.headers||{},body:incoming};const ctx={enabled:true,incoming,mode,telemetry:null};await ROUTER_CONTEXT.run(ctx,()=>coreHandler(routedReq,capture));return{status:capture.statusCode,data:capture.payload||{},telemetry:ctx.telemetry};}
 
 export default async function handler(req,res){
   if(req.method!=='POST'){res.setHeader('Allow','POST');return res.status(405).json({error:'POST only',server_version:ADAPTER_VERSION});}
   try{
-    const incoming0=req.body&&typeof req.body==='object'?req.body:{};
-    const mode=SUPPORTED_MODES.has(incoming0.inputMode)?incoming0.inputMode:'game';
-    const incoming={...incoming0};
+    const incoming0=req.body&&typeof req.body==='object'?req.body:{},mode=SUPPORTED_MODES.has(incoming0.inputMode)?incoming0.inputMode:'game',incoming={...incoming0};
     const resumableIds=mode==='game'?[...scheduledIdsDueByTurnEnd(incoming0.saveState,0),...unscheduledPausedIdsForResume(incoming0.saveState?.sceneRuntime,incoming0.action,incoming0.saveState?.activeEvents)]:[];
     incoming.saveState={...object(incoming0.saveState),sceneRuntime:mode==='game'?promotePausedEventProgress(incoming0.saveState?.sceneRuntime,resumableIds):object(incoming0.saveState?.sceneRuntime)};
-
-    if(mode==='meta'){
-      incoming.inputMode='meta';
-      incoming.action=String(incoming0.action||'');
-    }else if(mode==='continue'){
-      incoming.inputMode='game'; incoming.action=continueAction(incoming); incoming.forceTerra=false;
-      incoming.rollingSummary=String(incoming0.rollingSummary||'').slice(-3600);
-    }else if(mode==='auto'){
-      incoming.inputMode='game'; incoming.action=AUTO_DIRECTIVE;
-    }else{
-      incoming.inputMode='game'; incoming.action=String(incoming0.action||'');
-    }
-
-    if(isCombatLike(incoming.action)&&incoming.reasoningEffort==='auto') incoming.reasoningEffort='medium';
-
-    const result=await runCore(req,incoming,mode);
-    if(result.status<200||result.status>=300) return res.status(result.status).json({...result.data,server_version:ADAPTER_VERSION,adapter_version:ADAPTER_VERSION});
-    const data=result.data;
-    if(!data?.turn)throw new Error('코어 API 응답에 turn이 없습니다.');
-
-    let telemetry=result.telemetry||{routerVersion:routerVersion(),enabled:false,profile:'unknown'};
-    telemetry={...telemetry,actual_input_tokens:Number(data?.usage?.input_tokens||0),actual_output_tokens:Number(data?.usage?.output_tokens||0)};
-    if(Number(telemetry.soft_max_tokens||0)>0) telemetry.budget_status=telemetry.actual_input_tokens<=telemetry.soft_max_tokens?'OK':'OVER';
-
-    if(mode==='continue'){
-      lockContinueTurn(data.turn); applyExtendedExpressions(data.turn,incoming0.saveState||{});
-      data.runtime_state=consumeContinuationRuntime(incoming,data.turn);
-      data.background_digest=String(incoming.saveState?.backgroundDigest||'').slice(-1800);
-      const pipeline={pipeline:'continue-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true};
-      data.pipeline=pipeline; setAdapterRoute(data,mode,pipeline,telemetry); return res.status(200).json(data);
-    }
-
-    if(mode==='meta'){
-      const pipeline={pipeline:'meta-full-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true};
-      data.pipeline=pipeline; setAdapterRoute(data,mode,pipeline,telemetry); return res.status(200).json(data);
-    }
-
-    applyExtendedExpressions(data.turn,incoming0.saveState||{});
-    data.turn.choices=freshChoices(incoming.action,data.turn);
-    const sceneRuntime=localSceneRuntime({...incoming0,saveState:incoming.saveState},data.turn,telemetry?.event_director_v2);
-    const npcUpdates=incoming0.qualityPipeline===false?{}:localNpcUpdates(incoming0,data.turn);
-    data.runtime_state={npc_updates:npcUpdates,scene_runtime:sceneRuntime};
-    data.background_digest=localBackgroundDigest(incoming0,data.turn,sceneRuntime.participants);
-
-    const pipeline={
-      pipeline:incoming0.qualityPipeline===false?'single-writer-stable-v156':'single-pass-q3-stable-v156',
-      stages:1,qa_result:incoming0.qualityPipeline===false?'SKIP':'LOCAL_GUARD',rewrite_applied:false,
-      background_sim:false,background_local:incoming0.backgroundSim!==false,combat_engine:isCombatLike(incoming.action),runtime_synthesized:true,
-      continuation_beats:array(sceneRuntime.remaining_beats).length,context_router:telemetry,
-      event_director_v2:telemetry?.event_director_v2||null,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true,
-      note:'V1.5.6 keeps one core model call and adds evidence-gated NPC Goal V2 progression/lifecycle/history while preserving Goal-aware Event Director V2.1 guards and Relationship Reason V1.',
-    };
-    data.pipeline=pipeline; setAdapterRoute(data,mode,pipeline,telemetry);
-    return res.status(200).json(data);
-  }catch(error){
-    console.error('[V1.5.6]',error);
-    return res.status(Number.isInteger(error?.status)?error.status:500).json({error:error?.message||String(error),code:error?.code||'STABLE_ROUTER_V156_ERROR',server_version:ADAPTER_VERSION});
-  }
+    if(mode==='meta'){incoming.inputMode='meta';incoming.action=String(incoming0.action||'');}else if(mode==='continue'){incoming.inputMode='game';incoming.action=continueAction(incoming);incoming.forceTerra=false;incoming.rollingSummary=String(incoming0.rollingSummary||'').slice(-3600);}else if(mode==='auto'){incoming.inputMode='game';incoming.action=AUTO_DIRECTIVE;}else{incoming.inputMode='game';incoming.action=String(incoming0.action||'');}
+    if(isCombatLike(incoming.action)&&incoming.reasoningEffort==='auto')incoming.reasoningEffort='medium';
+    const result=await runCore(req,incoming,mode);if(result.status<200||result.status>=300)return res.status(result.status).json({...result.data,server_version:ADAPTER_VERSION,adapter_version:ADAPTER_VERSION});
+    const data=result.data;if(!data?.turn)throw new Error('코어 API 응답에 turn이 없습니다.');
+    let telemetry=result.telemetry||{routerVersion:routerVersion(),enabled:false,profile:'unknown'};telemetry={...telemetry,actual_input_tokens:Number(data?.usage?.input_tokens||0),actual_output_tokens:Number(data?.usage?.output_tokens||0)};if(Number(telemetry.soft_max_tokens||0)>0)telemetry.budget_status=telemetry.actual_input_tokens<=telemetry.soft_max_tokens?'OK':'OVER';
+    if(mode==='continue'){lockContinueTurn(data.turn);applyExtendedExpressions(data.turn,incoming0.saveState||{});data.runtime_state=consumeContinuationRuntime(incoming,data.turn);data.background_digest=String(incoming.saveState?.backgroundDigest||'').slice(-1800);const pipeline={pipeline:'continue-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true};data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);}
+    if(mode==='meta'){const pipeline={pipeline:'meta-full-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true};data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);}
+    applyExtendedExpressions(data.turn,incoming0.saveState||{});data.turn.choices=freshChoices(incoming.action,data.turn);const sceneRuntime=localSceneRuntime({...incoming0,saveState:incoming.saveState},data.turn,telemetry?.event_director_v2);const npcUpdates=incoming0.qualityPipeline===false?{}:localNpcUpdates(incoming0,data.turn);data.runtime_state={npc_updates:npcUpdates,scene_runtime:sceneRuntime};data.background_digest=localBackgroundDigest(incoming0,data.turn,sceneRuntime.participants);
+    const pipeline={pipeline:incoming0.qualityPipeline===false?'single-writer-stable-v156':'single-pass-q3-stable-v156',stages:1,qa_result:incoming0.qualityPipeline===false?'SKIP':'LOCAL_GUARD',rewrite_applied:false,background_sim:false,background_local:incoming0.backgroundSim!==false,combat_engine:isCombatLike(incoming.action),runtime_synthesized:true,continuation_beats:array(sceneRuntime.remaining_beats).length,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true,note:'V1.5.6 keeps one core model call and adds evidence-gated NPC Goal V2 progression/lifecycle/history while preserving Goal-aware Event Director V2.1 guards and Relationship Reason V1.'};
+    data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);
+  }catch(error){console.error('[V1.5.6]',error);return res.status(Number.isInteger(error?.status)?error.status:500).json({error:error?.message||String(error),code:error?.code||'STABLE_ROUTER_V156_ERROR',server_version:ADAPTER_VERSION});}
 }
 
 export { goalRuntimeFor, patchGoalV2StructuredFormat };
