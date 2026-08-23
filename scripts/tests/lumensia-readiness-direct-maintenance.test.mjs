@@ -4,9 +4,9 @@ import test from 'node:test';
 
 const workflow = readFileSync(new URL('../../.github/workflows/lumensia-merge-readiness.yml', import.meta.url), 'utf8');
 
-test('Merge Readiness directly follows a successful single-PR evaluation with trusted maintenance', () => {
-  assert.match(workflow, /maintain-after-pr:\s*\n\s*needs: evaluate-pr/);
-  assert.match(workflow, /if: always\(\) && needs\.evaluate-pr\.result == 'success'/);
+test('Merge Readiness follows either successful PR or scan evaluation with trusted maintenance', () => {
+  assert.match(workflow, /maintain-after-pr:\s*\n\s*needs: \[evaluate-pr, evaluate-scan\]/);
+  assert.match(workflow, /if: always\(\) && \(needs\.evaluate-pr\.result == 'success' \|\| needs\.evaluate-scan\.result == 'success'\)/);
   assert.match(workflow, /environment: lumensia-trusted-auto-pr/);
   assert.match(workflow, /permissions:\s*\n\s*contents: write\s*\n\s*checks: read\s*\n\s*statuses: read/);
   assert.match(workflow, /LUMENSIA_AUTO_MERGE_TOKEN: \$\{\{ github\.token \}\}/);
