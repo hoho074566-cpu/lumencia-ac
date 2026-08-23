@@ -55,6 +55,29 @@ jobs:
           set -euo pipefail
           awk 'BEGIN{f=0} /python3 - <<'"'"'PY'"'"'/{f=1;next} f && /^          PY$/{exit} f{sub(/^          /,"");print}' .github/workflows/scene-momentum-recovery-patch-once.yml > /tmp/scene-momentum-patch.py
           test -s /tmp/scene-momentum-patch.py
+
+          # Normalize buildInput with small exact substitutions so the older one-shot
+          # script sees its intended final marker instead of depending on one huge block.
+          python3 - <<'PY'
+          from pathlib import Path
+          path=Path('api/lib/context-router.js')
+          text=path.read_text(encoding='utf-8')
+          if 'momentumDirective=clampText(buildSceneMomentumDirective' not in text:
+              old=",action=String(incoming.action||''),cg=array(incoming.availableCgIds).slice(0,60).join(', ');"
+              new=",action=String(incoming.action||''),cg=array(incoming.availableCgIds).slice(0,60).join(', '),momentumDirective=clampText(buildSceneMomentumDirective({action,saveState:incoming.saveState||{}}),2800);"
+              if text.count(old)!=1: raise SystemExit(f'buildInput declaration marker count={text.count(old)}')
+              text=text.replace(old,new,1)
+              old2="===== CURRENT NPC/SCENE RUNTIME =====\\n${clampText(runtime,1800)}\\n\\n===== AVAILABLE_CG_IDS ====="
+              new2="===== CURRENT NPC/SCENE RUNTIME =====\\n${clampText(runtime,1800)}\\n\\n===== SCENE MOMENTUM HF1 =====\\n${momentumDirective}\\n\\n===== AVAILABLE_CG_IDS ====="
+              if text.count(old2)!=1: raise SystemExit(f'buildInput context marker count={text.count(old2)}')
+              text=text.replace(old2,new2,1)
+              old3="위 행동까지만 처리하고 PC의 다음 행동을 정하지 마라. ROUTINE은 빠르게 압축하고 주요 NPC 대사에는 감정 태그/강도/근거를 일치시켜라."
+              new3="USER ACTION이 이미 선언한 의미적 목표는 결정 가치 없는 중간 단계를 압축해 완료하되, 그 이후의 새로운 PC 선택·대사·감정은 만들지 마라. 플레이어 판단이 실제로 필요한 첫 지점에서 멈춰라. ROUTINE은 빠르고 변화 중심으로 진행하고 주요 NPC 대사에는 감정 태그/강도/근거를 일치시켜라."
+              if text.count(old3)!=1: raise SystemExit(f'action block marker count={text.count(old3)}')
+              text=text.replace(old3,new3,1)
+              path.write_text(text,encoding='utf-8')
+          PY
+
           python3 /tmp/scene-momentum-patch.py
 
       - name: Validate focused Scene Momentum files
