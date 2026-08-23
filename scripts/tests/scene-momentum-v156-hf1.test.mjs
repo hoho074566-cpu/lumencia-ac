@@ -25,6 +25,13 @@ const outdoorExitDirective = buildSceneMomentumDirective({ action:'밖으로 간
 assert.doesNotMatch(outdoorExitDirective,/현재 방\/생활공간 → 복도/,'outdoor exit must not fabricate an indoor route');
 assert.match(outdoorExitDirective,/이미 야외\/외부/);
 
+// Negated/unresolved exterior movement must not be auto-executed.
+assert.notEqual(classifySceneIntent('밖으로 나가지 않는다.',{location:'A동 개인실'}).kind,'exit-exterior','negated exterior movement must not compress into an exit');
+assert.notEqual(classifySceneIntent('밖에 안 나간다.',{location:'A동 개인실'}).kind,'exit-exterior','안 나간다 must not compress into an exit');
+const exteriorQuestion=classifySceneIntent('밖으로 나갈까?',{location:'A동 개인실'});
+assert.equal(exteriorQuestion.kind,'decision-sensitive','unresolved exterior deliberation must preserve player choice');
+assert.equal(exteriorQuestion.deltaTarget,0);
+
 // Travel must support common Korean particles and isolate the actual destination.
 const libraryTravel = classifySceneIntent('도서관에 간다.', { location:'중앙광장' });
 assert.equal(libraryTravel.kind,'travel');
@@ -119,6 +126,14 @@ const movedNpcStateTurn={...staticTurn,state_delta:{...staticTurn.state_delta,np
 const movedNpcStateDelta=deriveSceneDelta({saveState:activeGoalSave,previousRuntime:baseSave.sceneRuntime,turn:movedNpcStateTurn,nextParticipants:[],action:'본다'});
 assert.equal(movedNpcStateDelta.flags.npcStateChanged,true,'real NPC location/status mutation must count');
 
+// Minor named NPC dialogue is world action even when it has no registered speaker_key.
+const minorNpcTurn={...staticTurn,scene:[{kind:'dialogue',speaker_key:null,speaker_name:'기숙사 직원',text:'잠깐, 거기 학생.'}]};
+const minorNpcDelta=deriveSceneDelta({saveState:baseSave,previousRuntime:baseSave.sceneRuntime,turn:minorNpcTurn,nextParticipants:[],action:'본다'});
+assert.equal(minorNpcDelta.flags.npcAction,true,'named minor-NPC dialogue must count as NPC initiative/action');
+const narrationOnlyTurn={...staticTurn,scene:[{kind:'narration',speaker_key:null,speaker_name:'기숙사 직원',text:'복도는 조용했다.'}]};
+const narrationOnlyDelta=deriveSceneDelta({saveState:baseSave,previousRuntime:baseSave.sceneRuntime,turn:narrationOnlyTurn,nextParticipants:[],action:'본다'});
+assert.equal(narrationOnlyDelta.flags.npcAction,false,'narration metadata must not be mistaken for NPC dialogue/action');
+
 // Every persisted canonical state-delta family contributes to real progress.
 const deltaFamilies=[
   ['resourceChanged',{fatigue_delta:2}],
@@ -183,4 +198,4 @@ assert.match(genericDirective,/STOP은 전투 돌입\/되돌리기 어려운 위
 // Internal naming leak guard.
 assert.match(genericDirective,/내부 명칭 "PC"나 자리표시자 "Aaa"를 주어로 출력하지 않는다/);
 
-console.log('PASS Scene Momentum HF1 acceptance A-F + committed-action/negation/full-delta edge cases');
+console.log('PASS Scene Momentum HF1 acceptance A-F + intent/full-delta/minor-NPC edge cases');
