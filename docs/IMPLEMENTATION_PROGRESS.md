@@ -1,181 +1,150 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Scene Momentum Recovery HF1 — all known implementation P0/P1 findings fixed through current code HEAD; final docs-updated exact-HEAD Safety/Vercel/Codex review + manual merge gate pending. **Do not merge yet.**
+Scene Momentum Recovery HF1 — implementation is largely complete, but **final exact-head Codex review found one new current P1**. PR #33 is **NOT mergeable by policy yet** even though GitHub reports `mergeable=true`, Safety and Vercel are green. The next session must continue from this blocker, not restart HF1 diagnosis.
 
-## Current GitHub State
+## Current GitHub State at Handover
 - Repo: `hoho074566-cpu/lumencia-ac`
 - Main: `f6122be5f65a7b0b79555b83c9660eb9ed84cb6c` (`chore: restore standard Lumensia safety workflow`)
 - Working branch: `codex/scene-momentum-recovery-hf1`
 - PR: #33 `Restore Scene Momentum and narrative compression in V1.5.6`
-- Protected core/runtime PR: manual merge only.
-- Router authority fix: `1e23cec5dc4b19ddce2a089f01b8a6e393b45f71`
-- Initial time-floor fix: `b8c5a8bf3556566e85a532e4fe92c09f8423add8`
-- Momentum correctness fix: `e5ac6c50bcfb7046b7754503df8c394817a4ab12`
-- Full-authoritative-schedule + timed-predicate fix: `7e953b5c6158a7bb51e6c5d80b5da0bbdc024f8a`
-- Latest code/test commit before this docs update: `f5a64452d1dcd671cafa30ab033bb05e13308e2b` (`fix: guard question-form compressed intents`)
-- This docs update will create a newer docs-only exact HEAD; all final gates/reviews must bind to that resulting SHA.
+- Exact PR HEAD before this handover-doc commit: `8ca24ba0d4df31807bf89c1d066317b0329cf18e`
+- Latest code/test HEAD: `f5a64452d1dcd671cafa30ab033bb05e13308e2b`
+- GitHub PR state at `8ca24ba...`: open, draft=false, `mergeable=true`
+- Compare `main...8ca24ba...`: ahead 41 / behind 0
+- Compare `base_commit.sha`: `f6122be5...` = current main
+- Compare `merge_base_commit.sha`: `f6122be5...` = current main
+- Hosted Safety on `8ca24ba...`: **Lumensia PR Safety Gate #261 PASS**
+- Hosted Vercel on `8ca24ba...`: **PASS / Ready**
+- Protected core/runtime PR: **manual merge only**.
 
-## Completed
-### Merged foundation
-- PLAYER ACTION COMMIT.
-- CONTINUE reliability / monotonic Event Beat progression.
-- Scene Continuity.
-- Merge Readiness / Discord + exact-current-HEAD/current-base safety architecture.
-- Guarded low-risk Auto-PR/Auto-Merge V1.2 smoke proof; protected core remains manual merge only.
-- V1.5.5 NPC Motivation + Relationship Reason V1 (PR #30 merged).
-- V1.5.6 NPC Goal V2 (PR #31 merged).
-- characters-v2 32-character / 13-state refresh (PR #32 merged).
+## Completed Foundation
+Already merged before PR #33:
+- PLAYER ACTION COMMIT
+- CONTINUE reliability + same-moment hard freeze
+- Scene Continuity
+- monotonic Event Beat / CONTINUE no replay
+- Merge Readiness / Discord / exact-current-HEAD + current-base safety architecture
+- guarded LOW-RISK Auto-PR/Auto-Merge smoke proof
+- PR #30: V1.5.5 NPC Motivation + Relationship Reason V1
+- PR #31: V1.5.6 NPC Goal V2
+- PR #32: characters-v2 refresh
 
-### Scene Momentum Recovery HF1 implemented on PR #33
-- Deterministic `lib/scene-momentum.js`; no additional model calls.
-- Semantic intent completion and decision-free intermediate-step compression.
-- State Delta scoring + 3-turn stall/momentum history.
-- Scene Change > repeated Scene Description guidance.
-- NPC initiative / goal-aware world action without stealing PC agency.
-- Event Director momentum pressure while preserving direct-focus/callback/cooldown/location/schedule/present-participant/NO_EVENT guards.
-- Explicit meaningful STOP policy; trivial doors/corridors/stairs/path traversal do not require repeated prompts.
-- Pause/archive event null vs actual completion semantics.
-- Named unregistered minor-NPC dialogue counts as NPC action; narration does not.
-- Exactly one canonical `coreHandler()` call invariant retained.
+## Scene Momentum Recovery HF1 — Implemented
+Core contract:
 
-### Router authority P1 closure — `1e23cec5...`
-Applied the already-tested patch preserved in PR #33 comment `#5386396220`:
-- preserve schedule event `note`;
-- preserve NPC schedule `activity` / `commitment` / `confidence` through all compaction tiers;
-- reserve bounded minimum authoritative SAVE_STATE under ~5000-char USER ACTION pressure;
-- routine input stays <=9000 while SAVE_STATE + GM Director + Event Director V2.1 + Schedule + final USER ACTION survive;
-- `AFTERMATH_FIXED_FLOW` and `ACTIVE_COMBAT_FIXED_FLOW` precede momentum random-event selection.
+`User Action -> semantic intent -> compress decision-free steps -> world/NPC/event progression -> real State Delta -> consequence -> narration -> meaningful player decision -> STOP`
 
-Hosted:
-- Safety #255 PASS.
-- Vercel PASS.
+Implemented on PR #33:
+- deterministic `lib/scene-momentum.js`, no extra model call;
+- semantic action completion / trivial door-corridor-stair-path compression;
+- State Delta scoring + three-turn stall/momentum history;
+- Scene Change over repeated Scene Description;
+- NPC initiative and goal-aware world action without stealing PC agency;
+- Event Director momentum pressure with direct-focus/callback/cooldown/location/schedule/present-participant/NO_EVENT guards;
+- AFTERMATH and active-combat fixed flow;
+- meaningful STOP policy;
+- paused event null vs true completion handling;
+- named unregistered NPC dialogue counts as action; narration alone does not;
+- exactly one canonical `coreHandler()` / model call invariant preserved.
 
-### Deterministic local time-floor closure — `b8c5a8bf...`
-- forced floor stops at the nearest `scheduleContext.upcoming` boundary;
-- already-due schedule suppresses forced floor;
-- forced floor capped at canonical one-turn maximum 1440 minutes;
+## Important Fix Commits
+### Router authority P1 closure — `1e23cec5dc4b19ddce2a089f01b8a6e393b45f71`
+- schedule event `note` preserved;
+- NPC schedule `activity` / `commitment` / `confidence` preserved through compaction;
+- bounded minimum authoritative SAVE_STATE reserved under ~5000-char action pressure;
+- routine input <=9000 while SAVE_STATE + GM Director + Event Director V2.1 + Schedule + final USER ACTION survive;
+- AFTERMATH / active combat remain fixed flow before momentum random selection.
+- Safety #255 PASS / Vercel PASS.
+
+### Initial time-floor closure — `b8c5a8bf3556566e85a532e4fe92c09f8423add8`
+- local forced time floor stops at routed schedule boundary;
+- already-due schedule suppresses local floor;
+- local floor capped at 1440 minutes;
 - positive model-produced `advance_minutes` is never reduced;
-- permanent `scripts/tests/scene-momentum-time-floor.test.mjs`.
+- permanent `scene-momentum-time-floor.test.mjs`.
+- Safety #256 PASS / Vercel PASS.
 
-Hosted:
-- Safety #256 PASS.
-- Vercel PASS.
+### Momentum correctness — `e5ac6c50bcfb7046b7754503df8c394817a4ab12`
+- compound `1시간 30분` rest/wait = 90 minutes;
+- numeric zero growth rows do not fake progress;
+- one NPC state mutation does not double-count as NPC action;
+- fresh meaningful choices satisfy STOP and do not build false stall;
+- identical echoed `pc_status` is not progress;
+- CONTINUE receives `CONTINUE HARD FREEZE` instead of Scene Stall/world-change pressure;
+- permanent `scene-momentum-correctness.test.mjs`.
 
-### Momentum correctness closure — `e5ac6c50...`
-- compound `1시간 30분 쉰다/기다린다` supported as 90 minutes;
-- growth rows with numeric delta `0` do not fake progress;
-- one `npc_state_updates` mutation counts once and does not also fabricate `npcAction`;
-- fresh meaningful choices satisfy STOP policy and do not build false Scene Stall pressure;
-- identical echoed `pc_status` is not progress; real change remains progress;
-- CONTINUE receives explicit `CONTINUE HARD FREEZE` Scene Momentum replacement with no state-change/stall pressure;
-- permanent `scripts/tests/scene-momentum-correctness.test.mjs`.
+### Full authoritative schedule + timed-predicate fix — `7e953b5c6158a7bb51e6c5d80b5da0bbdc024f8a`
+- `nextScheduleBoundaryMinutes()` checks full authoritative `saveState.scheduledEvents` plus routed upcoming schedule;
+- completed/cancelled schedule rows ignored;
+- overdue unfinished schedule = boundary 0;
+- later same-day and next-day schedule boundary caps local forced time;
+- historical phrase `10분 전에 본 게시판을 확인한다` no longer becomes an explicit action duration;
+- explicit duration parsing restricted to actual wait/rest or timed deliberation;
+- Safety #259 PASS / Vercel PASS.
 
-### Fresh direct-review P1/P2 closure — `7e953b5c...`
-Fresh exact-head review discovered two additional correctness issues after the earlier docs snapshot:
-1. **P1 full schedule boundary:** `scheduleContext.upcoming` only contains same-day events within ~4 hours, so a long rest could cross a later authoritative `scheduledEvents` entry.
-2. **P2 historical duration:** `10분 전에 본 게시판을 확인한다` could incorrectly parse `10분` as the committed action duration.
+### Question-form compressed-action guard — `f5a64452d1dcd671cafa30ab033bb05e13308e2b`
+Question-form inputs that look like travel/observe/explore/wait/rest/exterior actions are `decision-sensitive`, `compression=false`, `minAdvanceMinutes=0`.
+Permanent cases include:
+- `도서관에 간다?`
+- `주변을 살핀다?`
+- `주변을 돌아다닌다?`
+- `10분 기다린다?`
+- `쉰다?`
 
-Fixed:
-- `api/chat-router.js::nextScheduleBoundaryMinutes()` now examines authoritative `saveState.scheduledEvents` plus routed `scheduleContext.upcoming` using absolute date/time minutes;
-- completed/cancelled schedule rows are ignored;
-- overdue unfinished authoritative schedule yields boundary 0;
-- later same-day and next-day schedule boundaries cap locally forced elapsed time;
-- positive model-produced advance is still never reduced;
-- explicit duration parsing is now restricted to actual committed wait/rest predicates or their timed deliberation forms;
-- `10분 전에 본 게시판을 확인한다` remains `observe` with `explicitDurationMinutes:null`;
-- permanent tests expanded for full schedule, next-day schedule, terminal schedule rows, overdue schedule and historical-duration observation.
+Safety #260 PASS / Vercel PASS.
 
-Hosted on `7e953b5c...`:
-- Safety #259 PASS.
-- Vercel PASS.
+## Final Docs Head Validation — `8ca24ba0d4df31807bf89c1d066317b0329cf18e`
+Before the latest Codex finding:
+- Safety #261: PASS
+- Vercel: PASS
+- compare: ahead 41 / behind 0
+- base_commit == current main
+- merge_base == current main
+- PR mergeable=true
 
-### Fresh question-form compressed-action P1 closure — `f5a64452...`
-Direct current review also surfaced that question-form compressed inputs such as `도서관에 간다?` could still match travel/observe/explore/wait/downtime regexes and execute.
+A fresh exact-head Codex review was submitted on `8ca24ba...` at 2026-08-23 21:47:49 UTC.
 
-Fixed:
-- question-form inputs that otherwise match compressed exterior/travel/observe/explore/wait/downtime intents are classified `decision-sensitive`;
-- compression=false;
-- minAdvanceMinutes=0;
-- permanent regression coverage includes:
-  - `도서관에 간다?`
-  - `주변을 살핀다?`
-  - `주변을 돌아다닌다?`
-  - `10분 기다린다?`
-  - `쉰다?`
+## CURRENT BLOCKER — NEW P1 FROM FINAL EXACT-HEAD REVIEW
+**Thread:** `PRRT_kwDOT8LCAs6biXWm`  
+**Comment:** `PRRC_kwDOT8LCAs7k3PCq`  
+**Path:** `api/lib/context-router.js`, around current line 422  
+**Title:** `Reserve the Scene Momentum directive under input pressure`
 
-Current hosted Safety/Vercel for `f5a64452...` must be confirmed before final docs-head review. This file must not assume a PASS until the live run says so.
+Problem:
+- `SCENE MOMENTUM HF1` is still inside `optionalContext`.
+- `composeRoutedInput()` correctly reserves minimum SAVE_STATE + authority tail + action, but prefix-clips `optionalContext` when routine input pressure is high.
+- A supported ~5000-character routine USER ACTION can therefore keep the final action and authority sections while silently dropping the Scene Momentum directive.
+- Example: a long action ending in `도서관에 간다.` can still be classified as travel by server-side post-processing, but the model may receive neither `INTENT=travel` nor stall/compression instructions.
+- The adapter can then apply deterministic State Delta/time-floor behavior to prose generated without the corresponding semantic-compression rules -> narrative/state mismatch.
+- Momentum recovery is also disabled exactly under long-action pressure.
 
-## In Progress
-Final exact-head closure:
-1. verify Safety + Vercel on current code HEAD `f5a64452...`;
-2. commit this docs/handover refresh;
-3. verify Safety + Vercel again on the resulting docs-updated exact HEAD;
-4. request fresh exact-current-HEAD/current-main Codex review;
-5. directly inspect non-outdated unresolved review threads.
+Required fix direction from Codex:
+- move `SCENE MOMENTUM HF1` into a reserved portion of routed input **or** give it its own explicit reserved budget;
+- keep existing minimum SAVE_STATE + GM Director + Event Director V2.1 + Schedule + final USER ACTION reservations;
+- do not exceed profile input budget;
+- do not add model calls;
+- preserve CONTINUE `CONTINUE HARD FREEZE` behavior and GAME/AUTO behavior.
 
-Sticky `Lumensia Merge Readiness` is supplementary only. If it disagrees with direct current review threads, direct evidence wins.
+Required permanent regression:
+- construct a supported ~5000-char ROUTINE action ending in a compressed intent such as `도서관에 간다.`;
+- assert routed input remains within routine budget (`<=9000` chars where existing contract expects it);
+- assert minimum authoritative SAVE_STATE survives;
+- assert GM Director / Event Director V2.1 / Schedule survive;
+- assert final USER ACTION survives in bounded form;
+- **assert `===== SCENE MOMENTUM HF1 =====` and `INTENT=travel` survive input pressure**;
+- preserve one canonical core/model call invariant;
+- run full `node scripts/lumensia-pr-check.mjs`.
 
-## Remaining
-### P0 — before PR #33 merge
-1. Confirm `f5a64452...` hosted Safety/Vercel.
-2. Commit docs refresh and capture the resulting exact HEAD.
-3. Hosted Safety PASS + Vercel PASS on that exact docs HEAD.
-4. Fresh Codex review bound to exact docs HEAD + actual current main.
-5. Direct current P0/P1 must be 0. Do not reuse prior-head approval.
-6. Refetch PR exact HEAD and current `main` immediately before merge.
-7. Compare `main...exact HEAD` and require:
-   - `base_commit.sha == current main`;
-   - `merge_base_commit.sha == current main`;
-   - behind=0;
-   - no conflict / mergeable;
-   - Safety PASS;
-   - Vercel PASS;
-   - exact-current-HEAD Codex P0/P1=0.
-8. Manual merge with `expected_head_sha` only.
-9. Verify merged main, Vercel production and `/api/health` markers.
+## Review State at Handover
+- Final exact-head Codex review **did complete** on `8ca24ba...`.
+- It introduced the current P1 above.
+- Therefore prior `Safety PASS + Vercel PASS + compare clean + mergeable=true` are **not sufficient for merge**.
+- Direct current P1 evidence outranks sticky Merge Readiness.
+- Sticky Merge Readiness was still stale/pending on an older head during this session; never use it alone.
+- Some older unresolved non-outdated P2 threads may remain visible even where code/tests already address the behavior (notably no-op delta scoring / historical-duration parsing). Re-evaluate them after the P1 fix, but project policy keeps P2/P3 non-blocking unless a fresh correctness issue materially escalates.
 
-### P1 — immediately after HF1 merge
-Do not restart the completed HF1 diagnosis. Continue with:
-- live-play acceptance for original problematic inputs (`본다 / 돌아다닌다 / 밖으로 간다 / 쉰다`);
-- Scene Purpose + explicit Scene Exit Condition;
-- stronger Turn Hook;
-- Event Consequence chaining / consequence lifetime;
-- NPC Initiative / Goal Tick refinement;
-- bounded off-screen progression;
-- deterministic novelty/repeated-information suppression if live play still loops.
-
-### P2 — longer Narrative roadmap
-- Adaptive Time Scale V2
-- Consequence Queue / Lifetime
-- Active Threads
-- Reputation / faction-social propagation
-- Setup → Payoff memory
-- NPC significance / relationship thresholds / knowledge boundaries
-- NPC-vs-NPC conflict
-- Fail Forward
-- Off-screen World Progression expansion
-- Multi-System Scene orchestration
-- Memory Hierarchy
-- novelty/repetition scoring
-- Report-style narration → scene-driven novel prose recovery
-
-Future gameplay roadmap discussed but not DONE:
-- NPC↔NPC Relationship V1
-- Faction / Social Consequence V1
-- Skill Learning V1
-- Awakening / Talent Evolution V1
-- Combat Growth V2
-- Living World / Event Director V3 / Long-term Consequence
-
-## Known Review / Infrastructure Warning
-- Earlier sticky Merge Readiness states sometimes reported READY/P0-P1=0 while direct current review threads still had live P1 findings.
-- Direct current review evidence outranks sticky status.
-- Do not weaken exact-head/current-base or review-cycle safeguards to obtain green status.
-- Codex Cloud push frequently fails with `CONNECT tunnel failed, response 403`; ChatGPT GitHub writer can apply tested diffs directly when needed.
-
-## Permanent Test Evidence
-HF1 permanent suites now include:
+## Permanent HF1 Test Suites
 - `scripts/tests/context-router-authority-tail.test.mjs`
 - `scripts/tests/context-router.test.mjs`
 - `scripts/tests/scene-momentum-v156-hf1.test.mjs`
@@ -184,30 +153,45 @@ HF1 permanent suites now include:
 - `scripts/tests/scene-momentum-paused-event.test.mjs`
 - `scripts/tests/scene-momentum-time-floor.test.mjs`
 - `scripts/tests/scene-momentum-correctness.test.mjs`
-- plus existing continuation/event/Goal V2/core/debug/assets/migration/automation/readiness suites.
+- plus existing continuation/event/Goal V2/core/debug/assets/migration/automation/readiness suites through `scripts/lumensia-pr-check.mjs` / hosted Safety Gate.
 
 ## DO NOT BREAK
 - exactly one canonical model/core call per normal turn;
-- stable `/api/chat-router` → `api/chat.js` architecture;
+- stable `/api/chat-router` -> `api/chat.js` architecture;
 - stable filenames; no versioned duplicate router/runtime;
 - `store:false`, prompt cache, 24h retention;
+- Context Router profile budgets;
 - player sovereignty + META freeze;
 - CONTINUE same-moment hard freeze;
 - completed Event Beats monotonic / CONTINUE no replay;
+- paused null != completion;
 - schedule/location/knowledge/cooldown/callback/NO_EVENT Director guards;
 - AFTERMATH / active-combat fixed flow;
 - canon, NPC personality, established relationships;
-- `app.js` base `APP_VERSION='1.4.8'` intentional;
-- characters-v2 current 32-character / 13-state contract;
-- protected core/runtime PR manual merge safety.
+- `app.js` base `APP_VERSION='1.4.8'` is intentional;
+- characters-v2 32-character / 13-state contract;
+- protected core/runtime PR #33 manual merge safety.
 
 ## NEXT ACTION
-1. Refetch PR #33 exact HEAD and current main.
-2. Confirm Safety + Vercel on `f5a64452...`.
-3. Commit this docs update, then use its resulting exact HEAD as the only final review target.
-4. Verify hosted Safety + Vercel on that exact HEAD.
-5. Request fresh exact-current-HEAD/current-main Codex review.
-6. Directly inspect unresolved non-outdated P0/P1 threads; sticky READY alone is insufficient.
-7. If true current P0/P1=0, perform final current-main/merge-base/behind/conflict revalidation and manual `expected_head_sha` merge.
-8. Verify production/main/health.
-9. Continue directly into **Scene Purpose / Turn Hook / Event Consequence**.
+**Do not merge PR #33.** The next chat starts here:
+
+1. Refetch live PR #33 exact HEAD and current main. This handover-doc commit will create a new docs-only HEAD, so do not assume `8ca24ba...` remains current.
+2. Read `docs/LUMENSIA_HANDOVER_CURRENT.md` and this file first.
+3. Do **not** redo completed HF1 diagnosis.
+4. Fix current P1 `PRRT_kwDOT8LCAs6biXWm` in `api/lib/context-router.js`: reserve `SCENE MOMENTUM HF1` under long-input pressure.
+5. Add/extend permanent long-action authority test so Scene Momentum itself survives alongside minimum SAVE_STATE + Director/V2/Schedule + final USER ACTION.
+6. Run focused router tests + full `node scripts/lumensia-pr-check.mjs`.
+7. Commit the code/test fix.
+8. Require hosted Safety PASS + Vercel PASS on the new exact code HEAD.
+9. Request a fresh exact-current-HEAD/current-main Codex review; prior `8ca24ba...` review cannot authorize the new head.
+10. Directly inspect unresolved non-outdated P0/P1 threads. Sticky READY alone is insufficient.
+11. Only if true current P0/P1=0: refetch current main + exact HEAD, compare, require base_commit==main, merge_base==main, behind=0, mergeable/no conflict, then manual merge with `expected_head_sha`.
+12. Verify merged main / production Vercel / `/api/health`.
+13. After HF1 merge, continue directly into **Scene Purpose -> Scene Exit Condition -> Turn Hook -> Event Consequence -> NPC Initiative/Goal Tick refinement**.
+
+## Stop Record
+- Completed this session: full schedule floor P1, historical-duration P2, question-form compression P1, docs-head Safety/Vercel/compare validation, final exact-head Codex review request and result inspection.
+- Unfinished: newly discovered long-input Scene Momentum reservation P1.
+- Tests at last reviewed exact head `8ca24ba...`: Safety #261 PASS, Vercel PASS.
+- Blocker: current P1 `PRRT_kwDOT8LCAs6biXWm`.
+- Merge: NOT PERFORMED.
