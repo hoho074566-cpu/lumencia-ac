@@ -10,6 +10,9 @@ assert.equal(rest.minAdvanceMinutes,90,'compound rest floor must respect explici
 const wait=classifySceneIntent('1시간 30분 기다린다.');
 assert.equal(wait.kind,'wait','compound wait duration must stay wait');
 assert.equal(wait.explicitDurationMinutes,90,'compound wait duration must parse to 90 minutes');
+const historicalObserve=classifySceneIntent('10분 전에 본 게시판을 확인한다.');
+assert.equal(historicalObserve.kind,'observe','historical duration context must still classify by the committed observation predicate');
+assert.equal(historicalObserve.explicitDurationMinutes,null,'historical “10분 전에” must not become an explicit action duration');
 
 const noOpGrowth=deriveSceneDelta({
   action:'훈련한다.',
@@ -64,4 +67,4 @@ assert.match(continueDirective,/CONTINUE HARD FREEZE/,'CONTINUE must receive fre
 assert.doesNotMatch(continueDirective,/SCENE_STALL=true/,'CONTINUE must never receive stall-recovery pressure');
 assert.doesNotMatch(continueDirective,/실제 변화가 필요/,'CONTINUE replacement must not demand state change');
 
-console.log('PASS Scene Momentum correctness (compound duration, no-op delta, dedupe, choice stop, status, CONTINUE freeze)');
+console.log('PASS Scene Momentum correctness (duration predicate, no-op delta, dedupe, choice stop, status, CONTINUE freeze)');

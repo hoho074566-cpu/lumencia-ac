@@ -159,15 +159,35 @@ function clockMinutes(value=''){
   if(!Number.isInteger(hour)||!Number.isInteger(minute)||hour<0||hour>23||minute<0||minute>59)return null;
   return hour*60+minute;
 }
+function dateTimeMinutes(date='',time=''){
+  const match=String(date||'').trim().match(/^(\d{1,4})-(\d{1,2})-(\d{1,2})$/),clock=clockMinutes(time);
+  if(!match||clock==null)return null;
+  const year=Number(match[1]),month=Number(match[2]),day=Number(match[3]),hour=Math.floor(clock/60),minute=clock%60;
+  if(!Number.isInteger(year)||!Number.isInteger(month)||!Number.isInteger(day)||month<1||month>12||day<1||day>31)return null;
+  const stamp=new Date(0);stamp.setUTCFullYear(year,month-1,day);stamp.setUTCHours(hour,minute,0,0);
+  if(stamp.getUTCFullYear()!==year||stamp.getUTCMonth()!==month-1||stamp.getUTCDate()!==day||stamp.getUTCHours()!==hour||stamp.getUTCMinutes()!==minute)return null;
+  return Math.floor(stamp.getTime()/60000);
+}
 function nextScheduleBoundaryMinutes(saveState={}){
   const save=object(saveState),schedule=object(save.scheduleContext);
   if(array(schedule.due).length)return 0;
-  const now=clockMinutes(save?.world?.time);if(now==null)return null;
-  const date=String(save?.world?.date||'');let best=null;
-  for(const event of array(schedule.upcoming)){
-    if(date&&event?.date&&String(event.date)!==date)continue;
-    const at=clockMinutes(event?.time);if(at==null)continue;
-    const delta=at-now;if(delta<0)continue;
+  const currentDate=String(save?.world?.date||''),currentTime=String(save?.world?.time||''),now=dateTimeMinutes(currentDate,currentTime);
+  if(now==null){
+    const currentClock=clockMinutes(currentTime);if(currentClock==null)return null;
+    let fallback=null;
+    for(const event of array(schedule.upcoming)){
+      if(currentDate&&event?.date&&String(event.date)!==currentDate)continue;
+      const at=clockMinutes(event?.time);if(at==null)continue;
+      const delta=at-currentClock;if(delta<=0)return 0;
+      if(fallback==null||delta<fallback)fallback=delta;
+    }
+    return fallback;
+  }
+  let best=null;
+  for(const event of [...array(save.scheduledEvents),...array(schedule.upcoming)]){
+    if(!event||['completed','cancelled'].includes(String(event.status||'').trim().toLowerCase()))continue;
+    const at=dateTimeMinutes(event.date||currentDate,event.time);if(at==null)continue;
+    const delta=at-now;if(delta<=0)return 0;
     if(best==null||delta<best)best=delta;
   }
   return best;
