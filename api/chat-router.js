@@ -66,12 +66,12 @@ function mergeRawGoalV2Fields(parsed,raw){
   const parsedRows=parsed?.state_delta?.npc_state_updates;
   const rawRows=raw?.state_delta?.npc_state_updates;
   if(!Array.isArray(parsedRows)||!Array.isArray(rawRows))return parsed;
-  const byKey=new Map(rawRows.filter(x=>x&&typeof x==='object').map(x=>[String(x.npc_key||''),x]));
-  for(let i=0;i<parsedRows.length;i++){
+  const limit=Math.min(parsedRows.length,rawRows.length);
+  for(let i=0;i<limit;i++){
     const row=parsedRows[i];
-    if(!row||typeof row!=='object')continue;
-    const source=byKey.get(String(row.npc_key||''))||rawRows[i];
-    if(!source||typeof source!=='object')continue;
+    const source=rawRows[i];
+    if(!row||typeof row!=='object'||!source||typeof source!=='object')continue;
+    if(String(row.npc_key||'')!==String(source.npc_key||''))continue;
     for(const field of ['goal_progress_delta','goal_state','goal_reason','goal_next_action','goal_replace']){
       if(Object.prototype.hasOwnProperty.call(source,field))row[field]=source[field];
     }
@@ -198,14 +198,23 @@ function goalRuntimeFor(incoming,key,old,npc,rel,em){
   const turnNo=Number(incoming.saveState?.turnNumber||0)+1;
   let history=array(old.goal_history).slice(-6);
   const isNew=!hasPrevious||replace;
-  if(replace){const archived=goalArchiveRow(previous,turnNo,reason||'goal replaced');if(archived)history=appendGoalHistory(history,archived);}
+  const previousState=GOAL_STATES.has(String(previous.state))?String(previous.state):'active';
+  if(replace){
+    const priorSnapshot=history.find(x=>String(x?.id||'')===String(previous.id||''));
+    const terminal=['completed','abandoned'].includes(previousState);
+    if(!terminal||!priorSnapshot){
+      const archiveTurn=terminal?bounded(previous.updated_turn,0,1e9,turnNo):turnNo;
+      const archiveReason=terminal?clampText(previous.last_progress_reason||reason,180):reason;
+      const archived=goalArchiveRow(previous,archiveTurn,archiveReason||'goal replaced');
+      if(archived)history=appendGoalHistory(history,archived);
+    }
+  }
 
   const due=array(incoming.saveState?.scheduleContext?.due).some(ev=>array(ev?.participants).map(String).includes(key));
   const activeHook=array(incoming.saveState?.hooks).some(h=>!['resolved','expired','declined'].includes(h?.status)&&String(h?.source_npc_key||'')===key);
   const target=inferGoalTarget(desire,incoming,key);
-  const priority=bounded(isNew?null:previous.priority,1,5,activeHook?4:3);
-  const urgency=due?5:activeHook?Math.max(4,bounded(isNew?null:previous.urgency,1,5,3)):bounded(isNew?null:previous.urgency,1,5,3);
-  const previousState=GOAL_STATES.has(String(previous.state))?String(previous.state):'active';
+  const priority=isNew?(activeHook?4:3):bounded(previous.priority,1,5,3);
+  const urgency=isNew?(due?5:activeHook?4:3):bounded(previous.urgency,1,5,3);
   const requestedState=reason&&GOAL_STATES.has(String(npc.goal_state))?String(npc.goal_state):null;
   const rawDelta=Number(npc.goal_progress_delta);
   const deltaSupplied=npc.goal_progress_delta!=null&&Number.isFinite(rawDelta);
@@ -238,17 +247,21 @@ function goalRuntimeFor(incoming,key,old,npc,rel,em){
 
   if(state==='completed')progress=100;
   const transition=state!==previousState||isNew;
+  const rephrased=Boolean(!isNew&&reportedDesire&&reportedDesire!==String(previous.desire||'').trim());
+  const goalTouched=Boolean(isNew||replace||meaningful||transition||rephrased||nextAction);
   const evidenceReason=(meaningful||transition||replace)?reason:'';
   const cause=clampText(rel.cause||rel.reason||em.reason||'',140).trim();
+  const previousNext=array(previous.next_actions).map(x=>clampText(x,140).trim()).filter(Boolean);
+  const nextActions=nextAction?[nextAction,...previousNext.filter(x=>x!==nextAction)].slice(0,4):previousNext.slice(0,4);
   const goal={
     id:isNew?`goal:${key}:${tinyHash(`${desire}:${turnNo}`)}`:String(previous.id||`goal:${key}:${tinyHash(desire)}`),
     target_type:target.target_type,target_key:target.target_key,desire,
     priority,urgency,progress,state,
     reasons:uniqText([...(isNew?[]:array(previous.reasons)),cause,evidenceReason],4),
-    next_actions:uniqText([...(isNew?[]:array(previous.next_actions)),nextAction],4),
+    next_actions:nextActions,
     obstacle:clampText(state==='blocked'?(reason||previous.obstacle||old.concern||old.unresolved_issue||''):(previous.obstacle||old.concern||old.unresolved_issue||''),140),
     source_turn:isNew?turnNo:bounded(previous.source_turn,0,1e9,turnNo),
-    updated_turn:turnNo,
+    updated_turn:goalTouched?turnNo:bounded(previous.updated_turn,0,1e9,bounded(previous.source_turn,0,1e9,turnNo)),
     last_progress_delta:meaningful?actualDelta:bounded(previous.last_progress_delta,-100,100,0),
     last_progress_reason:evidenceReason||clampText(previous.last_progress_reason||'',180),
   };
@@ -290,7 +303,10 @@ function localNpcUpdates(incoming,turn){
     const relationshipReason=relationshipReasonFor(incoming,turn,key,rel);
     const relationshipHistory=relationshipReason?[...array(old.relationship_history),relationshipReason].slice(-8):array(old.relationship_history).slice(-8);
     const goalPlan=activeGoal?.state==='active'?clampText(activeGoal?.next_actions?.[0]||activeGoal?.desire||'',180):'';
-    const oldPlan=activeGoal&&activeGoal.state!=='active'&&String(old.short_term_plan||'').trim()===String(activeGoal.desire||'').trim()?'':old.short_term_plan;
+    const oldPlanText=String(old.short_term_plan||'').trim();
+    const terminalGoal=Boolean(activeGoal&&activeGoal.state!=='active');
+    const terminalPlanMatches=terminalGoal&&(oldPlanText===String(activeGoal?.desire||'').trim()||oldPlanText===String(old?.active_goal?.desire||'').trim());
+    const oldPlan=terminalPlanMatches?'':old.short_term_plan;
     out[key]={
       mood:moodFromExpression(expression)||old.mood||'',
       social_stance:clampText(rel.status||old.social_stance||'',80),
