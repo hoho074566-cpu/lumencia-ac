@@ -223,6 +223,7 @@ function goalRuntimeFor(incoming,key,old,npc,rel,em){
   const nextAction=clampText(npc.goal_next_action||'',140).trim();
   let state=isNew?'active':previousState;
   let progress=isNew?0:bounded(previous.progress,0,100,0);
+  const initialProgress=progress;
   let actualDelta=0;
   let meaningful=false;
 
@@ -245,7 +246,12 @@ function goalRuntimeFor(incoming,key,old,npc,rel,em){
     if(requestedState&&requestedState!==previousState){state=requestedState;meaningful=true;}
   }
 
-  if(state==='completed')progress=100;
+  if(state==='completed'){
+    const completionDelta=100-initialProgress;
+    progress=100;
+    actualDelta=completionDelta;
+    if(completionDelta!==0)meaningful=true;
+  }
   const transition=state!==previousState||isNew;
   const rephrased=Boolean(!isNew&&reportedDesire&&reportedDesire!==String(previous.desire||'').trim());
   const goalTouched=Boolean(isNew||replace||meaningful||transition||rephrased||nextAction);
