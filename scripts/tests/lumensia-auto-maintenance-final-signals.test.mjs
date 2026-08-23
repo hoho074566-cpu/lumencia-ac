@@ -30,13 +30,13 @@ function pull(head = HEAD, mergeableState = 'clean', base = BASE) {
   };
 }
 
-function requestComment() {
+function requestComment(baseSha = BASE) {
   return {
     id: 1,
     body: makeCodexReviewRequestBody({
       prNumber: 21,
       head: HEAD,
-      baseSha: BASE,
+      baseSha,
       generationKey: 'final-signals',
       baselineReviewIds: [],
       baselineReviewCommentIds: [],
@@ -56,14 +56,14 @@ function cleanCodexComment() {
   };
 }
 
-function successCheck(conclusion = 'success') {
+function successCheck(conclusion = 'success', baseSha = BASE) {
   return {
     id: Math.random(),
     name: 'Repository checks',
     head_sha: HEAD,
     conclusion,
     created_at: '2026-08-23T00:00:30Z',
-    pull_requests: [{ number: 21, head: { sha: HEAD }, base: { sha: BASE } }],
+    pull_requests: [{ number: 21, head: { sha: HEAD }, base: { sha: baseSha } }],
   };
 }
 
@@ -158,9 +158,76 @@ test('hosted check failure on final signal reread prevents merge', async () => {
   assert.equal(summary.errors.length, 0);
 });
 
+test('stale base with a current P1 creates exactly one authoritative-base fix request', async () => {
+  const currentBase = 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+  const issueComments = [requestComment(currentBase)];
+  const posted = [];
+  const api = {
+    validate: async () => true,
+    compare: async () => currentComparison(HEAD, currentBase, BASE),
+    listOpenPulls: async () => [pull()],
+    getPull: async () => pull(),
+    listIssueComments: async () => [...issueComments],
+    listReviews: async () => [{
+      id: 20, commit_id: HEAD, submitted_at: '2026-08-23T00:01:00Z', state: 'COMMENTED',
+      user: { login: 'chatgpt-codex-connector[bot]' }, body: '',
+    }],
+    listReviewComments: async () => [{
+      id: 21, commit_id: HEAD, pull_request_review_id: 20, created_at: '2026-08-23T00:01:00Z',
+      user: { login: 'chatgpt-codex-connector[bot]' }, body: '[P1] current blocker',
+    }],
+    listCheckRuns: async () => ({ check_runs: [successCheck('success', currentBase)] }),
+    getCombinedStatus: async () => ({ statuses: [vercelStatus] }),
+    listPullFiles: async () => [file],
+    updatePull: async () => pull(),
+    createIssueComment: async (_number, body) => { posted.push(body); },
+  };
+  const summary = await maintainAutoPulls({
+    token: 'pat', mergeToken: 'ephemeral', owner: OWNER, repo: REPO, api,
+    mergeApi: { mergePull: async () => { throw new Error('unexpected merge'); } },
+    logger: silent, now: new Date('2026-08-23T00:02:00Z'),
+  });
+  assert.equal(posted.length, 1);
+  assert.match(posted[0], new RegExp(`"baseSha":"${currentBase}"`));
+  assert.equal(summary.fixesRequested, 1);
+  assert.equal(summary.waiting, 0);
+  assert.equal(summary.errors.length, 0);
+});
+
+test('stale base with an authoritative check failure creates a persistent human hold', async () => {
+  const currentBase = 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+  const issueComments = [requestComment(currentBase), cleanCodexComment()];
+  const posted = [];
+  const api = {
+    validate: async () => true,
+    compare: async () => currentComparison(HEAD, currentBase, BASE),
+    listOpenPulls: async () => [pull()],
+    getPull: async () => pull(),
+    listIssueComments: async () => [...issueComments],
+    listReviews: async () => [],
+    listReviewComments: async () => [],
+    listCheckRuns: async () => ({ check_runs: [successCheck('failure', currentBase)] }),
+    getCombinedStatus: async () => ({ statuses: [vercelStatus] }),
+    listPullFiles: async () => [file],
+    updatePull: async () => pull(),
+    createIssueComment: async (_number, body) => { posted.push(body); },
+  };
+  const summary = await maintainAutoPulls({
+    token: 'pat', mergeToken: 'ephemeral', owner: OWNER, repo: REPO, api,
+    mergeApi: { mergePull: async () => { throw new Error('unexpected merge'); } },
+    logger: silent, now: new Date('2026-08-23T00:02:00Z'),
+  });
+  assert.equal(posted.length, 1);
+  assert.match(posted[0], /lumensia-human-check:v1/);
+  assert.match(posted[0], /authoritative-check-failed/);
+  assert.equal(summary.humanRequired, 1);
+  assert.equal(summary.waiting, 0);
+  assert.equal(summary.errors.length, 0);
+});
+
 test('stale pull base and old-base READY evidence cannot merge after main advances', async () => {
   const currentBase = 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
-  const issueComments = [requestComment(), cleanCodexComment()];
+  const issueComments = [requestComment(currentBase), cleanCodexComment()];
   let mergeCalls = 0;
   const api = {
     validate: async () => true,
@@ -170,7 +237,7 @@ test('stale pull base and old-base READY evidence cannot merge after main advanc
     listIssueComments: async () => [...issueComments],
     listReviews: async () => [],
     listReviewComments: async () => [],
-    listCheckRuns: async () => ({ check_runs: [successCheck()] }),
+    listCheckRuns: async () => ({ check_runs: [successCheck('success', currentBase)] }),
     getCombinedStatus: async () => ({ statuses: [vercelStatus] }),
     listPullFiles: async () => [file],
     updatePull: async () => pull(),
