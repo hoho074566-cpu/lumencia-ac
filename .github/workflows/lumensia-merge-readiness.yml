@@ -144,8 +144,8 @@ jobs:
         run: node scripts/lumensia-merge-readiness.mjs
 
   maintain-after-pr:
-    needs: evaluate-pr
-    if: always() && needs.evaluate-pr.result == 'success'
+    needs: [evaluate-pr, evaluate-scan]
+    if: always() && (needs.evaluate-pr.result == 'success' || needs.evaluate-scan.result == 'success')
     concurrency:
       group: lumensia-auto-pr-scan
       cancel-in-progress: false
@@ -204,7 +204,7 @@ jobs:
         if: always()
         uses: actions/github-script@v7
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number || github.event.check_run.pull_requests[0].number }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number || github.event.check_run.pull_requests[0].number || github.event.workflow_run.pull_requests[0].number }}
           LOG_PATH: ${{ runner.temp }}/lumensia-maintenance.log
         with:
           github-token: ${{ github.token }}
