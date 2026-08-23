@@ -55,7 +55,9 @@ const MemoryAdd = z.object({
 const NpcStateUpdate = z.object({
   npc_key: z.string().min(1).max(64), location: z.string().max(160).nullable(), status: z.string().max(240).nullable(), current_goal: z.string().max(300).nullable(),
   long_term_goal: z.string().max(320).nullable(), short_term_goal: z.string().max(320).nullable(), goal_progress: z.number().int().min(0).max(100).nullable(), obstacle: z.string().max(280).nullable(),
-  goal_reason: z.string().max(280).nullable(), next_activity: z.string().max(240).nullable(), next_location: z.string().max(160).nullable(), next_change_minutes: z.number().int().min(0).max(10080).nullable(), last_seen: z.string().max(160).nullable(),
+  goal_progress_delta: z.number().int().min(-100).max(100).nullable(), goal_state: z.enum(['active','blocked','completed','abandoned']).nullable(),
+  goal_reason: z.string().max(280).nullable(), goal_next_action: z.string().max(240).nullable(), goal_replace: z.boolean().nullable(),
+  next_activity: z.string().max(240).nullable(), next_location: z.string().max(160).nullable(), next_change_minutes: z.number().int().min(0).max(10080).nullable(), last_seen: z.string().max(160).nullable(),
 });
 
 const NpcScheduleUpdate = z.object({ npc_key: z.string().min(1).max(64), delay_minutes: z.number().int().min(1).max(10080), location: z.string().min(1).max(160), activity: z.string().min(1).max(240), reason: z.string().min(1).max(260) });
