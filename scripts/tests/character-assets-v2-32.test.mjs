@@ -55,6 +55,6 @@ test('asset manifest uses only characters-v2 WEBP URLs', () => {
 test('portrait routing never synthesizes an unknown expression path', () => {
   assert.match(appSource, /ASSETS\.portraitExpressions\.includes\(normalized\)\s*\?\s*normalized\s*:\s*'default'/);
   assert.match(appSource, /const char = ASSETS\.characters\[key\]/);
-  assert.match(appSource, /char\?\.expressions\?\.\[candidate\]/);
-  assert.doesNotMatch(appSource, /portrait\/\$\{(?:normalized|requested|expression|candidate)\}\.webp/);
+  assert.match(appSource, /char\.expressions\?\.\[state\]/);
+  assert.doesNotMatch(appSource, /portrait\/\$\{(?:normalized|requested|expression|candidate|state)\}\.webp/);
 });
