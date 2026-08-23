@@ -1,0 +1,20 @@
+LUMENSIA V1.5.6 — NPC Goal V2 implementation task
+
+Goal: evolve V1.5.5 active_goal from passive persistence into evidence-based multi-turn progression, lifecycle transitions, replacement history, and debug visibility without adding another model call.
+
+Required behavior:
+1. Keep exactly one canonical core/model call per turn.
+2. Extend the existing npc_state_updates structured output minimally with nullable goal fields: goal_progress_delta (-100..100), goal_state (active|blocked|completed|abandoned), goal_reason, goal_next_action. current_goal remains the canonical goal text and backward-compatible field.
+3. Emit goal changes only when the turn provides real evidence. Never advance goals just because an NPC spoke or appeared.
+4. Same goal: apply bounded progress delta and preserve lifecycle. Clamp progress 0..100. blocked preserves progress unless a real delta is supplied. completed => 100. abandoned preserves final progress. Explicit reopen may return blocked/terminal goal to active only when the model reports it.
+5. New/changed current_goal: create a new active goal at progress 0 (or only an explicitly reported first-turn delta), do not inherit old priority/urgency/progress. Preserve the replaced/terminal prior goal in npcInnerStates.goal_history capped to 6.
+6. Preserve reasons/next_actions as bounded recent evidence. Add last_progress_delta, last_progress_reason, updated_turn. Keep source_turn as goal start turn.
+7. Event Director may read active goals only after all existing eligibility guards. Goal V2 must not bypass direct-focus, physical location, schedule, participant, callback, surprise cooldown, or no-event guards. Terminal/blocked goals must not create new Director eligibility.
+8. Relationship Reason V1 remains unchanged and one-call architecture remains unchanged.
+9. DEBUG should show goal P/U/state/progress plus latest delta/reason and recent goal history.
+10. Version target: app 1.5.6, API adapter 0.8.2. Stable paths remain /app-runtime.js, /api/chat-router, /api/lib/context-router.js, /api/chat. No versioned duplicate runtime/API files.
+11. Preserve HF1 context budgets and prompt caching behavior.
+12. Add focused regression tests covering: +progress, negative setback clamp, blocked preservation, completion=100, abandonment, explicit reopen, new-goal reset/no metadata inheritance, goal_history cap, no progress from mere dialogue, one canonical coreHandler call site, stable paths and version/debug markers.
+13. Protected core/runtime change: do not auto-merge. Require Safety + Vercel + exact-current-HEAD Codex review P0/P1=0 + no conflict + current-main revalidation before manual merge.
+
+This document is the implementation contract and may remain as release documentation.
