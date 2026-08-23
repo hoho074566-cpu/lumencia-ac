@@ -47,6 +47,17 @@ test('replacement creation stays active even if the same row requests a terminal
   assert.notEqual(result.goal.id,old.active_goal.id);
 });
 
+test('completion records the effective progress change to 100',()=>{
+  const old=oldGoal({progress:40});
+  const completed=goalRuntimeFor(incoming(old),key,old,{goal_state:'completed',goal_reason:'학생회 정비를 끝냈다'}, {}, {});
+  assert.equal(completed.goal.progress,100);
+  assert.equal(completed.goal.last_progress_delta,60);
+
+  const withIntermediateSetback=goalRuntimeFor(incoming(old),key,old,{goal_state:'completed',goal_progress_delta:-10,goal_reason:'마지막 장애물을 넘어서 결국 완료했다'}, {}, {});
+  assert.equal(withIntermediateSetback.goal.progress,100);
+  assert.equal(withIntermediateSetback.goal.last_progress_delta,60);
+});
+
 test('explicit NPC state keys are prioritized before the bounded passive synthesis set',()=>{
   assert.match(source,/const explicitKeys=\[\.\.\.new Set\(stateKeys\)\]\.slice\(0,12\)/);
   assert.match(source,/const passiveKeys=\[\.\.\.new Set\(\[\.\.\.relationKeys,\.\.\.speakerRows\.map/);
