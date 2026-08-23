@@ -358,6 +358,15 @@ function compactSchedule(save,keys){
   const npc={};for(const k of keys)if(sc?.npc_schedule?.[k])npc[k]=sc.npc_schedule[k];
   return{due:array(sc.due).slice(0,4).map(clean),upcoming:array(sc.upcoming).slice(0,5).map(clean),npc_schedule:npc};
 }
+function compactScheduleAuthority(schedule,max=2400){
+  const compactEvent=(ev)=>{const src=object(ev);return{id:clampText(src.id||'',80),title:clampText(src.title||'',120),date:src.date||null,time:src.time||null,location:clampText(src.location||'',100),importance:src.importance??null,status:src.status||null,participants:array(src.participants).slice(0,4)};};
+  const compactNpc=(row)=>{const src=object(row);return{location:clampText(src.location||src.area||'',100),activity:clampText(src.activity||src.commitment||src.title||'',120),time:src.time||null,next_change_minutes:src.next_change_minutes??null};};
+  const value={due:array(schedule?.due).slice(0,4).map(compactEvent),upcoming:array(schedule?.upcoming).slice(0,5).map(compactEvent),npc_schedule:Object.fromEntries(Object.entries(object(schedule?.npc_schedule)).slice(0,6).map(([key,row])=>[key,compactNpc(row)]))};
+  let text=safeJson(value);if(text.length<=max)return text;
+  const smaller={truncated:true,due:value.due.slice(0,3),upcoming:value.upcoming.slice(0,3),npc_schedule:Object.fromEntries(Object.entries(value.npc_schedule).slice(0,3))};
+  text=safeJson(smaller);if(text.length<=max)return text;
+  return safeJson({truncated:true,due:smaller.due.map(({id,title,time,location,participants})=>({id,title,time,location,participants})),upcoming:smaller.upcoming.map(({id,title,time,location,participants})=>({id,title,time,location,participants}))});
+}
 function compactSave(incoming,keys,registry,profile,keywords){
   const save=incoming.saveState||{},names=keys.map(k=>registry[k]).filter(Boolean),rel={},intimacy={},npcStates={},emotions={},inner={},npcMem={};
   for(const k of keys){if(save?.relationships?.[k]!=null)rel[k]=save.relationships[k];if(save?.intimacyStates?.[k]!=null)intimacy[k]=save.intimacyStates[k];if(save?.npcStates?.[k]!=null)npcStates[k]=save.npcStates[k];if(save?.emotionStates?.[k]!=null)emotions[k]=save.emotionStates[k];if(save?.npcInnerStates?.[k]!=null)inner[k]=compactInnerNpc(save.npcInnerStates[k]);if(save?.memories?.npc?.[k])npcMem[k]=selectMemories(save.memories.npc[k],keywords,names,profile.memoriesPerNpc);}
@@ -395,12 +404,19 @@ function cleanDirector(originalInput,limit){
   let d=sectionBetween(originalInput,'===== GM EVENT DIRECTOR (SERVER GUIDANCE) =====','===== SCHEDULE ENGINE (AUTHORITATIVE) =====');
   d=d.split('\n').filter(line=>!/candidate|후보|planCandidates|candidates=/i.test(line)).join('\n');return clampText(d,limit);
 }
+export function composeRoutedInput({optionalContext='',authorityTail='',actionBlock='',inputChars=9000}={}){
+  const headSource=String(optionalContext||''),tail=String(authorityTail||''),action=String(actionBlock||''),maxChars=Math.max(0,Number(inputChars)||0);
+  const headBudget=Math.max(0,maxChars-tail.length-action.length-4);
+  const head=headBudget>0?clampText(headSource,headBudget):'';
+  return [head,tail,action].filter(Boolean).join('\n\n');
+}
 function buildInput(incoming,originalInput,profile,routed){
   const save=compactSave(incoming,routed.keys,routed.registry,profile,routed.keywords),recent=compactRecent(incoming.recentTurns,profile.recentTurns),opts=clampText(sectionBetween(originalInput,'===== TURN OPTIONS =====','===== AUTHORITATIVE SAVE_STATE ====='),700),director=cleanDirector(originalInput,profile.name.includes('routine')?650:900),directorV2=clampText(routed.directorV2?.directive||'',1000),schedule=compactSchedule(incoming.saveState||{},routed.keys),runtime={npcInnerStates:Object.fromEntries(routed.keys.filter(k=>incoming.saveState?.npcInnerStates?.[k]).map(k=>[k,compactInnerNpc(incoming.saveState.npcInnerStates[k])])),sceneRuntime:incoming.saveState?.sceneRuntime||{},backgroundDigest:clampText(incoming.saveState?.backgroundDigest||'',350)},action=String(incoming.action||''),cg=array(incoming.availableCgIds).slice(0,60).join(', '),momentumDirective=clampText(buildSceneMomentumDirective({action,saveState:incoming.saveState||{}}),2800);
-  const variableContext=`===== TURN OPTIONS =====\n${opts}\n\n===== AUTHORITATIVE SAVE_STATE (ROUTED) =====\n${safeJson(save)}\n\n===== ROLLING SUMMARY TAIL =====\n${clampText(incoming.rollingSummary||'아직 없음',1500)}\n\n===== RECENT TURNS =====\n${safeJson(recent)}\n\n===== CURRENT NPC/SCENE RUNTIME =====\n${clampText(runtime,1800)}\n\n===== SCENE MOMENTUM HF1 =====\n${momentumDirective}\n\n===== AVAILABLE_CG_IDS =====\n${cg||'없음'}\n\n===== GM EVENT DIRECTOR (ROUTED) =====\n${director||'없음'}\n\n===== EVENT DIRECTOR V2.1 (ROUTED) =====\n${directorV2||'없음'}\n\n===== SCHEDULE ENGINE (ROUTED) =====\n${safeJson(schedule)}`;
+  const optionalContext=`===== TURN OPTIONS =====\n${opts}\n\n===== AUTHORITATIVE SAVE_STATE (ROUTED) =====\n${safeJson(save)}\n\n===== ROLLING SUMMARY TAIL =====\n${clampText(incoming.rollingSummary||'아직 없음',1500)}\n\n===== RECENT TURNS =====\n${safeJson(recent)}\n\n===== CURRENT NPC/SCENE RUNTIME =====\n${clampText(runtime,1800)}\n\n===== SCENE MOMENTUM HF1 =====\n${momentumDirective}\n\n===== AVAILABLE_CG_IDS =====\n${cg||'없음'}`;
+  const scheduleText=compactScheduleAuthority(schedule,Math.min(2400,Math.max(1600,Math.floor(profile.inputChars*.24))));
+  const authorityTail=`===== GM EVENT DIRECTOR (ROUTED) =====\n${director||'없음'}\n\n===== EVENT DIRECTOR V2.1 (ROUTED) =====\n${directorV2||'없음'}\n\n===== SCHEDULE ENGINE (ROUTED) =====\n${scheduleText}`;
   const actionBlock=`===== USER ACTION =====\n${action}\n\nUSER ACTION이 이미 선언한 의미적 목표는 결정 가치 없는 중간 단계를 압축해 완료하되, 그 이후의 새로운 PC 선택·대사·감정은 만들지 마라. 플레이어 판단이 실제로 필요한 첫 지점에서 멈춰라. ROUTINE은 빠르고 변화 중심으로 진행하고 주요 NPC 대사에는 감정 태그/강도/근거를 일치시켜라.`;
-  const variableBudget=Math.max(0,profile.inputChars-actionBlock.length-2);
-  return{text:`${clampText(variableContext,variableBudget)}\n\n${actionBlock}`};
+  return{text:composeRoutedInput({optionalContext,authorityTail,actionBlock,inputChars:profile.inputChars})};
 }
 
 export function routeOpenAIParams(params,{incoming={},mode='game'}={}){
