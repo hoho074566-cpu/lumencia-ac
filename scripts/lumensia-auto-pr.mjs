@@ -78,13 +78,14 @@ export function findLatestCodexReviewRequest(comments = [], prNumber, trustedAct
 
 export async function resolveCurrentBaseTarget(api, pull = {}) {
   const head = String(pull?.head?.sha || '');
-  const headRef = String(pull?.head?.ref || head);
-  if (!head || !headRef || typeof api?.compare !== 'function') return null;
-  const comparison = await api.compare('main', headRef);
-  const comparedHead = String(comparison?.head_commit?.sha || '');
+  if (!head || typeof api?.compare !== 'function') return null;
+  // Compare current main directly against the immutable pull HEAD SHA. GitHub's
+  // compare response has base_commit/merge_base_commit but no head_commit field,
+  // so pinning the compare operand to the exact SHA is the authoritative head check.
+  const comparison = await api.compare('main', head);
   const baseSha = String(comparison?.base_commit?.sha || '');
   const mergeBaseSha = String(comparison?.merge_base_commit?.sha || '');
-  if (comparedHead !== head || !baseSha || !mergeBaseSha) return null;
+  if (!baseSha || !mergeBaseSha) return null;
   return { head, baseSha, mergeBaseSha, comparison };
 }
 
