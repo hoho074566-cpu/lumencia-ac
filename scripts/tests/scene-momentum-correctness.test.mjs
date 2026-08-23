@@ -14,6 +14,13 @@ const historicalObserve=classifySceneIntent('10분 전에 본 게시판을 확�
 assert.equal(historicalObserve.kind,'observe','historical duration context must still classify by the committed observation predicate');
 assert.equal(historicalObserve.explicitDurationMinutes,null,'historical “10분 전에” must not become an explicit action duration');
 
+for(const action of ['도서관에 간다?','주변을 살핀다?','주변을 돌아다닌다?','10분 기다린다?','쉰다?']){
+  const intent=classifySceneIntent(action);
+  assert.equal(intent.kind,'decision-sensitive',`question-form compressed action must not execute: ${action}`);
+  assert.equal(intent.compression,false,`question-form compressed action must disable compression: ${action}`);
+  assert.equal(intent.minAdvanceMinutes,0,`question-form compressed action must not force time: ${action}`);
+}
+
 const noOpGrowth=deriveSceneDelta({
   action:'훈련한다.',
   saveState:{pc:{status:'안정'}},
@@ -67,4 +74,4 @@ assert.match(continueDirective,/CONTINUE HARD FREEZE/,'CONTINUE must receive fre
 assert.doesNotMatch(continueDirective,/SCENE_STALL=true/,'CONTINUE must never receive stall-recovery pressure');
 assert.doesNotMatch(continueDirective,/실제 변화가 필요/,'CONTINUE replacement must not demand state change');
 
-console.log('PASS Scene Momentum correctness (duration predicate, no-op delta, dedupe, choice stop, status, CONTINUE freeze)');
+console.log('PASS Scene Momentum correctness (question guards, duration predicate, no-op delta, dedupe, choice stop, status, CONTINUE freeze)');
