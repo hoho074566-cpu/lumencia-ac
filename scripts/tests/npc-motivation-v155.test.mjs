@@ -77,7 +77,7 @@ const legacyGoal = route('기다린다.', {
   },
 });
 const legacyDirector = legacyGoal.telemetry.event_director_v2;
-assert.equal(legacyGoal.telemetry.routerVersion, '1.5.5', 'HF1 context router version remains V1.5.5 under the V1.5.6 adapter');
+assert.equal(legacyGoal.telemetry.routerVersion, '1.5.6-hf1', 'Scene Momentum HF1 must advertise the current routed context version');
 assert.equal(legacyDirector?.version, '2.1', 'Event Director must report V2.1');
 assert.ok(legacyDirector?.goal_signals?.p2, 'legacy npcStates.current_goal must feed goal weighting');
 assert.equal(legacyDirector.goal_signals.p2.source, 'npc-state-current_goal', 'legacy current_goal source must be visible');
@@ -159,7 +159,7 @@ assert.equal((chatRouter.match(/coreHandler\(/g)||[]).length, 1, 'V1.5.6 must ke
 assert.match(runtime, /\[NPC GOAL V2\]/, 'DEBUG must expose NPC Goal V2');
 assert.match(runtime, /\[RECENT RELATIONSHIP REASONS\]/, 'DEBUG must expose persistent relationship reasons');
 assert.match(runtime, /const PATCH_VERSION = '1\.5\.6'/, 'runtime version must be V1.5.6');
-assert.match(health, /version: '0\.8\.2'/, 'health API version must be 0.8.2');
+assert.match(health, /version: '0\.8\.3'/, 'health API version must be 0.8.3 for Scene Momentum HF1');
 assert.match(health, /appVersion: '1\.5\.6'/, 'health appVersion must be 1.5.6');
 
 console.log('PASS NPC Motivation + Relationship Reason V1 / Goal V2 regressions');
