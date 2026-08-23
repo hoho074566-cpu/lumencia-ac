@@ -11,7 +11,7 @@ test('Merge Readiness directly follows a successful single-PR evaluation with tr
   assert.match(workflow, /permissions:\s*\n\s*contents: write\s*\n\s*checks: read\s*\n\s*statuses: read/);
   assert.match(workflow, /LUMENSIA_AUTO_MERGE_TOKEN: \$\{\{ github\.token \}\}/);
   assert.match(workflow, /LUMENSIA_PR_CREATOR_TOKEN: \$\{\{ secrets\.LUMENSIA_PR_CREATOR_TOKEN \}\}/);
-  assert.match(workflow, /run: node scripts\/lumensia-auto-maintenance-run\.mjs/);
+  assert.match(workflow, /node scripts\/lumensia-auto-maintenance-run\.mjs/);
 });
 
 test('direct maintenance shares the Auto PR maintenance concurrency group', () => {
