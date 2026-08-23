@@ -1,5 +1,6 @@
-// LUMENSIA MOBILE V1.5.4 — Stable Router + Event Director V2
-// External API version: 0.8.0
+// LUMENSIA MOBILE V1.5.5 — Stable Router + Event Director V2.1
+// External API version: 0.8.1
+// NPC Motivation + Relationship Reason V1.
 // One canonical core call per turn, but intercepts the final OpenAI request server-side
 // and replaces full CANON/save/history with a relevance-routed context budget.
 
@@ -12,18 +13,18 @@ import { compactEventProgress, mergeContinuationEventProgressState, mergeRoutedE
 
 export const config = { maxDuration: 300 };
 
-const ADAPTER_VERSION = '0.8.0';
-const APP_VERSION = '1.5.4';
+const ADAPTER_VERSION = '0.8.1';
+const APP_VERSION = '1.5.5';
 const SUPPORTED_MODES = new Set(['game','meta','auto','continue']);
 const ROUTER_CONTEXT = new AsyncLocalStorage();
-const PATCH_SYMBOL = Symbol.for('lumensia.stable.responses.parse.router.v154');
+const PATCH_SYMBOL = Symbol.for('lumensia.stable.responses.parse.router.v155');
 
-const AUTO_DIRECTIVE = String.raw`[LUMENSIA V1.5.4 AUTO FLOW]
+const AUTO_DIRECTIVE = String.raw`[LUMENSIA V1.5.5 AUTO FLOW]
 이 요청은 PC의 행동/대사/생각/감정/결정이 아니다. PC는 새 행동을 하지 않았다.
 현재 같은 장면에서 PC 개입이 필요 없는 흐름만 진행한다. 이미 시작된 NPC의 말, NPC끼리의 상호작용, 이미 예정되어 진행 중인 절차만 허용한다.
 PC가 대답/판단/행동해야 하는 첫 지점에서 즉시 멈춘다. AUTO를 핑계로 새 사건·새 인물·새 장소를 억지로 삽입하지 않는다.`;
 
-const CONTINUE_DIRECTIVE = String.raw`[LUMENSIA V1.5.4 CONTINUE]
+const CONTINUE_DIRECTIVE = String.raw`[LUMENSIA V1.5.5 CONTINUE]
 이 요청은 PC 행동이 아니다. 직전 GM 응답의 같은 순간/같은 장면을 문학적으로 조금 더 이어 쓴다.
 시간·위치·관계·기억·성장·일정·훅·보상·감정 저장상태를 변경하지 않는다. 직전 state_delta를 절대 다시 적용하지 않는다.
 PC의 행동·대사·감정·생각·수락·거절을 새로 만들지 않는다.`;
@@ -69,7 +70,7 @@ function lockContinueTurn(turn) {
   turn.cg_id = null;
   turn.director = {
     intervention:'none',beat:'routine',event_kind:'none',spotlight_keys:[],callback_key:null,callback_phase:'none',callback_note:null,
-    reason:'V1.5.4 CONTINUE hard freeze',
+    reason:'V1.5.5 CONTINUE hard freeze',
   };
   return turn;
 }
@@ -81,11 +82,70 @@ function moodFromExpression(expression='') {
 function relationChangeFor(turn,key){return array(turn?.state_delta?.relationship_changes).find(x=>String(x?.npc_key||x?.key||'')===key)||null;}
 function npcStateUpdateFor(turn,key){return array(turn?.state_delta?.npc_state_updates).find(x=>String(x?.npc_key||x?.key||'')===key)||null;}
 function emotionFor(turn,key){return array(turn?.emotion_updates).find(x=>String(x?.npc_key||x?.key||x?.speaker_key||'')===key)||null;}
+function bounded(value,min,max,fallback){const n=Number(value);return Number.isFinite(n)?Math.max(min,Math.min(max,n)):fallback;}
+function uniqText(rows,limit=4){return [...new Set(array(rows).map(x=>clampText(x,140).trim()).filter(Boolean))].slice(-limit);}
+function tinyHash(text=''){let h=0x811c9dc5;for(const ch of String(text)){h^=ch.charCodeAt(0);h=Math.imul(h,0x01000193);}return(h>>>0).toString(16).padStart(8,'0');}
+function containsName(text,value){const a=String(text||'').toLowerCase(),b=String(value||'').trim().toLowerCase();return b.length>=2&&a.includes(b);}
+function inferGoalTarget(text,incoming,key){
+  const value=String(text||'').trim();
+  const pcName=String(incoming.saveState?.pc?.name||'').trim();
+  if(/\b(?:pc|player)\b|플레이어|사용자|Aaa/i.test(value)||(pcName&&containsName(value,pcName)))return{target_type:'pc',target_key:'pc'};
+  const npcRows=Object.entries(CHARACTER_REGISTRY).filter(([k])=>k!==key).sort((a,b)=>String(b[1]).length-String(a[1]).length);
+  for(const [npcKey,name] of npcRows)if(containsName(value,name)||containsName(value,npcKey))return{target_type:'npc',target_key:npcKey};
+  for(const ev of array(incoming.saveState?.scheduleContext?.due)){
+    if((ev?.id&&containsName(value,ev.id))||(ev?.title&&containsName(value,ev.title)))return{target_type:'event',target_key:String(ev.id||ev.title).slice(0,100)};
+  }
+  const location=String(incoming.saveState?.world?.location||'').trim();
+  if(location&&containsName(value,location))return{target_type:'place',target_key:location.slice(0,100)};
+  const classMatch=value.match(/(?:기사과|마법과|신학부|연금(?:술)?과|수업|강의|세미나)/i);
+  if(classMatch)return{target_type:'class',target_key:classMatch[0]};
+  const orgMatch=value.match(/([가-힣A-Za-z0-9_]{2,36}(?:학생회|황실|가문|상회|교단|길드|조직|학부))/i);
+  if(orgMatch)return{target_type:'organization',target_key:orgMatch[1].slice(0,100)};
+  return{target_type:'event',target_key:null};
+}
+function activeGoalFor(incoming,turn,key,old,npc,rel,em){
+  const previous=object(old.active_goal);
+  const currentState=object(incoming.saveState?.npcStates?.[key]);
+  const desire=clampText(npc.current_goal||currentState.current_goal||previous.desire||old.short_term_plan||'',220).trim();
+  if(!desire)return null;
+  const same=String(previous.desire||'').trim()===desire;
+  const due=array(incoming.saveState?.scheduleContext?.due).some(ev=>array(ev?.participants).map(String).includes(key));
+  const activeHook=array(incoming.saveState?.hooks).some(h=>!['resolved','expired','declined'].includes(h?.status)&&String(h?.source_npc_key||'')===key);
+  const target=inferGoalTarget(desire,incoming,key);
+  const cause=clampText(rel.cause||rel.reason||em.reason||'',140).trim();
+  const follow=clampText(rel.followup||'',140).trim();
+  const priority=bounded(previous.priority,1,5,activeHook?4:3);
+  const urgency=due?5:activeHook?Math.max(4,bounded(previous.urgency,1,5,3)):bounded(previous.urgency,1,5,3);
+  const state=/목표\s*(?:완료|달성)|달성됨|완료됨/i.test(String(npc.status||''))?'completed':'active';
+  const progress=state==='completed'?100:same?bounded(previous.progress,0,100,0):0;
+  return{
+    id:same&&previous.id?String(previous.id):`goal:${key}:${tinyHash(desire)}`,
+    target_type:target.target_type,target_key:target.target_key,desire,priority,urgency,progress,state,
+    reasons:uniqText([...(same?array(previous.reasons):[]),cause],4),
+    next_actions:uniqText([...(same?array(previous.next_actions):[]),follow],4),
+    obstacle:clampText(old.concern||old.unresolved_issue||'',140),
+    source_turn:Number(incoming.saveState?.turnNumber||0)+1,
+  };
+}
+function relationshipReasonFor(incoming,turn,key,rel){
+  if(!rel||typeof rel!=='object'||!Object.keys(rel).length)return null;
+  return{
+    turn:Number(incoming.saveState?.turnNumber||0)+1,
+    dimensions:{affinity:bounded(rel.affinity_delta,-10,10,0),trust:bounded(rel.trust_delta,-10,10,0)},
+    status:rel.status||null,
+    cause:clampText(rel.cause||rel.reason||'',150),
+    expression:clampText(rel.expression||'',150),
+    followup:clampText(rel.followup||'',150),
+    source_event:clampText(turn?.event_progress?.event_instance_id||turn?.director?.callback_key||turn?.scene_title||'',120),
+  };
+}
 
 function localNpcUpdates(incoming,turn){
   const previous=object(incoming.saveState?.npcInnerStates);
   const speakerRows=array(turn?.scene).filter(x=>x?.speaker_key);
-  const keys=[...new Set(speakerRows.map(x=>String(x.speaker_key)).filter(Boolean))].slice(0,4);
+  const relationKeys=array(turn?.state_delta?.relationship_changes).map(x=>String(x?.npc_key||x?.key||'')).filter(Boolean);
+  const stateKeys=array(turn?.state_delta?.npc_state_updates).map(x=>String(x?.npc_key||x?.key||'')).filter(Boolean);
+  const keys=[...new Set([...speakerRows.map(x=>String(x.speaker_key)).filter(Boolean),...relationKeys,...stateKeys])].slice(0,6);
   const out={};
   for(const key of keys){
     const old=object(previous[key]);
@@ -93,15 +153,21 @@ function localNpcUpdates(incoming,turn){
     const em=emotionFor(turn,key)||{}; const rel=relationChangeFor(turn,key)||{}; const npc=npcStateUpdateFor(turn,key)||{};
     const expression=em.expression||em.current||lastDialogue.display_expression||lastDialogue.expression||'';
     const cause=clampText(rel.cause||rel.reason||em.reason||'',150);
-    const follow=clampText(rel.followup||npc.current_goal||npc.goal||'',160);
+    const follow=clampText(rel.followup||'',160);
+    const activeGoal=activeGoalFor(incoming,turn,key,old,npc,rel,em);
+    const relationshipReason=relationshipReasonFor(incoming,turn,key,rel);
+    const relationshipHistory=relationshipReason?[...array(old.relationship_history),relationshipReason].slice(-8):array(old.relationship_history).slice(-8);
     out[key]={
       mood:moodFromExpression(expression)||old.mood||'',
       social_stance:clampText(rel.status||old.social_stance||'',80),
       opinion_of_pc:cause?`최근 인상: ${cause}`:clampText(old.opinion_of_pc||'',180),
-      short_term_plan:follow||clampText(old.short_term_plan||'',180),
-      concern:clampText(npc.concern||old.concern||'',180),
-      wants_from_pc:clampText(npc.wants_from_pc||old.wants_from_pc||'',180),
+      short_term_plan:follow||clampText(activeGoal?.next_actions?.[0]||activeGoal?.desire||old.short_term_plan||'',180),
+      concern:clampText(old.concern||'',180),
+      wants_from_pc:clampText(old.wants_from_pc||'',180),
       unresolved_issue:clampText(old.unresolved_issue||'',180),
+      ...(activeGoal?{active_goal:activeGoal}:{}),
+      ...(relationshipReason?{relationship_reason:relationshipReason}:{}),
+      relationship_history:relationshipHistory,
     };
   }
   return out;
@@ -242,12 +308,12 @@ export default async function handler(req,res){
       lockContinueTurn(data.turn); applyExtendedExpressions(data.turn,incoming0.saveState||{});
       data.runtime_state=consumeContinuationRuntime(incoming,data.turn);
       data.background_digest=String(incoming.saveState?.backgroundDigest||'').slice(-1800);
-      const pipeline={pipeline:'continue-stable-v154',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null};
+      const pipeline={pipeline:'continue-stable-v155',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,npc_motivation_v1:true,relationship_reason_v1:true};
       data.pipeline=pipeline; setAdapterRoute(data,mode,pipeline,telemetry); return res.status(200).json(data);
     }
 
     if(mode==='meta'){
-      const pipeline={pipeline:'meta-full-stable-v154',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null};
+      const pipeline={pipeline:'meta-full-stable-v155',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,npc_motivation_v1:true,relationship_reason_v1:true};
       data.pipeline=pipeline; setAdapterRoute(data,mode,pipeline,telemetry); return res.status(200).json(data);
     }
 
@@ -259,17 +325,17 @@ export default async function handler(req,res){
     data.background_digest=localBackgroundDigest(incoming0,data.turn,sceneRuntime.participants);
 
     const pipeline={
-      pipeline:incoming0.qualityPipeline===false?'single-writer-stable-v154':'single-pass-q3-stable-v154',
+      pipeline:incoming0.qualityPipeline===false?'single-writer-stable-v155':'single-pass-q3-stable-v155',
       stages:1,qa_result:incoming0.qualityPipeline===false?'SKIP':'LOCAL_GUARD',rewrite_applied:false,
       background_sim:false,background_local:incoming0.backgroundSim!==false,combat_engine:isCombatLike(incoming.action),runtime_synthesized:true,
       continuation_beats:array(sceneRuntime.remaining_beats).length,context_router:telemetry,
-      event_director_v2:telemetry?.event_director_v2||null,
-      note:'V1.5.4 stable paths keep one core model call, HF1 token budgets, and Event Director V2 weighted variation.',
+      event_director_v2:telemetry?.event_director_v2||null,npc_motivation_v1:true,relationship_reason_v1:true,
+      note:'V1.5.5 keeps one core model call and adds persistent NPC goal/relation-reason runtime state plus goal-aware Event Director V2.1 weighting.',
     };
     data.pipeline=pipeline; setAdapterRoute(data,mode,pipeline,telemetry);
     return res.status(200).json(data);
   }catch(error){
-    console.error('[V1.5.4]',error);
-    return res.status(Number.isInteger(error?.status)?error.status:500).json({error:error?.message||String(error),code:error?.code||'STABLE_ROUTER_V154_ERROR',server_version:ADAPTER_VERSION});
+    console.error('[V1.5.5]',error);
+    return res.status(Number.isInteger(error?.status)?error.status:500).json({error:error?.message||String(error),code:error?.code||'STABLE_ROUTER_V155_ERROR',server_version:ADAPTER_VERSION});
   }
 }
