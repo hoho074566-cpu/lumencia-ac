@@ -403,7 +403,6 @@ export async function maintainAutoPulls({
       if (!isAutoManagedPull(pull, owner, repo)) continue;
       pull = await syncAutoPrPolicy(api, pull);
       let signals = await evaluatePull(api, pull, owner, configuredActors);
-      if (!currentBaseEligible(signals)) { summary.waiting += 1; continue; }
 
       // Any trusted current-head human marker is a persistent automation hold.
       if (findTrustedHumanCheck(signals.issueComments, pull.number, pull.head.sha, owner)) {
@@ -430,7 +429,6 @@ export async function maintainAutoPulls({
         if (!isAutoManagedPull(fixCandidate, owner, repo)
           || fixCandidate.head?.sha !== pull.head.sha
           || fixCandidateBase?.baseSha !== signals.currentBase.baseSha
-          || fixCandidateBase?.mergeBaseSha !== fixCandidateBase?.baseSha
           || signals.requestEntry.request?.head !== pull.head.sha
           || signals.requestEntry.request?.baseSha !== signals.currentBase.baseSha) {
           summary.waiting += 1;
@@ -459,6 +457,10 @@ export async function maintainAutoPulls({
         if (await ensureHumanCheck({ api, webhook, pull, signals, reason: decision.reason, details: decision.details || [], owner, logger, discordFetch })) summary.humanRequired += 1;
         continue;
       }
+
+      // A stale merge base blocks only merge authorization. Current-head P0/P1
+      // remediation and authoritative failures must still be handled above.
+      if (!currentBaseEligible(signals)) { summary.waiting += 1; continue; }
 
       if (decision.action !== 'MERGE') {
         summary.waiting += 1;
