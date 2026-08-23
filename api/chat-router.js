@@ -1,6 +1,6 @@
-// LUMENSIA MOBILE V1.5.5 — Stable Router + Event Director V2.1
-// External API version: 0.8.1
-// NPC Motivation + Relationship Reason V1.
+// LUMENSIA MOBILE V1.5.6 — Stable Router + Event Director V2.1
+// External API version: 0.8.2
+// NPC Goal V2 + Relationship Reason V1.
 // One canonical core call per turn, but intercepts the final OpenAI request server-side
 // and replaces full CANON/save/history with a relevance-routed context budget.
 
@@ -13,18 +13,19 @@ import { compactEventProgress, mergeContinuationEventProgressState, mergeRoutedE
 
 export const config = { maxDuration: 300 };
 
-const ADAPTER_VERSION = '0.8.1';
-const APP_VERSION = '1.5.5';
+const ADAPTER_VERSION = '0.8.2';
+const APP_VERSION = '1.5.6';
 const SUPPORTED_MODES = new Set(['game','meta','auto','continue']);
 const ROUTER_CONTEXT = new AsyncLocalStorage();
-const PATCH_SYMBOL = Symbol.for('lumensia.stable.responses.parse.router.v155');
+const PATCH_SYMBOL = Symbol.for('lumensia.stable.responses.parse.router.v156');
+const GOAL_STATES = new Set(['active','blocked','completed','abandoned']);
 
-const AUTO_DIRECTIVE = String.raw`[LUMENSIA V1.5.5 AUTO FLOW]
+const AUTO_DIRECTIVE = String.raw`[LUMENSIA V1.5.6 AUTO FLOW]
 이 요청은 PC의 행동/대사/생각/감정/결정이 아니다. PC는 새 행동을 하지 않았다.
 현재 같은 장면에서 PC 개입이 필요 없는 흐름만 진행한다. 이미 시작된 NPC의 말, NPC끼리의 상호작용, 이미 예정되어 진행 중인 절차만 허용한다.
 PC가 대답/판단/행동해야 하는 첫 지점에서 즉시 멈춘다. AUTO를 핑계로 새 사건·새 인물·새 장소를 억지로 삽입하지 않는다.`;
 
-const CONTINUE_DIRECTIVE = String.raw`[LUMENSIA V1.5.5 CONTINUE]
+const CONTINUE_DIRECTIVE = String.raw`[LUMENSIA V1.5.6 CONTINUE]
 이 요청은 PC 행동이 아니다. 직전 GM 응답의 같은 순간/같은 장면을 문학적으로 조금 더 이어 쓴다.
 시간·위치·관계·기억·성장·일정·훅·보상·감정 저장상태를 변경하지 않는다. 직전 state_delta를 절대 다시 적용하지 않는다.
 PC의 행동·대사·감정·생각·수락·거절을 새로 만들지 않는다.`;
@@ -70,7 +71,7 @@ function lockContinueTurn(turn) {
   turn.cg_id = null;
   turn.director = {
     intervention:'none',beat:'routine',event_kind:'none',spotlight_keys:[],callback_key:null,callback_phase:'none',callback_note:null,
-    reason:'V1.5.5 CONTINUE hard freeze',
+    reason:'V1.5.6 CONTINUE hard freeze',
   };
   return turn;
 }
@@ -103,35 +104,93 @@ function inferGoalTarget(text,incoming,key){
   if(orgMatch)return{target_type:'organization',target_key:orgMatch[1].slice(0,100)};
   return{target_type:'event',target_key:null};
 }
-function activeGoalFor(incoming,turn,key,old,npc,rel,em){
+function appendGoalHistory(history,row){
+  const rows=array(history).filter(Boolean);
+  if(!row?.id)return rows.slice(-6);
+  const filtered=rows.filter(x=>String(x?.id||'')!==String(row.id));
+  return [...filtered,row].slice(-6);
+}
+function goalArchiveRow(goal,turnNo,reason=''){
+  if(!goal?.id)return null;
+  return {
+    id:String(goal.id),desire:clampText(goal.desire||'',220),final_state:GOAL_STATES.has(String(goal.state))?String(goal.state):'active',
+    final_progress:bounded(goal.progress,0,100,0),ended_turn:turnNo,end_reason:clampText(reason||goal.last_progress_reason||'',180),
+  };
+}
+function goalRuntimeFor(incoming,key,old,npc,rel,em){
   const previous=object(old.active_goal);
+  const hasPrevious=Boolean(previous.id||previous.desire);
   const currentState=object(incoming.saveState?.npcStates?.[key]);
-  const desire=clampText(npc.current_goal||currentState.current_goal||previous.desire||old.short_term_plan||'',220).trim();
-  if(!desire)return null;
-  const same=String(previous.desire||'').trim()===desire;
-  const previousState=['active','blocked','completed','abandoned'].includes(String(previous.state||''))?String(previous.state):'active';
+  const reportedDesire=clampText(npc.current_goal||'',220).trim();
+  const fallbackDesire=clampText(previous.desire||currentState.current_goal||old.short_term_plan||'',220).trim();
+  const reason=clampText(npc.goal_reason||'',180).trim();
+  const requestedReplace=npc.goal_replace===true;
+  const replace=Boolean(hasPrevious&&requestedReplace&&reportedDesire&&reason);
+  const desire=reportedDesire||fallbackDesire;
+  if(!desire)return{goal:null,history:array(old.goal_history).slice(-6)};
+
+  const turnNo=Number(incoming.saveState?.turnNumber||0)+1;
+  let history=array(old.goal_history).slice(-6);
+  const isNew=!hasPrevious||replace;
+  if(replace){const archived=goalArchiveRow(previous,turnNo,reason||'goal replaced');if(archived)history=appendGoalHistory(history,archived);}
+
   const due=array(incoming.saveState?.scheduleContext?.due).some(ev=>array(ev?.participants).map(String).includes(key));
   const activeHook=array(incoming.saveState?.hooks).some(h=>!['resolved','expired','declined'].includes(h?.status)&&String(h?.source_npc_key||'')===key);
   const target=inferGoalTarget(desire,incoming,key);
+  const priority=bounded(isNew?null:previous.priority,1,5,activeHook?4:3);
+  const urgency=due?5:activeHook?Math.max(4,bounded(isNew?null:previous.urgency,1,5,3)):bounded(isNew?null:previous.urgency,1,5,3);
+  const previousState=GOAL_STATES.has(String(previous.state))?String(previous.state):'active';
+  const requestedState=reason&&GOAL_STATES.has(String(npc.goal_state))?String(npc.goal_state):null;
+  const rawDelta=Number(npc.goal_progress_delta);
+  const deltaSupplied=npc.goal_progress_delta!=null&&Number.isFinite(rawDelta);
+  const requestedDelta=deltaSupplied?bounded(Math.trunc(rawDelta),-100,100,0):0;
+  const validDelta=Boolean(reason&&deltaSupplied&&requestedDelta!==0);
+  const nextAction=clampText(npc.goal_next_action||'',140).trim();
+  let state=isNew?'active':previousState;
+  let progress=isNew?0:bounded(previous.progress,0,100,0);
+  let actualDelta=0;
+  let meaningful=false;
+
+  if(isNew){
+    if(validDelta){const next=bounded(progress+requestedDelta,0,100,progress);actualDelta=next-progress;progress=next;meaningful=actualDelta!==0;}
+    if(requestedState){state=requestedState;meaningful=true;}
+  }else if(previousState==='completed'){
+    if(requestedState==='active'&&validDelta&&requestedDelta<0){
+      const next=bounded(100+requestedDelta,0,99,99);
+      if(next<100){state='active';actualDelta=next-100;progress=next;meaningful=true;}
+    }
+    if(state==='completed')progress=100;
+  }else if(previousState==='abandoned'){
+    if(requestedState==='active'){
+      state='active';meaningful=true;
+      if(validDelta){const next=bounded(progress+requestedDelta,0,100,progress);actualDelta=next-progress;progress=next;}
+    }
+  }else{
+    if(validDelta){const next=bounded(progress+requestedDelta,0,100,progress);actualDelta=next-progress;progress=next;meaningful=actualDelta!==0;}
+    if(requestedState&&requestedState!==previousState){state=requestedState;meaningful=true;}
+  }
+
+  if(state==='completed')progress=100;
+  const transition=state!==previousState||isNew;
+  const evidenceReason=(meaningful||transition||replace)?reason:'';
   const cause=clampText(rel.cause||rel.reason||em.reason||'',140).trim();
-  const follow=clampText(rel.followup||'',140).trim();
-  const priority=bounded(same?previous.priority:null,1,5,activeHook?4:3);
-  const urgency=due?5:activeHook?Math.max(4,bounded(same?previous.urgency:null,1,5,3)):bounded(same?previous.urgency:null,1,5,3);
-  const statusText=String(npc.status||'');
-  const explicitState=/목표\s*(?:완료|달성)|달성됨|완료됨/i.test(statusText)?'completed'
-    :/목표\s*(?:포기|폐기|중단)|포기함|폐기함/i.test(statusText)?'abandoned'
-      :/목표\s*(?:막힘|차단|보류)|진행\s*불가/i.test(statusText)?'blocked'
-        :/목표\s*(?:재개|활성)|다시\s*추진/i.test(statusText)?'active':null;
-  const state=explicitState||(same?previousState:'active');
-  const progress=state==='completed'?100:same?bounded(previous.progress,0,100,0):0;
-  return{
-    id:same&&previous.id?String(previous.id):`goal:${key}:${tinyHash(desire)}`,
-    target_type:target.target_type,target_key:target.target_key,desire,priority,urgency,progress,state,
-    reasons:uniqText([...(same?array(previous.reasons):[]),cause],4),
-    next_actions:uniqText([...(same?array(previous.next_actions):[]),follow],4),
-    obstacle:clampText(old.concern||old.unresolved_issue||'',140),
-    source_turn:Number(incoming.saveState?.turnNumber||0)+1,
+  const goal={
+    id:isNew?`goal:${key}:${tinyHash(`${desire}:${turnNo}`)}`:String(previous.id||`goal:${key}:${tinyHash(desire)}`),
+    target_type:target.target_type,target_key:target.target_key,desire,
+    priority,urgency,progress,state,
+    reasons:uniqText([...(isNew?[]:array(previous.reasons)),cause,evidenceReason],4),
+    next_actions:uniqText([...(isNew?[]:array(previous.next_actions)),nextAction],4),
+    obstacle:clampText(state==='blocked'?(reason||previous.obstacle||old.concern||old.unresolved_issue||''):(previous.obstacle||old.concern||old.unresolved_issue||''),140),
+    source_turn:isNew?turnNo:bounded(previous.source_turn,0,1e9,turnNo),
+    updated_turn:turnNo,
+    last_progress_delta:meaningful?actualDelta:bounded(previous.last_progress_delta,-100,100,0),
+    last_progress_reason:evidenceReason||clampText(previous.last_progress_reason||'',180),
   };
+
+  const becameTerminal=!isNew&&!['completed','abandoned'].includes(previousState)&&['completed','abandoned'].includes(state);
+  const newTerminal=isNew&&['completed','abandoned'].includes(state);
+  if(becameTerminal||newTerminal){const archived=goalArchiveRow(goal,turnNo,reason);if(archived)history=appendGoalHistory(history,archived);}
+  return{goal,history};
 }
 function relationshipReasonFor(incoming,turn,key,rel){
   if(!rel||typeof rel!=='object'||!Object.keys(rel).length)return null;
@@ -160,7 +219,8 @@ function localNpcUpdates(incoming,turn){
     const expression=em.expression||em.current||lastDialogue.display_expression||lastDialogue.expression||'';
     const cause=clampText(rel.cause||rel.reason||em.reason||'',150);
     const follow=clampText(rel.followup||'',160);
-    const activeGoal=activeGoalFor(incoming,turn,key,old,npc,rel,em);
+    const goalResult=goalRuntimeFor(incoming,key,old,npc,rel,em);
+    const activeGoal=goalResult.goal;
     const relationshipReason=relationshipReasonFor(incoming,turn,key,rel);
     const relationshipHistory=relationshipReason?[...array(old.relationship_history),relationshipReason].slice(-8):array(old.relationship_history).slice(-8);
     const goalPlan=activeGoal?.state==='active'?clampText(activeGoal?.next_actions?.[0]||activeGoal?.desire||'',180):'';
@@ -174,6 +234,7 @@ function localNpcUpdates(incoming,turn){
       wants_from_pc:clampText(old.wants_from_pc||'',180),
       unresolved_issue:clampText(old.unresolved_issue||'',180),
       ...(activeGoal?{active_goal:activeGoal}:{}),
+      goal_history:goalResult.history,
       ...(relationshipReason?{relationship_reason:relationshipReason}:{}),
       relationship_history:relationshipHistory,
     };
@@ -316,12 +377,12 @@ export default async function handler(req,res){
       lockContinueTurn(data.turn); applyExtendedExpressions(data.turn,incoming0.saveState||{});
       data.runtime_state=consumeContinuationRuntime(incoming,data.turn);
       data.background_digest=String(incoming.saveState?.backgroundDigest||'').slice(-1800);
-      const pipeline={pipeline:'continue-stable-v155',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,npc_motivation_v1:true,relationship_reason_v1:true};
+      const pipeline={pipeline:'continue-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true};
       data.pipeline=pipeline; setAdapterRoute(data,mode,pipeline,telemetry); return res.status(200).json(data);
     }
 
     if(mode==='meta'){
-      const pipeline={pipeline:'meta-full-stable-v155',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,npc_motivation_v1:true,relationship_reason_v1:true};
+      const pipeline={pipeline:'meta-full-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true};
       data.pipeline=pipeline; setAdapterRoute(data,mode,pipeline,telemetry); return res.status(200).json(data);
     }
 
@@ -333,17 +394,17 @@ export default async function handler(req,res){
     data.background_digest=localBackgroundDigest(incoming0,data.turn,sceneRuntime.participants);
 
     const pipeline={
-      pipeline:incoming0.qualityPipeline===false?'single-writer-stable-v155':'single-pass-q3-stable-v155',
+      pipeline:incoming0.qualityPipeline===false?'single-writer-stable-v156':'single-pass-q3-stable-v156',
       stages:1,qa_result:incoming0.qualityPipeline===false?'SKIP':'LOCAL_GUARD',rewrite_applied:false,
       background_sim:false,background_local:incoming0.backgroundSim!==false,combat_engine:isCombatLike(incoming.action),runtime_synthesized:true,
       continuation_beats:array(sceneRuntime.remaining_beats).length,context_router:telemetry,
-      event_director_v2:telemetry?.event_director_v2||null,npc_motivation_v1:true,relationship_reason_v1:true,
-      note:'V1.5.5 keeps one core model call and adds persistent NPC goal/relation-reason runtime state plus goal-aware Event Director V2.1 weighting.',
+      event_director_v2:telemetry?.event_director_v2||null,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true,
+      note:'V1.5.6 keeps one core model call and adds evidence-gated NPC Goal V2 progression/lifecycle/history while preserving Goal-aware Event Director V2.1 guards and Relationship Reason V1.',
     };
     data.pipeline=pipeline; setAdapterRoute(data,mode,pipeline,telemetry);
     return res.status(200).json(data);
   }catch(error){
-    console.error('[V1.5.5]',error);
-    return res.status(Number.isInteger(error?.status)?error.status:500).json({error:error?.message||String(error),code:error?.code||'STABLE_ROUTER_V155_ERROR',server_version:ADAPTER_VERSION});
+    console.error('[V1.5.6]',error);
+    return res.status(Number.isInteger(error?.status)?error.status:500).json({error:error?.message||String(error),code:error?.code||'STABLE_ROUTER_V156_ERROR',server_version:ADAPTER_VERSION});
   }
 }
