@@ -147,7 +147,7 @@ jobs:
     needs: evaluate-pr
     if: always() && needs.evaluate-pr.result == 'success'
     concurrency:
-      group: lumensia-readiness-maintenance
+      group: lumensia-auto-pr-scan
       cancel-in-progress: false
     environment: lumensia-trusted-auto-pr
     permissions:
