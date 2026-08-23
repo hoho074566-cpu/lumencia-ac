@@ -1,16 +1,17 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Scene Momentum Recovery HF1 — implementation is largely complete, but **final exact-head Codex review found one new current P1**. PR #33 is **NOT mergeable by policy yet** even though GitHub reports `mergeable=true`, Safety and Vercel are green. The next session must continue from this blocker, not restart HF1 diagnosis.
+Scene Momentum Recovery HF1 — the long-input Scene Momentum reservation P1 has been fixed in the current candidate worktree and permanent regressions plus the full local PR check pass. PR #33 remains **NOT merge-authorized** until the resulting exact commit receives hosted Safety PASS, Vercel PASS, and a fresh exact-current-HEAD/current-main Codex review with P0/P1=0.
 
 ## Current GitHub State at Handover
 - Repo: `hoho074566-cpu/lumencia-ac`
 - Main: `f6122be5f65a7b0b79555b83c9660eb9ed84cb6c` (`chore: restore standard Lumensia safety workflow`)
 - Working branch: `codex/scene-momentum-recovery-hf1`
 - PR: #33 `Restore Scene Momentum and narrative compression in V1.5.6`
-- Exact PR HEAD before this handover-doc commit: `8ca24ba0d4df31807bf89c1d066317b0329cf18e`
-- Latest code/test HEAD: `f5a64452d1dcd671cafa30ab033bb05e13308e2b`
-- GitHub PR state at `8ca24ba...`: open, draft=false, `mergeable=true`
+- Live PR HEAD refetched before this fix: `0ddd3e300448ac2e241bd57f6371fde83dbf34c1`
+- Historical reviewed PR HEAD: `8ca24ba0d4df31807bf89c1d066317b0329cf18e`
+- Last published code/test HEAD before the current candidate: `f5a64452d1dcd671cafa30ab033bb05e13308e2b`
+- Historical GitHub PR state at `8ca24ba...`: open, draft=false, `mergeable=true`
 - Compare `main...8ca24ba...`: ahead 41 / behind 0
 - Compare `base_commit.sha`: `f6122be5...` = current main
 - Compare `merge_base_commit.sha`: `f6122be5...` = current main
@@ -105,13 +106,13 @@ Before the latest Codex finding:
 
 A fresh exact-head Codex review was submitted on `8ca24ba...` at 2026-08-23 21:47:49 UTC.
 
-## CURRENT BLOCKER — NEW P1 FROM FINAL EXACT-HEAD REVIEW
+## P1 FIX IMPLEMENTED — HOSTED VALIDATION PENDING
 **Thread:** `PRRT_kwDOT8LCAs6biXWm`  
 **Comment:** `PRRC_kwDOT8LCAs7k3PCq`  
 **Path:** `api/lib/context-router.js`, around current line 422  
 **Title:** `Reserve the Scene Momentum directive under input pressure`
 
-Problem:
+Original problem:
 - `SCENE MOMENTUM HF1` is still inside `optionalContext`.
 - `composeRoutedInput()` correctly reserves minimum SAVE_STATE + authority tail + action, but prefix-clips `optionalContext` when routine input pressure is high.
 - A supported ~5000-character routine USER ACTION can therefore keep the final action and authority sections while silently dropping the Scene Momentum directive.
@@ -119,26 +120,22 @@ Problem:
 - The adapter can then apply deterministic State Delta/time-floor behavior to prose generated without the corresponding semantic-compression rules -> narrative/state mismatch.
 - Momentum recovery is also disabled exactly under long-action pressure.
 
-Required fix direction from Codex:
-- move `SCENE MOMENTUM HF1` into a reserved portion of routed input **or** give it its own explicit reserved budget;
-- keep existing minimum SAVE_STATE + GM Director + Event Director V2.1 + Schedule + final USER ACTION reservations;
-- do not exceed profile input budget;
-- do not add model calls;
-- preserve CONTINUE `CONTINUE HARD FREEZE` behavior and GAME/AUTO behavior.
+Implemented closure:
+- `composeRoutedInput()` now accepts a dedicated `reservedContext` between clipped optional context and the existing Director/Schedule authority tail.
+- `===== SCENE MOMENTUM HF1 =====` is no longer inside prefix-clipped `optionalContext`.
+- A permanent exactly-5000-character ROUTINE action ending in `도서관에 간다.` proves the 9000-character budget retains minimum SAVE_STATE, Scene Momentum + `INTENT=travel`, GM Director, Event Director V2.1, Schedule payload, and the committed final action predicate.
+- Routed CONTINUE pressure now explicitly proves `INTENT=continue-freeze`; routed AUTO pressure proves normal `INTENT=generic` world flow.
+- Exactly one canonical core/model call remains covered by `core-invariants.test.mjs` and the full suite.
 
-Required permanent regression:
-- construct a supported ~5000-char ROUTINE action ending in a compressed intent such as `도서관에 간다.`;
-- assert routed input remains within routine budget (`<=9000` chars where existing contract expects it);
-- assert minimum authoritative SAVE_STATE survives;
-- assert GM Director / Event Director V2.1 / Schedule survive;
-- assert final USER ACTION survives in bounded form;
-- **assert `===== SCENE MOMENTUM HF1 =====` and `INTENT=travel` survive input pressure**;
-- preserve one canonical core/model call invariant;
-- run full `node scripts/lumensia-pr-check.mjs`.
+Local validation:
+- focused router / Scene Momentum / core invariant tests: PASS;
+- `node --check api/lib/context-router.js`: PASS;
+- `git diff --check`: PASS;
+- full `node scripts/lumensia-pr-check.mjs`: PASS (`All blocking Lumensia PR checks passed.`).
 
 ## Review State at Handover
 - Final exact-head Codex review **did complete** on `8ca24ba...`.
-- It introduced the current P1 above.
+- It introduced the original P1 above; the current candidate fixes it but has not yet received replacement exact-head review authority.
 - Therefore prior `Safety PASS + Vercel PASS + compare clean + mergeable=true` are **not sufficient for merge**.
 - Direct current P1 evidence outranks sticky Merge Readiness.
 - Sticky Merge Readiness was still stale/pending on an older head during this session; never use it alone.
@@ -175,23 +172,17 @@ Required permanent regression:
 ## NEXT ACTION
 **Do not merge PR #33.** The next chat starts here:
 
-1. Refetch live PR #33 exact HEAD and current main. This handover-doc commit will create a new docs-only HEAD, so do not assume `8ca24ba...` remains current.
-2. Read `docs/LUMENSIA_HANDOVER_CURRENT.md` and this file first.
-3. Do **not** redo completed HF1 diagnosis.
-4. Fix current P1 `PRRT_kwDOT8LCAs6biXWm` in `api/lib/context-router.js`: reserve `SCENE MOMENTUM HF1` under long-input pressure.
-5. Add/extend permanent long-action authority test so Scene Momentum itself survives alongside minimum SAVE_STATE + Director/V2/Schedule + final USER ACTION.
-6. Run focused router tests + full `node scripts/lumensia-pr-check.mjs`.
-7. Commit the code/test fix.
-8. Require hosted Safety PASS + Vercel PASS on the new exact code HEAD.
-9. Request a fresh exact-current-HEAD/current-main Codex review; prior `8ca24ba...` review cannot authorize the new head.
-10. Directly inspect unresolved non-outdated P0/P1 threads. Sticky READY alone is insufficient.
-11. Only if true current P0/P1=0: refetch current main + exact HEAD, compare, require base_commit==main, merge_base==main, behind=0, mergeable/no conflict, then manual merge with `expected_head_sha`.
-12. Verify merged main / production Vercel / `/api/health`.
-13. After HF1 merge, continue directly into **Scene Purpose -> Scene Exit Condition -> Turn Hook -> Event Consequence -> NPC Initiative/Goal Tick refinement**.
+1. Commit and publish the focused router/test/docs candidate.
+2. Require hosted Safety PASS + Vercel PASS on that exact current HEAD.
+3. Request a fresh exact-current-HEAD/current-main Codex review; prior `8ca24ba...` review cannot authorize the new head.
+4. Directly inspect unresolved non-outdated P0/P1 threads. Sticky READY alone is insufficient. Re-evaluate the current inventory-scoring P2, but it remains non-blocking unless fresh evidence escalates it.
+5. Only if true current P0/P1=0: refetch current main + exact HEAD, compare, require base_commit==main, merge_base==main, behind=0, mergeable/no conflict.
+6. Stop at manual-merge readiness. **Do not merge PR #33 in this task.**
+7. After a later human merge, verify merged main / production Vercel / `/api/health`, then continue into **Scene Purpose -> Scene Exit Condition -> Turn Hook -> Event Consequence -> NPC Initiative/Goal Tick refinement**.
 
 ## Stop Record
-- Completed this session: full schedule floor P1, historical-duration P2, question-form compression P1, docs-head Safety/Vercel/compare validation, final exact-head Codex review request and result inspection.
-- Unfinished: newly discovered long-input Scene Momentum reservation P1.
-- Tests at last reviewed exact head `8ca24ba...`: Safety #261 PASS, Vercel PASS.
-- Blocker: current P1 `PRRT_kwDOT8LCAs6biXWm`.
+- Completed this session: long-input Scene Momentum reservation P1 code fix, exactly-5000-character pressure regression, CONTINUE/AUTO reservation regressions, focused tests, full local PR check, and progress/handover refresh.
+- Unfinished: publish the new commit, hosted Safety/Vercel, fresh exact-head/current-main Codex review, and final manual-merge readiness checks.
+- Prior hosted evidence at reviewed head `8ca24ba...`: Safety #261 PASS, Vercel PASS; it does not authorize the new candidate.
+- Blocker: hosted exact-head validation and a fresh authoritative P0/P1=0 review are still required.
 - Merge: NOT PERFORMED.

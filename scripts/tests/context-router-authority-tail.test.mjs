@@ -15,11 +15,15 @@ const authorityTail=[
   '===== SCHEDULE ENGINE (ROUTED) =====',
   '{"due":[{"id":"SCHEDULE_SENTINEL","title":"반드시 보존"}]}',
 ].join('\n');
+const reservedContext='===== SCENE MOMENTUM HF1 =====\nINTENT=travel\nMOMENTUM_SENTINEL=KEEP';
 const actionBlock='===== USER ACTION =====\n돌아다닌다.\n\n의미적 목표를 완료한다.';
-const text=composeRoutedInput({optionalContext,authorityTail,actionBlock,inputChars:9000});
+const text=composeRoutedInput({optionalContext,reservedContext,authorityTail,actionBlock,inputChars:9000});
 
 assert.ok(text.length<=9000,`routed input must respect routine budget: ${text.length}`);
 assert.ok(text.length<optionalContext.length,'oversized optional context must be clipped');
+assert.match(text,/===== SCENE MOMENTUM HF1 =====/);
+assert.match(text,/INTENT=travel/);
+assert.match(text,/MOMENTUM_SENTINEL=KEEP/,'reserved Scene Momentum payload must survive prefix pressure');
 assert.match(text,/===== GM EVENT DIRECTOR \(ROUTED\) =====/);
 assert.match(text,/DIRECTOR_SENTINEL=KEEP/);
 assert.match(text,/===== EVENT DIRECTOR V2\.1 \(ROUTED\) =====/);
@@ -31,7 +35,7 @@ assert.ok(text.endsWith(actionBlock),'USER ACTION must remain the final authorit
 const source=readFileSync('api/lib/context-router.js','utf8');
 assert.match(source,/function compactScheduleAuthority\(/,'schedule authority must be structurally compacted before reservation');
 assert.match(source,/const authorityTail=`===== GM EVENT DIRECTOR \(ROUTED\) =====/,'buildInput must create a reserved authority tail');
-assert.match(source,/composeRoutedInput\(\{saveState,optionalContext,authorityTail,actionBlock,inputChars:profile\.inputChars\}\)/,'buildInput must use the reserved-state-and-tail composer');
+assert.match(source,/composeRoutedInput\(\{saveState,optionalContext,reservedContext,authorityTail,actionBlock,inputChars:profile\.inputChars\}\)/,'buildInput must use the reserved-state-and-tail composer');
 assert.doesNotMatch(source,/clampText\(variableContext,variableBudget\)/,'legacy prefix-only clamp must stay removed');
 
 const divider='='.repeat(20);
@@ -45,7 +49,9 @@ ${divider}\nGuide\n${divider}\nHelpful.
 ${divider}\nGuide\n${divider}\nBrief.
 ===== PC SYSTEM =====
 ${divider}\nRules\n${divider}\nResolve actions.`;
-const longAction=`도서관으로 이동한다. ${'긴 행동 설명 '.repeat(620)}`.slice(0,5000);
+const longActionSuffix='도서관에 간다.';
+const longAction=`${'긴 행동 설명 '.repeat(700)}`.slice(0,5000-longActionSuffix.length)+longActionSuffix;
+assert.equal(longAction.length,5000,'pressure fixture must stay at the supported 5,000-character boundary');
 const originalInput=`===== TURN OPTIONS =====\nnormal
 ===== AUTHORITATIVE SAVE_STATE =====\n{}
 ===== GM EVENT DIRECTOR (SERVER GUIDANCE) =====
@@ -63,6 +69,9 @@ assert.match(routed.params.input,/SCHEDULE_SENTINEL/);
 assert.match(routed.params.input,/NOTE_SENTINEL/);
 assert.match(routed.params.input,/"commitment":"fixed class"/);
 assert.match(routed.params.input,/"confidence":"fixed"/);
+assert.match(routed.params.input,/===== SCENE MOMENTUM HF1 =====/,'Scene Momentum heading must survive long-action pressure');
+assert.match(routed.params.input,/INTENT=travel/,'classified travel intent must reach the model under long-action pressure');
+assert.match(routed.params.input,/도서관에 간다\./,'the bounded USER ACTION must retain its committed travel predicate');
 assert.ok(routed.params.input.lastIndexOf('===== USER ACTION =====')>routed.params.input.lastIndexOf('===== SCHEDULE ENGINE (ROUTED) ====='),'USER ACTION marker must remain final');
 
 const aftermath=source.indexOf("AFTERMATH_FIXED_FLOW");
@@ -71,4 +80,4 @@ const momentum=source.indexOf('const momentumDue=momentumPressure');
 assert.ok(aftermath>=0&&aftermath<momentum,'aftermath fixed-flow guard must precede momentum random selection');
 assert.ok(combat>=0&&combat<momentum,'active-combat fixed-flow guard must precede momentum random selection');
 
-console.log('PASS Context Router authority-tail reservation (9k budget preserves director + schedule payload)');
+console.log('PASS Context Router authority-tail reservation (9k budget preserves momentum + director + schedule payload)');

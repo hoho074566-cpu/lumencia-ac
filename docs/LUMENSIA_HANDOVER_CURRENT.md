@@ -16,9 +16,10 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Branch: `codex/scene-momentum-recovery-hf1`
 - PR: #33 `Restore Scene Momentum and narrative compression in V1.5.6`
 - Current main: `f6122be5f65a7b0b79555b83c9660eb9ed84cb6c`
-- Exact PR HEAD before this docs-only handover commit: `8ca24ba0d4df31807bf89c1d066317b0329cf18e`
-- Latest code/test commit: `f5a64452d1dcd671cafa30ab033bb05e13308e2b`
-- PR state at `8ca24ba...`: open / not draft / `mergeable=true`
+- Live PR HEAD refetched before the reservation fix: `0ddd3e300448ac2e241bd57f6371fde83dbf34c1`
+- Historical reviewed PR HEAD: `8ca24ba0d4df31807bf89c1d066317b0329cf18e`
+- Last published code/test commit before the current candidate: `f5a64452d1dcd671cafa30ab033bb05e13308e2b`
+- Historical PR state at `8ca24ba...`: open / not draft / `mergeable=true`
 - Compare `main...8ca24ba...`: ahead 41 / behind 0
 - `base_commit.sha == current main`
 - `merge_base_commit.sha == current main`
@@ -26,7 +27,7 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Hosted Vercel: **PASS / Ready**
 - PR #33 is protected core/runtime work: **manual merge only**.
 
-## Critical new fact from the FINAL exact-head Codex review
+## Critical review finding and current candidate closure
 Final Codex review **did complete** on exact HEAD `8ca24ba...` at 2026-08-23 21:47:49 UTC and found a **new current P1**.
 
 - Thread: `PRRT_kwDOT8LCAs6biXWm`
@@ -34,12 +35,16 @@ Final Codex review **did complete** on exact HEAD `8ca24ba...` at 2026-08-23 21:
 - Path: `api/lib/context-router.js`, around current line 422
 - Finding: **Reserve the Scene Momentum directive under input pressure**
 
+Current candidate status:
+- the P1 is fixed by reserving `SCENE MOMENTUM HF1` separately from prefix-clipped optional context;
+- an exactly-5000-character ROUTINE action ending in `도서관에 간다.` keeps minimum SAVE_STATE, Momentum + `INTENT=travel`, Directors, Schedule, and the final committed predicate within the 9000-character budget;
+- CONTINUE keeps `INTENT=continue-freeze`; AUTO keeps normal world-flow routing;
+- focused tests and full local `node scripts/lumensia-pr-check.mjs` pass.
+
 This means:
 - **DO NOT MERGE PR #33 YET.**
-- Safety/Vercel/clean compare/mergeable status from `8ca24ba...` are real but insufficient because a current P1 exists.
-- The next chat must fix this P1 first, add a permanent regression, rerun all gates, and request another exact-head Codex review.
-
-This handover update itself will create a newer docs-only HEAD. Therefore the next chat must refetch the live PR HEAD and must not assume `8ca24ba...` is still exact current HEAD.
+- the new candidate still needs hosted Safety/Vercel and a fresh exact-current-HEAD/current-main Codex review;
+- Safety/Vercel/clean compare/mergeable status from `8ca24ba...` remain historical evidence only.
 
 ---
 
@@ -297,7 +302,7 @@ BUT this exact head's final Codex review found the new P1 below, so it is not me
 
 ---
 
-# 7. CURRENT BLOCKER — NEW FINAL-REVIEW P1
+# 7. FINAL-REVIEW P1 — FIXED IN CURRENT CANDIDATE
 
 ## P1: Reserve Scene Momentum directive under input pressure
 Thread: `PRRT_kwDOT8LCAs6biXWm`  
@@ -322,8 +327,8 @@ Example consequence:
 - prose and persisted/runtime state may diverge;
 - momentum recovery is disabled under exactly the input-pressure case that needs deterministic routing.
 
-### Required fix
-Move `SCENE MOMENTUM HF1` into reserved routed content or give it its own explicit reservation.
+### Implemented fix
+`SCENE MOMENTUM HF1` now has its own `reservedContext` and is composed after clipped optional context but before the existing Director/Schedule authority tail and final USER ACTION.
 
 Must preserve all existing reserved contracts:
 - minimum SAVE_STATE
@@ -336,8 +341,8 @@ Must preserve all existing reserved contracts:
 - CONTINUE hard freeze
 - GAME/AUTO existing behavior
 
-### Required permanent regression
-Extend router authority tests with a supported ~5000-char ROUTINE action ending in `도서관에 간다.` or equivalent compressed intent.
+### Permanent regression
+Router authority tests now use an exactly-5000-character ROUTINE action ending in `도서관에 간다.`.
 
 Assert:
 - routine routed input stays within expected 9000-char budget;
@@ -350,6 +355,8 @@ Assert:
 - `INTENT=travel` survives;
 - no extra core/model call;
 - full `node scripts/lumensia-pr-check.mjs` PASS.
+
+Additional mode regressions prove CONTINUE retains `INTENT=continue-freeze` and AUTO retains normal `INTENT=generic` routing under optional-context pressure.
 
 ---
 
@@ -364,9 +371,8 @@ Review submission:
 - result: current P1 described above.
 
 Therefore:
-- **DO NOT MERGE.**
-- previous clean compare/green gates do not override this P1.
-- after fixing it, the new code HEAD needs Safety/Vercel + a fresh exact-head Codex review again.
+- **DO NOT MERGE YET.**
+- the code/test P1 closure is locally green, but the resulting exact commit still needs Safety/Vercel + a fresh exact-head Codex review.
 - prior-head review cannot authorize the fix commit.
 
 Some older P2 threads can remain unresolved/non-outdated even though code/tests already cover the cited behavior (for example no-op growth scoring and historical-duration parsing). They are non-blocking by policy but should be rechecked after the P1 fix. Do not silently ignore a newly escalated correctness problem.
@@ -493,22 +499,18 @@ Gameplay roadmap discussed but not DONE:
 # 12. NEXT ACTION — NEW CHAT STARTS HERE
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
-2. Refetch live branch/PR #33 exact HEAD and current main. This docs commit changed HEAD after `8ca24ba...`.
+2. Refetch live branch/PR #33 exact HEAD and current main.
 3. Do **not** redo completed HF1 analysis.
-4. Open current P1 `PRRT_kwDOT8LCAs6biXWm` and inspect current `api/lib/context-router.js` / authority-tail tests.
-5. Fix Scene Momentum directive reservation under ~5000-char routine input pressure.
-6. Add permanent regression proving `SCENE MOMENTUM HF1` + `INTENT=travel` survive together with minimum SAVE_STATE + Director/V2/Schedule + final action within budget.
-7. Run focused tests + full `node scripts/lumensia-pr-check.mjs`.
-8. Commit the code/test fix.
-9. Hosted Safety PASS + Vercel PASS on the new exact code HEAD.
-10. Request fresh exact-current-HEAD/current-main Codex review.
-11. Directly inspect unresolved non-outdated P0/P1; sticky READY alone is insufficient.
-12. If and only if true current P0/P1=0: final main/head compare, base_commit==main, merge_base==main, behind=0, mergeable/no conflict, then manual `expected_head_sha` merge.
-13. Verify merged main, production Vercel and `/api/health`.
-14. Continue into **Scene Purpose -> Scene Exit Condition -> Turn Hook -> Event Consequence**.
+4. Publish the locally green Scene Momentum reservation candidate if it is not already published.
+5. Require hosted Safety PASS + Vercel PASS on the exact current code/docs HEAD.
+6. Request fresh exact-current-HEAD/current-main Codex review.
+7. Directly inspect unresolved non-outdated P0/P1; sticky READY alone is insufficient. Re-evaluate the inventory-scoring P2 without treating it as blocking unless new evidence escalates it.
+8. If and only if true current P0/P1=0: final main/head compare, base_commit==main, merge_base==main, behind=0, mergeable/no conflict.
+9. Stop at manual-merge readiness; **do not merge PR #33 in this task**.
+10. After a later human merge, verify merged main, production Vercel and `/api/health`, then continue into **Scene Purpose -> Scene Exit Condition -> Turn Hook -> Event Consequence**.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 긴빠이/Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. 완료된 HF1 진단을 다시 분석하지 말고 GitHub live main / PR #33 exact HEAD부터 확인한다. 직전 exact head `8ca24ba...`는 Safety #261 PASS, Vercel PASS, compare ahead 41/behind 0, base+merge-base=current main, mergeable=true였지만 FINAL Codex exact-head review가 current P1 `PRRT_kwDOT8LCAs6biXWm`을 발견했다. 문제는 긴 (~5000자) ROUTINE USER ACTION에서 `SCENE MOMENTUM HF1`이 optionalContext prefix clipping으로 빠질 수 있어 model narration과 post-response deterministic state/time-floor가 어긋날 수 있다는 것이다. `api/lib/context-router.js`에서 Scene Momentum directive를 reserved content/own reserved budget으로 옮기고, minimum SAVE_STATE + GM Director + Event Director V2.1 + Schedule + final USER ACTION + Scene Momentum/INTENT=travel가 모두 budget 안에서 살아남는 permanent regression을 추가한다. full `node scripts/lumensia-pr-check.mjs` PASS 후 commit -> hosted Safety/Vercel -> fresh exact-head Codex review -> direct P0/P1=0 -> final main/merge-base/behind/conflict 검증 -> protected PR #33 expected_head_sha manual merge 순서다. Sticky READY가 direct current threads와 충돌하면 sticky를 신뢰하지 않는다. HF1 merge 뒤에는 Scene Purpose / Scene Exit Condition / Turn Hook / Event Consequence로 바로 계속한다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 긴빠이/Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. 완료된 HF1 진단을 다시 분석하지 말고 GitHub live main / PR #33 exact HEAD부터 확인한다. FINAL Codex review가 찾은 P1 `PRRT_kwDOT8LCAs6biXWm`은 현재 candidate에서 `SCENE MOMENTUM HF1`을 별도 reserved context로 옮겨 수정했고, 정확히 5000자인 ROUTINE USER ACTION 끝의 `도서관에 간다.`와 minimum SAVE_STATE + Momentum/INTENT=travel + GM Director + Event Director V2.1 + Schedule이 9000자 예산 안에서 함께 살아남는 회귀 테스트를 추가했다. CONTINUE hard freeze와 AUTO world flow도 예약 상태로 검증했으며 focused/full local PR check는 PASS다. 다음은 candidate publish -> hosted Safety/Vercel -> fresh exact-current-HEAD/current-main Codex review -> direct P0/P1=0 -> final main/merge-base/behind/conflict 검증 순서다. 이 작업에서는 PR #33을 merge하지 말고 manual merge 직전에서 멈춘다. Sticky READY가 direct current threads와 충돌하면 sticky를 신뢰하지 않는다. HF1이 이후 사람에 의해 merge되면 Scene Purpose / Scene Exit Condition / Turn Hook / Event Consequence로 바로 계속한다.`
