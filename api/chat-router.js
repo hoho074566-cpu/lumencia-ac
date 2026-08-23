@@ -228,7 +228,7 @@ function goalRuntimeFor(incoming,key,old,npc,rel,em){
 
   if(isNew){
     if(validDelta){const next=bounded(progress+requestedDelta,0,100,progress);actualDelta=next-progress;progress=next;meaningful=actualDelta!==0;}
-    if(requestedState){state=requestedState;meaningful=true;}
+    if(requestedState&&(!replace||requestedState==='active')){state=requestedState;meaningful=true;}
   }else if(previousState==='completed'){
     if(requestedState==='active'&&validDelta&&requestedDelta<0){
       const next=bounded(100+requestedDelta,0,99,99);
@@ -253,13 +253,14 @@ function goalRuntimeFor(incoming,key,old,npc,rel,em){
   const cause=clampText(rel.cause||rel.reason||em.reason||'',140).trim();
   const previousNext=array(previous.next_actions).map(x=>clampText(x,140).trim()).filter(Boolean);
   const nextActions=nextAction?[nextAction,...previousNext.filter(x=>x!==nextAction)].slice(0,4):previousNext.slice(0,4);
+  const reopenedFromBlocked=!isNew&&previousState==='blocked'&&state==='active'&&requestedState==='active';
   const goal={
     id:isNew?`goal:${key}:${tinyHash(`${desire}:${turnNo}`)}`:String(previous.id||`goal:${key}:${tinyHash(desire)}`),
     target_type:target.target_type,target_key:target.target_key,desire,
     priority,urgency,progress,state,
     reasons:uniqText([...(isNew?[]:array(previous.reasons)),cause,evidenceReason],4),
     next_actions:nextActions,
-    obstacle:clampText(state==='blocked'?(reason||previous.obstacle||old.concern||old.unresolved_issue||''):(previous.obstacle||old.concern||old.unresolved_issue||''),140),
+    obstacle:clampText(state==='blocked'?(reason||previous.obstacle||old.concern||old.unresolved_issue||''):(reopenedFromBlocked?'':(previous.obstacle||old.concern||old.unresolved_issue||'')),140),
     source_turn:isNew?turnNo:bounded(previous.source_turn,0,1e9,turnNo),
     updated_turn:goalTouched?turnNo:bounded(previous.updated_turn,0,1e9,bounded(previous.source_turn,0,1e9,turnNo)),
     last_progress_delta:meaningful?actualDelta:bounded(previous.last_progress_delta,-100,100,0),
@@ -289,7 +290,9 @@ function localNpcUpdates(incoming,turn){
   const speakerRows=array(turn?.scene).filter(x=>x?.speaker_key);
   const relationKeys=array(turn?.state_delta?.relationship_changes).map(x=>String(x?.npc_key||x?.key||'')).filter(Boolean);
   const stateKeys=array(turn?.state_delta?.npc_state_updates).map(x=>String(x?.npc_key||x?.key||'')).filter(Boolean);
-  const keys=[...new Set([...speakerRows.map(x=>String(x.speaker_key)).filter(Boolean),...relationKeys,...stateKeys])].slice(0,6);
+  const explicitKeys=[...new Set(stateKeys)].slice(0,12);
+  const passiveKeys=[...new Set([...relationKeys,...speakerRows.map(x=>String(x.speaker_key)).filter(Boolean)])].filter(key=>!explicitKeys.includes(key)).slice(0,6);
+  const keys=[...explicitKeys,...passiveKeys].slice(0,12);
   const out={};
   for(const key of keys){
     const old=object(previous[key]);
@@ -305,7 +308,8 @@ function localNpcUpdates(incoming,turn){
     const goalPlan=activeGoal?.state==='active'?clampText(activeGoal?.next_actions?.[0]||activeGoal?.desire||'',180):'';
     const oldPlanText=String(old.short_term_plan||'').trim();
     const terminalGoal=Boolean(activeGoal&&activeGoal.state!=='active');
-    const terminalPlanMatches=terminalGoal&&(oldPlanText===String(activeGoal?.desire||'').trim()||oldPlanText===String(old?.active_goal?.desire||'').trim());
+    const priorGoalActions=new Set(array(old?.active_goal?.next_actions).map(x=>String(x||'').trim()).filter(Boolean));
+    const terminalPlanMatches=terminalGoal&&(oldPlanText===String(activeGoal?.desire||'').trim()||oldPlanText===String(old?.active_goal?.desire||'').trim()||priorGoalActions.has(oldPlanText));
     const oldPlan=terminalPlanMatches?'':old.short_term_plan;
     out[key]={
       mood:moodFromExpression(expression)||old.mood||'',
