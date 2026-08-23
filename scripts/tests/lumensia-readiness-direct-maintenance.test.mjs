@@ -14,6 +14,11 @@ test('Merge Readiness directly follows a successful single-PR evaluation with tr
   assert.match(workflow, /run: node scripts\/lumensia-auto-maintenance-run\.mjs/);
 });
 
+test('direct maintenance shares the Auto PR maintenance concurrency group', () => {
+  const job = workflow.split(/\n  maintain-after-pr:\n/)[1] || '';
+  assert.match(job, /concurrency:\s*\n\s*group: lumensia-auto-pr-scan\s*\n\s*cancel-in-progress: false/);
+});
+
 test('direct maintenance executes only trusted default-branch automation scripts', () => {
   const job = workflow.split(/\n  maintain-after-pr:\n/)[1] || '';
   assert.match(job, /ref: refs\/heads\/\$\{\{ github\.event\.repository\.default_branch \}\}/);
