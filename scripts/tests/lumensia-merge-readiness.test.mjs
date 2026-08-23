@@ -331,7 +331,7 @@ test('scan and event evaluations share the same per-PR concurrency group', () =>
   const workflow = readFileSync(new URL('../../.github/workflows/lumensia-merge-readiness.yml', import.meta.url), 'utf8');
   assert.match(workflow, /group: lumensia-readiness-pr-\$\{\{ matrix\.pr \}\}/);
   assert.match(workflow, /group: lumensia-readiness-pr-\$\{\{ github\.event\.pull_request\.number \|\| github\.event\.check_run\.pull_requests\[0\]\.number \}\}/);
-  assert.equal((workflow.match(/cancel-in-progress: false/g) || []).length, 2);
+  assert.equal((workflow.match(/cancel-in-progress: false/g) || []).length, 3);
   assert.match(workflow, /PR_NUMBER: \$\{\{ matrix\.pr \}\}/);
 });
 
@@ -582,9 +582,9 @@ test('latest review selection continues to ignore prior-head findings', () => {
 
 test('privileged workflow bootstraps only from the trusted default branch', () => {
   const workflow = readFileSync(new URL('../../.github/workflows/lumensia-merge-readiness.yml', import.meta.url), 'utf8');
-  assert.equal((workflow.match(/uses: actions\/checkout@v4/g) || []).length, 2);
-  assert.equal((workflow.match(/ref: refs\/heads\/\$\{\{ github\.event\.repository\.default_branch \}\}/g) || []).length, 2);
-  assert.equal((workflow.match(/persist-credentials: false/g) || []).length, 2);
+  assert.equal((workflow.match(/uses: actions\/checkout@v4/g) || []).length, 3);
+  assert.equal((workflow.match(/ref: refs\/heads\/\$\{\{ github\.event\.repository\.default_branch \}\}/g) || []).length, 3);
+  assert.equal((workflow.match(/persist-credentials: false/g) || []).length, 3);
   assert.doesNotMatch(workflow, /pull_request\.head|github\.head_ref|refs\/pull/);
 });
 
