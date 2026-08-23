@@ -86,6 +86,7 @@ jobs:
               return code[:start]+f"# {label} handled/omitted by safety wrapper\n"+code[end:]
           code=drop_block(code,'old_build="""',"text=once(text,old_build,new_build,'buildInput momentum wiring')",'buildInput giant assertion')
           code=drop_block(code,'debug_old=',"text=once(text,debug_old,debug_new,'runtime momentum debug')",'optional runtime debug injection')
+          code=code.replace("assert.match(runtime,/SCENE MOMENTUM HF1/);","assert.match(runtime,/Scene Momentum Recovery HF1/);")
           pp.write_text(code,encoding='utf-8')
           PY
 
