@@ -1,23 +1,21 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Scene Momentum Recovery HF1 — the long-input Scene Momentum reservation P1 has been fixed in the current candidate worktree and permanent regressions plus the full local PR check pass. PR #33 remains **NOT merge-authorized** until the resulting exact commit receives hosted Safety PASS, Vercel PASS, and a fresh exact-current-HEAD/current-main Codex review with P0/P1=0.
+Post-merge Narrative Engine continuation — Scene Momentum Recovery HF1 is merged and verified. The active work is **Live-play acceptance** against the original slow/looping input classes, followed by Scene Purpose, Explicit Scene Exit Condition, Stronger Turn Hook, and Event Consequence chaining.
 
-## Current GitHub State at Handover
+## Current GitHub State
 - Repo: `hoho074566-cpu/lumencia-ac`
-- Main: `f6122be5f65a7b0b79555b83c9660eb9ed84cb6c` (`chore: restore standard Lumensia safety workflow`)
-- Working branch: `codex/scene-momentum-recovery-hf1`
-- PR: #33 `Restore Scene Momentum and narrative compression in V1.5.6`
-- Live PR HEAD refetched before this fix: `0ddd3e300448ac2e241bd57f6371fde83dbf34c1`
-- Historical reviewed PR HEAD: `8ca24ba0d4df31807bf89c1d066317b0329cf18e`
-- Last published code/test HEAD before the current candidate: `f5a64452d1dcd671cafa30ab033bb05e13308e2b`
-- Historical GitHub PR state at `8ca24ba...`: open, draft=false, `mergeable=true`
-- Compare `main...8ca24ba...`: ahead 41 / behind 0
-- Compare `base_commit.sha`: `f6122be5...` = current main
-- Compare `merge_base_commit.sha`: `f6122be5...` = current main
-- Hosted Safety on `8ca24ba...`: **Lumensia PR Safety Gate #261 PASS**
-- Hosted Vercel on `8ca24ba...`: **PASS / Ready**
-- Protected core/runtime PR: **manual merge only**.
+- Main: `8d378b532910dfecaf5226118bffabdddbe74289` (`Merge pull request #33`)
+- Working branch: `codex/narrative-live-play-acceptance`
+- PR #33: **merged** at 2026-08-23 23:07:00 UTC
+- Reviewed/merged PR HEAD: `216bef1d51b72f2edb6da3f06c69e02aa45b5b10`
+- Exact-head Safety: **Lumensia PR Safety Gate #263 PASS**
+- Exact-head Vercel: **PASS / Ready**
+- Fresh exact-head Codex review: P0/P1 = 0; five P2 threads were non-blocking by repository policy.
+- Merge commit tree is identical to reviewed PR HEAD; no unexpected merge change.
+- Post-merge Vercel on main: **PASS**.
+- Production `/api/health`: `ok=true`, API configured, app `1.5.6`, adapter `/api/chat-router`, canonical core `/api/chat`, prompt cache retention `24h`.
+- Post-merge full `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
 ## Completed Foundation
 Already merged before PR #33:
@@ -106,7 +104,7 @@ Before the latest Codex finding:
 
 A fresh exact-head Codex review was submitted on `8ca24ba...` at 2026-08-23 21:47:49 UTC.
 
-## P1 FIX IMPLEMENTED — HOSTED VALIDATION PENDING
+## P1 FIX IMPLEMENTED AND MERGED
 **Thread:** `PRRT_kwDOT8LCAs6biXWm`  
 **Comment:** `PRRC_kwDOT8LCAs7k3PCq`  
 **Path:** `api/lib/context-router.js`, around current line 422  
@@ -133,13 +131,33 @@ Local validation:
 - `git diff --check`: PASS;
 - full `node scripts/lumensia-pr-check.mjs`: PASS (`All blocking Lumensia PR checks passed.`).
 
-## Review State at Handover
-- Final exact-head Codex review **did complete** on `8ca24ba...`.
-- It introduced the original P1 above; the current candidate fixes it but has not yet received replacement exact-head review authority.
-- Therefore prior `Safety PASS + Vercel PASS + compare clean + mergeable=true` are **not sufficient for merge**.
-- Direct current P1 evidence outranks sticky Merge Readiness.
-- Sticky Merge Readiness was still stale/pending on an older head during this session; never use it alone.
-- Some older unresolved non-outdated P2 threads may remain visible even where code/tests already address the behavior (notably no-op delta scoring / historical-duration parsing). Re-evaluate them after the P1 fix, but project policy keeps P2/P3 non-blocking unless a fresh correctness issue materially escalates.
+## PR #33 Final Review / Merge Record
+- Exact reviewed HEAD: `216bef1d51b72f2edb6da3f06c69e02aa45b5b10`.
+- Safety #263 PASS, Vercel PASS, fresh exact-head direct P0/P1=0.
+- Final compare before merge: ahead 43 / behind 0; base commit and merge-base both `f6122be5f65a7b0b79555b83c9660eb9ed84cb6c`.
+- Merge used `expected_head_sha=216bef1d51b72f2edb6da3f06c69e02aa45b5b10` and succeeded as merge commit `8d378b532910dfecaf5226118bffabdddbe74289`.
+- The five non-outdated unresolved findings were P2 only and remain follow-up evidence, not retroactive HF1 merge blockers.
+
+## Live-play Acceptance Round 1
+Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `scripts/qa/live-play-acceptance.mjs`.
+
+- 12 real `/api/chat-router` calls, cloned/stateless fixtures, Luna low reasoning, short prose.
+- Baseline result: 7 PASS / 5 flagged.
+- Confirmed PASS: short travel, exactly-5000-character action ending in travel, explicit wait, NPC approach/question, door-to-destination compression, CONTINUE hard freeze, NPC-first initiative.
+- Confirmed event behavior: completed entrance ceremony did not replay; a new meaningful interruption correctly stopped travel before the destination. The original destination-only assertion was too strict and was corrected.
+- Confirmed schedule behavior: a two-hour rest ten minutes before a mandatory orientation advanced only ten minutes and surfaced the scheduled event instead of skipping it.
+- Reproduced classifier gaps:
+  - `한 시간 쉰다.` / `두 시간 쉰다.` were narrated correctly but recorded as `generic`, not `downtime`;
+  - `게시판을 다시 확인한다.` was `generic`, not `observe`;
+  - `도서관에 갈까?` did not execute travel, but was `generic`, not `decision-sensitive`.
+- Local closure:
+  - bounded native-Korean duration numbers now parse for hours/minutes and compound forms;
+  - bounded repeat-observation adverbs remain observe intent;
+  - Korean travel deliberation/question forms become decision-sensitive without a movement floor;
+  - schedule-boundary regression now includes `두 시간 쉰다.`;
+  - explicit live harness is outside automatic CI, so it never spends API credits implicitly.
+- Focused intent/correctness/time-floor/HF1 tests: PASS.
+- Full `node scripts/lumensia-pr-check.mjs`: PASS.
 
 ## Permanent HF1 Test Suites
 - `scripts/tests/context-router-authority-tail.test.mjs`
@@ -170,19 +188,16 @@ Local validation:
 - protected core/runtime PR #33 manual merge safety.
 
 ## NEXT ACTION
-**Do not merge PR #33.** The next chat starts here:
-
-1. Commit and publish the focused router/test/docs candidate.
-2. Require hosted Safety PASS + Vercel PASS on that exact current HEAD.
-3. Request a fresh exact-current-HEAD/current-main Codex review; prior `8ca24ba...` review cannot authorize the new head.
-4. Directly inspect unresolved non-outdated P0/P1 threads. Sticky READY alone is insufficient. Re-evaluate the current inventory-scoring P2, but it remains non-blocking unless fresh evidence escalates it.
-5. Only if true current P0/P1=0: refetch current main + exact HEAD, compare, require base_commit==main, merge_base==main, behind=0, mergeable/no conflict.
-6. Stop at manual-merge readiness. **Do not merge PR #33 in this task.**
-7. After a later human merge, verify merged main / production Vercel / `/api/health`, then continue into **Scene Purpose -> Scene Exit Condition -> Turn Hook -> Event Consequence -> NPC Initiative/Goal Tick refinement**.
+1. Publish the Live-play Round 1 candidate and require hosted Safety + Vercel on the exact head.
+2. Rerun all 12 real acceptance cases against that deployed exact candidate; do not use production main for candidate validation.
+3. If the rerun is green, request fresh exact-current-HEAD/current-main Codex review and resolve only P0/P1 blockers.
+4. Stop at the protected-core manual merge gate; never auto-merge.
+5. After the acceptance fix is human-merged and production-smoked, implement **Scene Purpose** with bounded purpose state and no automatic player choice.
+6. Then continue through Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence chaining/lifetime -> NPC Initiative/Goal Tick refinement.
 
 ## Stop Record
-- Completed this session: long-input Scene Momentum reservation P1 code fix, exactly-5000-character pressure regression, CONTINUE/AUTO reservation regressions, focused tests, full local PR check, and progress/handover refresh.
-- Unfinished: publish the new commit, hosted Safety/Vercel, fresh exact-head/current-main Codex review, and final manual-merge readiness checks.
-- Prior hosted evidence at reviewed head `8ca24ba...`: Safety #261 PASS, Vercel PASS; it does not authorize the new candidate.
-- Blocker: hosted exact-head validation and a fresh authoritative P0/P1=0 review are still required.
-- Merge: NOT PERFORMED.
+- Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.
+- Completed after merge: first 12-case production Live-play run, four demonstrated classifier fixes, permanent regressions, full local PR check.
+- Unfinished: hosted candidate validation, 12-case exact-candidate rerun, fresh exact-head review, protected manual merge, Scene Purpose and subsequent Narrative Engine phases.
+- Blocker: none.
+- NEXT ACTION: publish/deploy the Live-play Round 1 candidate, then rerun the 12-case harness against that exact deployment.
