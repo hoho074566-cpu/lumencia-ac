@@ -56,8 +56,6 @@ jobs:
           awk 'BEGIN{f=0} /python3 - <<'"'"'PY'"'"'/{f=1;next} f && /^          PY$/{exit} f{sub(/^          /,"");print}' .github/workflows/scene-momentum-recovery-patch-once.yml > /tmp/scene-momentum-patch.py
           test -s /tmp/scene-momentum-patch.py
 
-          # Normalize buildInput with small exact substitutions so the older one-shot
-          # script sees its intended final marker instead of depending on one huge block.
           python3 - <<'PY'
           from pathlib import Path
           path=Path('api/lib/context-router.js')
@@ -76,6 +74,19 @@ jobs:
               if text.count(old3)!=1: raise SystemExit(f'action block marker count={text.count(old3)}')
               text=text.replace(old3,new3,1)
               path.write_text(text,encoding='utf-8')
+
+          # buildInput is deliberately normalized above using small markers. Remove the
+          # obsolete giant-block assertion from the extracted one-shot script.
+          pp=Path('/tmp/scene-momentum-patch.py')
+          code=pp.read_text(encoding='utf-8')
+          start=code.find('old_build="""')
+          end_marker="text=once(text,old_build,new_build,'buildInput momentum wiring')"
+          end=code.find(end_marker,start)
+          if start < 0 or end < 0:
+              raise SystemExit('could not locate obsolete buildInput giant-block assertion')
+          end += len(end_marker)
+          code=code[:start]+"# buildInput normalized by safety-wrapper small markers\n"+code[end:]
+          pp.write_text(code,encoding='utf-8')
           PY
 
           python3 /tmp/scene-momentum-patch.py
