@@ -86,7 +86,7 @@ assert.ok(legacyDirector.weights.p2 > legacyDirector.weights.p1, 'equal baseline
 assert.match(legacyGoal.params.instructions, /npc_state_updates\.current_goal/, 'routed contract must define meaningful current_goal updates');
 assert.match(legacyGoal.params.instructions, /목표가 행동·거절·접근·회피·우선순위/, 'goal-to-behavior rule is missing');
 
-const structuredGoal = route('기다린다.', {
+const structuredGoalState = {
   npcInnerStates: {
     p2: {
       active_goal: {
@@ -103,10 +103,12 @@ const structuredGoal = route('기다린다.', {
       },
     },
   },
-});
+};
+const structuredGoal = route('기다린다.', structuredGoalState);
 assert.equal(structuredGoal.telemetry.event_director_v2.goal_signals.p2.source, 'runtime-active-goal', 'structured runtime goal must be authoritative');
-assert.equal(structuredGoal.telemetry.event_director_v2.goal_signals.p2.progress, 30, 'goal progress must survive routing');
-assert.ok(structuredGoal.params.input.includes('금서고 접근 단서를 확보한다.'), 'active goal must reach routed model context');
+assert.equal(structuredGoal.telemetry.event_director_v2.goal_signals.p2.progress, 30, 'goal progress must survive Director routing');
+const structuredGoalContext = route('p2에게 직접 질문한다.', structuredGoalState);
+assert.ok(structuredGoalContext.params.input.includes('금서고 접근 단서를 확보한다.'), 'active goal must reach model context whenever that NPC is routed into the turn');
 
 const directFocus = route('p1에게 직접 질문한다.', {
   npcInnerStates: {
@@ -138,4 +140,4 @@ assert.match(runtime, /const PATCH_VERSION = '1\.5\.5'/, 'runtime version must b
 assert.match(health, /version: '0\.8\.1'/, 'health API version must be 0.8.1');
 assert.match(health, /appVersion: '1\.5\.5'/, 'health appVersion must be 1.5.5');
 
-console.log('PASS NPC Motivation + Relationship Reason V1 regressions (20 checks)');
+console.log('PASS NPC Motivation + Relationship Reason V1 regressions (21 checks)');
