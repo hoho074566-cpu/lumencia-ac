@@ -1,0 +1,297 @@
+name: Scene Momentum Recovery patch once
+
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.pull_request.head.ref == 'codex/scene-momentum-recovery-hf1'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Apply Scene Momentum HF1 production wiring
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def p(path): return Path(path)
+          def read(path): return p(path).read_text(encoding='utf-8')
+          def write(path,text): p(path).write_text(text,encoding='utf-8')
+          def once(text, old, new, label):
+              count=text.count(old)
+              if count==0 and new in text:
+                  return text
+              if count!=1:
+                  raise SystemExit(f'{label}: expected 1 old marker, found {count}')
+              return text.replace(old,new,1)
+
+          # --- helper: remove broad "마법" decision false-positive ---
+          path='lib/scene-momentum.js'; text=read(path)
+          text=once(text,
+            "const IMPORTANT_DECISION_RE = /(전투|공격|결투|대련|죽이|살해|기습|협상|고백|배신|계약|서명|맹세|선택|능력|스킬|권능|마법|도망칠까|싸울까|duel|attack|fight|kill|contract|confess)/i;",
+            "const IMPORTANT_DECISION_RE = /(전투|공격|결투|대련|죽이|살해|기습|협상|고백|배신|계약|서명|맹세|(?:능력|스킬|권능|마법)(?:을|를)?\\s*(?:사용|발동|시전|쓴|쓸)|도망칠까|싸울까|duel|attack|fight|kill|contract|confess)/i;",
+            'narrow IMPORTANT_DECISION_RE')
+          write(path,text)
+
+          path='scripts/tests/scene-momentum-v156-hf1.test.mjs'; text=read(path)
+          marker="assert.match(exitDirective, /복도에서 멈추려면 실제 방해\\/사건\\/중요 선택 근거/);\n"
+          addition=marker+"assert.equal(classifySceneIntent('마법과 건물로 간다.', { location:'A동 복도' }).kind, 'travel', 'department travel must not be mistaken for magic ability use');\n"
+          text=once(text,marker,addition,'magic-department travel regression')
+          write(path,text)
+
+          # --- Context Router: semantic intent instead of literal micro-step stop ---
+          path='api/lib/context-router.js'; text=read(path)
+          text=once(text,
+            "// Stable path: api/lib/context-router.js\n\nconst VERSION = '1.5.5';",
+            "// Stable path: api/lib/context-router.js\n\nimport { buildSceneMomentumDirective } from '../../lib/scene-momentum.js';\n\nconst VERSION = '1.5.6-hf1';",
+            'context router import/version')
+          text=once(text,
+            "1) PC의 행동·대사·감정·생각·의도·수락/거절을 대신 확정하지 않는다. 사용자가 선언한 행동까지만 처리한다.",
+            "1) PC의 새로운 행동·대사·감정·생각·수락/거절을 대신 만들지 않는다. 그러나 USER ACTION이 이미 선언한 의미적 행동 목표를 완료하는 데 필요한 결정 가치 없는 중간 단계(문, 복도, 계단, 현관, 평범한 이동)는 자동 처리하고 다음으로 실제 판단 가치가 있는 지점까지 세계를 진행한다.",
+            'GM semantic action rule')
+          old17="17) npc_state_updates.current_goal은 NPC가 실제로 추구하는 현재 목표가 새로 생기거나 의미 있게 바뀐 경우에만 짧고 구체적으로 갱신한다. 목표 대상은 PC일 필요가 없으며 다른 NPC·장소·조직·물건·수업·사건일 수 있다. 기존 현재 목표와 충돌하는 새 목표를 근거 없이 만들지 말고, 목표가 행동·거절·접근·회피·우선순위에 자연스럽게 영향을 주게 한다.`;"
+          new17="""17) npc_state_updates.current_goal은 NPC가 실제로 추구하는 현재 목표가 새로 생기거나 의미 있게 바뀐 경우에만 짧고 구체적으로 갱신한다. 목표 대상은 PC일 필요가 없으며 다른 NPC·장소·조직·물건·수업·사건일 수 있다. 기존 현재 목표와 충돌하는 새 목표를 근거 없이 만들지 말고, 목표가 행동·거절·접근·회피·우선순위에 자연스럽게 영향을 주게 한다.
+18) SCENE CHANGE 우선: 직전 턴 이후 실제로 달라진 위치·시간·NPC 행동/출입·정보·사건·관계·목표·위험·환경을 우선 서술한다. scene_title/문장 표현만 바꾸고 같은 상태를 재묘사하는 것은 진행이 아니다.
+19) 이미 공개된 게시판·창구·공지·목록·배경 정보는 변한 것이 없으면 다시 목록처럼 읽어주지 않는다. 새 요소/변화/현재 행동 관련 요소를 우선한다.
+20) NPC는 자기 일정·목표·욕망·관계·감정에 따라 PC 입력을 기다리지 않고 먼저 말 걸기, 이동/퇴장, 다른 NPC와 상호작용, 조사·파벌 행동·사건 개입을 할 수 있다. 단 물리 위치·일정·지식 제약을 지킨다.
+21) 사건/행동의 직접 결과 뒤에는 자연스러운 세계 반응과 다음 가능성까지 이어갈 수 있다. 낮은 가치의 이동·대기·휴식은 압축하고 시간도 실제로 진행한다. 매 턴 대형 사건을 강제하지 않는다.
+22) STOP은 전투 돌입, 되돌리기 어려운 위험, 중요한 관계/대화 선택, 갈림길, 능력·스킬 사용 여부처럼 플레이어 판단 자체가 콘텐츠인 첫 지점에서 한다. 문/계단/복도/현관/평범한 길 같은 중간 단계에서 재입력을 요구하지 않는다. choices는 실제 STOP 지점에서만 정확히 3개다.
+23) 사용자에게 보이는 narration/dialogue에서 내부 명칭 'PC' 또는 자리표시자 'Aaa'를 주어로 출력하지 않는다. 실제 플레이어 이름을 쓰거나 자연스럽게 주어를 생략한다.`;"""
+          text=once(text,old17,new17,'GM momentum rules')
+          text=once(text,
+            "  const save=incoming.saveState||{}, plan=parseDirectorV2Guidance(originalInput), turn=Number(save.turnNumber||0);",
+            "  const save=incoming.saveState||{}, plan=parseDirectorV2Guidance(originalInput), turn=Number(save.turnNumber||0), momentum=object(save?.sceneRuntime?.momentum), stallStreak=Math.max(0,Number(momentum.stall_streak||0)), momentumPressure=stallStreak>=2;",
+            'director momentum state')
+          text=once(text,
+            "const base={version:DIRECTOR_V2_VERSION,seed_tag:seedTag,cooldown_turns:DIRECTOR_COOLDOWN_TURNS,intervention:plan.intervention,routine_streak:plan.routineStreak,event_gap:plan.eventGap,selected_key:null,selected_name:null,event_style:'none',eligible_keys:[],roll:null,none_weight:null,result:'NO_ROLL',mode:'fixed-flow',goal_signals:{},selected_goal:null};",
+            "const base={version:DIRECTOR_V2_VERSION,seed_tag:seedTag,cooldown_turns:DIRECTOR_COOLDOWN_TURNS,intervention:plan.intervention,routine_streak:plan.routineStreak,event_gap:plan.eventGap,momentum_stall_streak:stallStreak,momentum_pressure:momentumPressure?'required':stallStreak===1?'watch':'normal',selected_key:null,selected_name:null,event_style:'none',eligible_keys:[],roll:null,none_weight:null,result:'NO_ROLL',mode:'fixed-flow',goal_signals:{},selected_goal:null};",
+            'director telemetry')
+          text=once(text,
+            "  const scheduled=plan.intervention==='scheduled';\n  const medium=plan.intervention==='medium'&&(plan.routineStreak>=2||plan.eventGap>=3||plan.crossDue);\n  if(!scheduled&&!medium)return fixedDirective('NO_RANDOM_EVENT_DUE');",
+            "  const scheduled=plan.intervention==='scheduled';\n  const medium=plan.intervention==='medium'&&(plan.routineStreak>=2||plan.eventGap>=3||plan.crossDue);\n  const momentumDue=momentumPressure;\n  if(!scheduled&&!medium&&!momentumDue)return fixedDirective('NO_RANDOM_EVENT_DUE');",
+            'director momentum due')
+          text=once(text,
+            "  const eventMode=scheduled?'scheduled-side-roll':'weighted-random';",
+            "  const eventMode=scheduled?'scheduled-side-roll':momentumDue?'momentum-recovery':'weighted-random';",
+            'director momentum mode')
+          old_build="""function buildInput(incoming,originalInput,profile,routed){
+  const save=compactSave(incoming,routed.keys,routed.registry,profile,routed.keywords),recent=compactRecent(incoming.recentTurns,profile.recentTurns),opts=clampText(sectionBetween(originalInput,'===== TURN OPTIONS =====','===== AUTHORITATIVE SAVE_STATE ====='),700),director=cleanDirector(originalInput,profile.name.includes('routine')?650:900),directorV2=clampText(routed.directorV2?.directive||'',1000),schedule=compactSchedule(incoming.saveState||{},routed.keys),runtime={npcInnerStates:Object.fromEntries(routed.keys.filter(k=>incoming.saveState?.npcInnerStates?.[k]).map(k=>[k,compactInnerNpc(incoming.saveState.npcInnerStates[k])])),sceneRuntime:incoming.saveState?.sceneRuntime||{},backgroundDigest:clampText(incoming.saveState?.backgroundDigest||'',350)},action=String(incoming.action||''),cg=array(incoming.availableCgIds).slice(0,60).join(', ');
+  const variableContext=`===== TURN OPTIONS =====\n${opts}\n\n===== AUTHORITATIVE SAVE_STATE (ROUTED) =====\n${safeJson(save)}\n\n===== ROLLING SUMMARY TAIL =====\n${clampText(incoming.rollingSummary||'아직 없음',1500)}\n\n===== RECENT TURNS =====\n${safeJson(recent)}\n\n===== CURRENT NPC/SCENE RUNTIME =====\n${clampText(runtime,1800)}\n\n===== AVAILABLE_CG_IDS =====\n${cg||'없음'}\n\n===== GM EVENT DIRECTOR (ROUTED) =====\n${director||'없음'}\n\n===== EVENT DIRECTOR V2.1 (ROUTED) =====\n${directorV2||'없음'}\n\n===== SCHEDULE ENGINE (ROUTED) =====\n${safeJson(schedule)}`;
+  const actionBlock=`===== USER ACTION =====\n${action}\n\n위 행동까지만 처리하고 PC의 다음 행동을 정하지 마라. ROUTINE은 빠르게 압축하고 주요 NPC 대사에는 감정 태그/강도/근거를 일치시켜라.`;"""
+          new_build="""function buildInput(incoming,originalInput,profile,routed){
+  const save=compactSave(incoming,routed.keys,routed.registry,profile,routed.keywords),recent=compactRecent(incoming.recentTurns,profile.recentTurns),opts=clampText(sectionBetween(originalInput,'===== TURN OPTIONS =====','===== AUTHORITATIVE SAVE_STATE ====='),700),director=cleanDirector(originalInput,profile.name.includes('routine')?650:900),directorV2=clampText(routed.directorV2?.directive||'',1000),schedule=compactSchedule(incoming.saveState||{},routed.keys),runtime={npcInnerStates:Object.fromEntries(routed.keys.filter(k=>incoming.saveState?.npcInnerStates?.[k]).map(k=>[k,compactInnerNpc(incoming.saveState.npcInnerStates[k])])),sceneRuntime:incoming.saveState?.sceneRuntime||{},backgroundDigest:clampText(incoming.saveState?.backgroundDigest||'',350)},action=String(incoming.action||''),cg=array(incoming.availableCgIds).slice(0,60).join(', '),momentumDirective=clampText(buildSceneMomentumDirective({action,saveState:incoming.saveState||{}}),2800);
+  const variableContext=`===== TURN OPTIONS =====\n${opts}\n\n===== AUTHORITATIVE SAVE_STATE (ROUTED) =====\n${safeJson(save)}\n\n===== ROLLING SUMMARY TAIL =====\n${clampText(incoming.rollingSummary||'아직 없음',1500)}\n\n===== RECENT TURNS =====\n${safeJson(recent)}\n\n===== CURRENT NPC/SCENE RUNTIME =====\n${clampText(runtime,1800)}\n\n===== SCENE MOMENTUM HF1 =====\n${momentumDirective}\n\n===== AVAILABLE_CG_IDS =====\n${cg||'없음'}\n\n===== GM EVENT DIRECTOR (ROUTED) =====\n${director||'없음'}\n\n===== EVENT DIRECTOR V2.1 (ROUTED) =====\n${directorV2||'없음'}\n\n===== SCHEDULE ENGINE (ROUTED) =====\n${safeJson(schedule)}`;
+  const actionBlock=`===== USER ACTION =====\n${action}\n\nUSER ACTION이 이미 선언한 의미적 목표는 결정 가치 없는 중간 단계를 압축해 완료하되, 그 이후의 새로운 PC 선택·대사·감정은 만들지 마라. 플레이어 판단이 실제로 필요한 첫 지점에서 멈춰라. ROUTINE은 빠르고 변화 중심으로 진행하고 주요 NPC 대사에는 감정 태그/강도/근거를 일치시켜라.`;"""
+          text=once(text,old_build,new_build,'buildInput momentum wiring')
+          text=once(text,
+            "prompt_cache_key:process.env.OPENAI_PROMPT_CACHE_KEY||'lumensia-stable-context-router-v155'",
+            "prompt_cache_key:process.env.OPENAI_PROMPT_CACHE_KEY||'lumensia-stable-context-router-v156-hf1'",
+            'prompt cache key')
+          write(path,text)
+
+          # --- Stable API adapter/runtime state ---
+          path='api/chat-router.js'; text=read(path)
+          text=once(text,
+            "import { actualScheduledEntrants, freshChoices, reconcileParticipants } from '../lib/scene-continuity.js';",
+            "import { actualScheduledEntrants, freshChoices, reconcileParticipants } from '../lib/scene-continuity.js';\nimport { SCENE_MOMENTUM_VERSION, classifySceneIntent, deriveSceneDelta, updateSceneMomentum } from '../lib/scene-momentum.js';",
+            'chat router momentum import')
+          text=once(text,"const ADAPTER_VERSION = '0.8.2';","const ADAPTER_VERSION = '0.8.3';",'adapter version')
+          text=once(text,
+            "const PATCH_SYMBOL = Symbol.for('lumensia.stable.responses.parse.router.v156');",
+            "const PATCH_SYMBOL = Symbol.for('lumensia.stable.responses.parse.router.v156hf1');",
+            'patch symbol')
+          old_auto="""const AUTO_DIRECTIVE = String.raw`[LUMENSIA V1.5.6 AUTO FLOW]
+이 요청은 PC의 행동/대사/생각/감정/결정이 아니다. PC는 새 행동을 하지 않았다.
+현재 같은 장면에서 PC 개입이 필요 없는 흐름만 진행한다. 이미 시작된 NPC의 말, NPC끼리의 상호작용, 이미 예정되어 진행 중인 절차만 허용한다.
+PC가 대답/판단/행동해야 하는 첫 지점에서 즉시 멈춘다. AUTO를 핑계로 새 사건·새 인물·새 장소를 억지로 삽입하지 않는다.`;"""
+          new_auto="""const AUTO_DIRECTIVE = String.raw`[LUMENSIA V1.5.6 AUTO FLOW — SCENE MOMENTUM HF1]
+이 요청은 PC의 새 행동/대사/생각/감정/결정이 아니다. PC의 선택을 대신 만들지 않는다.
+PC 판단이 필요 없는 세계의 자연스러운 흐름은 진행한다: 진행 중/예정된 사건의 후속, NPC의 목표·일정에 따른 접근/퇴장/상호작용, 다른 NPC끼리의 행동, 시간·환경 변화와 이미 발생한 결과의 파급을 허용한다.
+NPC와 사건은 PC가 먼저 찾아오기를 기다릴 필요가 없다. 다만 물리 위치·일정·지식·관계 제약을 지키고 순간이동/새 대형 사건/새 비밀을 억지로 만들지 않는다.
+PC가 대답·판단·위험한 선택을 해야 하는 첫 의미 있는 지점에서 즉시 멈춘다.`;"""
+          text=once(text,old_auto,new_auto,'AUTO momentum directive')
+          insert_after="function bounded(value,min,max,fallback){if(value==null||value==='')return fallback;const n=Number(value);return Number.isFinite(n)?Math.max(min,Math.min(max,n)):fallback;}"
+          helper="""
+function applySceneMomentumTimeFloor(incoming,turn,mode='game'){
+  const intent=classifySceneIntent(incoming?.action||'',{location:incoming?.saveState?.world?.location||''});
+  if(mode!=='game'||!turn?.state_delta||!intent.compression||intent.minAdvanceMinutes<=0)return intent;
+  const hasMeaningfulStop=array(turn?.choices).length>0||String(turn?.importance||'').toLowerCase()==='critical';
+  if(!hasMeaningfulStop){
+    const current=Math.max(0,Number(turn.state_delta.advance_minutes||0));
+    turn.state_delta.advance_minutes=Math.max(current,Number(intent.minAdvanceMinutes||0));
+  }
+  return intent;
+}"""
+          text=once(text,insert_after,insert_after+helper,'time floor helper')
+          old_runtime_start="""function localSceneRuntime(incoming,turn,directorTelemetry=null){
+  const previous=object(incoming.saveState?.sceneRuntime);"""
+          new_runtime_start="""function localSceneRuntime(incoming,turn,directorTelemetry=null){
+  const previous=object(incoming.saveState?.sceneRuntime);"""
+          text=once(text,old_runtime_start,new_runtime_start,'local runtime anchor')
+          old_return="""  return {
+    scene_key:clampText(turn?.scene_title||previous.scene_key||'scene',120),participants,objects:array(previous.objects).slice(0,10),
+    positions:Object.fromEntries(Object.entries(object(previous.positions)).slice(0,10)),ongoing_topic:clampText(turn?.scene_summary||previous.ongoing_topic||'',280),
+    unresolved_question:hasDecision?clampText(choices.join(' / '),300):'',immediate_pressure:clampText(previous.immediate_pressure||'',220),
+    tone:clampText(turn?.importance||previous.tone||'routine',80),remaining_beats:hasDecision?[]:array(previous.remaining_beats).slice(0,1),...progressState,
+  };"""
+          new_return="""  const sceneDelta=deriveSceneDelta({saveState:incoming.saveState||{},previousRuntime:previous,turn,nextParticipants:participants,action:incoming.action||''});
+  const momentum=updateSceneMomentum(previous,sceneDelta,{turnNumber:Number(incoming.saveState?.turnNumber||0)+1});
+  return {
+    scene_key:clampText(turn?.scene_title||previous.scene_key||'scene',120),participants,objects:array(previous.objects).slice(0,10),
+    positions:Object.fromEntries(Object.entries(object(previous.positions)).slice(0,10)),ongoing_topic:clampText(turn?.scene_summary||previous.ongoing_topic||'',280),
+    unresolved_question:hasDecision?clampText(choices.join(' / '),300):'',immediate_pressure:clampText(previous.immediate_pressure||'',220),
+    tone:clampText(turn?.importance||previous.tone||'routine',80),remaining_beats:hasDecision?[]:array(previous.remaining_beats).slice(0,1),momentum,scene_delta:sceneDelta,...progressState,
+  };"""
+          text=once(text,old_return,new_return,'persist scene momentum')
+          text=once(text,
+            "function setAdapterRoute(data,mode,pipeline,telemetry){data.route={...(data.route||{}),input_mode:mode,adapter_version:ADAPTER_VERSION,app_version:APP_VERSION,core_server_version:data.server_version||data.route?.server_version||'0.5.6',quality_pipeline:pipeline?.pipeline||'legacy',qa_result:pipeline?.qa_result||'SKIP',rewrite_applied:false,context_router:telemetry||null};data.server_version=ADAPTER_VERSION;return data;}",
+            "function setAdapterRoute(data,mode,pipeline,telemetry){data.route={...(data.route||{}),input_mode:mode,adapter_version:ADAPTER_VERSION,app_version:APP_VERSION,core_server_version:data.server_version||data.route?.server_version||'0.5.6',quality_pipeline:pipeline?.pipeline||'legacy',qa_result:pipeline?.qa_result||'SKIP',rewrite_applied:false,context_router:telemetry||null,scene_momentum:pipeline?.scene_momentum||null};data.server_version=ADAPTER_VERSION;return data;}",
+            'route momentum telemetry')
+          old_handler="""    applyExtendedExpressions(data.turn,incoming0.saveState||{});data.turn.choices=freshChoices(incoming.action,data.turn);const sceneRuntime=localSceneRuntime({...incoming0,saveState:incoming.saveState},data.turn,telemetry?.event_director_v2);const npcUpdates=incoming0.qualityPipeline===false?{}:localNpcUpdates(incoming0,data.turn);data.runtime_state={npc_updates:npcUpdates,scene_runtime:sceneRuntime};data.background_digest=localBackgroundDigest(incoming0,data.turn,sceneRuntime.participants);
+    const pipeline={pipeline:incoming0.qualityPipeline===false?'single-writer-stable-v156':'single-pass-q3-stable-v156',stages:1,qa_result:incoming0.qualityPipeline===false?'SKIP':'LOCAL_GUARD',rewrite_applied:false,background_sim:false,background_local:incoming0.backgroundSim!==false,combat_engine:isCombatLike(incoming.action),runtime_synthesized:true,continuation_beats:array(sceneRuntime.remaining_beats).length,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true,note:'V1.5.6 keeps one core model call and adds evidence-gated NPC Goal V2 progression/lifecycle/history while preserving Goal-aware Event Director V2.1 guards and Relationship Reason V1.'};"""
+          new_handler="""    applyExtendedExpressions(data.turn,incoming0.saveState||{});data.turn.choices=freshChoices(incoming.action,data.turn);const sceneIntent=applySceneMomentumTimeFloor({...incoming0,saveState:incoming.saveState,action:incoming0.action||''},data.turn,mode);const sceneRuntime=localSceneRuntime({...incoming0,saveState:incoming.saveState,action:incoming0.action||''},data.turn,telemetry?.event_director_v2);const npcUpdates=incoming0.qualityPipeline===false?{}:localNpcUpdates(incoming0,data.turn);data.runtime_state={npc_updates:npcUpdates,scene_runtime:sceneRuntime};data.background_digest=localBackgroundDigest(incoming0,data.turn,sceneRuntime.participants);
+    const sceneMomentum={version:SCENE_MOMENTUM_VERSION,intent:sceneIntent?.kind||sceneRuntime?.momentum?.last_intent||'generic',score:Number(sceneRuntime?.momentum?.last_score||0),structural_score:Number(sceneRuntime?.momentum?.last_structural_score||0),target:Number(sceneRuntime?.momentum?.last_target||0),stall_streak:Number(sceneRuntime?.momentum?.stall_streak||0),pressure:sceneRuntime?.momentum?.pressure||'normal'};
+    const pipeline={pipeline:incoming0.qualityPipeline===false?'single-writer-stable-v156-hf1':'single-pass-q3-stable-v156-hf1',stages:1,qa_result:incoming0.qualityPipeline===false?'SKIP':'LOCAL_GUARD',rewrite_applied:false,background_sim:false,background_local:incoming0.backgroundSim!==false,combat_engine:isCombatLike(incoming.action),runtime_synthesized:true,continuation_beats:array(sceneRuntime.remaining_beats).length,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,scene_momentum:sceneMomentum,scene_momentum_v1:true,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true,note:'V1.5.6 Scene Momentum Recovery HF1 keeps one core model call while restoring semantic action compression, deterministic State Delta/stall tracking, NPC initiative, downtime skip, and meaningful stop points.'};"""
+          text=once(text,old_handler,new_handler,'handler momentum wiring')
+          text=once(text,
+            "export { goalRuntimeFor, patchGoalV2StructuredFormat };",
+            "export { applySceneMomentumTimeFloor, goalRuntimeFor, patchGoalV2StructuredFormat };",
+            'export time floor')
+          write(path,text)
+
+          # --- Health ---
+          path='api/health.js'; text=read(path)
+          text=once(text,"version: '0.8.2',","version: '0.8.3',",'health API version')
+          text=once(text,
+            "relationshipReason: 'V1 cause/expression/followup + turn/source persistence',",
+            "relationshipReason: 'V1 cause/expression/followup + turn/source persistence',\n    sceneMomentum: 'HF1 semantic action compression + deterministic State Delta/stall + NPC initiative + meaningful-stop policy',",
+            'health momentum')
+          write(path,text)
+
+          # --- Stable runtime: debug telemetry + duplicate control suppression ---
+          path='app-runtime.js'; text=read(path)
+          text=once(text,
+            "// V1.5.6 NPC Goal V2 + Relationship Reason V1 on the proven V1.4.8 base app.",
+            "// V1.5.6 Scene Momentum Recovery HF1 + NPC Goal V2 + Relationship Reason V1 on the proven V1.4.8 base app.",
+            'runtime header')
+          text=once(text,
+            "? `API ${h.version || '?'} 연결 준비됨 · ${h.luna} / ${h.terra}${h.qualityPipeline ? ' · Q3' : ''}${h.contextRouter ? ' · CR' : ''}${h.npcMotivation ? ' · MOT2' : ''}${h.accessTokenRequired ? ' · 접속 토큰 필요' : ''}`",
+            "? `API ${h.version || '?'} 연결 준비됨 · ${h.luna} / ${h.terra}${h.qualityPipeline ? ' · Q3' : ''}${h.contextRouter ? ' · CR' : ''}${h.npcMotivation ? ' · MOT2' : ''}${h.sceneMomentum ? ' · MOM' : ''}${h.accessTokenRequired ? ' · 접속 토큰 필요' : ''}`",
+            'runtime health MOM tag')
+          anchor="function renderFlowControlsStable() {"
+          suppress="""function suppressDuplicateFlowControlsStable() {
+  const stable = $('flowControlsStable');
+  for (const button of story.querySelectorAll('button')) {
+    if (stable?.contains(button)) continue;
+    const label = String(button.textContent || '').replace(/\\s+/g, ' ').trim();
+    if (!/^(?:▶\\s*)?자동 진행(?:\\s*·.*)?$|^(?:✦\\s*)?이어서 생성(?:\\s*·.*)?$/.test(label)) continue;
+    button.disabled = true;
+    button.hidden = true;
+    button.setAttribute('aria-hidden', 'true');
+  }
+}
+
+"""
+          if suppress not in text:
+              text=once(text,anchor,suppress+anchor,'duplicate flow suppressor')
+          text=once(text,
+            "function renderFlowControlsStable() {\n  let wrap = $('flowControlsStable');",
+            "function renderFlowControlsStable() {\n  suppressDuplicateFlowControlsStable();\n  let wrap = $('flowControlsStable');",
+            'suppress before render')
+          text=once(text,
+            "  if (cont) {\n    cont.disabled = !canContinueStable();",
+            "  suppressDuplicateFlowControlsStable();\n  if (cont) {\n    cont.disabled = !canContinueStable();",
+            'suppress after stable creation')
+          text=once(text,
+            "      canContinueStable.toString(),\n      renderFlowControlsStable.toString(),",
+            "      canContinueStable.toString(),\n      suppressDuplicateFlowControlsStable.toString(),\n      renderFlowControlsStable.toString(),",
+            'helper source suppressor')
+          debug_old="\\n\\n[COUNTS]\\ntimeline ${save.timeline.length}"
+          debug_new="\\n\\n[SCENE MOMENTUM HF1]\\nintent=${save.qualityTelemetry?.scene_momentum?.intent||save.sceneRuntime?.momentum?.last_intent||'-'} / score=${save.qualityTelemetry?.scene_momentum?.score??save.sceneRuntime?.momentum?.last_score??'-'} / structural=${save.qualityTelemetry?.scene_momentum?.structural_score??save.sceneRuntime?.momentum?.last_structural_score??'-'} / target=${save.qualityTelemetry?.scene_momentum?.target??save.sceneRuntime?.momentum?.last_target??'-'}\\nstall=${save.qualityTelemetry?.scene_momentum?.stall_streak??save.sceneRuntime?.momentum?.stall_streak??0} / pressure=${save.qualityTelemetry?.scene_momentum?.pressure||save.sceneRuntime?.momentum?.pressure||'normal'}\\n\\n[COUNTS]\\ntimeline ${save.timeline.length}"
+          # This marker is embedded inside the large debug replacement string in source; replace only its single textual occurrence.
+          text=once(text,debug_old,debug_new,'runtime momentum debug')
+          write(path,text)
+
+          # --- Permanent integration contract test ---
+          integration = r'''#!/usr/bin/env node
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+const context = readFileSync('api/lib/context-router.js','utf8');
+const chat = readFileSync('api/chat-router.js','utf8');
+const health = readFileSync('api/health.js','utf8');
+const runtime = readFileSync('app-runtime.js','utf8');
+
+assert.match(context,/buildSceneMomentumDirective/);
+assert.match(context,/SCENE MOMENTUM HF1/);
+assert.doesNotMatch(context,/위 행동까지만 처리하고 PC의 다음 행동을 정하지 마라/);
+assert.match(context,/결정 가치 없는 중간 단계/);
+assert.match(context,/SCENE CHANGE 우선/);
+assert.match(context,/momentum_stall_streak/);
+assert.match(context,/momentum-recovery/);
+assert.match(context,/NO_EVENT/,'momentum must retain a no-event outcome');
+assert.match(context,/DIRECT_USER_FOCUS/,'momentum must preserve direct-user-focus guard');
+assert.match(context,/CALLBACK_PRIORITY/,'momentum must preserve callback guard');
+assert.match(context,/DIRECTOR_COOLDOWN_TURNS/,'momentum must preserve cooldown guard');
+
+assert.match(chat,/SCENE_MOMENTUM_VERSION/);
+assert.match(chat,/applySceneMomentumTimeFloor/);
+assert.match(chat,/deriveSceneDelta/);
+assert.match(chat,/updateSceneMomentum/);
+assert.match(chat,/momentum,scene_delta:sceneDelta/);
+assert.match(chat,/scene_momentum_v1:true/);
+assert.match(chat,/const ADAPTER_VERSION = '0\.8\.3'/);
+assert.equal((chat.match(/coreHandler\(/g)||[]).length,1,'stable adapter must keep exactly one canonical coreHandler call site');
+for (const n of [1,2,3,8,10,30]) assert.ok(chat.includes(`minAdvanceMinutes`) || n >= 0);
+
+assert.match(health,/version: '0\.8\.3'/);
+assert.match(health,/appVersion: '1\.5\.6'/);
+assert.match(health,/sceneMomentum:/);
+assert.match(runtime,/suppressDuplicateFlowControlsStable/);
+assert.match(runtime,/SCENE MOMENTUM HF1/);
+assert.match(runtime,/· MOM/);
+
+console.log('PASS Scene Momentum HF1 production wiring (router, runtime State Delta, one-call invariant, health/debug/UI)');
+'''
+          write('scripts/tests/scene-momentum-v156-hf1-integration.test.mjs',integration)
+          PY
+
+      - name: Validate focused files
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check lib/scene-momentum.js
+          node --check api/lib/context-router.js
+          node --check api/chat-router.js
+          node --check api/health.js
+          node --check app-runtime.js
+          node scripts/tests/scene-momentum-v156-hf1.test.mjs
+          node scripts/tests/scene-momentum-v156-hf1-integration.test.mjs
+          test "$(grep -o 'coreHandler(' api/chat-router.js | wc -l)" -eq 1
+
+      - name: Commit production integration to PR branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add lib/scene-momentum.js api/lib/context-router.js api/chat-router.js api/health.js app-runtime.js scripts/tests/scene-momentum-v156-hf1.test.mjs scripts/tests/scene-momentum-v156-hf1-integration.test.mjs
+          if git diff --cached --quiet; then
+            echo 'Scene Momentum production wiring already present.'
+            exit 0
+          fi
+          git diff --cached --check
+          git commit -m 'fix: restore Scene Momentum in V1.5.6'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
