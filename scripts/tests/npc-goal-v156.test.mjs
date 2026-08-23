@@ -1,6 +1,28 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { goalRuntimeFor, patchGoalV2StructuredFormat } from '../../api/chat-router.js';
+
+const source=readFileSync('api/chat-router.js','utf8');
+const lifecycleStart=source.indexOf('function bounded(');
+const lifecycleEnd=source.indexOf('function relationshipReasonFor(');
+assert.ok(lifecycleStart>=0&&lifecycleEnd>lifecycleStart,'Goal V2 lifecycle source markers missing');
+const lifecycleSource=source.slice(lifecycleStart,lifecycleEnd);
+const makeLifecycle=new Function('array','object','clampText','CHARACTER_REGISTRY',`
+  const GOAL_STATES=new Set(['active','blocked','completed','abandoned']);
+  ${lifecycleSource}
+  return {goalRuntimeFor};
+`);
+const array=(v)=>Array.isArray(v)?v:[];
+const object=(v)=>v&&typeof v==='object'&&!Array.isArray(v)?v:{};
+const clampText=(v,max=1200)=>typeof v==='string'?v.slice(0,max):JSON.stringify(v??'').slice(0,max);
+const {goalRuntimeFor}=makeLifecycle(array,object,clampText,{anastasia:'아나스타샤',isabel:'이사벨'});
+
+const schemaStart=source.indexOf('function goalV2FieldSchema(){');
+const schemaEnd=source.indexOf('function installResponsesRouter()');
+assert.ok(schemaStart>=0&&schemaEnd>schemaStart,'Goal V2 structured-format source markers missing');
+const schemaSource=source.slice(schemaStart,schemaEnd);
+const makeSchema=new Function(`const GOAL_V2_RULES='[NPC GOAL V2]';${schemaSource};return {patchGoalV2StructuredFormat};`);
+const {patchGoalV2StructuredFormat}=makeSchema();
 
 const key='anastasia';
 function incoming(old={},turnNumber=10){
