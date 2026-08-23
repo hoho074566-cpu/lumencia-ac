@@ -4,6 +4,7 @@ import {
   AUTO_PR_MARKER,
   DISCORD_DELIVERED_MARKER,
   findLatestCodexReviewRequest,
+  resolveCurrentBaseTarget,
 } from './lumensia-auto-pr.mjs';
 import {
   evaluateChecks,
@@ -194,6 +195,18 @@ function ageMinutes(value, now = new Date()) {
   return Number.isFinite(stamp) ? Math.max(0, (now.getTime() - stamp) / 60000) : Infinity;
 }
 
+function authoritativeChecksPass(checks = {}) {
+  return checks?.safety === 'PASS'
+    && checks?.vercel === 'PASS'
+    && checks?.required === 'PASS';
+}
+
+export function autoMergeStateAllowed(pull = {}, checks = {}) {
+  if (pull?.mergeable !== true) return false;
+  if (pull?.mergeable_state === 'clean') return true;
+  return pull?.mergeable_state === 'unstable' && authoritativeChecksPass(checks);
+}
+
 export function decideMaintenanceAction({
   pull,
   codex,
@@ -228,7 +241,7 @@ export function decideMaintenanceAction({
   }
 
   if (readiness?.state !== 'READY') return { action: 'WAIT', reason: 'not-ready' };
-  if (pull?.mergeable !== true || pull?.mergeable_state !== 'clean') return { action: 'WAIT', reason: 'merge-state-not-clean' };
+  if (!autoMergeStateAllowed(pull, checks)) return { action: 'WAIT', reason: 'merge-state-not-safe' };
 
   if (pull?.changed_files !== undefined && pull?.changed_files !== null) {
     const expectedChangedFiles = Number(pull.changed_files);
@@ -287,7 +300,9 @@ async function deliverDiscord(webhook, message, fetchImpl = fetch, logger = cons
 
 async function evaluatePull(api, pull, owner, configuredActors) {
   const head = pull.head.sha;
-  const baseSha = pull.base.sha;
+  const target = await resolveCurrentBaseTarget(api, pull);
+  if (!target) return { currentBase: null, issueComments: [], files: [], requestEntry: null, codex: { state: 'PENDING', P0: 0, P1: 0, P2: 0, P3: 0, unknown: 0 }, checks: {}, readiness: { state: 'WAIT' } };
+  const baseSha = target.baseSha;
   const [issueComments, reviews, reviewComments, checkRunsResponse, combinedStatus, files] = await Promise.all([
     api.listIssueComments(pull.number),
     api.listReviews(pull.number),
@@ -325,7 +340,14 @@ async function evaluatePull(api, pull, owner, configuredActors) {
     mergeableState: pull.mergeable_state,
     draft: pull.draft,
   });
-  return { issueComments, files, requestEntry, codex, checks, readiness };
+  return { currentBase: target, issueComments, files, requestEntry, codex, checks, readiness };
+}
+
+function currentBaseEligible(signals, expectedBaseSha = '') {
+  const target = signals?.currentBase;
+  return Boolean(target
+    && target.mergeBaseSha === target.baseSha
+    && (!expectedBaseSha || target.baseSha === expectedBaseSha));
 }
 
 async function ensureHumanCheck({ api, webhook, pull, signals, reason, details, owner, logger, discordFetch }) {
@@ -403,11 +425,12 @@ export async function maintainAutoPulls({
       if (decision.action === 'FIX') {
         if (!signals.requestEntry) { summary.waiting += 1; continue; }
         const fixCandidate = await api.getPull(pull.number);
+        const fixCandidateBase = await resolveCurrentBaseTarget(api, fixCandidate);
         if (!isAutoManagedPull(fixCandidate, owner, repo)
           || fixCandidate.head?.sha !== pull.head.sha
-          || fixCandidate.base?.sha !== pull.base.sha
+          || fixCandidateBase?.baseSha !== signals.currentBase.baseSha
           || signals.requestEntry.request?.head !== pull.head.sha
-          || signals.requestEntry.request?.baseSha !== pull.base.sha) {
+          || signals.requestEntry.request?.baseSha !== signals.currentBase.baseSha) {
           summary.waiting += 1;
           continue;
         }
@@ -415,7 +438,7 @@ export async function maintainAutoPulls({
         await api.createIssueComment(pull.number, makeAutoFixRequestBody({
           prNumber: pull.number,
           head: pull.head.sha,
-          baseSha: pull.base.sha,
+          baseSha: signals.currentBase.baseSha,
           branch: pull.head.ref,
           attempt: decision.attempt,
           reviewRequestCommentId: signals.requestEntry.comment.id,
@@ -435,6 +458,10 @@ export async function maintainAutoPulls({
         continue;
       }
 
+      // A stale merge base blocks only merge authorization. Current-head P0/P1
+      // remediation and authoritative failures must still be handled above.
+      if (!currentBaseEligible(signals)) { summary.waiting += 1; continue; }
+
       if (decision.action !== 'MERGE') {
         summary.waiting += 1;
         continue;
@@ -444,6 +471,7 @@ export async function maintainAutoPulls({
       pull = await api.getPull(pull.number);
       if (!isAutoManagedPull(pull, owner, repo)) { summary.waiting += 1; continue; }
       signals = await evaluatePull(api, pull, owner, configuredActors);
+      if (!currentBaseEligible(signals)) { summary.waiting += 1; continue; }
       if (findTrustedHumanCheck(signals.issueComments, pull.number, pull.head.sha, owner)) {
         summary.humanRequired += 1;
         continue;
@@ -466,19 +494,21 @@ export async function maintainAutoPulls({
       }
 
       const validatedHead = pull.head.sha;
-      const validatedBase = pull.base.sha;
+      const validatedBase = signals.currentBase.baseSha;
       let mergeCandidate = await api.getPull(pull.number);
+      const mergeCandidateBase = await resolveCurrentBaseTarget(api, mergeCandidate);
       if (!isAutoManagedPull(mergeCandidate, owner, repo)
         || mergeCandidate.head?.sha !== validatedHead
-        || mergeCandidate.base?.sha !== validatedBase
-        || mergeCandidate.mergeable !== true
-        || mergeCandidate.mergeable_state !== 'clean') {
+        || mergeCandidateBase?.baseSha !== validatedBase
+        || mergeCandidateBase?.mergeBaseSha !== mergeCandidateBase?.baseSha
+        || !autoMergeStateAllowed(mergeCandidate, signals.checks)) {
         summary.waiting += 1;
         continue;
       }
 
       // Re-read every authoritative signal after the final PR snapshot.
       const finalSignals = await evaluatePull(api, mergeCandidate, owner, configuredActors);
+      if (!currentBaseEligible(finalSignals, validatedBase)) { summary.waiting += 1; continue; }
       if (findTrustedHumanCheck(finalSignals.issueComments, mergeCandidate.number, mergeCandidate.head.sha, owner)) {
         summary.humanRequired += 1;
         continue;
@@ -502,16 +532,81 @@ export async function maintainAutoPulls({
 
       // One last PR snapshot ensures the hosted-signal read did not race a head/base retarget.
       const lastCandidate = await api.getPull(mergeCandidate.number);
+      const lastCandidateBase = await resolveCurrentBaseTarget(api, lastCandidate);
       if (!isAutoManagedPull(lastCandidate, owner, repo)
         || lastCandidate.head?.sha !== mergeCandidate.head?.sha
-        || lastCandidate.base?.sha !== mergeCandidate.base?.sha
-        || lastCandidate.mergeable !== true
-        || lastCandidate.mergeable_state !== 'clean') {
+        || lastCandidateBase?.baseSha !== validatedBase
+        || lastCandidateBase?.mergeBaseSha !== lastCandidateBase?.baseSha
+        || !autoMergeStateAllowed(lastCandidate, finalSignals.checks)) {
         summary.waiting += 1;
         continue;
       }
-      pull = lastCandidate;
-      signals = finalSignals;
+
+      // GitHub may report `unstable` after checks move. Bind authoritative PASS evidence to
+      // this final snapshot by rereading every hosted/Codex signal after the snapshot.
+      let postSnapshotSignals = finalSignals;
+      if (lastCandidate.mergeable_state === 'unstable') {
+        postSnapshotSignals = await evaluatePull(api, lastCandidate, owner, configuredActors);
+        if (!currentBaseEligible(postSnapshotSignals, validatedBase)) { summary.waiting += 1; continue; }
+        if (findTrustedHumanCheck(postSnapshotSignals.issueComments, lastCandidate.number, lastCandidate.head.sha, owner)) {
+          summary.humanRequired += 1;
+          continue;
+        }
+        const postSnapshotFixRequests = trustedAutoFixRequests(postSnapshotSignals.issueComments, lastCandidate.number, owner);
+        const postSnapshotDecision = decideMaintenanceAction({
+          pull: lastCandidate,
+          codex: postSnapshotSignals.codex,
+          checks: postSnapshotSignals.checks,
+          readiness: postSnapshotSignals.readiness,
+          files: postSnapshotSignals.files,
+          fixRequests: postSnapshotFixRequests,
+          now,
+          mergeTokenAvailable: Boolean(mergeToken && mergeApi),
+        });
+        if (postSnapshotDecision.action !== 'MERGE') {
+          if (postSnapshotDecision.action === 'HUMAN' && await ensureHumanCheck({
+            api,
+            webhook,
+            pull: lastCandidate,
+            signals: postSnapshotSignals,
+            reason: postSnapshotDecision.reason,
+            details: postSnapshotDecision.details || [],
+            owner,
+            logger,
+            discordFetch,
+          })) summary.humanRequired += 1;
+          else summary.waiting += 1;
+          continue;
+        }
+
+        // The post-snapshot signal read can itself race a head/base update. Bind the
+        // mutation to the exact snapshot evaluated above with one final PR fetch.
+        const mutationCandidate = await api.getPull(lastCandidate.number);
+        const mutationBase = await resolveCurrentBaseTarget(api, mutationCandidate);
+        if (!isAutoManagedPull(mutationCandidate, owner, repo)
+          || mutationCandidate.head?.sha !== lastCandidate.head?.sha
+          || mutationBase?.baseSha !== validatedBase
+          || mutationBase?.mergeBaseSha !== mutationBase?.baseSha
+          || !autoMergeStateAllowed(mutationCandidate, postSnapshotSignals.checks)) {
+          summary.waiting += 1;
+          continue;
+        }
+        pull = mutationCandidate;
+      } else {
+        pull = lastCandidate;
+      }
+      signals = postSnapshotSignals;
+
+      // The merge mutation is privileged: compare once more so neither a stale PR
+      // base field nor a main-tip race can reuse evidence from an older base.
+      const mutationTarget = await resolveCurrentBaseTarget(api, pull);
+      if (!mutationTarget
+        || mutationTarget.head !== validatedHead
+        || mutationTarget.baseSha !== validatedBase
+        || mutationTarget.mergeBaseSha !== mutationTarget.baseSha) {
+        summary.waiting += 1;
+        continue;
+      }
 
       let result;
       try {

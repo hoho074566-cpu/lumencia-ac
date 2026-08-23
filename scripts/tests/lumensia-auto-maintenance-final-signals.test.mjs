@@ -14,29 +14,29 @@ const HEAD = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const NEW_HEAD = 'cccccccccccccccccccccccccccccccccccccccc';
 const BASE = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
-function pull(head = HEAD) {
+function pull(head = HEAD, mergeableState = 'clean', base = BASE) {
   return {
     number: 21,
     state: 'open',
     draft: false,
     mergeable: true,
-    mergeable_state: 'clean',
+    mergeable_state: mergeableState,
     changed_files: 1,
     body: `${AUTO_PR_MARKER}\n${DISCORD_DELIVERED_MARKER}`,
     html_url: 'https://github.com/hoho074566-cpu/lumencia-ac/pull/21',
     user: { login: OWNER },
     head: { ref: 'codex/final-signals', sha: head, repo: { full_name: FULL } },
-    base: { ref: 'main', sha: BASE, repo: { full_name: FULL } },
+    base: { ref: 'main', sha: base, repo: { full_name: FULL } },
   };
 }
 
-function requestComment() {
+function requestComment(baseSha = BASE) {
   return {
     id: 1,
     body: makeCodexReviewRequestBody({
       prNumber: 21,
       head: HEAD,
-      baseSha: BASE,
+      baseSha,
       generationKey: 'final-signals',
       baselineReviewIds: [],
       baselineReviewCommentIds: [],
@@ -47,20 +47,33 @@ function requestComment() {
   };
 }
 
-function successCheck(conclusion = 'success') {
+function cleanCodexComment() {
+  return {
+    id: 2,
+    body: `Codex Review: Didn't find any major issues. Great.\n\n**Reviewed commit:** \`${HEAD.slice(0, 10)}\``,
+    created_at: '2026-08-23T00:01:00Z',
+    user: { login: 'chatgpt-codex-connector[bot]' },
+  };
+}
+
+function successCheck(conclusion = 'success', baseSha = BASE) {
   return {
     id: Math.random(),
     name: 'Repository checks',
     head_sha: HEAD,
     conclusion,
     created_at: '2026-08-23T00:00:30Z',
-    pull_requests: [{ number: 21, head: { sha: HEAD }, base: { sha: BASE } }],
+    pull_requests: [{ number: 21, head: { sha: HEAD }, base: { sha: baseSha } }],
   };
 }
 
 const vercelStatus = { context: 'Vercel', state: 'success', sha: HEAD, created_at: '2026-08-23T00:00:30Z' };
 const file = { filename: 'docs/guide.md', status: 'modified', additions: 1, deletions: 0, changes: 1 };
 const silent = { log() {}, warn() {}, error() {} };
+
+function currentComparison(head = HEAD, base = BASE, mergeBase = base) {
+  return { head_commit: { sha: head }, base_commit: { sha: base }, merge_base_commit: { sha: mergeBase } };
+}
 
 test('.vercelignore is protected deployment configuration', () => {
   assert.notEqual(protectedMergeReason('.vercelignore'), '');
@@ -71,6 +84,7 @@ test('auto-fix is not posted after HEAD advances', async () => {
   let commentCalls = 0;
   const api = {
     validate: async () => true,
+    compare: async () => currentComparison(),
     listOpenPulls: async () => [pull()],
     getPull: async () => (++getPullCalls === 1 ? pull() : pull(NEW_HEAD)),
     listIssueComments: async () => [requestComment()],
@@ -108,19 +122,12 @@ test('auto-fix is not posted after HEAD advances', async () => {
 });
 
 test('hosted check failure on final signal reread prevents merge', async () => {
-  const issueComments = [
-    requestComment(),
-    {
-      id: 2,
-      body: `Codex Review: Didn't find any major issues. Great.\n\n**Reviewed commit:** \`${HEAD.slice(0, 10)}\``,
-      created_at: '2026-08-23T00:01:00Z',
-      user: { login: 'chatgpt-codex-connector[bot]' },
-    },
-  ];
+  const issueComments = [requestComment(), cleanCodexComment()];
   let checkCalls = 0;
   let mergeCalls = 0;
   const api = {
     validate: async () => true,
+    compare: async () => currentComparison(),
     listOpenPulls: async () => [pull()],
     getPull: async () => pull(),
     listIssueComments: async () => [...issueComments],
@@ -148,5 +155,229 @@ test('hosted check failure on final signal reread prevents merge', async () => {
   assert.equal(mergeCalls, 0);
   assert.equal(summary.merged, 0);
   assert.equal(summary.humanRequired, 1);
+  assert.equal(summary.errors.length, 0);
+});
+
+test('stale base with a current P1 creates exactly one authoritative-base fix request', async () => {
+  const currentBase = 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+  const issueComments = [requestComment(currentBase)];
+  const posted = [];
+  const api = {
+    validate: async () => true,
+    compare: async () => currentComparison(HEAD, currentBase, BASE),
+    listOpenPulls: async () => [pull()],
+    getPull: async () => pull(),
+    listIssueComments: async () => [...issueComments],
+    listReviews: async () => [{
+      id: 20, commit_id: HEAD, submitted_at: '2026-08-23T00:01:00Z', state: 'COMMENTED',
+      user: { login: 'chatgpt-codex-connector[bot]' }, body: '',
+    }],
+    listReviewComments: async () => [{
+      id: 21, commit_id: HEAD, pull_request_review_id: 20, created_at: '2026-08-23T00:01:00Z',
+      user: { login: 'chatgpt-codex-connector[bot]' }, body: '[P1] current blocker',
+    }],
+    listCheckRuns: async () => ({ check_runs: [successCheck('success', currentBase)] }),
+    getCombinedStatus: async () => ({ statuses: [vercelStatus] }),
+    listPullFiles: async () => [file],
+    updatePull: async () => pull(),
+    createIssueComment: async (_number, body) => { posted.push(body); },
+  };
+  const summary = await maintainAutoPulls({
+    token: 'pat', mergeToken: 'ephemeral', owner: OWNER, repo: REPO, api,
+    mergeApi: { mergePull: async () => { throw new Error('unexpected merge'); } },
+    logger: silent, now: new Date('2026-08-23T00:02:00Z'),
+  });
+  assert.equal(posted.length, 1);
+  assert.match(posted[0], new RegExp(`"baseSha":"${currentBase}"`));
+  assert.equal(summary.fixesRequested, 1);
+  assert.equal(summary.waiting, 0);
+  assert.equal(summary.errors.length, 0);
+});
+
+test('stale base with an authoritative check failure creates a persistent human hold', async () => {
+  const currentBase = 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+  const issueComments = [requestComment(currentBase), cleanCodexComment()];
+  const posted = [];
+  const api = {
+    validate: async () => true,
+    compare: async () => currentComparison(HEAD, currentBase, BASE),
+    listOpenPulls: async () => [pull()],
+    getPull: async () => pull(),
+    listIssueComments: async () => [...issueComments],
+    listReviews: async () => [],
+    listReviewComments: async () => [],
+    listCheckRuns: async () => ({ check_runs: [successCheck('failure', currentBase)] }),
+    getCombinedStatus: async () => ({ statuses: [vercelStatus] }),
+    listPullFiles: async () => [file],
+    updatePull: async () => pull(),
+    createIssueComment: async (_number, body) => { posted.push(body); },
+  };
+  const summary = await maintainAutoPulls({
+    token: 'pat', mergeToken: 'ephemeral', owner: OWNER, repo: REPO, api,
+    mergeApi: { mergePull: async () => { throw new Error('unexpected merge'); } },
+    logger: silent, now: new Date('2026-08-23T00:02:00Z'),
+  });
+  assert.equal(posted.length, 1);
+  assert.match(posted[0], /lumensia-human-check:v1/);
+  assert.match(posted[0], /authoritative-check-failed/);
+  assert.equal(summary.humanRequired, 1);
+  assert.equal(summary.waiting, 0);
+  assert.equal(summary.errors.length, 0);
+});
+
+test('stale pull base and old-base READY evidence cannot merge after main advances', async () => {
+  const currentBase = 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+  const issueComments = [requestComment(currentBase), cleanCodexComment()];
+  let mergeCalls = 0;
+  const api = {
+    validate: async () => true,
+    compare: async () => currentComparison(HEAD, currentBase, BASE),
+    listOpenPulls: async () => [pull()],
+    getPull: async () => pull(),
+    listIssueComments: async () => [...issueComments],
+    listReviews: async () => [],
+    listReviewComments: async () => [],
+    listCheckRuns: async () => ({ check_runs: [successCheck('success', currentBase)] }),
+    getCombinedStatus: async () => ({ statuses: [vercelStatus] }),
+    listPullFiles: async () => [file],
+    updatePull: async () => pull(),
+    createIssueComment: async () => { throw new Error('unexpected comment'); },
+  };
+  const summary = await maintainAutoPulls({
+    token: 'pat', mergeToken: 'ephemeral', owner: OWNER, repo: REPO, api,
+    mergeApi: { mergePull: async () => { mergeCalls += 1; return { merged: true }; } },
+    logger: silent, now: new Date('2026-08-23T00:02:00Z'),
+  });
+  assert.equal(mergeCalls, 0);
+  assert.equal(summary.waiting, 1);
+  assert.equal(summary.merged, 0);
+  assert.equal(summary.errors.length, 0);
+});
+
+test('unstable final snapshot rereads authoritative signals and blocks stale PASS', async () => {
+  const issueComments = [requestComment(), cleanCodexComment()];
+  let getPullCalls = 0;
+  let checkCalls = 0;
+  let mergeCalls = 0;
+  const api = {
+    validate: async () => true,
+    compare: async () => currentComparison(),
+    listOpenPulls: async () => [pull()],
+    getPull: async () => {
+      getPullCalls += 1;
+      return getPullCalls >= 4 ? pull(HEAD, 'unstable') : pull();
+    },
+    listIssueComments: async () => [...issueComments],
+    listReviews: async () => [],
+    listReviewComments: async () => [],
+    listCheckRuns: async () => {
+      checkCalls += 1;
+      return { check_runs: [successCheck(checkCalls >= 4 ? 'failure' : 'success')] };
+    },
+    getCombinedStatus: async () => ({ statuses: [vercelStatus] }),
+    listPullFiles: async () => [file],
+    updatePull: async () => pull(),
+    createIssueComment: async (_number, body) => {
+      const comment = { id: 200 + issueComments.length, body, created_at: '2026-08-23T00:03:00Z', user: { login: OWNER } };
+      issueComments.push(comment);
+      return comment;
+    },
+  };
+  const summary = await maintainAutoPulls({
+    token: 'pat', mergeToken: 'ephemeral', owner: OWNER, repo: REPO, api,
+    mergeApi: { mergePull: async () => { mergeCalls += 1; return { merged: true, sha: 'd'.repeat(40) }; } },
+    logger: silent, now: new Date('2026-08-23T00:02:00Z'),
+  });
+  assert.equal(getPullCalls, 4);
+  assert.equal(checkCalls, 4);
+  assert.equal(mergeCalls, 0);
+  assert.equal(summary.merged, 0);
+  assert.equal(summary.humanRequired, 1);
+  assert.equal(summary.errors.length, 0);
+});
+
+test('unstable final snapshot merges only after post-snapshot signals pass', async () => {
+  const issueComments = [requestComment(), cleanCodexComment()];
+  let getPullCalls = 0;
+  let checkCalls = 0;
+  let mergeCalls = 0;
+  const api = {
+    validate: async () => true,
+    compare: async () => currentComparison(),
+    listOpenPulls: async () => [pull()],
+    getPull: async () => {
+      getPullCalls += 1;
+      return getPullCalls >= 4 ? pull(HEAD, 'unstable') : pull();
+    },
+    listIssueComments: async () => [...issueComments],
+    listReviews: async () => [],
+    listReviewComments: async () => [],
+    listCheckRuns: async () => {
+      checkCalls += 1;
+      return { check_runs: [successCheck()] };
+    },
+    getCombinedStatus: async () => ({ statuses: [vercelStatus] }),
+    listPullFiles: async () => [file],
+    updatePull: async () => pull(),
+    createIssueComment: async (_number, body) => {
+      const comment = { id: 300 + issueComments.length, body, created_at: '2026-08-23T00:03:00Z', user: { login: OWNER } };
+      issueComments.push(comment);
+      return comment;
+    },
+  };
+  const summary = await maintainAutoPulls({
+    token: 'pat', mergeToken: 'ephemeral', owner: OWNER, repo: REPO, api,
+    mergeApi: { mergePull: async () => { mergeCalls += 1; return { merged: true, sha: 'd'.repeat(40) }; } },
+    logger: silent, now: new Date('2026-08-23T00:02:00Z'),
+  });
+  assert.equal(getPullCalls, 5);
+  assert.equal(checkCalls, 4);
+  assert.equal(mergeCalls, 1);
+  assert.equal(summary.merged, 1);
+  assert.equal(summary.humanRequired, 0);
+  assert.equal(summary.errors.length, 0);
+});
+
+test('base advance during unstable post-snapshot signal read prevents merge', async () => {
+  const issueComments = [requestComment(), cleanCodexComment()];
+  const newBase = 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+  let getPullCalls = 0;
+  let checkCalls = 0;
+  let mergeCalls = 0;
+  const api = {
+    validate: async () => true,
+    compare: async () => (getPullCalls >= 5 ? currentComparison(HEAD, newBase, BASE) : currentComparison()),
+    listOpenPulls: async () => [pull()],
+    getPull: async () => {
+      getPullCalls += 1;
+      if (getPullCalls >= 5) return pull(HEAD, 'unstable', newBase);
+      return getPullCalls >= 4 ? pull(HEAD, 'unstable') : pull();
+    },
+    listIssueComments: async () => [...issueComments],
+    listReviews: async () => [],
+    listReviewComments: async () => [],
+    listCheckRuns: async () => {
+      checkCalls += 1;
+      return { check_runs: [successCheck()] };
+    },
+    getCombinedStatus: async () => ({ statuses: [vercelStatus] }),
+    listPullFiles: async () => [file],
+    updatePull: async () => pull(),
+    createIssueComment: async (_number, body) => {
+      const comment = { id: 400 + issueComments.length, body, created_at: '2026-08-23T00:03:00Z', user: { login: OWNER } };
+      issueComments.push(comment);
+      return comment;
+    },
+  };
+  const summary = await maintainAutoPulls({
+    token: 'pat', mergeToken: 'ephemeral', owner: OWNER, repo: REPO, api,
+    mergeApi: { mergePull: async () => { mergeCalls += 1; return { merged: true, sha: 'd'.repeat(40) }; } },
+    logger: silent, now: new Date('2026-08-23T00:02:00Z'),
+  });
+  assert.equal(getPullCalls, 5);
+  assert.equal(checkCalls, 4);
+  assert.equal(mergeCalls, 0);
+  assert.equal(summary.merged, 0);
+  assert.equal(summary.waiting, 1);
   assert.equal(summary.errors.length, 0);
 });
