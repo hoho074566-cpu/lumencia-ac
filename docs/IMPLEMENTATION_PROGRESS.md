@@ -7,7 +7,7 @@ Post-merge Narrative Engine continuation — PR #36 NPC Initiative HF3 is merged
 - Repo: `hoho074566-cpu/lumencia-ac`
 - Main: `1faadd105cf7b7780544abb5ca5276af04198796` (`Merge pull request #36`)
 - Working branch: `codex/scene-purpose-v1`
-- PR #37: **open**. Published HEAD `a5cff2eddd78926144fc6a27ff19f60797cdc1f1` passed Safety and Vercel and completed focused signed-in Exact Preview acceptance, but its fresh review found that nonempty same-scene actions classified as `generic` could still retain stale purpose.
+- PR #37: **open**. Published HEAD `a433d3ad37a6a830ab199088157aa733c71ade91` passed Safety and Vercel; focused signed-in Exact Preview confirmed that nonempty generic actions refresh stale focus. Its fresh review then found that the AUTO no-PC-action sentinel could be misclassified as `player-action`.
 - PR #36: **merged** from exact docs checkpoint HEAD `c347744858300359ab8d6da204cb5d9277d366be`; reviewed code HEAD `c7881f4c31758d0350833f31c37d116f3ff4c18d`.
 - PR #36 final checkpoint Safety Gate #290: **PASS**; Vercel: **PASS / Ready**.
 - Fresh reviewed-code Codex result on `c7881f4...`: direct P0/P1 = 0 (`Didn't find any major issues`). The docs-only checkpoint did not change that code tree. The previously reported committed-action priority P1 is closed by limiting present-NPC stall recovery to passive `wait` / `downtime` intents.
@@ -37,7 +37,7 @@ Post-merge Narrative Engine continuation — PR #36 NPC Initiative HF3 is merged
 - No schema migration, extra model call, new API entrypoint, `app.js` rewrite, or `api/chat.js` rewrite.
 - Focused syntax, purpose, context authority-tail, CONTINUE, event, continuity, and Scene Momentum suites: PASS.
 - Full `scripts/lumensia-pr-check.mjs`: PASS in a clean LF checkout. The normal Windows working tree still exposes the known CRLF-only false negative in five pre-existing workflow string assertions; canonical Git blobs and hosted Linux checks use LF.
-- The current local closure distinguishes empty descriptive output churn from a nonempty player action: generic actions now refresh `player-action` purpose, while decision-sensitive questions, active events, decisions, NPC interaction precedence, and CONTINUE freeze remain unchanged. This closure is not merge-authoritative until committed, pushed, and freshly reviewed at the exact new head.
+- The current local closure distinguishes both empty descriptive churn and the exact AUTO no-PC-action sentinel from a real nonempty player action. Generic player actions still refresh purpose, while AUTO, decision-sensitive questions, active events, decisions, NPC interaction precedence, and CONTINUE freeze remain unchanged. This closure is not merge-authoritative until committed, pushed, and freshly reviewed at the exact new head.
 
 ## Completed Foundation
 Already merged before PR #33:
@@ -282,9 +282,9 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
 
 ## NEXT ACTION
-1. Finish the generic-action purpose regression checks, full PR check, and second exact-diff/scope review.
+1. Finish the AUTO sentinel purpose regression checks, full PR check, and second exact-diff/scope review.
 2. Commit and push the focused PR #37 closure, then require hosted Safety/Vercel and fresh exact-current-HEAD P0/P1 authority.
-3. Rerun the affected generic-action case on the exact Preview; retain the already-completed transition/event/decision/CONTINUE evidence unless the reviewed code path changes again.
+3. Rerun the affected AUTO case on the exact Preview; retain the already-completed generic-action/transition/event/decision/CONTINUE evidence unless the reviewed code path changes again.
 4. If every exact-current-head gate is green and no special blocker appears, use the user's explicit merge authorization and verify the merge tree plus production health.
 5. Only after Scene Purpose is complete, start Explicit Scene Exit Condition as a separate change. Do not mix Turn Hook or Event Consequence into this PR.
 
@@ -309,8 +309,8 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed on PR #36 code head `c7881f4...`: passive-only initiative closure published; Safety #289/Vercel Ready; fresh direct P0/P1=0; ahead 3 / behind 0; current-base and merge-base match main.
 - Completed locally this session: branch/head verification, Cloud Browser recovery retries, protected-Preview URL confirmation, dedicated live-token availability check, syntax/static checks, `git diff --check`, and full PR check PASS.
 - Completed: Exact Preview door/location and NPC-initiative reruns plus the full 12-case acceptance, PR #36 authorized merge, exact merge-tree verification, and production health smoke.
-- Completed on published PR #37 head `a5cff2e`: bounded purpose implementation, hosted Safety/Vercel, and focused signed-in Exact Preview transition/event/decision/CONTINUE plus same-scene refresh evidence.
-- Fresh exact-head review found one remaining stale-purpose path for nonempty actions classified as `generic`; the local focused closure and permanent regression are present but not yet published.
+- Completed on published PR #37 head `a433d3a`: bounded purpose implementation, hosted Safety/Vercel, and focused signed-in Exact Preview generic-action/transition/event/decision/CONTINUE plus same-scene refresh evidence.
+- Fresh exact-head review found that the AUTO no-PC-action sentinel could become `player-action`; the user authorized a new remediation cycle, and the local focused closure plus permanent regression are present but not yet published.
 - Unfinished: full check/second review for that closure, commit/push, fresh exact-head gates/review, affected Preview rerun, guarded merge, merge-tree verification, and production health; all later narrative phases remain separate.
 - Blocker: none locally.
-- NEXT ACTION: validate and publish the generic-action closure, then revalidate every exact-current-head gate.
+- NEXT ACTION: validate and publish the AUTO sentinel closure, then revalidate every exact-current-head gate.
