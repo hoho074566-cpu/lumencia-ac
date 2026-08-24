@@ -268,15 +268,32 @@ const cases = [
   {
     id: 'question-form',
     action: '지금 오리엔테이션이 끝난 뒤 대장간에 들를 시간이 있을까?',
-    saveState: baseSave(),
+    saveState: baseSave({
+      world: { date: '1285-03-02', time: '12:00', location: '기사과 강의동 지정교실', weather: '맑음' },
+      activeEvents: ['combat-orientation'],
+      sceneRuntime: {
+        scene_key: 'combat-orientation', participants: ['artemis'], ongoing_topic: '기사과 오리엔테이션 진행 중',
+        unresolved_question: '', remaining_beats: ['장비 점검 안내'],
+        eventProgress: { eventInstanceId: 'combat-orientation', activeBeat: 'briefing', completedBeats: ['arrival'], paused: false, resumeKey: 'combat-orientation' },
+        momentum: { stall_streak: 3, pressure: 'required', recent_deltas: [] },
+      },
+    }),
     recentTurns: [],
     rollingSummary: '아직 기숙사 개인실에 있다.',
     evaluate(data) {
-      const delta = object(data.turn?.state_delta);
+      const turn = object(data.turn), delta = object(turn.state_delta), event = object(turn.event_progress);
+      const eventArrays = [
+        ...array(delta.active_events_remove), ...array(delta.completed_events_add), ...array(delta.scheduled_events_complete),
+      ].map(String);
       return {
         decision_sensitive: data?.pipeline?.scene_momentum?.intent === 'decision-sensitive',
         no_travel_execution: delta.new_location == null,
         same_moment_preserved: Number(delta.advance_minutes) === 0,
+        active_event_not_completed: !eventArrays.includes('combat-orientation'),
+        active_event_identity_preserved: !turn.event_progress || (
+          event.event_instance_id === 'combat-orientation' && event.active_beat === 'briefing' &&
+          array(event.completed_beats).join('|') === 'arrival'
+        ),
       };
     },
   },
@@ -298,7 +315,7 @@ const cases = [
     }],
     rollingSummary: '카인은 대도서관 입구에 도착했고 라리스가 방문 목적을 물었다.',
     evaluate(data) {
-      const delta = object(data.turn?.state_delta);
+      const delta = object(data.turn?.state_delta), rows = array(data.turn?.scene), visible = sceneText(data.turn);
       const zeroArrays = Object.entries(delta).filter(([, value]) => Array.isArray(value)).every(([, value]) => value.length === 0);
       const zeroScalars = Number(delta.advance_minutes) === 0 && delta.new_location == null && delta.pc_status == null &&
         Number(delta.fatigue_delta || 0) === 0 && Number(delta.gold_delta || 0) === 0;
@@ -307,6 +324,8 @@ const cases = [
         continue_freeze_intent: data?.route?.scene_momentum?.intent === 'continue-freeze' || data?.pipeline?.context_router?.profile === 'continue-11k-v154',
         zero_scalar_state: zeroScalars,
         zero_state_arrays: zeroArrays,
+        no_new_npc_dialogue: rows.every((row) => row.kind !== 'dialogue' && !row.speaker_key && !row.speaker_name),
+        no_new_npc_action: !/(?:라리스|NPC).{0,24}(?:말했|대답했|물었|일어섰|움직였|다가왔|떠났|고개를|손을|책을\s*(?:덮|폈))/u.test(visible),
       };
     },
   },

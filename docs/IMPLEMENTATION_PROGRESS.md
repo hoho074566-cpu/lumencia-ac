@@ -181,6 +181,8 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed-event forward then moved 12:40 -> 12:48 and the classroom -> 기사과 대장간 without replaying the orientation. Isabel and the smith initiated naturally, and the turn ended on a meaningful response hook without choosing for the player.
 - Candidate live acceptance is sufficient across all 12 requested behavior classes: short travel, long-action travel, wait, rest, repeated observation, NPC approach/question, door/location transition, pre-schedule rest, question form, CONTINUE, completed-event forward, and NPC initiative.
 - Final direct-thread audit found one still-applicable P1: the manual CLI harness omitted the deployment access header, so a protected Preview returned `401 BAD_ACCESS_TOKEN`. The harness now reads only `LUMENSIA_LIVE_ACCESS_TOKEN`, conditionally forwards it as `x-lumensia-token`, never prints it, and has a permanent static regression. Browser acceptance never exposed or reused the token value.
+- Fresh exact-head review `PRR_kwDOT8LCAs8AAAABKkJDNQ` on `b30ad59aba9c242bb4beb549a4f444abd645603e` found one new direct P1: a question with `stall_streak >= 2` received both sovereignty freeze and `SCENE_STALL=true`. The fix suppresses stall-recovery pressure for `decision-sensitive` turns, with a permanent regression proving no world mutation is requested.
+- Two fresh P2s directly matched failures already reproduced during this acceptance phase, so the required P1 head change also hardens the harness: the question fixture now seeds an active orientation and checks non-completion/identity, while CONTINUE rejects new NPC dialogue/action in addition to zero state delta. Other non-reproduced P2s remain non-blocking and unchanged.
 
 ## Permanent HF1 Test Suites
 - `scripts/tests/context-router-authority-tail.test.mjs`
@@ -211,7 +213,7 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PR #33 manual merge safety.
 
 ## NEXT ACTION
-1. Repeat the full PR check, commit/publish the protected-harness auth fix and final checkpoint, and wait for exact-head Safety + Vercel.
+1. Repeat the full PR check, commit/publish the decision-sensitive stall fix and hardened acceptance assertions, and wait for exact-head Safety + Vercel.
 2. Obtain a fresh exact-current-HEAD/current-main Codex review. Direct P0/P1 must be zero; P2/P3 remain non-blocking unless newly reproduced.
 3. Re-fetch main/PR and verify behind=0, base commit=merge-base=current main, open/non-draft/mergeable, clean/synced, Safety/Vercel PASS; then stop at the protected-core manual merge gate and never auto-merge.
 4. After the acceptance fix is human-merged, rerun all 12 cases on production and smoke `/api/health`, then implement **Scene Purpose** with bounded purpose state and no automatic player choice.
