@@ -205,6 +205,9 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - The runtime aligns the clock only when `event_progress.event_instance_id` exactly matches an authoritative occurrence scheduled at that future minute. Due/overdue IDs and unrelated NPC/Director interruptions are subtracted from that exact-boundary set and remain unforced.
 - Permanent cases cover the production-like overdue-row + 10-minute future orientation, implicit 30–240-minute rest with a 35-minute event, explicit-duration equality, due/overdue committed-action freedom, and unrelated early choices.
 - Focused tests, full `node scripts/lumensia-pr-check.mjs`, and `git diff --check`: **PASS**.
+- Exact Preview `d898734cc190c2115078d8191f273215f99ced46` passed the corrected 11:50 case with a coherent 12:00 world clock, unchanged room location, active/non-completed `knight_orientation`, and preserved attend/stay/other choice. The other ten GAME acceptance classes also passed in isolated UI saves.
+- The same full live cycle exposed one separate CONTINUE P1: a raw `remaining_beats` sentence instructed a new book-closing action and the model replayed the preceding NPC question even though State Delta stayed frozen.
+- Local closure removes unstarted pending beats from both the synthetic CONTINUE action and routed SAVE_STATE while retaining the original queue for post-response consumption. It also explicitly forbids replaying prior NPC dialogue. CONTINUE/Event/Context/Schedule focused tests and the full PR check pass.
 
 ## Permanent HF1 Test Suites
 - `scripts/tests/context-router-authority-tail.test.mjs`
@@ -235,8 +238,8 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
 
 ## NEXT ACTION
-1. Commit/publish the complete current-review/clock closure on PR #35 and wait for new exact-head Safety + Vercel.
-2. Rerun the failing pre-schedule long-rest case and then the full 12-case acceptance against the new exact Preview.
+1. Commit/publish the CONTINUE narrative-freeze closure on PR #35 and wait for new exact-head Safety + Vercel.
+2. Rerun the affected CONTINUE case and the schedule-boundary case against the new exact Preview; the preceding full live cycle already passed the other ten isolated cases.
 3. Obtain a fresh exact-current-HEAD/current-main Codex review. Direct P0/P1 must be zero; P2/P3 remain non-blocking unless newly reproduced.
 4. Re-fetch main/PR and verify behind=0, base commit=merge-base=current main, open/non-draft/mergeable, clean/synced, Safety/Vercel PASS; then stop at the protected-core manual merge gate.
 5. After human merge, rerun production acceptance and implement **Scene Purpose** with bounded purpose state and no automatic player choice, followed by Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence chaining/lifetime.
@@ -251,6 +254,8 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed post-merge evidence: 11/12 production live cases green and the remaining schedule-boundary sovereignty failure reproduced exactly.
 - Completed on initial HF2 exact Preview: Safety #277/Vercel PASS; 120-minute skip/nonattendance choice fixed, but live evidence exposed a 0-minute clock/prose mismatch at the schedule boundary.
 - Completed local fix iteration: future-only reachable boundary directive; exact occurrence/clock alignment; due/overdue and unrelated choices remain executable; focused tests PASS.
-- Unfinished: revised exact-head publish/live rerun, hosted gates/fresh review, protected manual merge, Scene Purpose and later phases.
-- Blocker: current PR #35 exact head does not yet include the complete two-P1 + clock-consistency closure.
-- NEXT ACTION: commit/publish -> exact Preview case/full 12 -> fresh review -> protected manual-merge gate.
+- Completed exact Preview acceptance on `d898734...`: all 11 GAME cases passed, including the corrected 12:00 schedule boundary; CONTINUE reproduced a narrative hard-freeze P1 despite zero state delta.
+- Completed local CONTINUE closure: pending-beat prompt removal, prior-dialogue replay prohibition, original queue consumption preserved; focused/full tests PASS.
+- Unfinished: revised exact-head publish, affected Preview reruns, hosted gates/fresh review, protected manual merge, Scene Purpose and later phases.
+- Blocker: current PR #35 exact head does not yet include the CONTINUE narrative-freeze closure.
+- NEXT ACTION: commit/publish -> exact Preview CONTINUE + schedule rerun -> fresh review -> protected manual-merge gate.

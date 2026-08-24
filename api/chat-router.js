@@ -127,9 +127,15 @@ function emptyStateDelta() {
 
 function continueAction(incoming) {
   const runtime = object(incoming.saveState?.sceneRuntime);
-  const beat = array(runtime.remaining_beats)[0] || '';
   const eventAnchor = compactEventProgress(runtime.eventProgress);
-  return clampText(`${CONTINUE_DIRECTIVE}${beat?`\n미처리 같은-장면 beat: ${beat}`:''}${eventAnchor?`\n현재 이벤트 진행(권위 상태): ${eventAnchor}`:''}\n직전 장면 연속성: ${clampText(runtime,900)}`,5000);
+  const continuity={scene_key:runtime.scene_key||'',participants:array(runtime.participants).slice(0,8),ongoing_topic:runtime.ongoing_topic||'',unresolved_question:runtime.unresolved_question||''};
+  return clampText(`${CONTINUE_DIRECTIVE}${eventAnchor?`\n현재 이벤트 진행(권위 상태): ${eventAnchor}`:''}\n직전 장면 연속성: ${clampText(continuity,900)}`,5000);
+}
+
+function continueRouteSave(saveState={}) {
+  const save=object(saveState),safeRuntime={...object(save.sceneRuntime)};
+  delete safeRuntime.remaining_beats;
+  return{...save,sceneRuntime:safeRuntime};
 }
 
 function lockContinueTurn(turn) {
@@ -418,12 +424,12 @@ export default async function handler(req,res){
     const incoming0=req.body&&typeof req.body==='object'?req.body:{},mode=SUPPORTED_MODES.has(incoming0.inputMode)?incoming0.inputMode:'game',incoming={...incoming0};
     const resumableIds=mode==='game'?[...scheduledIdsDueByTurnEnd(incoming0.saveState,0),...unscheduledPausedIdsForResume(incoming0.saveState?.sceneRuntime,incoming0.action,incoming0.saveState?.activeEvents)]:[];
     incoming.saveState={...object(incoming0.saveState),sceneRuntime:mode==='game'?promotePausedEventProgress(incoming0.saveState?.sceneRuntime,resumableIds):object(incoming0.saveState?.sceneRuntime)};
-    if(mode==='meta'){incoming.inputMode='meta';incoming.action=String(incoming0.action||'');}else if(mode==='continue'){incoming.inputMode='game';incoming.action=continueAction(incoming);incoming.forceTerra=false;incoming.rollingSummary=String(incoming0.rollingSummary||'').slice(-3600);}else if(mode==='auto'){incoming.inputMode='game';incoming.action=AUTO_DIRECTIVE;}else{incoming.inputMode='game';incoming.action=String(incoming0.action||'');}
+    if(mode==='meta'){incoming.inputMode='meta';incoming.action=String(incoming0.action||'');}else if(mode==='continue'){incoming.inputMode='game';incoming.action=continueAction(incoming);incoming.saveState=continueRouteSave(incoming.saveState);incoming.forceTerra=false;incoming.rollingSummary=String(incoming0.rollingSummary||'').slice(-3600);}else if(mode==='auto'){incoming.inputMode='game';incoming.action=AUTO_DIRECTIVE;}else{incoming.inputMode='game';incoming.action=String(incoming0.action||'');}
     if(isCombatLike(incoming.action)&&incoming.reasoningEffort==='auto')incoming.reasoningEffort='medium';
     const result=await runCore(req,incoming,mode);if(result.status<200||result.status>=300)return res.status(result.status).json({...result.data,server_version:ADAPTER_VERSION,adapter_version:ADAPTER_VERSION});
     const data=result.data;if(!data?.turn)throw new Error('코어 API 응답에 turn이 없습니다.');
     let telemetry=result.telemetry||{routerVersion:routerVersion(),enabled:false,profile:'unknown'};telemetry={...telemetry,actual_input_tokens:Number(data?.usage?.input_tokens||0),actual_output_tokens:Number(data?.usage?.output_tokens||0)};if(Number(telemetry.soft_max_tokens||0)>0)telemetry.budget_status=telemetry.actual_input_tokens<=telemetry.soft_max_tokens?'OK':'OVER';
-    if(mode==='continue'){lockContinueTurn(data.turn);applyExtendedExpressions(data.turn,incoming0.saveState||{});data.runtime_state=consumeContinuationRuntime(incoming,data.turn);data.background_digest=String(incoming.saveState?.backgroundDigest||'').slice(-1800);const pipeline={pipeline:'continue-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true};data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);}
+    if(mode==='continue'){lockContinueTurn(data.turn);applyExtendedExpressions(data.turn,incoming0.saveState||{});data.runtime_state=consumeContinuationRuntime({...incoming,saveState:object(incoming0.saveState)},data.turn);data.background_digest=String(incoming.saveState?.backgroundDigest||'').slice(-1800);const pipeline={pipeline:'continue-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true};data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);}
     if(mode==='meta'){const pipeline={pipeline:'meta-full-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true};data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);}
     applyExtendedExpressions(data.turn,incoming0.saveState||{});data.turn.choices=freshChoices(incoming.action,data.turn);const sceneIntent=applySceneMomentumTimeFloor({...incoming0,saveState:incoming.saveState,action:incoming0.action||''},data.turn,mode);const sceneRuntime=localSceneRuntime({...incoming0,saveState:incoming.saveState,action:incoming0.action||''},data.turn,telemetry?.event_director_v2);const npcUpdates=incoming0.qualityPipeline===false?{}:localNpcUpdates(incoming0,data.turn);data.runtime_state={npc_updates:npcUpdates,scene_runtime:sceneRuntime};data.background_digest=localBackgroundDigest(incoming0,data.turn,sceneRuntime.participants);
     const sceneMomentum={version:SCENE_MOMENTUM_VERSION,intent:sceneIntent?.kind||sceneRuntime?.momentum?.last_intent||'generic',score:Number(sceneRuntime?.momentum?.last_score||0),structural_score:Number(sceneRuntime?.momentum?.last_structural_score||0),target:Number(sceneRuntime?.momentum?.last_target||0),stall_streak:Number(sceneRuntime?.momentum?.stall_streak||0),pressure:sceneRuntime?.momentum?.pressure||'normal'};

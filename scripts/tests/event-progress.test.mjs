@@ -108,6 +108,11 @@ assert.ok(retrospective.includes('speech')&&isEventBeatEligible(previous,'ceremo
 
 const router=readFileSync('api/chat-router.js','utf8');
 assert.match(router,/continueAction[\s\S]*compactEventProgress\(runtime\.eventProgress\)/,'CONTINUE action carries compact progress');
+const continueActionSource=router.slice(router.indexOf('function continueAction'),router.indexOf('function continueRouteSave'));
+assert.doesNotMatch(continueActionSource,/remaining_beats|미처리 같은-장면 beat/,'CONTINUE action must not promote an unstarted pending beat into model instructions');
+assert.match(router,/function continueRouteSave[\s\S]*delete safeRuntime\.remaining_beats/,'CONTINUE routed SAVE_STATE must hide pending beats that would contradict hard freeze');
+assert.match(router,/mode==='continue'[\s\S]*incoming\.saveState=continueRouteSave\(incoming\.saveState\)/,'CONTINUE must route only the freeze-safe runtime view');
+assert.match(router,/consumeContinuationRuntime\(\{\.\.\.incoming,saveState:object\(incoming0\.saveState\)\}/,'CONTINUE must still consume the original pending-beat queue after the frozen response');
 assert.match(router,/consumeContinuationRuntime[\s\S]*mergeContinuationEventProgressState/,'CONTINUE uses conservative occurrence-aware merging');
 assert.match(router,/mode==='game'\?promotePausedEventProgress/, 'paused occurrence promotion must be disabled for CONTINUE/AUTO/META');
 assert.match(router,/scheduled_events_complete[\s\S]*scheduledStillActive/, 'scheduled null is paused only while the occurrence remains authoritative and unfinished');

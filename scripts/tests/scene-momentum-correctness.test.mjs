@@ -74,6 +74,7 @@ assert.match(continueDirective,/CONTINUE HARD FREEZE/,'CONTINUE must receive fre
 assert.doesNotMatch(continueDirective,/SCENE_STALL=true/,'CONTINUE must never receive stall-recovery pressure');
 assert.doesNotMatch(continueDirective,/실제 변화가 필요/,'CONTINUE replacement must not demand state change');
 assert.match(continueDirective,/새 NPC 대사·발화·몸짓·이동·결정·도착·퇴장을 추가하지 않는다/,'CONTINUE must forbid new NPC interaction even within the same clock minute');
+assert.match(continueDirective,/기존 NPC 대사도 인용·반복·재출력하지 않는다/,'CONTINUE must not replay the preceding dialogue as if it were new output');
 assert.match(continueDirective,/정적인 감각 묘사만 허용/,'CONTINUE may elaborate prose without progressing the scene');
 
 console.log('PASS Scene Momentum correctness (question guards, duration predicate, no-op delta, dedupe, choice stop, status, CONTINUE freeze)');
