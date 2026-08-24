@@ -12,13 +12,21 @@ assert.deepEqual(initial,{version:SCENE_PURPOSE_VERSION,kind:'scene',focus:turn.
 const retained=deriveScenePurpose({previousRuntime:{scene_key:turn.scene_title,purpose:initial},turn:{...turn,scene_summary:'빛의 각도만 조금 달라졌다.'},sceneDelta:baseDelta,sceneKey:turn.scene_title,turnNumber:13});
 assert.deepEqual(retained,initial,'same-scene descriptive churn must not replace the bounded purpose');
 
+const refreshedAction=deriveScenePurpose({previousRuntime:{scene_key:turn.scene_title,purpose:initial},turn:{...turn,scene_summary:'같은 열람실에서 검술 훈련을 시작한다.'},sceneDelta:{...baseDelta,intent:'committed-consequence'},action:'검술 훈련을 시작한다.',sceneKey:turn.scene_title,turnNumber:13});
+assert.equal(refreshedAction.kind,'action','a new committed same-scene objective must replace stale purpose');
+assert.equal(refreshedAction.source,'player-action');
+
+const refreshedInteraction=deriveScenePurpose({previousRuntime:{scene_key:turn.scene_title,purpose:initial},turn:{...turn,scene_summary:'안내인이 다가와 봉인 기록에 관해 묻는다.'},sceneDelta:{...baseDelta,flags:{...baseDelta.flags,npcAction:true}},sceneKey:turn.scene_title,turnNumber:13});
+assert.equal(refreshedInteraction.kind,'interaction','a new same-scene NPC interaction must replace stale purpose');
+assert.equal(refreshedInteraction.source,'npc-interaction');
+
 const eventPurpose=deriveScenePurpose({previousRuntime:{scene_key:turn.scene_title,purpose:initial},turn:{...turn,scene_summary:'봉인 해제 절차가 첫 단계에 들어갔다.'},sceneDelta:{...baseDelta,structuralScore:1,flags:{...baseDelta.flags,eventProgress:true}},eventProgress:{eventInstanceId:'sealed_archive#12',activeBeat:'unlock'},sceneKey:turn.scene_title,turnNumber:14});
 assert.equal(eventPurpose.kind,'event');
 assert.equal(eventPurpose.source,'event-progress');
 assert.equal(eventPurpose.event_instance_id,'sealed_archive#12');
 
-const eventRetained=deriveScenePurpose({previousRuntime:{scene_key:turn.scene_title,purpose:eventPurpose},turn:{...turn,scene_summary:'같은 해제 절차가 계속된다.'},sceneDelta:baseDelta,eventProgress:{eventInstanceId:'sealed_archive#12',activeBeat:'unlock'},sceneKey:turn.scene_title,turnNumber:15});
-assert.deepEqual(eventRetained,eventPurpose,'the same active occurrence must keep one stable purpose');
+const eventRetained=deriveScenePurpose({previousRuntime:{scene_key:turn.scene_title,purpose:eventPurpose},turn:{...turn,scene_summary:'같은 해제 절차에서 안내인이 다음 봉인을 가리킨다.'},sceneDelta:{...baseDelta,intent:'committed-consequence',flags:{...baseDelta.flags,npcAction:true}},eventProgress:{eventInstanceId:'sealed_archive#12',activeBeat:'unlock'},sceneKey:turn.scene_title,turnNumber:15});
+assert.deepEqual(eventRetained,eventPurpose,'the same active occurrence must remain authoritative across actions and NPC interaction');
 
 const decision=deriveScenePurpose({previousRuntime:{scene_key:turn.scene_title,purpose:eventPurpose},turn:{...turn,scene_summary:'어느 봉인을 먼저 풀지 선택해야 한다.',choices:['왼쪽 봉인을 푼다.','오른쪽 봉인을 푼다.','아직 건드리지 않는다.']},sceneDelta:baseDelta,eventProgress:{eventInstanceId:'sealed_archive#12',activeBeat:'choice'},sceneKey:turn.scene_title,turnNumber:16});
 assert.equal(decision.kind,'decision');
