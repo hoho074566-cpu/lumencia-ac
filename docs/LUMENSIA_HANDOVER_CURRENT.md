@@ -35,8 +35,9 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Root cause: `EXPLICIT_DURATION=120min` had no exact earlier schedule hard-stop priority in the reserved Scene Momentum directive. The local adapter only raises a missing time floor and intentionally does not shrink positive model output, so it could not repair this without prose/state divergence.
 - Current HF2 fix shares the authoritative boundary calculator with the prompt path and emits `SCHEDULE_BOUNDARY=10min`: stop at the event start, leave the remaining rest unexecuted, and do not auto-decide absence/completion.
 - Initial exact Preview `a7a1a5fba44ed29872cde0dd655e129b81262685` passed Safety #277 and Vercel. Live play blocked the 120-minute skip and preserved attendance choice, but exposed a second inconsistency: the prose/event reached noon while the runtime clock stayed at 11:50 because any model choices suppressed the local floor.
-- The local follow-up advances to the boundary only when structured `event_progress` identifies an authoritative event due exactly by that bounded time. Unrelated early interruptions with choices are explicitly not forced forward.
-- Focused router/time-floor tests, full `node scripts/lumensia-pr-check.mjs`, and `git diff --check` pass. Publish a new exact head before repeating Preview acceptance/review.
+- Initial review `PRR_kwDOT8LCAs8AAAABKkOr9A` found two direct P1s: reachable boundaries beyond the minimum or equal to an explicit duration were omitted, while due/overdue rows created a contradictory 0-minute hard stop that froze new committed actions. One separate P2 remains non-blocking.
+- The current local closure selects only strictly future boundaries for model hard stops, uses the full permitted action range including equality, and aligns the runtime clock only when structured event progress matches an occurrence scheduled at that exact future minute. Due/overdue and unrelated early interruptions remain unforced.
+- Focused router/time-floor tests, full `node scripts/lumensia-pr-check.mjs`, and `git diff --check`: **PASS**. Publish a new exact head before repeating Preview acceptance/review.
 
 ## Critical review finding and merged closure
 Final Codex review **did complete** on exact HEAD `8ca24ba...` at 2026-08-23 21:47:49 UTC and found a **new current P1**.
@@ -548,7 +549,7 @@ Gameplay roadmap discussed but not DONE:
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
 2. Confirm main still contains merge commit `88fa53036c58324ffd5012ab7b5ed0cd3099dd6d`; do **not** redo completed HF1 or PR #34 diagnosis.
-3. Commit/publish the structured-boundary clock follow-up on PR #35 and obtain new exact-head Safety + Vercel.
+3. Commit/publish the complete current-review/clock closure on PR #35 and obtain new exact-head Safety + Vercel.
 4. Run the pre-schedule long-rest case and then all 12 acceptance cases against that new exact Preview. The mandatory schedule must advance exactly to its start, stop the longer rest, and preserve PC attendance choice.
 5. Obtain a fresh exact-current-HEAD/current-main Codex review with direct P0/P1=0.
 6. Re-fetch main/PR and verify every merge gate, then stop at protected-core manual merge readiness; do not auto-merge this new PR without separate exact authorization.
@@ -558,4 +559,4 @@ Gameplay roadmap discussed but not DONE:
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #34는 exact head `4479615`로 검증돼 merge commit `88fa5303`으로 main에 반영됐다. Post-merge production에서 11:50의 두 시간 휴식이 필수 12:00 일정을 건너뛰는 문제가 재현됐다. PR #35 initial Preview `a7a1a5f`는 120분 skip/불참 자동 결정을 막았지만 runtime clock이 11:50에 남았다. 현재 local follow-up은 structured schedule occurrence가 실제 boundary에 도달한 경우에만 정확히 10분 floor를 적용하고 unrelated choice interruption은 그대로 두며 focused/full tests가 PASS다. revised publish -> exact Preview live -> Safety/Vercel -> fresh direct P0/P1=0 -> protected manual merge gate까지 진행한 뒤, human merge 후 Scene Purpose -> Scene Exit -> Turn Hook -> Event Consequence로 계속한다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #34는 exact head `4479615`로 검증돼 merge commit `88fa5303`으로 main에 반영됐다. PR #35 initial Preview `a7a1a5f`는 120분 skip/불참 자동 결정을 막았지만 runtime clock이 11:50에 남았고, initial review는 reachable-range/equality 누락과 due/overdue 0분 봉쇄 P1을 찾았다. 현재 local closure는 strictly-future reachable boundary만 지시하고 exact scheduled occurrence에서만 clock을 정렬하며 due/overdue·unrelated choice는 강제하지 않는다. focused/full tests PASS 상태에서 revised publish -> exact Preview live -> Safety/Vercel -> fresh direct P0/P1=0 -> protected manual merge gate까지 진행한 뒤, human merge 후 Scene Purpose -> Scene Exit -> Turn Hook -> Event Consequence로 계속한다.`

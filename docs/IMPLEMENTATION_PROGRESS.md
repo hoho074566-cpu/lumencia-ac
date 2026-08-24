@@ -200,8 +200,11 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Permanent tests prove the exact boundary directive, its priority over explicit duration, authoritative schedule-tail retention, full-schedule/next-day/overdue behavior, and all existing time-floor invariants.
 - Initial exact Preview head `a7a1a5fba44ed29872cde0dd655e129b81262685`: Safety #277 PASS and Vercel Ready.
 - Its live 11:50 case correctly stopped before executing 120 minutes or deciding nonattendance, surfaced the orientation, and offered attend/stay/other choices. However, the header/runtime clock remained 11:50 while prose said noon: a structured boundary choice caused the existing meaningful-choice guard to skip the local 10-minute floor.
-- Local follow-up applies the bounded floor only when `event_progress.event_instance_id` exactly matches an authoritative schedule occurrence due at that boundary. An unrelated early NPC/Director interruption with choices remains at the model-produced moment.
-- Focused tests cover both branches and pass. Full `node scripts/lumensia-pr-check.mjs` and `git diff --check`: **PASS**.
+- Initial review `PRR_kwDOT8LCAs8AAAABKkOr9A` on `a7a1a5f...` found two P1s: a future boundary within an implicit action's allowed range (or exactly equal to an explicit duration) did not emit the hard stop, and already-due/overdue events produced a contradictory 0-minute hard stop that froze newly committed actions. Its remaining finding was P2.
+- Local review/live closure treats due/overdue rows as current context while selecting only the nearest strictly future hard stop; a boundary is emitted whenever it is reachable within the action's full allowed time range, including equality.
+- The runtime aligns the clock only when `event_progress.event_instance_id` exactly matches an authoritative occurrence scheduled at that future minute. Due/overdue IDs and unrelated NPC/Director interruptions are subtracted from that exact-boundary set and remain unforced.
+- Permanent cases cover the production-like overdue-row + 10-minute future orientation, implicit 30–240-minute rest with a 35-minute event, explicit-duration equality, due/overdue committed-action freedom, and unrelated early choices.
+- Focused tests, full `node scripts/lumensia-pr-check.mjs`, and `git diff --check`: **PASS**.
 
 ## Permanent HF1 Test Suites
 - `scripts/tests/context-router-authority-tail.test.mjs`
@@ -232,7 +235,7 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
 
 ## NEXT ACTION
-1. Commit/publish the structured-boundary clock follow-up on PR #35 and wait for new exact-head Safety + Vercel.
+1. Commit/publish the complete current-review/clock closure on PR #35 and wait for new exact-head Safety + Vercel.
 2. Rerun the failing pre-schedule long-rest case and then the full 12-case acceptance against the new exact Preview.
 3. Obtain a fresh exact-current-HEAD/current-main Codex review. Direct P0/P1 must be zero; P2/P3 remain non-blocking unless newly reproduced.
 4. Re-fetch main/PR and verify behind=0, base commit=merge-base=current main, open/non-draft/mergeable, clean/synced, Safety/Vercel PASS; then stop at the protected-core manual merge gate.
@@ -247,7 +250,7 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed: PR #34 exact-head gates and expected-head merge; merge-tree verification; merged-main full regression; production Vercel and `/api/health` smoke.
 - Completed post-merge evidence: 11/12 production live cases green and the remaining schedule-boundary sovereignty failure reproduced exactly.
 - Completed on initial HF2 exact Preview: Safety #277/Vercel PASS; 120-minute skip/nonattendance choice fixed, but live evidence exposed a 0-minute clock/prose mismatch at the schedule boundary.
-- Completed locally: schedule-identity-gated 10-minute floor for structured boundary choices; unrelated interruptions remain unforced; focused tests PASS.
+- Completed local fix iteration: future-only reachable boundary directive; exact occurrence/clock alignment; due/overdue and unrelated choices remain executable; focused tests PASS.
 - Unfinished: revised exact-head publish/live rerun, hosted gates/fresh review, protected manual merge, Scene Purpose and later phases.
-- Blocker: current PR #35 exact head does not yet include the clock-consistency follow-up.
-- NEXT ACTION: full test -> commit/publish -> exact Preview case/full 12 -> fresh review -> protected manual-merge gate.
+- Blocker: current PR #35 exact head does not yet include the complete two-P1 + clock-consistency closure.
+- NEXT ACTION: commit/publish -> exact Preview case/full 12 -> fresh review -> protected manual-merge gate.
