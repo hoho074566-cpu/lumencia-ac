@@ -338,7 +338,7 @@ function applyRuntimeStateStable(data, isContinue = false) {
   }
 }
 
-function materializeEventConsequencesStable(turn, pipeline = null) {
+function materializeEventConsequencesStable(turn, pipeline = null, action = '') {
   const delta = turn?.state_delta;
   if (!delta || typeof delta !== 'object') return [];
   const sourceEvent = turn?.event_progress?.event_instance_id
@@ -354,6 +354,7 @@ function materializeEventConsequencesStable(turn, pipeline = null) {
     existingHooks: save.hooks,
     sourceEvent,
     maxAdditions: isDueFollowUp ? (pipeline?.event_consequence?.status === 'resolved' ? 1 : 0) : 3,
+    minimumDelayMinutes: explicitFutureDelayMinutes(action),
   });
   if (!additions.length) return additions;
   const reserved = additions.slice(0, 8);
@@ -472,7 +473,7 @@ async function sendActionStable(action, requestedMode = null) {
 
     let notices = [];
     if (!isMeta && !isContinue) {
-      materializeEventConsequencesStable(data.turn, data.pipeline);
+      materializeEventConsequencesStable(data.turn, data.pipeline, action);
       notices = applyDelta(data.turn.state_delta);
       applyEmotionUpdates(data.turn.emotion_updates || []);
       updateDirectorState(data.turn);
@@ -609,7 +610,7 @@ async function boot() {
     source = replaceOnce(
       source,
       "import { migrateLegacyNpcKeys } from './save-migrations.js';",
-      `import { migrateLegacyNpcKeys } from '${location.origin}/save-migrations.js?v=156';\nimport { materializeDelayedConsequences } from '${location.origin}/lib/event-consequence.js?v=156';`,
+      `import { migrateLegacyNpcKeys } from '${location.origin}/save-migrations.js?v=156';\nimport { explicitFutureDelayMinutes, materializeDelayedConsequences } from '${location.origin}/lib/event-consequence.js?v=156';`,
       'save migration import'
     );
 

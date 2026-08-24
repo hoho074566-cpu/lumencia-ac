@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   buildEventConsequenceDirective,
   eventConsequenceEvidence,
+  explicitFutureDelayMinutes,
   expiredEventConsequences,
   materializeDelayedConsequences,
   nextEventConsequenceBoundaryMinutes,
@@ -55,6 +56,14 @@ test('delayed result becomes one bounded persisted hook and duplicate queue entr
   const second={...delayed,event_name:'학생회 조사',reason:'기록 신호를 학생회가 확인한다'};
   const bounded=materializeDelayedConsequences({rows:[delayed,second],world:{date:'1285-03-01',time:'09:10'},turnNumber:9,maxAdditions:1});
   assert.equal(bounded.length,1,'a due result may create at most one causal follow-up');
+});
+
+test('an explicit future delay is a hard lower bound for model queue timing', () => {
+  assert.equal(explicitFutureDelayMinutes('15분 뒤 파란 빛을 내게 한다.'),15);
+  assert.equal(explicitFutureDelayMinutes('2시간 후 다시 확인한다.'),120);
+  assert.equal(explicitFutureDelayMinutes('그냥 기다린다.'),null);
+  const [hook]=materializeDelayedConsequences({rows:[{...delayed,delay_minutes:5}],world:{date:'1285-03-01',time:'10:07'},advanceMinutes:3,turnNumber:10,minimumDelayMinutes:explicitFutureDelayMinutes('15분 뒤 파란 빛을 내게 한다.')});
+  assert.equal(hook.event_consequence.due_at,'1285-03-01T10:25');
 });
 
 test('due selection supports an explicit wait crossing the trigger but not an early ordinary turn', () => {
