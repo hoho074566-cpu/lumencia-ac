@@ -42,6 +42,11 @@ assert.match(indirectQuestionDirective,/진행 중인 일정\/이벤트를 완�
 const stalledQuestionDirective=buildSceneMomentumDirective({action:indirectScheduleQuestion,saveState:{world:{location:'기사과 강의실'},sceneRuntime:{momentum:{stall_streak:3}}}});
 assert.doesNotMatch(stalledQuestionDirective,/SCENE_STALL=true/,'decision-sensitive sovereignty freeze must suppress contradictory stall pressure');
 assert.doesNotMatch(stalledQuestionDirective,/실제 변화가 필요/,'a stalled question turn must not require world mutation');
+for(const action of ['지금 오리엔테이션이 끝난 뒤 대장간에 들를 시간이 있을까.', '지금 오리엔테이션이 끝난 뒤 대장간에 들를 시간이 있을까요.', '대장간에 들를 시간이 있을까']){
+  const intent=classifySceneIntent(action,{location:'기사과 강의실'});
+  assert.equal(intent.kind,'decision-sensitive',`Korean interrogative ending must preserve sovereignty without a question mark: ${action}`);
+  assert.doesNotMatch(buildSceneMomentumDirective({action,saveState:{world:{location:'기사과 강의실'},sceneRuntime:{momentum:{stall_streak:3}}}}),/SCENE_STALL=true/,`question without ? must suppress stall pressure: ${action}`);
+}
 assert.equal(classifySceneIntent('기다린다.',{location:'광장'}).kind,'wait');
 assert.equal(classifySceneIntent('공격한다.',{location:'광장'}).kind,'committed-consequence');
 

@@ -411,6 +411,8 @@ The final direct-thread audit found one applicable P1 before requesting review: 
 
 Fresh review `PRR_kwDOT8LCAs8AAAABKkJDNQ` on exact head `b30ad59aba9c242bb4beb549a4f444abd645603e` found one new direct P1: high stall pressure contradicted the question sovereignty freeze. The current local fix omits `SCENE_STALL=true` for `decision-sensitive` turns and adds a regression at stall streak 3. Because the same review's P2 evidence directly matched live failures already reproduced here, the harness also seeds/preserves the active orientation in the question case and rejects new NPC dialogue/action in CONTINUE. Non-reproduced P2s remain non-blocking.
 
+Fresh review `PRR_kwDOT8LCAs8AAAABKkKXOQ` on exact head `acab3594c784fdd3b93a32f1163320e5b4fcdbdd` found one follow-up P1: `있을까.` / `있을까요.` without a question mark still became generic. The current local fix recognizes bounded terminal `까/까요` forms with optional punctuation and keeps them decision-sensitive even at stall streak 3. The related active-event acceptance assertion now rejects `event_progress:null` and requires the same occurrence/beat/completed beats.
+
 ---
 
 # 9. PERMANENT TEST COVERAGE

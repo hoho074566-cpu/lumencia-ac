@@ -183,6 +183,7 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Final direct-thread audit found one still-applicable P1: the manual CLI harness omitted the deployment access header, so a protected Preview returned `401 BAD_ACCESS_TOKEN`. The harness now reads only `LUMENSIA_LIVE_ACCESS_TOKEN`, conditionally forwards it as `x-lumensia-token`, never prints it, and has a permanent static regression. Browser acceptance never exposed or reused the token value.
 - Fresh exact-head review `PRR_kwDOT8LCAs8AAAABKkJDNQ` on `b30ad59aba9c242bb4beb549a4f444abd645603e` found one new direct P1: a question with `stall_streak >= 2` received both sovereignty freeze and `SCENE_STALL=true`. The fix suppresses stall-recovery pressure for `decision-sensitive` turns, with a permanent regression proving no world mutation is requested.
 - Two fresh P2s directly matched failures already reproduced during this acceptance phase, so the required P1 head change also hardens the harness: the question fixture now seeds an active orientation and checks non-completion/identity, while CONTINUE rejects new NPC dialogue/action in addition to zero state delta. Other non-reproduced P2s remain non-blocking and unchanged.
+- Fresh exact-head review `PRR_kwDOT8LCAs8AAAABKkKXOQ` on `acab3594c784fdd3b93a32f1163320e5b4fcdbdd` found one follow-up P1: Korean question-only endings such as `있을까.` / `있을까요.` without `?` still routed as generic. The bounded classifier now recognizes terminal `까/까요` with optional sentence punctuation and applies the same decision-sensitive stall freeze. Its related P2 also closed a demonstrated acceptance gap by requiring the active event progress object itself to remain identical instead of accepting `null` pause.
 
 ## Permanent HF1 Test Suites
 - `scripts/tests/context-router-authority-tail.test.mjs`
@@ -213,7 +214,7 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PR #33 manual merge safety.
 
 ## NEXT ACTION
-1. Repeat the full PR check, commit/publish the decision-sensitive stall fix and hardened acceptance assertions, and wait for exact-head Safety + Vercel.
+1. Repeat the full PR check, commit/publish the bounded Korean question-ending fix and strict active-event assertion, and wait for exact-head Safety + Vercel.
 2. Obtain a fresh exact-current-HEAD/current-main Codex review. Direct P0/P1 must be zero; P2/P3 remain non-blocking unless newly reproduced.
 3. Re-fetch main/PR and verify behind=0, base commit=merge-base=current main, open/non-draft/mergeable, clean/synced, Safety/Vercel PASS; then stop at the protected-core manual merge gate and never auto-merge.
 4. After the acceptance fix is human-merged, rerun all 12 cases on production and smoke `/api/health`, then implement **Scene Purpose** with bounded purpose state and no automatic player choice.

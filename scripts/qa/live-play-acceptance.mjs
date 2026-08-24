@@ -290,7 +290,7 @@ const cases = [
         no_travel_execution: delta.new_location == null,
         same_moment_preserved: Number(delta.advance_minutes) === 0,
         active_event_not_completed: !eventArrays.includes('combat-orientation'),
-        active_event_identity_preserved: !turn.event_progress || (
+        active_event_identity_preserved: Boolean(turn.event_progress) && (
           event.event_instance_id === 'combat-orientation' && event.active_beat === 'briefing' &&
           array(event.completed_beats).join('|') === 'arrival'
         ),
