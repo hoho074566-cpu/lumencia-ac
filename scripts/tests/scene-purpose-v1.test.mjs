@@ -71,6 +71,13 @@ const currentActionDirective=buildScenePurposeDirective({action:'검술 훈련�
 assert.match(currentActionDirective,/PURPOSE_MODE=current-action-first/);
 assert.match(currentActionDirective,/USER ACTION이 저장된 PURPOSE_FOCUS보다 우선한다/);
 assert.match(currentActionDirective,/현재 행동의 목표를 바꾸지 않는다/);
+assert.match(currentActionDirective,/USER ACTION에 명시되지 않은 PC의 추가 행동·대사·감정·생각·수락·거절·선택을 대신 만들지 않는다/);
+
+const directQuestionDirective=buildScenePurposeDirective({action:'안내인에게 기숙사가 어디인지 묻는다?',saveState:{world:{location:turn.scene_title},sceneRuntime:{purpose:initial}}});
+assert.match(directQuestionDirective,/PURPOSE_MODE=current-action-first/);
+assert.match(directQuestionDirective,/DIRECT QUESTION PRIORITY: 현재 질문에 먼저 직접 답하고/);
+assert.match(directQuestionDirective,/질문을 다른 선택의 실행으로 바꾸지 않는다/);
+assert.match(directQuestionDirective,/PC의 추가 행동·대사·감정·생각·수락·거절·선택을 대신 만들지 않는다/);
 
 const autoDirective=buildScenePurposeDirective({action:'[AUTO FLOW: PC 새 행동 없음]',saveState:{sceneRuntime:{purpose:initial}}});
 assert.match(autoDirective,/PURPOSE_MODE=continuity/);
