@@ -88,6 +88,40 @@ assert.match(routed.params.input,/HOOK_MODE=current-action-first/,'current commi
 assert.match(routed.params.input,/도서관에 간다\./,'the bounded USER ACTION must retain its committed travel predicate');
 assert.ok(routed.params.input.lastIndexOf('===== USER ACTION =====')>routed.params.input.lastIndexOf('===== SCHEDULE ENGINE (ROUTED) ====='),'USER ACTION marker must remain final');
 
+const denseActionSuffix='대도서관으로 간다.';
+const denseAction=`${'밀집 행동 설명 '.repeat(600)}`.slice(0,3800-denseActionSuffix.length)+denseActionSuffix;
+const denseEvents=Array.from({length:5},(_,index)=>({id:`dense-${index}`,title:`기사과 필수 일정 ${index} ${'상세 '.repeat(20)}`,note:`NOTE_DENSE_${index} ${'권위 일정 설명 '.repeat(30)}`,date:'1285-03-01',time:`${String(10+index).padStart(2,'0')}:00`,location:`DENSE_LOCATION_${index}`,status:'scheduled',participants:['guide']}));
+const denseOriginalInput=`===== TURN OPTIONS =====\nnormal
+===== AUTHORITATIVE SAVE_STATE =====\n{}
+===== GM EVENT DIRECTOR (SERVER GUIDANCE) =====
+${'DIRECTOR_DENSE '.repeat(80)}
+===== SCHEDULE ENGINE (AUTHORITATIVE) =====\nSCHEDULE_DENSE_SENTINEL`;
+const denseSave={
+  turnNumber:8,
+  world:{date:'1285-03-01',time:'09:00',location:'SAVE_WORLD_DENSE'},
+  pc:{name:'SAVE_PC_DENSE',department:'기사과'},
+  npcStates:{guide:{location:'hall',status:'waiting'}},
+  sceneRuntime:{
+    participants:['guide'],
+    purpose:{version:'1.0',kind:'interaction',focus:'PURPOSE_DENSE_SENTINEL',source:'npc-interaction',established_turn:8},
+    exit_condition:{version:'1.0',kind:'interaction-turn',target:'EXIT_DENSE_SENTINEL',source:'scene-purpose',status:'open',established_turn:8,purpose_established_turn:8},
+    turn_hook:{version:'1.0',kind:'npc-address',anchor:'TURN_HOOK_DENSE_SENTINEL',source:'scene-dialogue',status:'awaiting-player',established_turn:8,speaker_key:'guide'},
+    momentum:{stall_streak:2},
+  },
+  scheduleContext:{
+    due:denseEvents.slice(0,4),upcoming:denseEvents,
+    npc_schedule:{guide:{location:'hall',activity:'DENSE_ACTIVITY '.repeat(20),commitment:'DENSE_COMMITMENT '.repeat(20),confidence:'fixed',time:'10:00'}},
+  },
+  scheduledEvents:denseEvents,
+};
+const denseRouted=routeOpenAIParams({instructions,input:denseOriginalInput},{mode:'game',incoming:{action:denseAction,rollingSummary:'dense old '.repeat(1000),recentTurns:[],saveState:denseSave}});
+assert.ok(denseRouted.params.input.length<=9000,`dense routine authority input exceeded budget: ${denseRouted.params.input.length}`);
+assert.match(denseRouted.params.input,/SCHEDULE ENGINE \(ROUTED\)/);
+assert.match(denseRouted.params.input,/NOTE_DENSE_0/);
+assert.match(denseRouted.params.input,/STRONGER TURN HOOK V1/);
+assert.match(denseRouted.params.input,/TURN_HOOK_DENSE_SENTINEL/);
+assert.match(denseRouted.params.input,/대도서관으로 간다\./);
+
 const aftermath=source.indexOf("AFTERMATH_FIXED_FLOW");
 const combat=source.indexOf("ACTIVE_COMBAT_FIXED_FLOW");
 const momentum=source.indexOf('const momentumDue=momentumPressure');

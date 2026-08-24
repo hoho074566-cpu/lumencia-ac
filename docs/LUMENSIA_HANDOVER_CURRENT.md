@@ -45,7 +45,7 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Fresh player choices become `player-choice/awaiting-player`; an unsatisfied Exit becomes an active continuation; direct NPC questions/requests remain player-owned; active events, new leads, and authoritative NPC/world mutations become active hooks. Plain location change or generic dialogue is only a soft next step.
 - Current USER ACTION outranks an old hook. AUTO cannot resolve an awaiting-player hook. CONTINUE preserves the prior object unchanged and cannot add a new question, choice, or NPC action.
 - The prompt asks for a concrete next direction after `EXIT_TARGET` without forcing every turn into a question or three choices. It explicitly rejects static re-description, known-information relisting, and fake questions as hooks.
-- The authoritative minimum save carries only kind/status/anchor, keeping 5,000-character ROUTINE actions within the existing 9k budget while preserving the other reserved authorities.
+- The authoritative minimum save carries only kind/status/anchor. Permanent 5,000-character and dense 3,800-character + maximum routine Schedule/Director fixtures remain within the existing 9k budget while preserving every reserved authority and the final action predicate.
 - No long-lived `saveState.hooks` mutation, Event Consequence chaining, schema migration, extra model call, new endpoint, `app.js` rewrite, or canonical `api/chat.js` rewrite.
 - Focused and adjacent deterministic suites pass. The ordinary Windows full check hits only the known CRLF workflow-string false negative after all changed-area tests pass; the clean-LF full run remains before publication.
 
