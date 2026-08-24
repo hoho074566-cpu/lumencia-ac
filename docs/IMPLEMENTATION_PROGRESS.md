@@ -7,7 +7,7 @@ Post-merge Narrative Engine continuation — PR #36 NPC Initiative HF3 is merged
 - Repo: `hoho074566-cpu/lumencia-ac`
 - Main: `1faadd105cf7b7780544abb5ca5276af04198796` (`Merge pull request #36`)
 - Working branch: `codex/scene-purpose-v1`
-- PR #37: **open**. Exact head `906bd3de96bf7e49c8af8f31fa19dff4771b3e27` passed Safety/Vercel and focused signed-in AUTO Preview acceptance. Its fresh review found that the prior saved focus could still steer the current model call before post-response purpose refresh. Current code candidate `c7e0a8b896790c015891dd44f864e9a47026249b` explicitly makes the current committed action authoritative; the final docs checkpoint is the branch HEAD containing this record.
+- PR #37: **open**. The previous docs checkpoint `b6dfefbb8afb0c8affe1f6065e736ee769e9c11d` passed the focused current-action Preview rerun, but fresh review found that the production multiline `AUTO_DIRECTIVE` was still classified as a player action. Current code candidate `c9d293691ede83d2bb1dd4e249325881f3b987a5` recognizes the routed production header as AUTO; the final docs checkpoint is the branch HEAD containing this record.
 - PR #36: **merged** from exact docs checkpoint HEAD `c347744858300359ab8d6da204cb5d9277d366be`; reviewed code HEAD `c7881f4c31758d0350833f31c37d116f3ff4c18d`.
 - PR #36 final checkpoint Safety Gate #290: **PASS**; Vercel: **PASS / Ready**.
 - Fresh reviewed-code Codex result on `c7881f4...`: direct P0/P1 = 0 (`Didn't find any major issues`). The docs-only checkpoint did not change that code tree. The previously reported committed-action priority P1 is closed by limiting present-NPC stall recovery to passive `wait` / `downtime` intents.
@@ -37,7 +37,7 @@ Post-merge Narrative Engine continuation — PR #36 NPC Initiative HF3 is merged
 - No schema migration, extra model call, new API entrypoint, `app.js` rewrite, or `api/chat.js` rewrite.
 - Focused syntax, purpose, context authority-tail, CONTINUE, event, continuity, and Scene Momentum suites: PASS.
 - Full `scripts/lumensia-pr-check.mjs`: PASS in a clean LF checkout. The normal Windows working tree still exposes the known CRLF-only false negative in five pre-existing workflow string assertions; canonical Git blobs and hosted Linux checks use LF.
-- The current candidate distinguishes empty descriptive churn and the exact AUTO sentinel from real player action, and its pre-response directive uses `PURPOSE_MODE=current-action-first` for committed input. The saved focus becomes compatible NPC/world/event context only and cannot redirect the current action. AUTO, decision-sensitive questions, active events, decisions, NPC interaction precedence, and CONTINUE freeze remain unchanged. This candidate is not merge-authoritative until the final docs checkpoint is pushed and freshly reviewed.
+- The current candidate distinguishes empty descriptive churn, the short AUTO sentinel, and the production multiline routed AUTO header from real player action. Its pre-response directive uses `PURPOSE_MODE=current-action-first` only for committed input; both AUTO forms use continuity. The saved focus becomes compatible NPC/world/event context only and cannot redirect a real current action. Decision-sensitive questions, active events, decisions, NPC interaction precedence, and CONTINUE freeze remain unchanged. This candidate is not merge-authoritative until the final docs checkpoint is pushed and freshly reviewed.
 
 ## Completed Foundation
 Already merged before PR #33:
