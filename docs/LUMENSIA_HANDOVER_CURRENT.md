@@ -13,8 +13,11 @@ Repository: `hoho074566-cpu/lumencia-ac`
 # 0. SESSION STOP CHECKPOINT — 가장 먼저 읽을 것
 
 ## Live state immediately before this handover update
-- Branch: `codex/narrative-live-play-acceptance`
-- Current main: `8d378b532910dfecaf5226118bffabdddbe74289`
+- Branch: `codex/live-schedule-boundary-hf2`
+- Current main: `88fa53036c58324ffd5012ab7b5ed0cd3099dd6d`
+- PR #34: **merged** at 2026-08-24 01:47:23 UTC using `expected_head_sha=4479615f4904c74ee9e3dfd349b809136706808e`.
+- PR #34 exact-head gates: Safety #274 PASS, Vercel PASS / Ready, fresh direct P0/P1=0, ahead 11 / behind 0, base commit and merge-base equal then-current main.
+- Merge commit tree exactly equals the reviewed PR #34 head tree; no unexpected merge delta.
 - PR #33: **merged** at 2026-08-23 23:07:00 UTC
 - Reviewed/merged PR HEAD: `216bef1d51b72f2edb6da3f06c69e02aa45b5b10`
 - Guarded merge used the same full `expected_head_sha`.
@@ -25,6 +28,28 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Post-merge main Vercel: **PASS**.
 - Production `/api/health`: healthy; app `1.5.6`, canonical `/api/chat`, adapter `/api/chat-router`, `24h` prompt-cache retention.
 - Full post-merge `node scripts/lumensia-pr-check.mjs`: **PASS**.
+
+## Current blocker / active fix
+- The merged-main production 12-case rerun produced 11 PASS / 1 FAIL.
+- `두 시간 쉰다.` at 11:50 advanced 120 minutes and auto-completed the mandatory 12:00 orientation, deciding PC nonattendance despite the schedule payload being present.
+- Root cause: `EXPLICIT_DURATION=120min` had no exact earlier schedule hard-stop priority in the reserved Scene Momentum directive. The local adapter only raises a missing time floor and intentionally does not shrink positive model output, so it could not repair this without prose/state divergence.
+- Current HF2 fix shares the authoritative boundary calculator with the prompt path and emits `SCHEDULE_BOUNDARY=10min`: stop at the event start, leave the remaining rest unexecuted, and do not auto-decide absence/completion.
+- Initial exact Preview `a7a1a5fba44ed29872cde0dd655e129b81262685` passed Safety #277 and Vercel. Live play blocked the 120-minute skip and preserved attendance choice, but exposed a second inconsistency: the prose/event reached noon while the runtime clock stayed at 11:50 because any model choices suppressed the local floor.
+- Initial review `PRR_kwDOT8LCAs8AAAABKkOr9A` found two direct P1s: reachable boundaries beyond the minimum or equal to an explicit duration were omitted, while due/overdue rows created a contradictory 0-minute hard stop that froze new committed actions. One separate P2 remains non-blocking.
+- The current local closure selects only strictly future boundaries for model hard stops, uses the full permitted action range including equality, and aligns the runtime clock only when structured event progress matches an occurrence scheduled at that exact future minute. Due/overdue and unrelated early interruptions remain unforced.
+- Exact Preview `d898734cc190c2115078d8191f273215f99ced46` confirmed the schedule fix end-to-end: 11:50 -> 12:00, unchanged room, active/non-completed orientation, attendance choice preserved. All other GAME acceptance classes passed in isolated UI saves.
+- Its CONTINUE case exposed a separate narrative hard-freeze P1: the raw pending-beat text caused a new NPC action and replayed dialogue despite zero State Delta. The local closure hides `remaining_beats` from the routed model view, keeps the original queue in post-response runtime state, and explicitly forbids prior-dialogue replay.
+- Final runtime exact HEAD `636458e2aef899022d320324aa14b0f654e72ea5` passed the affected Preview reruns: CONTINUE stayed at 09:15/library entrance with static prose only and no new NPC dialogue/action, while the schedule case again reached exactly 12:00 in the room with an active/incomplete orientation and preserved player choice.
+- Direct review thread `PRRT_kwDOT8LCAs6bj9L0` then identified one remaining P1: `event_progress` is optional, so a response that clearly presents the exact schedule only in prose could still leave the clock at 11:50. The local closure aligns on either the exact occurrence ID or a bounded authoritative event-title match at that exact minute, without forcing unrelated interruptions.
+- Focused CONTINUE/Event/router/time-floor tests, full `node scripts/lumensia-pr-check.mjs`, and `git diff --check`: **PASS**.
+- Exact code HEAD `e4de523b37f3508d4fc6534ff4aa49df3fd74b05` passed Safety #282, Vercel, and the schedule Preview rerun: exact 12:00, unchanged room, active/incomplete `knight_orientation`, player choices preserved.
+- Fresh review `PRR_kwDOT8LCAs8AAAABKkUk7Q` on `d1ada8288c62bf55a6c41e09485959b568a3a5c8` found three current P1s: unrelated NPC/world schedules can become PC hard stops; a CONTINUE beat hidden from the model is still consumed; and short travel/exit/explore/observe can be stretched to a later schedule boundary instead of only being capped.
+- The repository's two Codex-local automatic fix/review iterations are exhausted. No third automatic fix was attempted; PR #35 is not merge-ready.
+- The user subsequently authorized a new remediation cycle and instructed Codex to automate all safe work through guarded exact-head merge and post-merge continuation.
+- The local remediation jointly closes the three findings: schedule boundaries are filtered to PC-owned/general-academic/own-department relevance; later boundaries for short actions are `SCHEDULE_CAP` rather than mandatory targets; and frozen CONTINUE preserves every model-hidden pending beat.
+- Focused Scene Momentum, schedule-floor, Context Router, Event Progress, CONTINUE, core-invariant tests and the full `node scripts/lumensia-pr-check.mjs` pass.
+- Published exact HEAD `fc94fa55af1adfbcd921c2b919236d017c5503e3` passed Safety Gate #285 and Vercel Ready. Fresh direct review produced no P0, two nonblocking P2s, and one P1: the UI promised that the deliberately hidden legacy beat queue would be generated by CONTINUE even though the hard-freeze path cannot consume it safely.
+- The current closure stops advertising hidden beats as executable: CONTINUE has no queue count or next-beat promise and truthfully describes static same-moment elaboration, while the unseen queue remains preserved rather than silently consumed. A permanent runtime regression covers this contract.
 
 ## Critical review finding and merged closure
 Final Codex review **did complete** on exact HEAD `8ca24ba...` at 2026-08-23 21:47:49 UTC and found a **new current P1**.
@@ -535,15 +560,14 @@ Gameplay roadmap discussed but not DONE:
 # 12. NEXT ACTION — NEW CHAT STARTS HERE
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
-2. Confirm main still contains merge commit `8d378b532910dfecaf5226118bffabdddbe74289`; do **not** redo completed HF1 diagnosis.
-3. Preserve the recorded earlier gates, but do not treat them as authority for the new local question-sovereignty patch.
-4. Run the full PR check and publish this final acceptance checkpoint.
-5. Wait for exact-head Safety/Vercel, then obtain a fresh exact-current-HEAD/current-main Codex review with direct P0/P1=0.
-6. Re-fetch main/PR and verify every merge gate, then stop at protected-core manual merge readiness; do not auto-merge.
-7. After a human merge, run all 12 cases plus `/api/health` on production, then proceed to **Scene Purpose -> Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence**.
+2. Confirm main still contains merge commit `88fa53036c58324ffd5012ab7b5ed0cd3099dd6d`; do **not** redo completed HF1 or PR #34 diagnosis.
+3. Publish the fresh-review CONTINUE UI P1 closure and rerun its focused/full tests plus exact-head hosted checks.
+4. Require fresh exact-current-HEAD/current-main direct P0/P1=0 plus Safety/Vercel PASS.
+5. Immediately re-fetch all merge gates and merge only with the unchanged full `expected_head_sha`; any changed condition forbids the merge.
+6. After merge, rerun production acceptance and proceed to **Scene Purpose -> Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence**.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. HF1은 main에 반영됐다. PR #34 exact Preview의 12개 live behavior class가 모두 충분히 통과했고, 간접 질문 sovereignty·reload-safe CONTINUE UI·새 NPC 행동 없는 narrative hard freeze·완료 이벤트 no-replay까지 검증됐다. Code head `9623091`은 Safety #270/Vercel/live PASS다. 최종 문서 checkpoint를 publish하고 fresh exact-head Safety/Vercel/Codex direct P0/P1=0 및 behind/base/merge-base/mergeable/clean을 확인한 뒤 protected manual merge gate에서 멈춰라. human merge 뒤 production acceptance -> Scene Purpose -> Scene Exit -> Turn Hook -> Event Consequence로 계속한다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #35의 schedule/CONTINUE/short-action P1들은 human-authorized remediation으로 닫았고, exact HEAD fc94fa55 리뷰가 발견한 false CONTINUE beat advertisement P1도 hidden queue 비소비 + generic static-continuation UI로 닫았다. 새 exact head를 게시한 뒤 Safety/Vercel -> fresh direct P0/P1=0 -> immediate exact merge gates 순서로 검증한다. 전부 PASS일 때만 unchanged expected_head_sha로 guarded merge하고, post-merge production acceptance 뒤 Scene Purpose -> Scene Exit -> Turn Hook -> Event Consequence로 계속한다.`

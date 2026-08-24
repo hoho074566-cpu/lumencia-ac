@@ -118,11 +118,8 @@ function renderFlowControlsStable() {
     cont.hidden = false;
     cont.removeAttribute('aria-hidden');
     cont.disabled = !canContinueStable();
-    const beats = Array.isArray(save?.sceneRuntime?.remaining_beats) ? save.sceneRuntime.remaining_beats.length : 0;
-    cont.textContent = beats ? `✦ 이어서 생성 · ${beats}` : '✦ 이어서 생성';
-    cont.title = beats
-      ? `같은 장면에 미처리 beat ${beats}개가 있습니다. 상태 변화 없이 다음 beat를 이어 씁니다.`
-      : '직전 GM 응답의 같은 장면만 더 이어 씁니다. 게임 상태는 진행하지 않습니다.';
+    cont.textContent = '✦ 이어서 생성';
+    cont.title = '직전 GM 응답의 같은 순간만 정적으로 보강합니다. 게임 상태는 진행하지 않습니다.';
   }
 }
 

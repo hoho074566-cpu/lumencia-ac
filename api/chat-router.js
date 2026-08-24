@@ -9,7 +9,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import coreHandler, { CHARACTER_REGISTRY } from './chat.js';
 import { routeOpenAIParams, routerVersion, array, object, clampText } from './lib/context-router.js';
 import { actualScheduledEntrants, freshChoices, reconcileParticipants } from '../lib/scene-continuity.js';
-import { SCENE_MOMENTUM_VERSION, classifySceneIntent, deriveSceneDelta, updateSceneMomentum } from '../lib/scene-momentum.js';
+import { SCENE_MOMENTUM_VERSION, classifySceneIntent, deriveSceneDelta, isPcRelevantScheduleEvent, nextScheduleBoundaryMinutes, scheduleBoundaryLimitMinutes, updateSceneMomentum } from '../lib/scene-momentum.js';
 import { compactEventProgress, mergeContinuationEventProgressState, mergeRoutedEventProgressState, occurrenceIdFromStartEvidence, promotePausedEventProgress, scheduledIdsDueByTurnEnd, unscheduledPausedIdsForResume } from '../lib/event-progress.js';
 
 export const config = { maxDuration: 300 };
@@ -127,9 +127,15 @@ function emptyStateDelta() {
 
 function continueAction(incoming) {
   const runtime = object(incoming.saveState?.sceneRuntime);
-  const beat = array(runtime.remaining_beats)[0] || '';
   const eventAnchor = compactEventProgress(runtime.eventProgress);
-  return clampText(`${CONTINUE_DIRECTIVE}${beat?`\n미처리 같은-장면 beat: ${beat}`:''}${eventAnchor?`\n현재 이벤트 진행(권위 상태): ${eventAnchor}`:''}\n직전 장면 연속성: ${clampText(runtime,900)}`,5000);
+  const continuity={scene_key:runtime.scene_key||'',participants:array(runtime.participants).slice(0,8),ongoing_topic:runtime.ongoing_topic||'',unresolved_question:runtime.unresolved_question||''};
+  return clampText(`${CONTINUE_DIRECTIVE}${eventAnchor?`\n현재 이벤트 진행(권위 상태): ${eventAnchor}`:''}\n직전 장면 연속성: ${clampText(continuity,900)}`,5000);
+}
+
+function continueRouteSave(saveState={}) {
+  const save=object(saveState),safeRuntime={...object(save.sceneRuntime)};
+  delete safeRuntime.remaining_beats;
+  return{...save,sceneRuntime:safeRuntime};
 }
 
 function lockContinueTurn(turn) {
@@ -152,56 +158,38 @@ function relationChangeFor(turn,key){return array(turn?.state_delta?.relationshi
 function npcStateUpdateFor(turn,key){return array(turn?.state_delta?.npc_state_updates).find(x=>String(x?.npc_key||x?.key||'')===key)||null;}
 function emotionFor(turn,key){return array(turn?.emotion_updates).find(x=>String(x?.npc_key||x?.key||x?.speaker_key||'')===key)||null;}
 function bounded(value,min,max,fallback){if(value==null||value==='')return fallback;const n=Number(value);return Number.isFinite(n)?Math.max(min,Math.min(max,n)):fallback;}
-function clockMinutes(value=''){
-  const match=String(value||'').trim().match(/^(\d{1,2}):(\d{2})$/);
-  if(!match)return null;
-  const hour=Number(match[1]),minute=Number(match[2]);
-  if(!Number.isInteger(hour)||!Number.isInteger(minute)||hour<0||hour>23||minute<0||minute>59)return null;
-  return hour*60+minute;
+function scheduleTimestamp(date='',time=''){
+  const dm=String(date||'').trim().match(/^(\d{1,4})-(\d{1,2})-(\d{1,2})$/),tm=String(time||'').trim().match(/^(\d{1,2}):(\d{2})$/);if(!dm||!tm)return null;
+  const year=Number(dm[1]),month=Number(dm[2]),day=Number(dm[3]),hour=Number(tm[1]),minute=Number(tm[2]);if(month<1||month>12||day<1||day>31||hour<0||hour>23||minute<0||minute>59)return null;
+  const stamp=new Date(0);stamp.setUTCFullYear(year,month-1,day);stamp.setUTCHours(hour,minute,0,0);if(stamp.getUTCFullYear()!==year||stamp.getUTCMonth()!==month-1||stamp.getUTCDate()!==day||stamp.getUTCHours()!==hour||stamp.getUTCMinutes()!==minute)return null;return stamp.getTime();
 }
-function dateTimeMinutes(date='',time=''){
-  const match=String(date||'').trim().match(/^(\d{1,4})-(\d{1,2})-(\d{1,2})$/),clock=clockMinutes(time);
-  if(!match||clock==null)return null;
-  const year=Number(match[1]),month=Number(match[2]),day=Number(match[3]),hour=Math.floor(clock/60),minute=clock%60;
-  if(!Number.isInteger(year)||!Number.isInteger(month)||!Number.isInteger(day)||month<1||month>12||day<1||day>31)return null;
-  const stamp=new Date(0);stamp.setUTCFullYear(year,month-1,day);stamp.setUTCHours(hour,minute,0,0);
-  if(stamp.getUTCFullYear()!==year||stamp.getUTCMonth()!==month-1||stamp.getUTCDate()!==day||stamp.getUTCHours()!==hour||stamp.getUTCMinutes()!==minute)return null;
-  return Math.floor(stamp.getTime()/60000);
+function scheduleRowsAtBoundary(saveState={},boundary=null){
+  const save=object(saveState),world=object(save.world),start=scheduleTimestamp(world.date,world.time),minutes=Number(boundary);if(start==null||!Number.isFinite(minutes)||minutes<=0)return[];
+  const target=start+minutes*60000,seen=new Set(),rows=[];
+  for(const row of [...array(save.scheduledEvents),...array(save?.scheduleContext?.upcoming)]){if(!row||['completed','cancelled'].includes(String(row.status||'').trim().toLowerCase())||!isPcRelevantScheduleEvent(save,row))continue;const at=scheduleTimestamp(row.date||world.date,row.time);if(at!==target)continue;const key=`${String(row.id||'').trim().toLowerCase()}|${row.date||world.date}|${row.time||''}`;if(seen.has(key))continue;seen.add(key);rows.push(row);}
+  return rows;
 }
-function nextScheduleBoundaryMinutes(saveState={}){
-  const save=object(saveState),schedule=object(save.scheduleContext);
-  if(array(schedule.due).length)return 0;
-  const currentDate=String(save?.world?.date||''),currentTime=String(save?.world?.time||''),now=dateTimeMinutes(currentDate,currentTime);
-  if(now==null){
-    const currentClock=clockMinutes(currentTime);if(currentClock==null)return null;
-    let fallback=null;
-    for(const event of array(schedule.upcoming)){
-      if(currentDate&&event?.date&&String(event.date)!==currentDate)continue;
-      const at=clockMinutes(event?.time);if(at==null)continue;
-      const delta=at-currentClock;if(delta<=0)return 0;
-      if(fallback==null||delta<fallback)fallback=delta;
-    }
-    return fallback;
-  }
-  let best=null;
-  for(const event of [...array(save.scheduledEvents),...array(schedule.upcoming)]){
-    if(!event||['completed','cancelled'].includes(String(event.status||'').trim().toLowerCase()))continue;
-    const at=dateTimeMinutes(event.date||currentDate,event.time);if(at==null)continue;
-    const delta=at-now;if(delta<=0)return 0;
-    if(best==null||delta<best)best=delta;
-  }
-  return best;
+function scheduleRowMentioned(turn,row={}){
+  const visible=[turn?.scene_title,...array(turn?.scene).map(item=>item?.text),...array(turn?.choices)].filter(Boolean).join(' ').toLowerCase(),id=String(row.id||'').trim().toLowerCase();if(id.length>=4&&visible.includes(id))return true;
+  const generic=new Set(['필수','일정','시작','종료','예정','행사','event','required']),raw=String(row.title||'').toLowerCase().match(/[가-힣a-z0-9]+/g)||[],tokens=[...new Set(raw.filter(token=>token.length>=2&&!generic.has(token)))];if(!tokens.length)return false;
+  const matched=tokens.filter(token=>visible.includes(token)).length;return matched>=Math.min(2,tokens.length);
 }
 function applySceneMomentumTimeFloor(incoming,turn,mode='game'){
   const intent=classifySceneIntent(incoming?.action||'',{location:incoming?.saveState?.world?.location||''});
   if(mode!=='game'||!turn?.state_delta||!intent.compression||intent.minAdvanceMinutes<=0)return intent;
   const hasMeaningfulStop=array(turn?.choices).length>0;
-  if(!hasMeaningfulStop){
-    const current=Math.max(0,Number(turn.state_delta.advance_minutes||0));
-    const requestedFloor=Math.min(1440,Math.max(0,Number(intent.minAdvanceMinutes||0)));
-    const boundary=nextScheduleBoundaryMinutes(incoming?.saveState||{});
-    const boundedFloor=boundary==null?requestedFloor:Math.min(requestedFloor,Math.max(0,boundary));
-    turn.state_delta.advance_minutes=Math.max(current,boundedFloor);
+  const current=Math.max(0,Number(turn.state_delta.advance_minutes||0));
+  const requestedFloor=Math.min(1440,Math.max(0,Number(intent.minAdvanceMinutes||0)));
+  const boundary=nextScheduleBoundaryMinutes(incoming?.saveState||{},{futureOnly:true});
+  const boundedFloor=boundary==null?requestedFloor:Math.min(requestedFloor,Math.max(0,boundary));
+  const allowedMax=scheduleBoundaryLimitMinutes(intent);
+  const eventId=String(turn?.event_progress?.event_instance_id||turn?.event_progress?.eventInstanceId||'').trim().toLowerCase();
+  const dueAtBoundary=new Set(boundary==null?[]:scheduledIdsDueByTurnEnd(incoming?.saveState||{},boundary).map(value=>String(value).trim().toLowerCase()));
+  const dueBeforeBoundary=new Set(boundary==null?[]:scheduledIdsDueByTurnEnd(incoming?.saveState||{},Math.max(0,boundary-1)).map(value=>String(value).trim().toLowerCase()));
+  const boundaryRows=scheduleRowsAtBoundary(incoming?.saveState||{},boundary),boundaryIds=new Set(boundaryRows.map(row=>String(row?.id||'').trim().toLowerCase()).filter(Boolean)),structuredBoundary=Boolean(eventId&&boundaryIds.has(eventId)&&dueAtBoundary.has(eventId)&&!dueBeforeBoundary.has(eventId)),visibleBoundary=Boolean(!eventId&&boundaryRows.some(row=>scheduleRowMentioned(turn,row)));
+  const reachedScheduledBoundary=Boolean(boundary!=null&&boundary<=allowedMax&&(structuredBoundary||visibleBoundary));
+  if(!hasMeaningfulStop||reachedScheduledBoundary){
+    turn.state_delta.advance_minutes=Math.max(current,reachedScheduledBoundary?boundary:boundedFloor);
   }
   return intent;
 }
@@ -420,7 +408,7 @@ function localSceneRuntime(incoming,turn,directorTelemetry=null){
   };
 }
 function clone(value){try{return structuredClone(value);}catch{return JSON.parse(JSON.stringify(value??null));}}
-function consumeContinuationRuntime(incoming,turn){const prev=clone(object(incoming.saveState?.sceneRuntime));prev.remaining_beats=array(prev.remaining_beats).slice(1);Object.assign(prev,mergeContinuationEventProgressState(prev.eventProgress,prev.eventProgressByInstance,turn?.event_progress));return{npc_updates:{},scene_runtime:prev};}
+function consumeContinuationRuntime(incoming,turn){const prev=clone(object(incoming.saveState?.sceneRuntime));prev.remaining_beats=array(prev.remaining_beats).slice();Object.assign(prev,mergeContinuationEventProgressState(prev.eventProgress,prev.eventProgressByInstance,turn?.event_progress));return{npc_updates:{},scene_runtime:prev};}
 
 function localBackgroundDigest(incoming,turn,participants){
   const prior=String(incoming.saveState?.backgroundDigest||'').slice(-1100);if(incoming.backgroundSim===false)return prior;
@@ -453,12 +441,12 @@ export default async function handler(req,res){
     const incoming0=req.body&&typeof req.body==='object'?req.body:{},mode=SUPPORTED_MODES.has(incoming0.inputMode)?incoming0.inputMode:'game',incoming={...incoming0};
     const resumableIds=mode==='game'?[...scheduledIdsDueByTurnEnd(incoming0.saveState,0),...unscheduledPausedIdsForResume(incoming0.saveState?.sceneRuntime,incoming0.action,incoming0.saveState?.activeEvents)]:[];
     incoming.saveState={...object(incoming0.saveState),sceneRuntime:mode==='game'?promotePausedEventProgress(incoming0.saveState?.sceneRuntime,resumableIds):object(incoming0.saveState?.sceneRuntime)};
-    if(mode==='meta'){incoming.inputMode='meta';incoming.action=String(incoming0.action||'');}else if(mode==='continue'){incoming.inputMode='game';incoming.action=continueAction(incoming);incoming.forceTerra=false;incoming.rollingSummary=String(incoming0.rollingSummary||'').slice(-3600);}else if(mode==='auto'){incoming.inputMode='game';incoming.action=AUTO_DIRECTIVE;}else{incoming.inputMode='game';incoming.action=String(incoming0.action||'');}
+    if(mode==='meta'){incoming.inputMode='meta';incoming.action=String(incoming0.action||'');}else if(mode==='continue'){incoming.inputMode='game';incoming.action=continueAction(incoming);incoming.saveState=continueRouteSave(incoming.saveState);incoming.forceTerra=false;incoming.rollingSummary=String(incoming0.rollingSummary||'').slice(-3600);}else if(mode==='auto'){incoming.inputMode='game';incoming.action=AUTO_DIRECTIVE;}else{incoming.inputMode='game';incoming.action=String(incoming0.action||'');}
     if(isCombatLike(incoming.action)&&incoming.reasoningEffort==='auto')incoming.reasoningEffort='medium';
     const result=await runCore(req,incoming,mode);if(result.status<200||result.status>=300)return res.status(result.status).json({...result.data,server_version:ADAPTER_VERSION,adapter_version:ADAPTER_VERSION});
     const data=result.data;if(!data?.turn)throw new Error('코어 API 응답에 turn이 없습니다.');
     let telemetry=result.telemetry||{routerVersion:routerVersion(),enabled:false,profile:'unknown'};telemetry={...telemetry,actual_input_tokens:Number(data?.usage?.input_tokens||0),actual_output_tokens:Number(data?.usage?.output_tokens||0)};if(Number(telemetry.soft_max_tokens||0)>0)telemetry.budget_status=telemetry.actual_input_tokens<=telemetry.soft_max_tokens?'OK':'OVER';
-    if(mode==='continue'){lockContinueTurn(data.turn);applyExtendedExpressions(data.turn,incoming0.saveState||{});data.runtime_state=consumeContinuationRuntime(incoming,data.turn);data.background_digest=String(incoming.saveState?.backgroundDigest||'').slice(-1800);const pipeline={pipeline:'continue-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true};data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);}
+    if(mode==='continue'){lockContinueTurn(data.turn);applyExtendedExpressions(data.turn,incoming0.saveState||{});data.runtime_state=consumeContinuationRuntime({...incoming,saveState:object(incoming0.saveState)},data.turn);data.background_digest=String(incoming.saveState?.backgroundDigest||'').slice(-1800);const pipeline={pipeline:'continue-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true};data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);}
     if(mode==='meta'){const pipeline={pipeline:'meta-full-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true};data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);}
     applyExtendedExpressions(data.turn,incoming0.saveState||{});data.turn.choices=freshChoices(incoming.action,data.turn);const sceneIntent=applySceneMomentumTimeFloor({...incoming0,saveState:incoming.saveState,action:incoming0.action||''},data.turn,mode);const sceneRuntime=localSceneRuntime({...incoming0,saveState:incoming.saveState,action:incoming0.action||''},data.turn,telemetry?.event_director_v2);const npcUpdates=incoming0.qualityPipeline===false?{}:localNpcUpdates(incoming0,data.turn);data.runtime_state={npc_updates:npcUpdates,scene_runtime:sceneRuntime};data.background_digest=localBackgroundDigest(incoming0,data.turn,sceneRuntime.participants);
     const sceneMomentum={version:SCENE_MOMENTUM_VERSION,intent:sceneIntent?.kind||sceneRuntime?.momentum?.last_intent||'generic',score:Number(sceneRuntime?.momentum?.last_score||0),structural_score:Number(sceneRuntime?.momentum?.last_structural_score||0),target:Number(sceneRuntime?.momentum?.last_target||0),stall_streak:Number(sceneRuntime?.momentum?.stall_streak||0),pressure:sceneRuntime?.momentum?.pressure||'normal'};

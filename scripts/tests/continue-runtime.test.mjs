@@ -60,6 +60,8 @@ assert.match(flowSource, /querySelectorAll\('#flowControlsStable'\)[\s\S]*existi
 assert.equal((flowSource.match(/addEventListener\('click'/g) || []).length, 2, 'AUTO and CONTINUE listeners must only be installed in the creation branch');
 assert.match(flowSource, /auto\.hidden\s*=\s*false;[\s\S]*auto\.removeAttribute\('aria-hidden'\)/, 'AUTO must recover from a stale duplicate-hidden state');
 assert.match(flowSource, /cont\.hidden\s*=\s*false;[\s\S]*cont\.removeAttribute\('aria-hidden'\)/, 'CONTINUE must recover from a stale duplicate-hidden state');
+assert.doesNotMatch(flowSource, /remaining_beats|미처리 beat|이어서 생성\s*·/, 'CONTINUE must not advertise a model-hidden legacy beat queue as executable content');
+assert.match(flowSource, /cont\.textContent\s*=\s*'✦ 이어서 생성'/, 'CONTINUE keeps a truthful generic same-moment label');
 const suppressSource = functionSource('suppressDuplicateFlowControlsStable');
 assert.match(suppressSource, /button\.closest\('#flowControlsStable'\)/, 'duplicate suppression must never hide a stable flow-control button');
 assert.match(runtime, /'renderAll flow controls lifecycle'/, 'the runtime transformation must install the central renderAll hook');

@@ -2,26 +2,80 @@
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { scheduledIdsDueByTurnEnd } from '../../lib/event-progress.js';
+import { buildSceneMomentumDirective, classifySceneIntent, isPcRelevantScheduleEvent, nextScheduleBoundaryMinutes, scheduleBoundaryLimitMinutes } from '../../lib/scene-momentum.js';
 
 const source=readFileSync('api/chat-router.js','utf8');
 const start=source.indexOf('function bounded(');
 const end=source.indexOf('function uniqText(');
 assert.ok(start>=0&&end>start,'Scene Momentum time-floor source markers missing');
 const timeFloorSource=source.slice(start,end);
-const makeHelpers=new Function('array','object','classifySceneIntent',`${timeFloorSource}\nreturn {applySceneMomentumTimeFloor,nextScheduleBoundaryMinutes};`);
+const makeHelpers=new Function('array','object','classifySceneIntent','isPcRelevantScheduleEvent','nextScheduleBoundaryMinutes','scheduleBoundaryLimitMinutes','scheduledIdsDueByTurnEnd',`${timeFloorSource}\nreturn {applySceneMomentumTimeFloor};`);
 const array=(value)=>Array.isArray(value)?value:[];
 const object=(value)=>value&&typeof value==='object'&&!Array.isArray(value)?value:{};
-const classifySceneIntent=(action)=>({kind:'downtime',compression:true,minAdvanceMinutes:String(action).includes('48시간')?2880:String(action).includes('6시간')?360:String(action).includes('두 시간')?120:30});
-const {applySceneMomentumTimeFloor,nextScheduleBoundaryMinutes}=makeHelpers(array,object,classifySceneIntent);
+const {applySceneMomentumTimeFloor}=makeHelpers(array,object,classifySceneIntent,isPcRelevantScheduleEvent,nextScheduleBoundaryMinutes,scheduleBoundaryLimitMinutes,scheduledIdsDueByTurnEnd);
+
+const knightPc={name:'카인',department:'기사과'};
+const irrelevantScheduleSave={
+  pc:knightPc,
+  world:{date:'1285-03-01',time:'09:50'},
+  scheduleContext:{due:[],upcoming:[
+    {id:'npc-briefing',title:'아르테미스 교관 회의',date:'1285-03-01',time:'09:54',participants:['artemis']},
+    {id:'world-bell',title:'서문 종각 타종',date:'1285-03-01',time:'09:55',kind:'world',participants:[]},
+    {id:'magic-class',title:'마법과 필수 수업',date:'1285-03-01',time:'09:56',kind:'academic',participants:['elena']},
+    {id:'knight-class',title:'기사과 필수 수업',date:'1285-03-01',time:'10:00',kind:'academic',participants:['artemis']},
+  ]},
+};
+assert.equal(isPcRelevantScheduleEvent(irrelevantScheduleSave,irrelevantScheduleSave.scheduleContext.upcoming[0]),false,'an NPC-only legacy row must not constrain the PC clock');
+assert.equal(isPcRelevantScheduleEvent(irrelevantScheduleSave,irrelevantScheduleSave.scheduleContext.upcoming[1]),false,'a world-only event must progress independently');
+assert.equal(isPcRelevantScheduleEvent(irrelevantScheduleSave,irrelevantScheduleSave.scheduleContext.upcoming[2]),false,'another department schedule must not constrain this PC');
+assert.equal(isPcRelevantScheduleEvent(irrelevantScheduleSave,irrelevantScheduleSave.scheduleContext.upcoming[3]),true,'the PC department schedule remains authoritative');
+assert.equal(isPcRelevantScheduleEvent(irrelevantScheduleSave,{id:'personal-magic-visit',title:'마법과 건물 개인 면담',kind:'personal',participants:['elena']}),true,'a personal PC appointment stays relevant even when its location names another department');
+assert.equal(isPcRelevantScheduleEvent(irrelevantScheduleSave,{id:'joint-class',title:'기사과·마법과 합동 수업',kind:'academic',participants:['artemis','elena']}),true,'a cross-department academic event remains relevant to every named department');
+assert.equal(nextScheduleBoundaryMinutes(irrelevantScheduleSave,{futureOnly:true}),10,'only the next PC-relevant schedule may become a hard stop');
+
+const shortTravelSave={pc:knightPc,world:{date:'1285-03-01',time:'09:40'},scheduleContext:{due:[],upcoming:[{id:'knight-class',title:'기사과 필수 수업',date:'1285-03-01',time:'10:00',kind:'academic'}]}};
+const shortTravelDirective=buildSceneMomentumDirective({action:'도서관에 간다.',saveState:shortTravelSave});
+assert.doesNotMatch(shortTravelDirective,/SCHEDULE_BOUNDARY=20min/,'a short travel estimate must not be stretched to a later schedule boundary');
+assert.match(shortTravelDirective,/SCHEDULE_CAP=20min/,'a later boundary inside the travel guide is a cap, not a required target');
+assert.equal(scheduleBoundaryLimitMinutes(classifySceneIntent('도서관에 간다.')),3,'short travel hard-stop targeting is bounded by its minimum completion estimate');
+let shortTravelTurn={state_delta:{advance_minutes:0},choices:['수업으로 간다','도서관으로 간다','기다린다'],event_progress:{event_instance_id:'knight-class'}};
+applySceneMomentumTimeFloor({action:'도서관에 간다.',saveState:shortTravelSave},shortTravelTurn,'game');
+assert.equal(shortTravelTurn.state_delta.advance_minutes,0,'post-processing must not align a short action to a later cap');
 
 const boundarySave={world:{date:'1285-03-01',time:'09:50'},scheduleContext:{due:[],upcoming:[{id:'class',date:'1285-03-01',time:'10:00'}]}};
 assert.equal(nextScheduleBoundaryMinutes(boundarySave),10,'next schedule boundary should be ten minutes away');
+const boundedRestDirective=buildSceneMomentumDirective({action:'두 시간 쉰다.',saveState:boundarySave});
+assert.match(boundedRestDirective,/SCHEDULE_BOUNDARY=10min/,'the model must receive the exact upcoming schedule boundary');
+assert.match(boundedRestDirective,/120분 휴식을 경계 너머까지 실행하지 말고 10분 뒤 일정 시작 순간에서 멈춘다/,'the earlier mandatory schedule must override the longer downtime duration');
+assert.match(boundedRestDirective,/SCHEDULE_BOUNDARY가 더 짧으면 그 일정 경계가 최우선/,'the explicit-duration rule must not contradict the earlier schedule boundary');
+const implicitRestSave={world:{date:'1285-03-01',time:'09:25'},scheduleContext:{due:[],upcoming:[{id:'class',date:'1285-03-01',time:'10:00'}]}};
+assert.match(buildSceneMomentumDirective({action:'쉰다.',saveState:implicitRestSave}),/SCHEDULE_BOUNDARY=35min/,'an implicit rest must expose any boundary reachable within its 30-240 minute guide');
+assert.match(buildSceneMomentumDirective({action:'10분 기다린다.',saveState:boundarySave}),/SCHEDULE_BOUNDARY=10min/,'a boundary equal to the explicit duration must remain a hard stop');
 let turn={state_delta:{advance_minutes:0},choices:[]};
 applySceneMomentumTimeFloor({action:'쉰다.',saveState:boundarySave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'forced downtime floor must stop at the next authoritative schedule boundary');
 turn={state_delta:{advance_minutes:0},choices:[]};
 applySceneMomentumTimeFloor({action:'두 시간 쉰다.',saveState:boundarySave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'native-Korean long rest must stop at the next authoritative schedule boundary');
+
+const boundaryChoiceSave={...boundarySave,pc:knightPc,scheduledEvents:[{id:'past-ceremony',date:'1285-03-01',time:'08:00',status:'scheduled'},{id:'class',date:'1285-03-01',time:'10:00',status:'scheduled'}]};
+turn={state_delta:{advance_minutes:0},choices:['수업에 간다','남는다','다른 일을 한다'],event_progress:{event_instance_id:'class'}};
+applySceneMomentumTimeFloor({action:'두 시간 쉰다.',saveState:boundaryChoiceSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,10,'an unrelated overdue row must not hide the structured future schedule boundary');
+turn={scene_title:'정오의 호출',scene:[{kind:'narration',text:'기사과 1학년 필수 오리엔테이션이 시작되어 참석 여부를 정해야 한다.'}],state_delta:{advance_minutes:0},choices:['참석한다','남는다','다른 일을 한다'],event_progress:null};
+applySceneMomentumTimeFloor({action:'두 시간 쉰다.',saveState:{...boundaryChoiceSave,scheduledEvents:[{id:'class',title:'기사과 필수 오리엔테이션',date:'1285-03-01',time:'10:00',status:'scheduled'}]}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,10,'authoritative boundary title evidence must align the clock even when event_progress is omitted');
+turn={scene_title:'오리엔테이션 전의 소란',scene:[{kind:'narration',text:'기사과 필수 오리엔테이션 이야기가 들리지만 지금은 다른 개입이다.'}],state_delta:{advance_minutes:0},choices:['대응한다','피한다','지켜본다'],event_progress:{event_instance_id:'director:interruption'}};
+applySceneMomentumTimeFloor({action:'두 시간 쉰다.',saveState:{...boundaryChoiceSave,scheduledEvents:[{id:'class',title:'기사과 필수 오리엔테이션',date:'1285-03-01',time:'10:00',status:'scheduled'}]}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,0,'an unrelated structured interruption must not be mistaken for the mentioned future schedule');
+turn={state_delta:{advance_minutes:0},choices:['대응한다','피한다','지켜본다'],event_progress:{event_instance_id:'director:interruption'}};
+applySceneMomentumTimeFloor({action:'두 시간 쉰다.',saveState:boundaryChoiceSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,0,'an unrelated meaningful interruption must remain at its model-produced moment');
+const implicitBoundaryChoiceSave={...implicitRestSave,scheduledEvents:[{id:'class',date:'1285-03-01',time:'10:00',status:'scheduled'}]};
+turn={state_delta:{advance_minutes:0},choices:['수업에 간다','남는다','다른 일을 한다'],event_progress:{event_instance_id:'class'}};
+applySceneMomentumTimeFloor({action:'쉰다.',saveState:implicitBoundaryChoiceSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,35,'a boundary within the implicit 30-240 minute guide must align the structured event and clock');
 
 const fullScheduleSave={world:{date:'1285-03-01',time:'07:00'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[{id:'noon-class',date:'1285-03-01',time:'12:00',status:'scheduled'}]};
 assert.equal(nextScheduleBoundaryMinutes(fullScheduleSave),300,'full authoritative schedule must expose events beyond the four-hour upcoming window');
@@ -43,9 +97,11 @@ assert.equal(turn.state_delta.advance_minutes,360,'ignored terminal schedule row
 
 const overdueSchedule={world:{date:'1285-03-01',time:'13:00'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[{id:'overdue',date:'1285-03-01',time:'12:00',status:'scheduled'}]};
 assert.equal(nextScheduleBoundaryMinutes(overdueSchedule),0,'an overdue unfinished authoritative event must stop local time advancement immediately');
+assert.equal(nextScheduleBoundaryMinutes(overdueSchedule,{futureOnly:true}),null,'an overdue event is current context, not a future model hard stop');
+assert.doesNotMatch(buildSceneMomentumDirective({action:'기숙사로 간다.',saveState:overdueSchedule}),/SCHEDULE_BOUNDARY=0min/,'an overdue event must not contradict a newly committed travel action');
 turn={state_delta:{advance_minutes:0},choices:[]};
 applySceneMomentumTimeFloor({action:'6시간 쉰다.',saveState:overdueSchedule},turn,'game');
-assert.equal(turn.state_delta.advance_minutes,0,'overdue unfinished schedule must suppress the locally forced floor');
+assert.equal(turn.state_delta.advance_minutes,360,'an already-overdue event must not freeze a newly committed downtime action');
 
 turn={state_delta:{advance_minutes:0},choices:[]};
 applySceneMomentumTimeFloor({action:'48시간 쉰다.',saveState:{world:{date:'1285-03-01',time:'14:00'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
@@ -60,6 +116,6 @@ assert.equal(turn.state_delta.advance_minutes,400,'schedule bounding must not re
 
 turn={state_delta:{advance_minutes:0},choices:[]};
 applySceneMomentumTimeFloor({action:'쉰다.',saveState:{world:{date:'1285-03-01',time:'10:00'},scheduleContext:{due:[{id:'class'}],upcoming:[]}}},turn,'game');
-assert.equal(turn.state_delta.advance_minutes,0,'an already-due event must suppress locally forced time advancement');
+assert.equal(turn.state_delta.advance_minutes,30,'an already-due event is current context and must not freeze a newly committed action');
 
 console.log('PASS Scene Momentum deterministic time-floor bounds (full schedule + boundary + 1440 cap)');
