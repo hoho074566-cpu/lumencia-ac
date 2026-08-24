@@ -70,6 +70,10 @@ const oversized = route(oversizedAction, { rollingSummary: 'old context '.repeat
 assert.ok(oversized.params.input.length<=9000, 'oversized USER ACTION must respect the routine input budget');
 assert.match(oversized.params.input,/===== AUTHORITATIVE SAVE_STATE \(ROUTED MINIMUM\) =====/,'oversized USER ACTION must retain minimum authoritative state');
 assert.ok(oversized.params.input.indexOf('===== USER ACTION =====') > 0, 'variable context should precede USER ACTION');
+const scheduledRest=route('두 시간 쉰다.',{saveState:{world:{date:'1285-03-02',time:'11:50',location:'기숙사'},scheduledEvents:[{id:'combat-orientation',date:'1285-03-02',time:'12:00',status:'scheduled'}],scheduleContext:{due:[],upcoming:[{id:'combat-orientation',title:'필수 오리엔테이션',date:'1285-03-02',time:'12:00',importance:5}]}}});
+assert.match(scheduledRest.params.input,/SCHEDULE_BOUNDARY=10min/,'reserved Scene Momentum must carry the exact schedule hard stop');
+assert.match(scheduledRest.params.input,/120분 휴식을 전부 실행하지 말고 10분 뒤 일정 시작 순간에서 멈춘다/,'schedule hard stop must override the longer explicit rest in routed model input');
+assert.match(scheduledRest.params.input,/"id":"combat-orientation"/,'the matching authoritative schedule row must remain in the routed tail');
 const routedContract=route('주변을 살핀다.').params.instructions;
 assert.match(routedContract,/event_progress는 현재 논리적 이벤트 occurrence의 compact 진행 상태/, 'routed GAME prompt is missing event progress contract');
 assert.match(routedContract,/완료 beat는 언급·회상할 수 있지만 현재 행동으로 재실행하거나 active로 되돌리지 않는다/, 'routed GAME prompt is missing monotonic completion rule');

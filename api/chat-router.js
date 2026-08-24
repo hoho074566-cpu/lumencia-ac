@@ -9,7 +9,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import coreHandler, { CHARACTER_REGISTRY } from './chat.js';
 import { routeOpenAIParams, routerVersion, array, object, clampText } from './lib/context-router.js';
 import { actualScheduledEntrants, freshChoices, reconcileParticipants } from '../lib/scene-continuity.js';
-import { SCENE_MOMENTUM_VERSION, classifySceneIntent, deriveSceneDelta, updateSceneMomentum } from '../lib/scene-momentum.js';
+import { SCENE_MOMENTUM_VERSION, classifySceneIntent, deriveSceneDelta, nextScheduleBoundaryMinutes, updateSceneMomentum } from '../lib/scene-momentum.js';
 import { compactEventProgress, mergeContinuationEventProgressState, mergeRoutedEventProgressState, occurrenceIdFromStartEvidence, promotePausedEventProgress, scheduledIdsDueByTurnEnd, unscheduledPausedIdsForResume } from '../lib/event-progress.js';
 
 export const config = { maxDuration: 300 };
@@ -152,46 +152,6 @@ function relationChangeFor(turn,key){return array(turn?.state_delta?.relationshi
 function npcStateUpdateFor(turn,key){return array(turn?.state_delta?.npc_state_updates).find(x=>String(x?.npc_key||x?.key||'')===key)||null;}
 function emotionFor(turn,key){return array(turn?.emotion_updates).find(x=>String(x?.npc_key||x?.key||x?.speaker_key||'')===key)||null;}
 function bounded(value,min,max,fallback){if(value==null||value==='')return fallback;const n=Number(value);return Number.isFinite(n)?Math.max(min,Math.min(max,n)):fallback;}
-function clockMinutes(value=''){
-  const match=String(value||'').trim().match(/^(\d{1,2}):(\d{2})$/);
-  if(!match)return null;
-  const hour=Number(match[1]),minute=Number(match[2]);
-  if(!Number.isInteger(hour)||!Number.isInteger(minute)||hour<0||hour>23||minute<0||minute>59)return null;
-  return hour*60+minute;
-}
-function dateTimeMinutes(date='',time=''){
-  const match=String(date||'').trim().match(/^(\d{1,4})-(\d{1,2})-(\d{1,2})$/),clock=clockMinutes(time);
-  if(!match||clock==null)return null;
-  const year=Number(match[1]),month=Number(match[2]),day=Number(match[3]),hour=Math.floor(clock/60),minute=clock%60;
-  if(!Number.isInteger(year)||!Number.isInteger(month)||!Number.isInteger(day)||month<1||month>12||day<1||day>31)return null;
-  const stamp=new Date(0);stamp.setUTCFullYear(year,month-1,day);stamp.setUTCHours(hour,minute,0,0);
-  if(stamp.getUTCFullYear()!==year||stamp.getUTCMonth()!==month-1||stamp.getUTCDate()!==day||stamp.getUTCHours()!==hour||stamp.getUTCMinutes()!==minute)return null;
-  return Math.floor(stamp.getTime()/60000);
-}
-function nextScheduleBoundaryMinutes(saveState={}){
-  const save=object(saveState),schedule=object(save.scheduleContext);
-  if(array(schedule.due).length)return 0;
-  const currentDate=String(save?.world?.date||''),currentTime=String(save?.world?.time||''),now=dateTimeMinutes(currentDate,currentTime);
-  if(now==null){
-    const currentClock=clockMinutes(currentTime);if(currentClock==null)return null;
-    let fallback=null;
-    for(const event of array(schedule.upcoming)){
-      if(currentDate&&event?.date&&String(event.date)!==currentDate)continue;
-      const at=clockMinutes(event?.time);if(at==null)continue;
-      const delta=at-currentClock;if(delta<=0)return 0;
-      if(fallback==null||delta<fallback)fallback=delta;
-    }
-    return fallback;
-  }
-  let best=null;
-  for(const event of [...array(save.scheduledEvents),...array(schedule.upcoming)]){
-    if(!event||['completed','cancelled'].includes(String(event.status||'').trim().toLowerCase()))continue;
-    const at=dateTimeMinutes(event.date||currentDate,event.time);if(at==null)continue;
-    const delta=at-now;if(delta<=0)return 0;
-    if(best==null||delta<best)best=delta;
-  }
-  return best;
-}
 function applySceneMomentumTimeFloor(incoming,turn,mode='game'){
   const intent=classifySceneIntent(incoming?.action||'',{location:incoming?.saveState?.world?.location||''});
   if(mode!=='game'||!turn?.state_delta||!intent.compression||intent.minAdvanceMinutes<=0)return intent;

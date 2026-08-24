@@ -13,8 +13,11 @@ Repository: `hoho074566-cpu/lumencia-ac`
 # 0. SESSION STOP CHECKPOINT — 가장 먼저 읽을 것
 
 ## Live state immediately before this handover update
-- Branch: `codex/narrative-live-play-acceptance`
-- Current main: `8d378b532910dfecaf5226118bffabdddbe74289`
+- Branch: `codex/live-schedule-boundary-hf2`
+- Current main: `88fa53036c58324ffd5012ab7b5ed0cd3099dd6d`
+- PR #34: **merged** at 2026-08-24 01:47:23 UTC using `expected_head_sha=4479615f4904c74ee9e3dfd349b809136706808e`.
+- PR #34 exact-head gates: Safety #274 PASS, Vercel PASS / Ready, fresh direct P0/P1=0, ahead 11 / behind 0, base commit and merge-base equal then-current main.
+- Merge commit tree exactly equals the reviewed PR #34 head tree; no unexpected merge delta.
 - PR #33: **merged** at 2026-08-23 23:07:00 UTC
 - Reviewed/merged PR HEAD: `216bef1d51b72f2edb6da3f06c69e02aa45b5b10`
 - Guarded merge used the same full `expected_head_sha`.
@@ -25,6 +28,13 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Post-merge main Vercel: **PASS**.
 - Production `/api/health`: healthy; app `1.5.6`, canonical `/api/chat`, adapter `/api/chat-router`, `24h` prompt-cache retention.
 - Full post-merge `node scripts/lumensia-pr-check.mjs`: **PASS**.
+
+## Current blocker / active fix
+- The merged-main production 12-case rerun produced 11 PASS / 1 FAIL.
+- `두 시간 쉰다.` at 11:50 advanced 120 minutes and auto-completed the mandatory 12:00 orientation, deciding PC nonattendance despite the schedule payload being present.
+- Root cause: `EXPLICIT_DURATION=120min` had no exact earlier schedule hard-stop priority in the reserved Scene Momentum directive. The local adapter only raises a missing time floor and intentionally does not shrink positive model output, so it could not repair this without prose/state divergence.
+- Current HF2 fix shares the authoritative boundary calculator with the prompt path and emits `SCHEDULE_BOUNDARY=10min`: stop at the event start, leave the remaining rest unexecuted, and do not auto-decide absence/completion.
+- Focused router/time-floor tests and full local PR check pass. This protected-core fix still requires exact Preview live evidence, Safety/Vercel, fresh exact-head P0/P1=0, and a human merge.
 
 ## Critical review finding and merged closure
 Final Codex review **did complete** on exact HEAD `8ca24ba...` at 2026-08-23 21:47:49 UTC and found a **new current P1**.
@@ -535,15 +545,15 @@ Gameplay roadmap discussed but not DONE:
 # 12. NEXT ACTION — NEW CHAT STARTS HERE
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
-2. Confirm main still contains merge commit `8d378b532910dfecaf5226118bffabdddbe74289`; do **not** redo completed HF1 diagnosis.
-3. Preserve the recorded earlier gates, but do not treat them as authority for the new local question-sovereignty patch.
-4. Run the full PR check and publish this final acceptance checkpoint.
-5. Wait for exact-head Safety/Vercel, then obtain a fresh exact-current-HEAD/current-main Codex review with direct P0/P1=0.
-6. Re-fetch main/PR and verify every merge gate, then stop at protected-core manual merge readiness; do not auto-merge.
-7. After a human merge, run all 12 cases plus `/api/health` on production, then proceed to **Scene Purpose -> Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence**.
+2. Confirm main still contains merge commit `88fa53036c58324ffd5012ab7b5ed0cd3099dd6d`; do **not** redo completed HF1 or PR #34 diagnosis.
+3. Publish `codex/live-schedule-boundary-hf2` and obtain exact-head Safety + Vercel.
+4. Run the pre-schedule long-rest case and then all 12 acceptance cases against that exact Preview. The mandatory schedule must stop the longer rest without auto-deciding PC absence/completion.
+5. Obtain a fresh exact-current-HEAD/current-main Codex review with direct P0/P1=0.
+6. Re-fetch main/PR and verify every merge gate, then stop at protected-core manual merge readiness; do not auto-merge this new PR without separate exact authorization.
+7. After human merge, rerun production acceptance and proceed to **Scene Purpose -> Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence**.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. HF1은 main에 반영됐다. PR #34 exact Preview의 12개 live behavior class가 모두 충분히 통과했고, 간접 질문 sovereignty·reload-safe CONTINUE UI·새 NPC 행동 없는 narrative hard freeze·완료 이벤트 no-replay까지 검증됐다. Code head `9623091`은 Safety #270/Vercel/live PASS다. 최종 문서 checkpoint를 publish하고 fresh exact-head Safety/Vercel/Codex direct P0/P1=0 및 behind/base/merge-base/mergeable/clean을 확인한 뒤 protected manual merge gate에서 멈춰라. human merge 뒤 production acceptance -> Scene Purpose -> Scene Exit -> Turn Hook -> Event Consequence로 계속한다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #34는 exact head `4479615`로 검증돼 merge commit `88fa5303`으로 main에 반영됐다. Post-merge production 12-case 중 11개는 PASS했고, 11:50의 두 시간 휴식이 필수 12:00 일정을 건너뛰는 한 건이 재현됐다. `codex/live-schedule-boundary-hf2`의 local fix는 reserved `SCHEDULE_BOUNDARY`로 정확한 일정 시작 시점에서 멈추며 focused/full tests가 PASS다. 이 branch를 publish하고 exact Preview live -> Safety/Vercel -> fresh direct P0/P1=0 -> protected manual merge gate까지 진행한 뒤, human merge 후 Scene Purpose -> Scene Exit -> Turn Hook -> Event Consequence로 계속한다.`

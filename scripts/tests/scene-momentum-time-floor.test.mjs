@@ -2,20 +2,25 @@
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { buildSceneMomentumDirective, nextScheduleBoundaryMinutes } from '../../lib/scene-momentum.js';
 
 const source=readFileSync('api/chat-router.js','utf8');
 const start=source.indexOf('function bounded(');
 const end=source.indexOf('function uniqText(');
 assert.ok(start>=0&&end>start,'Scene Momentum time-floor source markers missing');
 const timeFloorSource=source.slice(start,end);
-const makeHelpers=new Function('array','object','classifySceneIntent',`${timeFloorSource}\nreturn {applySceneMomentumTimeFloor,nextScheduleBoundaryMinutes};`);
+const makeHelpers=new Function('array','object','classifySceneIntent','nextScheduleBoundaryMinutes',`${timeFloorSource}\nreturn {applySceneMomentumTimeFloor};`);
 const array=(value)=>Array.isArray(value)?value:[];
 const object=(value)=>value&&typeof value==='object'&&!Array.isArray(value)?value:{};
 const classifySceneIntent=(action)=>({kind:'downtime',compression:true,minAdvanceMinutes:String(action).includes('48시간')?2880:String(action).includes('6시간')?360:String(action).includes('두 시간')?120:30});
-const {applySceneMomentumTimeFloor,nextScheduleBoundaryMinutes}=makeHelpers(array,object,classifySceneIntent);
+const {applySceneMomentumTimeFloor}=makeHelpers(array,object,classifySceneIntent,nextScheduleBoundaryMinutes);
 
 const boundarySave={world:{date:'1285-03-01',time:'09:50'},scheduleContext:{due:[],upcoming:[{id:'class',date:'1285-03-01',time:'10:00'}]}};
 assert.equal(nextScheduleBoundaryMinutes(boundarySave),10,'next schedule boundary should be ten minutes away');
+const boundedRestDirective=buildSceneMomentumDirective({action:'두 시간 쉰다.',saveState:boundarySave});
+assert.match(boundedRestDirective,/SCHEDULE_BOUNDARY=10min/,'the model must receive the exact upcoming schedule boundary');
+assert.match(boundedRestDirective,/120분 휴식을 전부 실행하지 말고 10분 뒤 일정 시작 순간에서 멈춘다/,'the earlier mandatory schedule must override the longer downtime duration');
+assert.match(boundedRestDirective,/SCHEDULE_BOUNDARY가 더 짧으면 그 일정 경계가 최우선/,'the explicit-duration rule must not contradict the earlier schedule boundary');
 let turn={state_delta:{advance_minutes:0},choices:[]};
 applySceneMomentumTimeFloor({action:'쉰다.',saveState:boundarySave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'forced downtime floor must stop at the next authoritative schedule boundary');
