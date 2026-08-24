@@ -52,6 +52,15 @@ assert.equal(different.repetition_streak,0,'new visible material must not be mis
 const requested=deriveSceneNovelty({previousRuntime:{novelty:first},turn:repeatedTurn,sceneDelta:noStructuralChange,action:'게시판 내용을 다시 설명해 줘',turnNumber:2});
 assert.equal(requested.repetition_streak,0,'an explicit recap request must not create suppression pressure');
 
+for(const ordinaryAction of [
+  '다시 자리에서 일어나 경비에게 말을 건다',
+  'I repeatedly check the notice board.',
+  'Repeat the attack.',
+]){
+  const ordinary=deriveSceneNovelty({previousRuntime:{novelty:first},turn:repeatedTurn,sceneDelta:noStructuralChange,action:ordinaryAction,turnNumber:2});
+  assert.equal(ordinary.repetition_streak,1,`ordinary action must not be classified as recap: ${ordinaryAction}`);
+}
+
 const bounded=normalizeSceneNovelty({
   repetition_streak:99,recent_terms:Array.from({length:40},(_,index)=>`term-${index}`),repeated_terms:Array.from({length:20},(_,index)=>`repeat-${index}`),recent_axes:['danger','invalid-axis'],last_turn:-10,last_similarity:5,
 });
@@ -77,6 +86,11 @@ const recap=buildSceneNoveltyDirective({action:'게시판 내용을 다시 설�
 assert.match(recap,/REQUESTED RECAP/);
 assert.match(recap,/새 사건이나 상태 변화를 날조하지 않는다/);
 assert.doesNotMatch(recap,/REPEAT_GUARD/);
+assert.match(buildSceneNoveltyDirective({action:'지금까지 상황을 요약해줘',saveState,recentTurns:[repeatedTurn]}),/REQUESTED RECAP/);
+assert.match(buildSceneNoveltyDirective({action:'Please recap the scene.',saveState,recentTurns:[repeatedTurn]}),/REQUESTED RECAP/);
+for(const ordinaryAction of ['다시 자리에서 일어나 경비에게 말을 건다','I repeatedly check the notice board.','Repeat the attack.']){
+  assert.doesNotMatch(buildSceneNoveltyDirective({action:ordinaryAction,saveState,recentTurns:[repeatedTurn]}),/REQUESTED RECAP/);
+}
 
 const frozen=buildSceneNoveltyDirective({action:'[LUMENSIA V1.5.6 CONTINUE] 직전 장면을 이어서 묘사한다.',saveState,recentTurns:[repeatedTurn]});
 assert.match(frozen,/CONTINUE PRESERVE/);
@@ -91,7 +105,7 @@ assert.match(router,/scene_novelty_v1:true/);
 assert.match(router,/novelty,scene_delta:sceneDelta/);
 assert.match(context,/buildSceneNoveltyDirective/);
 assert.match(context,/DETERMINISTIC SCENE NOVELTY V1/);
-assert.match(context,/actionTextLimit=noveltyDirective\?Math\.max\(1800,Math\.min\(5200,action\.length\)-noveltyDirective\.length\):5200/);
+assert.doesNotMatch(context,/actionTextLimit=noveltyDirective/,'novelty context must not independently truncate a user action already covered by the routed input budget');
 assert.match(health,/sceneNovelty:/);
 assert.match(runtime,/save\.sceneRuntime = \{ \.\.\.\(save\.sceneRuntime \|\| \{\}\), \.\.\.runtime\.scene_runtime \}/,'the stable runtime must persist bounded novelty inside the existing sceneRuntime root');
 assert.equal((router.match(/await runCore\(req,incoming,mode\)/g)||[]).length,1,'novelty must not add another canonical core call');

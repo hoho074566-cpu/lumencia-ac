@@ -126,6 +126,11 @@ assert.match(denseRouted.params.input,/REPEAT_GUARD=required/);
 assert.match(denseRouted.params.input,/TURN_HOOK_DENSE_SENTINEL/);
 assert.match(denseRouted.params.input,/대도서관으로 간다\./);
 
+const moderateAction=`${'중간 길이 행동 설명 '.repeat(260)}`.slice(0,2000);
+const moderateSave={turnNumber:8,world:{date:'1285-03-01',time:'09:00',location:'SAVE_WORLD_MODERATE'},pc:{name:'SAVE_PC_MODERATE'},sceneRuntime:{novelty:denseSave.sceneRuntime.novelty}};
+const moderateRouted=routeOpenAIParams({instructions,input:originalInput},{mode:'game',incoming:{action:moderateAction,rollingSummary:'',recentTurns:[],saveState:moderateSave}});
+assert.ok(moderateRouted.params.input.includes(moderateAction),'an active novelty directive must not truncate a 2,000-character action when the routed input has room');
+
 const maximumActionSuffix='대도서관으로 간다.';
 const maximumAction=`${'최대 행동 압력 '.repeat(900)}`.slice(0,5200-maximumActionSuffix.length)+maximumActionSuffix;
 const maximumRouted=routeOpenAIParams({instructions,input:denseOriginalInput},{mode:'game',incoming:{action:maximumAction,rollingSummary:'dense old '.repeat(1000),recentTurns:[],saveState:denseSave}});
