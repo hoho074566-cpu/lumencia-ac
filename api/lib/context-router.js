@@ -289,9 +289,12 @@ function buildEventDirectorV2(incoming,originalInput,registry,mode='game'){
   const scheduleBoundary=nextScheduleBoundaryMinutes(save,{futureOnly:false});
   const scheduleFirst=scheduleBoundary!=null&&consequenceMinutes!=null&&scheduleBoundary<=consequenceMinutes;
   if(dueConsequence&&!scheduleFirst){
-    const telemetry={...base,result:'EVENT_CONSEQUENCE_DUE',mode:'fixed-flow',event_consequence_id:dueConsequence.id,event_consequence_due_at:dueConsequence.due_at,event_consequence_trigger_minutes:consequenceMinutes};
+    const consequenceNpcText=[dueConsequence.event_name,Number(dueConsequence.secret_level||0)<=2?dueConsequence.reason:''].filter(Boolean).join(' ');
+    const consequenceKeys=mentionedNpcKeys(consequenceNpcText,registry).slice(0,2);
+    const selectedKey=consequenceKeys[0]||null;
+    const telemetry={...base,result:'EVENT_CONSEQUENCE_DUE',mode:'fixed-flow',selected_key:selectedKey,selected_name:selectedKey?registry[selectedKey]||null:null,event_consequence_id:dueConsequence.id,event_consequence_due_at:dueConsequence.due_at,event_consequence_trigger_minutes:consequenceMinutes,event_consequence_npc_keys:consequenceKeys};
     const consequenceDirective=buildEventConsequenceDirective(dueConsequence,{currentAction:incoming.action||'',triggerMinutes:consequenceMinutes});
-    return{telemetry,selectedKey:null,directive:`[EVENT DIRECTOR V2.1]\nMODE=FIXED_FLOW\nRESULT=EVENT_CONSEQUENCE_DUE\nCONSEQUENCE_ID=${dueConsequence.id}\n이전 인과 결과를 우선하며 새 랜덤 사건을 추가하지 마라.`,consequenceDirective};
+    return{telemetry,selectedKey,consequenceKeys,directive:`[EVENT DIRECTOR V2.1]\nMODE=FIXED_FLOW\nRESULT=EVENT_CONSEQUENCE_DUE\nCONSEQUENCE_ID=${dueConsequence.id}\n이전 인과 결과를 우선하며 새 랜덤 사건을 추가하지 마라.`,consequenceDirective};
   }
   if(mode==='auto')return fixedDirective('RNG_DISABLED_AUTO');
 
@@ -358,6 +361,7 @@ function deriveKeys(incoming,registry,maxNpcs,directorV2=null){
   const last=array(incoming.recentTurns).slice(-1)[0], latestSpeaker=[...array(last?.scene)].reverse().find(item=>item?.speaker_key)?.speaker_key;
   if(latestSpeaker&&present.has(String(latestSpeaker))&&registry[latestSpeaker])set.add(String(latestSpeaker));
   if(directorV2?.selectedKey&&registry[directorV2.selectedKey]&&set.size<maxNpcs)set.add(String(directorV2.selectedKey));
+  for(const key of array(directorV2?.consequenceKeys)){if(set.size>=maxNpcs)break;if(registry[key])set.add(String(key));}
   addExplicitKeys(set,incoming.action||'',registry,maxNpcs);
   for(const k of array(save?.scheduleContext?.due).flatMap(ev=>array(ev?.participants)))if(set.size<maxNpcs&&registry[k])set.add(String(k));
   for(const k of authoritative)if(set.size<maxNpcs&&registry[k])set.add(String(k));

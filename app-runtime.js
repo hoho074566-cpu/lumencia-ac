@@ -338,12 +338,14 @@ function applyRuntimeStateStable(data, isContinue = false) {
   }
 }
 
-function materializeEventConsequencesStable(turn) {
+function materializeEventConsequencesStable(turn, pipeline = null) {
   const delta = turn?.state_delta;
   if (!delta || typeof delta !== 'object') return [];
-  const sourceEvent = save?.sceneRuntime?.eventProgress?.eventInstanceId
+  const sourceEvent = turn?.event_progress?.event_instance_id
+    || save?.sceneRuntime?.eventProgress?.eventInstanceId
     || save?.sceneRuntime?.turn_hook?.event_instance_id
     || null;
+  const isDueFollowUp = Boolean(pipeline?.event_consequence?.selected_id);
   const additions = materializeDelayedConsequences({
     rows: delta.delayed_consequences_add,
     world: save.world,
@@ -351,9 +353,12 @@ function materializeEventConsequencesStable(turn) {
     turnNumber: save.turnNumber + 1,
     existingHooks: save.hooks,
     sourceEvent,
+    maxAdditions: isDueFollowUp ? (pipeline?.event_consequence?.status === 'resolved' ? 1 : 0) : 3,
   });
   if (!additions.length) return additions;
-  delta.hooks_add = [...(Array.isArray(delta.hooks_add) ? delta.hooks_add : []), ...additions].slice(0, 8);
+  const reserved = additions.slice(0, 8);
+  const ordinary = (Array.isArray(delta.hooks_add) ? delta.hooks_add : []).slice(0, Math.max(0, 8 - reserved.length));
+  delta.hooks_add = [...ordinary, ...reserved];
   return additions;
 }
 
@@ -467,7 +472,7 @@ async function sendActionStable(action, requestedMode = null) {
 
     let notices = [];
     if (!isMeta && !isContinue) {
-      materializeEventConsequencesStable(data.turn);
+      materializeEventConsequencesStable(data.turn, data.pipeline);
       notices = applyDelta(data.turn.state_delta);
       applyEmotionUpdates(data.turn.emotion_updates || []);
       updateDirectorState(data.turn);

@@ -47,6 +47,14 @@ test('delayed result becomes one bounded persisted hook and duplicate queue entr
     existingHooks:[hook],
   });
   assert.deepEqual(duplicate, []);
+
+  const resolved={...hook,status:'resolved'};
+  const replay=materializeDelayedConsequences({rows:[delayed],world:{date:'1285-03-02',time:'09:10'},turnNumber:10,existingHooks:[resolved]});
+  assert.deepEqual(replay,[],'terminal consequence fingerprints must keep a one-shot result from replaying');
+
+  const second={...delayed,event_name:'학생회 조사',reason:'기록 신호를 학생회가 확인한다'};
+  const bounded=materializeDelayedConsequences({rows:[delayed,second],world:{date:'1285-03-01',time:'09:10'},turnNumber:9,maxAdditions:1});
+  assert.equal(bounded.length,1,'a due result may create at most one causal follow-up');
 });
 
 test('due selection supports an explicit wait crossing the trigger but not an early ordinary turn', () => {
@@ -71,6 +79,9 @@ test('visible manifestation resolves the queue item while an ignored result rema
   const open=reconcileEventConsequenceLifecycle({saveState:save,turn:ignored,selectedConsequence:selected});
   assert.equal(open.status,'open');
   assert.deepEqual(ignored.state_delta.hooks_update.map(row=>[row.id,row.status]),[[hook.id,'open']]);
+
+  const choiceOnly={scene_title:'조용한 복도',scene:[{kind:'narration',text:'복도에는 아무 변화가 없다.'}],scene_summary:'변화 없이 머물렀다.',choices:['교수 호출을 확인한다'],state_delta:{hooks_update:[]}};
+  assert.equal(eventConsequenceEvidence(choiceOnly,selected).realized,false,'a future choice is not manifestation evidence');
 });
 
 test('secret cause is not copied into the due directive and expired items close without firing', () => {
@@ -103,6 +114,16 @@ test('router reserves a due consequence as fixed flow and a direct player questi
   const question=routeOpenAIParams({instructions,input},{mode:'game',incoming:{action:'지금 밖으로 나갈까?',saveState,recentTurns:[]}});
   assert.notEqual(question.telemetry.event_director_v2.result,'EVENT_CONSEQUENCE_DUE');
   assert.doesNotMatch(question.params.input,/===== EVENT CONSEQUENCE V1 =====/);
+});
+
+test('a due consequence routes canon for a named public NPC', () => {
+  const [hook]=materializeDelayedConsequences({rows:[{...delayed,event_name:'에밀리의 호출',reason:'에밀리가 결투 기록을 확인하려 부른다'}],world:{date:'1285-03-01',time:'09:00'},advanceMinutes:10,turnNumber:8});
+  const namedInstructions=`===== CHARACTER REGISTRY =====\nguide=가이드, emily=에밀리\n===== WORLD CANON =====\nacademy\n===== NPC CANON =====\nemily canon\n===== NPC SPEECH =====\nemily speech\n===== PC SYSTEM =====\npc`;
+  const saveState={turnNumber:8,world:{date:'1285-03-01',time:'09:40',location:'중앙광장'},pc:{name:'아리아'},hooks:[hook],sceneRuntime:{participants:[],momentum:{}},scheduleContext:{due:[],upcoming:[]},director:{}};
+  const routed=routeOpenAIParams({instructions:namedInstructions,input},{mode:'game',incoming:{action:'기다린다.',saveState,recentTurns:[]}});
+  assert.equal(routed.telemetry.event_director_v2.result,'EVENT_CONSEQUENCE_DUE');
+  assert.ok(routed.telemetry.selected_npcs.includes('emily'));
+  assert.deepEqual(routed.telemetry.event_director_v2.event_consequence_npc_keys,['emily']);
 });
 
 test('an explicit wait routes to its consequence boundary and an earlier fixed schedule wins', () => {

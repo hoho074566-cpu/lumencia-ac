@@ -7,7 +7,7 @@ Narrative Engine continuation — live acceptance, Scene Purpose, Scene Exit, an
 - Repo: `hoho074566-cpu/lumencia-ac`
 - Main: `5f2073a2874a9b8ee45a6aa34d6e4508997c3cb3` (`Stronger Turn Hook V1 (#40)`)
 - Working branch: `codex/event-consequence-v1`
-- PR #41: **open**, title `Event Consequence V1 bounded chaining and lifetime`; protected runtime/API paths keep it human-merge only. Published checkpoint `dbdc54b68d33dd095475ff8cecfe09cc6bdea277` passed Safety #316, Vercel Ready, and reports no merge conflict. Exact Preview: `https://lumencia-ac-git-codex-event-consequence-v1-ah-203c.vercel.app`.
+- PR #41: **open**, title `Event Consequence V1 bounded chaining and lifetime`; protected runtime/API paths keep it human-merge only. Published acceptance checkpoint `dbdc54b68d33dd095475ff8cecfe09cc6bdea277` passed Safety #316, Vercel Ready, and reports no merge conflict. Exact Preview: `https://lumencia-ac-git-codex-event-consequence-v1-ah-203c.vercel.app`. The current branch adds the hosted-review closure below and needs new exact-head authority.
 - PR #40: **merged** as squash commit `5f2073a2874a9b8ee45a6aa34d6e4508997c3cb3` from reviewed exact head `85af592b8baae57958eb16d88da83f946d26a2e0`. Safety #313, Vercel, fresh exact-head Codex P0/P1=0, and affected Exact Preview acceptance passed; reviewed and merged trees both equal `2354a0db58c6405beec40fcfaae885fd8850c0db`.
 - PR #39: **merged** as squash commit `4516cc162ef34426ef94d29cf5aa6489013927ec` from reviewed exact head `ba64f9f779cda39f91ef41abfddf3c47f823606c`. Safety #307, Vercel, fresh exact-head Codex P0/P1=0, and affected Chrome Preview acceptance passed. Merge and reviewed-head trees both equal `dfce564cc6b457a5258d5165ea05ce496acf99c6`; production Vercel and `/api/health` are healthy.
 - PR #38: **merged** as `227bcf23ace6ad7dca38b5d02d50a8652dd13a38`; same-occurrence event focus refreshes on authoritative beat/completion progress and remains stable when progress is unchanged.
@@ -44,6 +44,7 @@ Narrative Engine continuation — live acceptance, Scene Purpose, Scene Exit, an
 - Focused Event Consequence/schema/runtime/authority tests and all affected Scene Momentum/Purpose/Exit/Turn Hook regressions pass. Commit `9bf5d24...` and published checkpoint `dbdc54b...` also pass the full clean-LF `scripts/lumensia-pr-check.mjs` and a clean-LF Chrome boot smoke: the patched app reaches V1.5.6, loads `/lib/event-consequence.js` with HTTP 200, and reports no browser console error.
 - Second review found no blocker in schema compatibility, secret routing, lifecycle duplication, time/schedule priority, CONTINUE/META freeze, one-call architecture, or scope.
 - Exact Preview lifecycle acceptance passed on `dbdc54b...`: an unsafe sigil edit stopped at a real three-way player decision; after the player committed, the delayed malfunction stayed latent through the immediate 08:50→08:52 move; a later 40-minute wait surfaced it at 10:02 as a visible record signal and caretaker reaction; the next departure turn did not repeat it. The scheduled admission ceremony retained priority before the due result.
+- The first hosted review on `dbdc54b...` had P0/P1=0 and six P2 hardening findings. The focused closure enforces zero/one follow-up according to visible resolution, reserves canonical hook capacity for materialized rows, retains terminal fingerprints for one-shot dedupe, excludes unchosen choices from realization evidence, routes public named-NPC canon for due consequences, and prefers current-turn `event_progress` as the causal source. Each path has a permanent regression.
 
 ## Stronger Turn Hook V1 — Completed
 - New bounded `sceneRuntime.turn_hook` records allowlisted kind/source/status, a single-line 220-character anchor, bounded establishment turn, and only applicable speaker/event IDs.
@@ -321,8 +322,8 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
 
 ## NEXT ACTION
-1. Push the lifecycle-acceptance documentation checkpoint on PR #41, then require exact-current-HEAD Safety/Vercel and a fresh P0/P1=0 Codex review.
-2. Revalidate the exact head against current main and preserve the clean-LF full-check result after any required review fix. A docs-only hosted update needs only a targeted smoke; do not repeat the completed lifecycle run unless code changes.
+1. Run the full clean-LF check and push the focused hosted-review closure on PR #41, then require exact-current-HEAD Safety/Vercel and a fresh P0/P1=0 Codex review.
+2. Revalidate the exact head against current main. Because the closure changes runtime behavior, re-run the targeted due/no-repeat/player-choice Exact Preview smoke.
 3. Do not merge PR #41 from a Codex task. Protected runtime/API paths make merge human-only.
 4. Start NPC Initiative / Goal Tick refinement only after PR #41 closes.
 
@@ -354,5 +355,5 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed: PR #39 exact-head Safety/Vercel/Codex/Preview gates, expected-head squash merge, exact tree verification, production Vercel, and health smoke.
 - Initial published candidate: `4a24a77...`; Vercel PASS, Safety #308 initially in progress. Its first live travel rerun found the generic-choice issue above, so it is not merge-authoritative.
 - Completed: PR #40 exact-head Safety/Vercel/Codex/Preview gates, squash merge `5f2073a...`, exact tree verification, production Vercel, and health smoke.
-- Current published candidate `dbdc54b...`: bounded delayed-result materialization into existing hooks, due selection, schedule/player sovereignty guards, visible-result completion, open retry, expiry, duplicate rejection, secret-cause masking, and adaptive authority preservation all have permanent regressions. Full clean-LF check, second review, Safety #316, Vercel Ready, clean-LF Chrome boot, and Exact Preview lifecycle acceptance pass.
-- NEXT ACTION: push this documentation checkpoint, require exact-head hosted gates and fresh P0/P1=0 review, then leave protected-path PR #41 open for human merge.
+- Acceptance checkpoint `dbdc54b...`: bounded delayed-result materialization into existing hooks, due selection, schedule/player sovereignty guards, visible-result completion, open retry, expiry, duplicate rejection, secret-cause masking, and adaptive authority preservation passed full clean-LF check, Safety #316, Vercel Ready, clean-LF Chrome boot, and Exact Preview lifecycle acceptance. Its hosted review had P0/P1=0; the current closure addresses all six P2 hardening comments.
+- NEXT ACTION: full-check and push the review closure, require exact-head hosted gates/fresh P0/P1=0, rerun targeted Exact Preview, then leave protected-path PR #41 open for human merge.
