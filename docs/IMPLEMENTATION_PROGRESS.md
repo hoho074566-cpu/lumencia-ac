@@ -165,9 +165,10 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Safety Gate #265: **PASS**; Vercel: **PASS / Ready**; compare: ahead 2 / behind 0 with base commit and merge-base at current main `8d378b532910dfecaf5226118bffabdddbe74289`.
 - Fresh exact-head Codex review `PRR_kwDOT8LCAs8AAAABKj3Erw`: direct P0/P1 = 0. New suggestions are P2 only and remain non-blocking without a live reproduction.
 - Follow-up closes those P2s because acceptance accuracy is the purpose of this phase: explicit wait/rest durations are exact, pre-schedule no-op is rejected, CONTINUE checks scalar and array deltas, completed-event reactivation checks event arrays, all visible fields are scanned for internal names, repeated-known-fact paraphrases require a hook, and `갈까 말까` / `가야 할까` / `갈까요` remain decision-sensitive.
-- The user completed Vercel SSO in Cloud Browser and the exact Preview app now loads at head `cd5b711f47be99fbe321fb2eddc6c5d8d3eff568`.
-- Exact Preview `/api/health` then reported `apiConfigured=false`. Read-only inspection of Vercel Environment Variables confirmed `OPENAI_API_KEY` is scoped to **Production only**, while `OPENAI_MODEL_LUNA`, `OPENAI_MODEL_TERRA`, and `LUMENSIA_ACCESS_TOKEN` are scoped to Production and Preview.
-- Therefore the 12 real model-backed candidate cases remain blocked by Preview runtime configuration, not by gameplay code or Deployment Protection. Extending a production secret to Preview is a security-scope change and was not performed automatically.
+- The user completed Vercel SSO in Cloud Browser and explicitly authorized adding Preview scope to the existing `OPENAI_API_KEY`.
+- The key value was not viewed, copied, replaced, or exposed. Production remained selected and Preview was added; Vercel confirmed the environment-variable update.
+- Exact head `58f00adf3fccc071afe59bd4134471874fe14b39` was redeployed as Preview deployment `F4Zua1Ud7EQDazJcvwSB2ZjgryeG`, which reached Ready. The authenticated branch alias then reported `API 0.8.3 연결 준비됨 · gpt-5.6-luna / gpt-5.6-terra · Q3 · CR · MOT2 · MOM`.
+- The runtime-configuration blocker is resolved. No live model case has run yet: opening the first test fixture triggered a native file chooser that locked the Cloud Browser control session before the fixture was applied or a request was sent.
 
 ## Permanent HF1 Test Suites
 - `scripts/tests/context-router-authority-tail.test.mjs`
@@ -198,8 +199,8 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PR #33 manual merge safety.
 
 ## NEXT ACTION
-1. With explicit user authorization, extend the existing Vercel `OPENAI_API_KEY` environment variable from Production-only to Preview as well, then redeploy the exact PR #34 head. Do not reveal, copy, or replace the secret value.
-2. Reconfirm the authenticated exact Preview `/api/health` reports `apiConfigured=true`, then rerun all 12 real acceptance cases against that exact deployment; production main is not candidate evidence.
+1. Dismiss the currently open native file chooser in the Cloud Browser with Cancel/Esc, then reconnect to the authenticated PR #34 Preview.
+2. Import the first stateless QA fixture through the supported file-chooser path and rerun all 12 real acceptance cases against the exact deployment; production main is not candidate evidence.
 3. Resolve only reproduced P0/P1 blockers. P2/P3 remain non-blocking without live reproduction.
 4. If code or docs change, repeat exact-head Safety + Vercel + fresh exact-current-HEAD/current-main Codex review; then stop at the protected-core manual merge gate and never auto-merge.
 5. After the acceptance fix is human-merged, rerun all 12 cases on production and smoke `/api/health`, then implement **Scene Purpose** with bounded purpose state and no automatic player choice.
@@ -209,7 +210,7 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.
 - Completed after merge: first 12-case production Live-play run, four demonstrated classifier fixes, permanent regressions, full local PR check.
 - Completed on PR #34 candidate `cd5b711`: hosted Safety #265 PASS, Vercel Ready, fresh exact-head direct P0/P1=0; branch is clean/synchronized and base/merge-base remain current main.
-- Completed environment diagnosis: Vercel SSO is satisfied, but exact Preview health reports no API key; project settings show `OPENAI_API_KEY` is Production-only.
-- Unfinished: make the existing key available to Preview with explicit authorization, redeploy, authenticated 12-case exact-candidate rerun, renewed exact-head gates after this docs checkpoint, protected manual merge, production 12-case acceptance, Scene Purpose and subsequent Narrative Engine phases.
-- Blocker: the exact Preview runtime has no `OPENAI_API_KEY`. This is not a gameplay failure. Do not substitute production main for candidate evidence and do not broaden secret scope automatically.
-- NEXT ACTION: explicitly authorize the Production-to-Preview scope extension for the existing Vercel `OPENAI_API_KEY`; then redeploy and rerun `/api/health` plus all 12 cases on the exact deployment.
+- Completed environment recovery: user-authorized Preview scope was added without exposing the key; exact-head redeploy `F4Zua1Ud7EQDazJcvwSB2ZjgryeG` is Ready and authenticated health is configured.
+- Unfinished: authenticated 12-case exact-candidate rerun, renewed exact-head gates after this docs checkpoint, protected manual merge, production 12-case acceptance, Scene Purpose and subsequent Narrative Engine phases.
+- Blocker: a native file chooser opened while importing the first stateless fixture and currently prevents Cloud Browser control. No fixture was applied and no model request was sent.
+- NEXT ACTION: user dismisses that chooser with Cancel/Esc; immediately resume fixture import and the 12-case exact Preview run.
