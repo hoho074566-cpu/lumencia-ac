@@ -158,6 +158,22 @@ function relationChangeFor(turn,key){return array(turn?.state_delta?.relationshi
 function npcStateUpdateFor(turn,key){return array(turn?.state_delta?.npc_state_updates).find(x=>String(x?.npc_key||x?.key||'')===key)||null;}
 function emotionFor(turn,key){return array(turn?.emotion_updates).find(x=>String(x?.npc_key||x?.key||x?.speaker_key||'')===key)||null;}
 function bounded(value,min,max,fallback){if(value==null||value==='')return fallback;const n=Number(value);return Number.isFinite(n)?Math.max(min,Math.min(max,n)):fallback;}
+function scheduleTimestamp(date='',time=''){
+  const dm=String(date||'').trim().match(/^(\d{1,4})-(\d{1,2})-(\d{1,2})$/),tm=String(time||'').trim().match(/^(\d{1,2}):(\d{2})$/);if(!dm||!tm)return null;
+  const year=Number(dm[1]),month=Number(dm[2]),day=Number(dm[3]),hour=Number(tm[1]),minute=Number(tm[2]);if(month<1||month>12||day<1||day>31||hour<0||hour>23||minute<0||minute>59)return null;
+  const stamp=new Date(0);stamp.setUTCFullYear(year,month-1,day);stamp.setUTCHours(hour,minute,0,0);if(stamp.getUTCFullYear()!==year||stamp.getUTCMonth()!==month-1||stamp.getUTCDate()!==day||stamp.getUTCHours()!==hour||stamp.getUTCMinutes()!==minute)return null;return stamp.getTime();
+}
+function scheduleRowsAtBoundary(saveState={},boundary=null){
+  const save=object(saveState),world=object(save.world),start=scheduleTimestamp(world.date,world.time),minutes=Number(boundary);if(start==null||!Number.isFinite(minutes)||minutes<=0)return[];
+  const target=start+minutes*60000,seen=new Set(),rows=[];
+  for(const row of [...array(save.scheduledEvents),...array(save?.scheduleContext?.upcoming)]){if(!row||['completed','cancelled'].includes(String(row.status||'').trim().toLowerCase()))continue;const at=scheduleTimestamp(row.date||world.date,row.time);if(at!==target)continue;const key=`${String(row.id||'').trim().toLowerCase()}|${row.date||world.date}|${row.time||''}`;if(seen.has(key))continue;seen.add(key);rows.push(row);}
+  return rows;
+}
+function scheduleRowMentioned(turn,row={}){
+  const visible=[turn?.scene_title,...array(turn?.scene).map(item=>item?.text),...array(turn?.choices)].filter(Boolean).join(' ').toLowerCase(),id=String(row.id||'').trim().toLowerCase();if(id.length>=4&&visible.includes(id))return true;
+  const generic=new Set(['필수','일정','시작','종료','예정','행사','event','required']),raw=String(row.title||'').toLowerCase().match(/[가-힣a-z0-9]+/g)||[],tokens=[...new Set(raw.filter(token=>token.length>=2&&!generic.has(token)))];if(!tokens.length)return false;
+  const matched=tokens.filter(token=>visible.includes(token)).length;return matched>=Math.min(2,tokens.length);
+}
 function applySceneMomentumTimeFloor(incoming,turn,mode='game'){
   const intent=classifySceneIntent(incoming?.action||'',{location:incoming?.saveState?.world?.location||''});
   if(mode!=='game'||!turn?.state_delta||!intent.compression||intent.minAdvanceMinutes<=0)return intent;
@@ -170,7 +186,8 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game'){
   const eventId=String(turn?.event_progress?.event_instance_id||turn?.event_progress?.eventInstanceId||'').trim().toLowerCase();
   const dueAtBoundary=new Set(boundary==null?[]:scheduledIdsDueByTurnEnd(incoming?.saveState||{},boundary).map(value=>String(value).trim().toLowerCase()));
   const dueBeforeBoundary=new Set(boundary==null?[]:scheduledIdsDueByTurnEnd(incoming?.saveState||{},Math.max(0,boundary-1)).map(value=>String(value).trim().toLowerCase()));
-  const reachedScheduledBoundary=Boolean(eventId&&boundary!=null&&boundary<=allowedMax&&dueAtBoundary.has(eventId)&&!dueBeforeBoundary.has(eventId));
+  const boundaryRows=scheduleRowsAtBoundary(incoming?.saveState||{},boundary),structuredBoundary=Boolean(eventId&&dueAtBoundary.has(eventId)&&!dueBeforeBoundary.has(eventId)),visibleBoundary=Boolean(!eventId&&boundaryRows.some(row=>scheduleRowMentioned(turn,row)));
+  const reachedScheduledBoundary=Boolean(boundary!=null&&boundary<=allowedMax&&(structuredBoundary||visibleBoundary));
   if(!hasMeaningfulStop||reachedScheduledBoundary){
     turn.state_delta.advance_minutes=Math.max(current,reachedScheduledBoundary?boundary:boundedFloor);
   }
