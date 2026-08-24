@@ -7,6 +7,7 @@ Narrative Engine continuation — live acceptance, Scene Purpose, Scene Exit, St
 - Repo: `hoho074566-cpu/lumencia-ac`
 - Main: `8c5ca35a463356f375a4171148268a08abf0c83a` (`NPC Goal Tick V1`, PR #42 merge)
 - Working branch: `codex/bounded-offscreen-progression-v1`
+- PR #43: **open / protected-path / human-merge only**. Initial exact head `5431bbb7d19ad3dd2b0086d3d69814ed040f8062` passed Safety #32745369252, Vercel Ready, mergeability/no-conflict, targeted Exact Preview acceptance, and fresh Codex P0/P1=0 review. Four focused P2 findings are closed locally in code checkpoint `21e0279b126135cdf5d3122bbbe4df7ef002fd03`; this new head still requires fresh hosted gates/review and the affected Preview rerun.
 - PR #42: **merged** from exact reviewed head `6c115e661ed7257b3787b74d5f142a1c0b39e38d`. Safety #32741095125, Vercel, exact-head Codex P0/P1=0, and targeted Exact Preview acceptance passed. Merge `8c5ca35...` and reviewed head share tree `22195b469f2ccb1b3afdc7c197f5259fb110d59a`.
 - PR #41: **merged** from exact reviewed head `06617b3ffe11d83bc512d7e4f520c17946d7bdf0`; Safety/Vercel/fresh P0/P1=0 and targeted Preview lifecycle acceptance passed. Merge `da248a2...` and reviewed head share tree `2bac9dd94468d37ff0cb7787ad6c42cdba478b27`.
 - PR #40: **merged** as squash commit `5f2073a2874a9b8ee45a6aa34d6e4508997c3cb3` from reviewed exact head `85af592b8baae57958eb16d88da83f946d26a2e0`. Safety #313, Vercel, fresh exact-head Codex P0/P1=0, and affected Exact Preview acceptance passed; reviewed and merged trees both equal `2354a0db58c6405beec40fcfaae885fd8850c0db`.
@@ -40,8 +41,10 @@ Narrative Engine continuation — live acceptance, Scene Purpose, Scene Exit, St
 - Current-scene NPCs, model-authored NPC updates, unknown/unseen NPCs, PC-relevant schedules, secret/private schedules, completed/cancelled occurrences, META, CONTINUE, and disabled background simulation are excluded.
 - Only bounded NPC `location`/`status` may change. Goal V2 progress, relationships, memories, faction state, event completion, secrets, and player decisions are never synthesized.
 - Starts older than 60 minutes are retained only as bounded historical background evidence and do not claim that an NPC is still at the event location.
-- Dedicated regressions cover PC priority, current/model-update protection, known-NPC and secrecy guards, completion guards, cross-midnight clocks, long-skip history, two-NPC/two-event caps, digest bounds, frontend persistence, and one-call architecture.
-- Code checkpoint `4d4a66e...` passes focused regressions and the full authoritative clean-LF `scripts/lumensia-pr-check.mjs origin/main HEAD`. The second regression/scope review found no blocker after duplicate participant/event and unsafe-key hardening.
+- Dedicated regressions cover PC priority, every visible speaker beyond the bounded participant list, model-update protection, known-NPC and secrecy guards, explicit restricted visibility, invalid calendar dates, completion guards, cross-midnight clocks, long-skip history/latest-start precedence, hard caps, digest bounds, frontend persistence, and one-call architecture.
+- Initial code checkpoint `4d4a66e...` and published docs head `5431bbb...` passed focused regressions and the full authoritative clean-LF `scripts/lumensia-pr-check.mjs origin/main HEAD`.
+- Exact Preview on `5431bbb...` passed all three targeted cases: the eligible other-department start produced one bounded Chloe update and one digest row; background disabled produced zero updates/digest rows; the PC-department schedule stopped at the important 12:00 choice and produced no off-screen mutation.
+- Fresh review on `5431bbb...` reported P0/P1=0 and four P2 edge cases. Code checkpoint `21e0279...` closes all four: strict calendar round-trip validation, explicit-public-only visibility/access, protection for every turn speaker, and latest-start precedence when a long skip crosses old and recent starts for one NPC. Focused regressions, syntax checks, `git diff --check`, and the substantive second review pass; exact-current-head hosted/full checks remain the next gate.
 
 ## NPC Goal Tick V1 — Completed
 - Final reviewed head `6c115e661ed7257b3787b74d5f142a1c0b39e38d` merged as `8c5ca35a463356f375a4171148268a08abf0c83a`; targeted Preview acceptance and all exact-head gates passed.
@@ -344,11 +347,11 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
 
 ## NEXT ACTION
-1. Push the current exact Bounded Off-screen Progression V1 checkpoint and open one focused protected-path PR.
-2. Require exact-current-HEAD Safety/Vercel and a fresh P0/P1=0 Codex review; revalidate current main, merge-base, and no conflict.
-3. On the exact Preview, exercise one eligible other-department schedule crossing plus disabled-background and PC-schedule protection. Current-scene/model-update guards remain deterministic regressions unless a reliable visible fixture can isolate them.
-4. Keep the exact reviewed/accepted head immutable and the PR human-merge only.
-5. Do not expand this phase into goal progress, relationships, factions, rumors, arbitrary event completion, or a second model call.
+1. Commit/push the final P2-closure docs checkpoint to PR #43 and run the authoritative clean-LF full check at that exact HEAD.
+2. Require fresh exact-current-HEAD Safety/Vercel and Codex P0/P1=0 review; revalidate current main, merge-base, and no conflict.
+3. Rerun only the three affected Exact Preview cases: eligible other-department crossing, disabled background, and PC-schedule protection.
+4. If every gate is green, report PR #43 ready for the user's human merge. Do not merge it from a Codex task because `api/**` and canonical runtime paths are protected.
+5. Keep the exact reviewed/accepted head immutable and do not expand this phase into goal progress, relationships, factions, rumors, arbitrary event completion, or a second model call.
 
 ## Stop Record
 - Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.
@@ -382,4 +385,4 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed: PR #41 exact reviewed head `06617b3...` merged as `da248a2...`; merge and reviewed trees are identical.
 - Completed locally on NPC Goal Tick V1 code `c9efe50...`: guarded proactive present-NPC tick, bounded cooldown checkpoint, feasibility filters, player/event/schedule/freeze guards, permanent regressions, substantive second review, and full clean-LF PR check PASS.
 - Opened PR #42 from `codex/npc-goal-tick-v1` against current main; the initial published head is mergeable with no behind delta.
-- NEXT ACTION: push this final status checkpoint, require exact-head hosted authority, then run targeted Exact Preview acceptance and leave protected-path PR #42 for human merge.
+- NEXT ACTION: publish the PR #43 P2-closure checkpoint, require fresh exact-head hosted authority/review and the three affected Preview cases, then leave protected-path PR #43 for human merge.

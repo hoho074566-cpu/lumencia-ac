@@ -1,6 +1,6 @@
 # LUMENSIA — CURRENT INTEGRATED DEVELOPMENT HANDOVER
 
-작성 기준: 2026-08-24  
+작성 기준: 2026-08-25
 프로젝트: 긴빠이 프로젝트 / Lumensia Academy  
 Repository: `hoho074566-cpu/lumencia-ac`
 
@@ -15,6 +15,7 @@ Repository: `hoho074566-cpu/lumencia-ac`
 ## Live state immediately before this handover update
 - Branch: `codex/bounded-offscreen-progression-v1`
 - Base/current main: `8c5ca35a463356f375a4171148268a08abf0c83a` (`NPC Goal Tick V1`, PR #42 merge).
+- PR #43: **open / protected-path / human-merge only**. Initial exact head `5431bbb7d19ad3dd2b0086d3d69814ed040f8062` passed Safety #32745369252, Vercel Ready, mergeability/no-conflict, targeted Exact Preview acceptance, and fresh Codex P0/P1=0 review. Four focused P2 findings are closed locally in code checkpoint `21e0279b126135cdf5d3122bbbe4df7ef002fd03`; the new exact head still requires fresh hosted gates/review and the affected Preview rerun.
 - PR #42: **merged** from exact reviewed head `6c115e661ed7257b3787b74d5f142a1c0b39e38d`. Safety #32741095125, Vercel, exact-head Codex P0/P1=0, and targeted Exact Preview acceptance passed. Merge `8c5ca35...` and reviewed head share tree `22195b469f2ccb1b3afdc7c197f5259fb110d59a`.
 - PR #41: **merged** from exact reviewed head `06617b3ffe11d83bc512d7e4f520c17946d7bdf0`. Safety/Vercel passed, fresh exact-head Codex P0/P1=0, and the targeted delayed-result player-choice/no-early-fire/due/no-repeat Preview lifecycle passed. Merge commit `da248a2...` has tree `2bac9dd94468d37ff0cb7787ad6c42cdba478b27`, exactly equal to the reviewed head tree.
 - PR #40 is **merged** from reviewed exact head `85af592b8baae57958eb16d88da83f946d26a2e0`. Safety #313, Vercel, fresh exact-head Codex P0/P1=0, and affected Exact Preview acceptance passed. Squash merge `5f2073a...` exactly preserves reviewed tree `2354a0db58c6405beec40fcfaae885fd8850c0db`; production is healthy.
@@ -48,8 +49,9 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Present NPCs, model-authored state updates, unseen NPCs, PC schedules, secret/private schedules, completed/cancelled occurrences, disabled background simulation, META, and CONTINUE remain frozen or excluded.
 - Goal V2 progress, relationships, memories, faction state, event completion, secrets, and PC choices are out of scope and cannot be synthesized by this phase.
 - A crossed start older than 60 minutes is historical digest evidence only; it cannot claim that the NPC is still at the event location.
-- Permanent tests cover secrecy/knowledge/current-scene/model-update guards, PC priority, cross-midnight clocks, long skips, hard caps, digest bounds, frontend application, and the single-call architecture.
-- Code checkpoint `4d4a66e...` passes focused regressions and the full authoritative clean-LF repository check. A second regression/scope review found no remaining blocker after hardening duplicate rows and unsafe internal keys.
+- Permanent tests cover secrecy/knowledge/current-scene/model-update guards, all visible speakers beyond the participant cap, PC priority, explicit restricted visibility, invalid calendar dates, cross-midnight clocks, long skips/latest-start precedence, hard caps, digest bounds, frontend application, and the single-call architecture.
+- Initial checkpoint `5431bbb...` passed full clean-LF checks and all three targeted Exact Preview cases: eligible other-department transition 1 update/1 digest, disabled background 0/0, and PC-schedule boundary with no off-screen mutation.
+- Fresh review on `5431bbb...` reported P0/P1=0 and four P2 edge cases. Code checkpoint `21e0279...` closes them with calendar round-trip validation, explicit-public-only visibility/access, every-turn-speaker protection, and latest-start precedence. Focused tests, syntax checks, `git diff --check`, and the substantive second review pass locally.
 
 ## Completed active predecessor — NPC Goal Tick V1
 - Final reviewed head `6c115e661ed7257b3787b74d5f142a1c0b39e38d` merged as `8c5ca35a463356f375a4171148268a08abf0c83a`; initial code checkpoint `c9efe50bfc95d5093acbe36aef88f2cc98024a3f` carried the core candidate.
@@ -647,13 +649,13 @@ Gameplay roadmap discussed but not DONE:
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
 2. Confirm main contains PR #42 merge `8c5ca35a463356f375a4171148268a08abf0c83a`; do **not** redo completed HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Stronger Turn Hook, Event Consequence, or NPC Goal Tick diagnosis.
-3. Continue only Bounded Off-screen Progression V1 on `codex/bounded-offscreen-progression-v1`.
-4. Push the current exact checkpoint and open one focused PR, then require exact-current-HEAD Safety/Vercel and a fresh Codex P0/P1=0 review.
-5. Revalidate current main/merge-base/no-conflict and run only the affected Preview schedule-crossing/background-disabled/PC-schedule cases.
-6. This work changes protected runtime/API paths; keep the PR human-merge only and do not merge it from a Codex task. Do not expand into arbitrary off-screen goal/relationship/faction progression in this PR.
+3. Continue only PR #43 / Bounded Off-screen Progression V1 on `codex/bounded-offscreen-progression-v1`; code checkpoint `21e0279...` is the P2 closure.
+4. Commit/push the docs checkpoint, run the full clean-LF check at exact HEAD, then require fresh exact-current-HEAD Safety/Vercel and Codex P0/P1=0 review.
+5. Revalidate current main/merge-base/no-conflict and rerun only the three affected Preview schedule-crossing/background-disabled/PC-schedule cases.
+6. If all gates pass, tell the user PR #43 is ready for human merge. This PR changes protected runtime/API paths, so do not merge it from a Codex task and do not expand it into arbitrary off-screen goal/relationship/faction progression.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #42는 reviewed head `6c115e6...`에서 main `8c5ca35...`로 merge됐고 merge tree가 reviewed tree와 정확히 같다. HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Stronger Turn Hook, Event Consequence, NPC Goal Tick 진단을 다시 하지 않는다. 현재 branch는 `codex/bounded-offscreen-progression-v1`이다. 활성 범위는 시간이 실제로 공개 비-PC 일정 시작을 지날 때 이미 알려진 부재 NPC 최대 2명의 위치/상태와 bounded digest만 갱신하는 Bounded Off-screen Progression V1이다. Goal V2 진행, 관계, 파벌, 소문, 비밀, 사건 완료, 추가 모델 호출, 저장 마이그레이션은 이 PR 범위가 아니다. clean-LF 검사와 두 번째 회귀 검토를 완료하고 protected-path human-only PR로 진행한다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #42는 reviewed head `6c115e6...`에서 main `8c5ca35...`로 merge됐고 merge tree가 reviewed tree와 정확히 같다. HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Stronger Turn Hook, Event Consequence, NPC Goal Tick 진단을 다시 하지 않는다. 현재 branch는 `codex/bounded-offscreen-progression-v1`, open PR은 #43, P2 closure code는 `21e0279...`다. 활성 범위는 시간이 실제로 공개 비-PC 일정 시작을 지날 때 이미 알려진 부재 NPC 최대 2명의 위치/상태와 bounded digest만 갱신하는 Bounded Off-screen Progression V1이다. Goal V2 진행, 관계, 파벌, 소문, 비밀, 사건 완료, 추가 모델 호출, 저장 마이그레이션은 이 PR 범위가 아니다. exact-head clean-LF/hosted/review/Preview 3-case를 모두 재검증하고 protected-path human-only PR로 진행한다.`
