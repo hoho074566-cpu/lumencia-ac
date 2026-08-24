@@ -40,7 +40,8 @@ Narrative Engine continuation — live acceptance, Scene Purpose, Scene Exit, an
 - A consequence resolves only when its event is visibly present in narration/structured state. An ignored or falsely acknowledged result stays `open`; expired items close deterministically. Secret causes at level 3+ are not copied into the due directive or normal routed hook detail.
 - A manifested result may schedule at most one genuinely new causal follow-up; server-side fingerprinting rejects duplicate chains.
 - No new persistence root, save migration, second model call, new API entrypoint, `app.js` rewrite, canonical `api/chat.js` rewrite, faction/reputation propagation, or off-screen simulation expansion.
-- Focused Event Consequence/schema/runtime/authority tests and all affected Scene Momentum/Purpose/Exit/Turn Hook regressions pass. Full clean-LF PR check, second review, commit/push, hosted gates, and Exact Preview acceptance remain.
+- Focused Event Consequence/schema/runtime/authority tests and all affected Scene Momentum/Purpose/Exit/Turn Hook regressions pass. Commit `9bf5d24...` also passes the full clean-LF `scripts/lumensia-pr-check.mjs` and a clean-LF Chrome boot smoke: the patched app reaches V1.5.6, loads `/lib/event-consequence.js` with HTTP 200, and reports no browser console error.
+- Second review found no blocker in schema compatibility, secret routing, lifecycle duplication, time/schedule priority, CONTINUE/META freeze, one-call architecture, or scope. Push/PR, hosted gates, fresh exact-head review, and Exact Preview lifecycle acceptance remain.
 
 ## Stronger Turn Hook V1 — Completed
 - New bounded `sceneRuntime.turn_hook` records allowlisted kind/source/status, a single-line 220-character anchor, bounded establishment turn, and only applicable speaker/event IDs.
@@ -318,8 +319,8 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
 
 ## NEXT ACTION
-1. Run the full check from a clean LF worktree and perform the second exact-diff review for schema compatibility, secret boundaries, lifecycle duplication, time/schedule priority, and CONTINUE/META freeze.
-2. Commit and push `codex/event-consequence-v1`, open its focused PR, then require hosted Safety/Vercel and a fresh exact-current-HEAD P0/P1 review.
+1. Push `codex/event-consequence-v1`, open its focused PR, then require hosted Safety/Vercel and a fresh exact-current-HEAD P0/P1 review.
+2. Revalidate the published exact head against current main and preserve the clean-LF full-check result after any required review fix.
 3. On the Exact Preview, verify a naturally created delayed result persists, does not fire early, surfaces at/after its due boundary, preserves an important player decision, and does not regress one quiet Turn Hook/NPC direct-request case.
 4. Do not begin NPC Initiative / Goal Tick refinement until this PR's acceptance is complete. Protected runtime/API paths remain human-merge only under repository policy.
 
@@ -351,5 +352,5 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed: PR #39 exact-head Safety/Vercel/Codex/Preview gates, expected-head squash merge, exact tree verification, production Vercel, and health smoke.
 - Initial published candidate: `4a24a77...`; Vercel PASS, Safety #308 initially in progress. Its first live travel rerun found the generic-choice issue above, so it is not merge-authoritative.
 - Completed: PR #40 exact-head Safety/Vercel/Codex/Preview gates, squash merge `5f2073a...`, exact tree verification, production Vercel, and health smoke.
-- Current local candidate: bounded delayed-result materialization into existing hooks, due selection, schedule/player sovereignty guards, visible-result completion, open retry, expiry, duplicate rejection, secret-cause masking, and adaptive authority preservation all have permanent regressions.
-- NEXT ACTION: clean-LF full check and second review, then publish the focused Event Consequence V1 PR and validate its exact Preview lifecycle.
+- Current committed candidate `9bf5d24...`: bounded delayed-result materialization into existing hooks, due selection, schedule/player sovereignty guards, visible-result completion, open retry, expiry, duplicate rejection, secret-cause masking, and adaptive authority preservation all have permanent regressions. Full clean-LF check, second review, and clean-LF Chrome boot smoke pass.
+- NEXT ACTION: publish the focused Event Consequence V1 PR, require exact-head hosted gates/review, and validate its Exact Preview lifecycle.

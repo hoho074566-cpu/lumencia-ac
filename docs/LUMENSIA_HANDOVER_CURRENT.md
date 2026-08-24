@@ -50,6 +50,8 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - A realized consequence may add at most one genuinely new delayed consequence. Fingerprints block the same causal result from being rescheduled.
 - Permanent tests cover materialization, dedupe, due lookahead, schedule priority, direct-question sovereignty, visible completion, false acknowledgement, expiry, secret masking, legacy structured-output preservation, dynamic runtime insertion, one-call architecture, and minimum adaptive input authority.
 - No second model call, new API entrypoint, canonical `app.js`/`api/chat.js` rewrite, persistence migration, faction/reputation system, or off-screen expansion.
+- Code commit `9bf5d24...` passes the full clean-LF repository check. A clean-LF Chrome smoke boots the assembled app as V1.5.6, loads `/lib/event-consequence.js` with HTTP 200, and has no console error. The ordinary Windows checkout's initial loader failure was only its known CRLF marker mismatch and disappears in the authoritative LF worktree.
+- Second review found no P0/P1 blocker across schema compatibility, queue bounds, duplicate/expiry ordering, secret routing, schedule/player priority, META/CONTINUE freeze, or the one-call invariant.
 
 ## Completed active predecessor — Stronger Turn Hook V1
 - `sceneRuntime.turn_hook` is a bounded next-direction checkpoint: allowlisted kind/source/status, a 220-character single-line anchor, bounded turn, and only applicable speaker/event IDs.
@@ -619,7 +621,7 @@ Gameplay roadmap discussed but not DONE:
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
 2. Confirm main contains PR #40 squash merge `5f2073a2874a9b8ee45a6aa34d6e4508997c3cb3`; do **not** redo completed HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, or Stronger Turn Hook diagnosis.
-3. Continue only Event Consequence V1 on `codex/event-consequence-v1`. Run the clean-LF full check and second exact-diff regression/scope review, then commit/push/open the focused PR.
+3. Continue only Event Consequence V1 on `codex/event-consequence-v1`. Candidate `9bf5d24...` has clean-LF full-check, second-review, and clean-LF Chrome boot authority; push/open the focused PR.
 4. Require exact-current-HEAD Safety/Vercel and fresh Codex P0/P1 authority. Exact Preview must verify delayed-result creation/persistence, no early fire, due manifestation, and player-choice protection, plus one quiet Turn Hook/NPC direct-response regression.
 5. Do not start NPC Initiative / Goal Tick refinement until acceptance closes. Because this candidate changes protected runtime/API paths, repository policy keeps the eventual merge human-only.
 
@@ -627,4 +629,4 @@ Gameplay roadmap discussed but not DONE:
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #40은 reviewed head `85af592...`에서 main `5f2073a...`로 squash merge됐고 Safety #313/Vercel/fresh P0/P1=0/affected Preview/production까지 통과했다. HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Stronger Turn Hook 진단을 다시 하지 않는다. 현재 branch는 `codex/event-consequence-v1`; 기존 `delayed_consequences_add`를 새 저장 스키마 없이 `save.hooks`의 bounded queue로 연결하고 due/expiry/visible completion/duplicate denial/secret masking/player+schedule priority를 구현한 local candidate다. Focused regressions PASS. clean-LF full check, second review, commit/push/PR, hosted exact-head gates/review, lifecycle Preview acceptance를 진행한다. NPC Initiative / Goal Tick refinement는 그 뒤이며 protected runtime/API merge는 human-only다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #40은 reviewed head `85af592...`에서 main `5f2073a...`로 squash merge됐고 Safety #313/Vercel/fresh P0/P1=0/affected Preview/production까지 통과했다. HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Stronger Turn Hook 진단을 다시 하지 않는다. 현재 branch는 `codex/event-consequence-v1`; commit `9bf5d24...`가 기존 `delayed_consequences_add`를 새 저장 스키마 없이 `save.hooks`의 bounded queue로 연결하고 due/expiry/visible completion/duplicate denial/secret masking/player+schedule priority를 구현한다. Focused regressions, full clean-LF check, second review, clean-LF Chrome V1.5.6 boot smoke PASS. push/PR, hosted exact-head gates/review, lifecycle Preview acceptance를 진행한다. NPC Initiative / Goal Tick refinement는 그 뒤이며 protected runtime/API merge는 human-only다.`
