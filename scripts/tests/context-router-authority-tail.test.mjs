@@ -133,6 +133,20 @@ assert.match(maximumRouted.params.input,/SCHEDULE ENGINE \(ROUTED\)/);
 assert.match(maximumRouted.params.input,/STRONGER TURN HOOK V1/);
 assert.match(maximumRouted.params.input,/대도서관으로 간다\./);
 
+const adaptiveSave={...denseSave,routerFeedback:{routerVersion:'1.5.6-hf1',profile:'routine-17k-v154',lastInputTokens:100000}};
+const adaptiveRouted=routeOpenAIParams({instructions,input:denseOriginalInput},{mode:'game',incoming:{action:maximumAction,rollingSummary:'dense old '.repeat(1000),recentTurns:[],saveState:adaptiveSave}});
+assert.equal(adaptiveRouted.telemetry.adaptive_scale,.76,'pressure fixture must exercise the minimum supported adaptive scale');
+assert.ok(adaptiveRouted.params.input.length<=6840,`adaptive routine input exceeded its 0.76 profile budget: ${adaptiveRouted.params.input.length}`);
+assert.match(adaptiveRouted.params.input,/AUTHORITATIVE SAVE_STATE \(ROUTED MINIMUM\)/);
+assert.match(adaptiveRouted.params.input,/SCENE MOMENTUM HF1/);
+assert.match(adaptiveRouted.params.input,/STRONGER TURN HOOK V1/);
+assert.match(adaptiveRouted.params.input,/SCHEDULE ENGINE \(ROUTED\)/);
+assert.match(adaptiveRouted.params.input,/"id":"dense-0"/,'adaptive pressure must retain the first authoritative schedule occurrence');
+assert.match(adaptiveRouted.params.input,/최대 행동 압력/,'adaptive middle compaction must retain the beginning of USER ACTION');
+assert.match(adaptiveRouted.params.input,/대도서관으로 간다\./,'adaptive pressure must retain the committed USER ACTION predicate');
+assert.equal(adaptiveRouted.params.input.includes(maximumAction),false,'adaptive pressure fixture must actually exercise bounded middle compaction');
+assert.ok(adaptiveRouted.params.input.lastIndexOf('===== USER ACTION =====')>adaptiveRouted.params.input.lastIndexOf('===== SCHEDULE ENGINE (ROUTED) ====='),'adaptive USER ACTION marker must remain final');
+
 const aftermath=source.indexOf("AFTERMATH_FIXED_FLOW");
 const combat=source.indexOf("ACTIVE_COMBAT_FIXED_FLOW");
 const momentum=source.indexOf('const momentumDue=momentumPressure');
