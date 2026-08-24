@@ -65,6 +65,13 @@ assert.equal(bounded.reputations.student_council.reputation,100,'faction reputat
 assert.equal(bounded.reputations.student_council.history.length,8,'faction causal history must stay bounded');
 assert.equal(bounded.reputations.student_council.history.at(-1).reason,'공개 표창','latest bounded history must retain the new cause');
 
+const taintedHistory=normalizeFactionSocial({reputations:{student_council:{reputation:3,history:[
+  {turn:1,reputation_delta:3,evidence_type:'invented_evidence',observer_npc_keys:[],reason:'잘못된 증거 유형'},
+  {turn:2,reputation_delta:1,evidence_type:'witnessed_action',observer_npc_keys:[],reason:'목격자 없는 목격 기록'},
+  {turn:3,reputation_delta:1,evidence_type:'official_record',observer_npc_keys:[],reason:'유효한 공식 기록'},
+]}}});
+assert.deepEqual(taintedHistory.reputations.student_council.history.map((row)=>row.reason),['유효한 공식 기록'],'invalid or unsupported saved evidence must be dropped rather than relabeled as public evidence');
+
 const noOp=deriveFactionSocialState({previous:bounded,turnNumber:11,changes:[{faction_key:'student_council',reputation_delta:0,stance:'우호',evidence_type:'public_event',observer_npc_keys:[],reason:'동일 상태 재출력'}]});
 assert.deepEqual(noOp,bounded,'same-stance zero-delta rows must not append false social history');
 const invalid=deriveFactionSocialState({previous:bounded,turnNumber:11,changes:[{faction_key:'invented_faction',reputation_delta:10,stance:'우호',evidence_type:'public_event',observer_npc_keys:[],reason:'미등록 조직'}]});
