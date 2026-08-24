@@ -67,6 +67,14 @@ assert.match(proactive.params.input,/NEXT_ACTION=평가 결과를 먼저 묻는�
 assert.match(proactive.params.input,/선택만으로 목표 진척을 만들지 말고/,'selection alone must not synthesize progress');
 assert.match(proactive.params.input,/PC의 행동·대사·감정·중요 선택을 대신 결정하지 마라/,'player sovereignty must survive the routine authority budget');
 
+const maximumGoal={...goal('g'.repeat(80)),desire:'긴 목표 설명 '.repeat(40),target_type:'pc',target_key:'t'.repeat(100),next_actions:['긴 다음 행동 '.repeat(35)]};
+const maximumGuarded=route('주변을 살펴본다.',{
+  npcInnerStates:{p1:{active_goal:maximumGoal}},
+  routerFeedback:{routerVersion:'1.5.6-hf1',profile:'routine-17k-v154',lastInputTokens:26000},
+});
+assert.match(maximumGuarded.params.input,/ORDER=USER_ACTION_FIRST/,'action order must precede variable goal text at the minimum authority budget');
+assert.match(maximumGuarded.params.input,/GUARDS=NO_PC_CONTROL\|FEASIBLE_ONLY\|GOAL_PROGRESS_EVIDENCE_ONLY\|IMPOSSIBLE_TO_HOOK/,'all invariant Goal Tick guards must survive maximum-length goal fields');
+
 const lowDrive=route('주변을 살펴본다.',{npcInnerStates:{p1:{active_goal:goal('goal:p1:low',3,3)}}});
 assert.equal(lowDrive.telemetry.event_director_v2.result,'NO_RANDOM_EVENT_DUE','low-drive goals must still wait for ordinary momentum pressure');
 
@@ -95,6 +103,11 @@ assert.equal(route('주변을 살펴본다.',{sceneRuntime:{participants:['p1'],
 assert.equal(route('주변을 살펴본다.',{sceneRuntime:{participants:['p1'],eventProgress:{eventInstanceId:'active:test',activeBeat:'choice',paused:false}}}).telemetry.event_director_v2.result,'NO_RANDOM_EVENT_DUE','an active event beat must remain ahead of proactive Goal Tick');
 const scheduled=baseDirector.replace('INTERVENTION: light','INTERVENTION: scheduled');
 assert.notEqual(route('주변을 살펴본다.',{},scheduled).telemetry.event_director_v2.result,'PRESENT_NPC_GOAL_TICK','fixed schedule flow must remain ahead of Goal Tick');
+const upcomingAt=(time)=>({scheduleContext:{upcoming:[{id:'academy:fixed',title:'고정 수업',date:'1285-03-01',time,kind:'academic',participants:['pc']}]}});
+assert.notEqual(route('주변을 살펴본다.',upcomingAt('10:01')).telemetry.event_director_v2.result,'PRESENT_NPC_GOAL_TICK','an observation reaching the next fixed schedule boundary must block Goal Tick');
+assert.notEqual(route('돌아다닌다.',upcomingAt('10:08')).telemetry.event_director_v2.result,'PRESENT_NPC_GOAL_TICK','exploration must not cross a reachable fixed schedule boundary for Goal Tick');
+assert.notEqual(route('좀 쉰다.',upcomingAt('10:10')).telemetry.event_director_v2.result,'PRESENT_NPC_GOAL_TICK','open-ended downtime must yield to a reachable fixed schedule boundary');
+assert.equal(route('주변을 살펴본다.',upcomingAt('10:02')).telemetry.event_director_v2.result,'PRESENT_NPC_GOAL_TICK','a schedule beyond the observation window must not suppress eligible initiative');
 assert.notEqual(route('주변을 살펴본다.',{},baseDirector,'auto').telemetry.event_director_v2.result,'PRESENT_NPC_GOAL_TICK','AUTO keeps its existing fixed-flow authority');
 assert.notEqual(route('주변을 살펴본다.',{},baseDirector,'continue').telemetry.event_director_v2.result,'PRESENT_NPC_GOAL_TICK','CONTINUE remains frozen');
 
@@ -114,6 +127,32 @@ assert.equal(tickState.progress_evidence,false,'visible initiative without expli
 
 const ignoredTick=deriveGoalTickState({previousRuntime:{},directorTelemetry:proactive.telemetry.event_director_v2,turn:{scene:[],state_delta:{}},turnNumber:9});
 assert.equal(ignoredTick.manifested,false);
+const unchangedSave={npcStates:{p1:{location:'academy',status:'관찰 중',current_goal:'PC에게 실기 평가 결과를 직접 확인한다.'}},npcInnerStates:{p1:{active_goal:goal('goal:p1:test')}}};
+const bookkeepingTick=deriveGoalTickState({
+  previousRuntime:{},directorTelemetry:proactive.telemetry.event_director_v2,saveState:unchangedSave,turnNumber:9,
+  turn:{scene:[{kind:'narration',speaker_key:null,text:'복도는 여전히 조용했다.'}],state_delta:{npc_state_updates:[{npc_key:'p1',location:'academy',status:'관찰 중',current_goal:'PC에게 실기 평가 결과를 직접 확인한다.'}]}},
+});
+assert.equal(bookkeepingTick.manifested,false,'unchanged NPC bookkeeping must not start the manifested cooldown');
+assert.equal(bookkeepingTick.progress_evidence,false,'repeated goal metadata is not Goal V2 evidence');
+const movedTick=deriveGoalTickState({
+  previousRuntime:{},directorTelemetry:proactive.telemetry.event_director_v2,saveState:unchangedSave,turnNumber:9,
+  turn:{scene:[],state_delta:{npc_state_updates:[{npc_key:'p1',location:'courtyard',status:'이동 중'}]}},
+});
+assert.equal(movedTick.manifested,true,'an actual selected-NPC state change may start cooldown');
+
+const driveEightGoal=goal('goal:p1:drive-eight',4,4);
+const firstOwner=deriveGoalTickState({
+  previousRuntime:{},turnNumber:9,saveState:{},
+  directorTelemetry:{result:'PRESENT_NPC_GOAL_TICK',selected_key:'p1',selected_name:'One',selected_goal:driveEightGoal},
+  turn:{scene:[{kind:'dialogue',speaker_key:'p1',text:'먼저 확인하지.'}],state_delta:{}},
+});
+const secondOwner=deriveGoalTickState({
+  previousRuntime:{goal_tick:firstOwner},turnNumber:10,saveState:{},
+  directorTelemetry:{result:'PRESENT_NPC_GOAL_TICK',selected_key:'p2',selected_name:'Two',selected_goal:goal('goal:p2:drive-eight',4,4)},
+  turn:{scene:[{kind:'dialogue',speaker_key:'p2',text:'내 차례군.'}],state_delta:{}},
+});
+assert.equal(secondOwner.recent.length,2,'alternating NPC ticks must retain both bounded checkpoints');
+assert.equal(isGoalTickCoolingDown({saveState:{sceneRuntime:{goal_tick:secondOwner}},key:'p1',goal:driveEightGoal,turnNumber:11}),true,'another NPC tick must not erase the first NPC per-goal cooldown');
 const preserved=deriveGoalTickState({previousRuntime:{goal_tick:tickState},directorTelemetry:{result:'NO_RANDOM_EVENT_DUE'},turn:{},turnNumber:10});
 assert.deepEqual(preserved,tickState,'non-tick turns must preserve the last bounded cooldown checkpoint');
 

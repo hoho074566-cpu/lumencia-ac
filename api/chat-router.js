@@ -439,7 +439,7 @@ function localSceneRuntime(incoming,turn,directorTelemetry=null,mode='game'){
   const proposedExit=deriveSceneExitCondition({action:incoming.action||'',saveState:incoming.saveState||{},purpose,turnNumber});
   const exitCondition=evaluateSceneExitCondition(proposedExit,{turn,sceneDelta,previousRuntime:previous,eventProgress:progressState.eventProgress});
   const turnHook=deriveTurnHook({turn,sceneDelta,purpose,exitCondition,eventProgress:progressState.eventProgress,previousRuntime:previous,action:incoming.action||'',mode,turnNumber});
-  const goalTick=deriveGoalTickState({previousRuntime:previous,directorTelemetry,turn,turnNumber});
+  const goalTick=deriveGoalTickState({previousRuntime:previous,directorTelemetry,turn,turnNumber,saveState:incoming.saveState||{}});
   return {
     scene_key:sceneKey,participants,objects:array(previous.objects).slice(0,10),
     positions:Object.fromEntries(Object.entries(object(previous.positions)).slice(0,10)),ongoing_topic:clampText(turn?.scene_summary||previous.ongoing_topic||'',280),
