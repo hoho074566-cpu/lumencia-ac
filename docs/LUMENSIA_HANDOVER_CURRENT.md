@@ -41,7 +41,8 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Its CONTINUE case exposed a separate narrative hard-freeze P1: the raw pending-beat text caused a new NPC action and replayed dialogue despite zero State Delta. The local closure hides `remaining_beats` from the routed model view, keeps the original queue only for post-response consumption, and explicitly forbids prior-dialogue replay.
 - Final runtime exact HEAD `636458e2aef899022d320324aa14b0f654e72ea5` passed the affected Preview reruns: CONTINUE stayed at 09:15/library entrance with static prose only and no new NPC dialogue/action, while the schedule case again reached exactly 12:00 in the room with an active/incomplete orientation and preserved player choice.
 - Direct review thread `PRRT_kwDOT8LCAs6bj9L0` then identified one remaining P1: `event_progress` is optional, so a response that clearly presents the exact schedule only in prose could still leave the clock at 11:50. The local closure aligns on either the exact occurrence ID or a bounded authoritative event-title match at that exact minute, without forcing unrelated interruptions.
-- Focused CONTINUE/Event/router/time-floor tests, full `node scripts/lumensia-pr-check.mjs`, and `git diff --check`: **PASS**. Publish before repeating the schedule Preview case and fresh review.
+- Focused CONTINUE/Event/router/time-floor tests, full `node scripts/lumensia-pr-check.mjs`, and `git diff --check`: **PASS**.
+- Exact code HEAD `e4de523b37f3508d4fc6534ff4aa49df3fd74b05` passed Safety #282, Vercel, and the schedule Preview rerun: exact 12:00, unchanged room, active/incomplete `knight_orientation`, player choices preserved.
 
 ## Critical review finding and merged closure
 Final Codex review **did complete** on exact HEAD `8ca24ba...` at 2026-08-23 21:47:49 UTC and found a **new current P1**.
@@ -553,8 +554,8 @@ Gameplay roadmap discussed but not DONE:
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
 2. Confirm main still contains merge commit `88fa53036c58324ffd5012ab7b5ed0cd3099dd6d`; do **not** redo completed HF1 or PR #34 diagnosis.
-3. Run the full PR check, commit/publish the optional-event-progress boundary closure, and obtain exact-head Safety + Vercel.
-4. Rerun the schedule-boundary Preview case and obtain a fresh exact-current-HEAD/current-main Codex review with direct P0/P1=0.
+3. Publish this final exact-live-evidence docs checkpoint and obtain exact-head Safety + Vercel.
+4. Obtain a fresh exact-current-HEAD/current-main Codex review with direct P0/P1=0.
 5. Re-fetch main/PR and verify every merge gate, then stop at protected-core manual merge readiness; do not auto-merge this new PR without separate exact authorization.
 6. After human merge, rerun production acceptance and proceed to **Scene Purpose -> Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence**.
 
@@ -562,4 +563,4 @@ Gameplay roadmap discussed but not DONE:
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #34는 exact head `4479615`로 검증돼 merge commit `88fa5303`으로 main에 반영됐다. PR #35의 schedule closure는 exact Preview에서 11:50 -> 12:00과 선택 보존으로 PASS했고, runtime head `636458e`는 CONTINUE pending beat의 새 NPC 행동/대사 replay도 막았다. 이후 direct review는 optional event_progress 없이 prose로만 일정 경계를 제시할 때 clock이 남을 P1을 찾았고, 현재 local closure는 exact-minute authoritative event-title evidence도 제한적으로 인정하며 unrelated choices는 강제하지 않는다. full test -> publish -> schedule Preview -> Safety/Vercel -> fresh direct P0/P1=0 -> protected manual merge gate까지 진행한 뒤, human merge 후 Scene Purpose -> Scene Exit -> Turn Hook -> Event Consequence로 계속한다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #34는 exact head `4479615`로 검증돼 merge commit `88fa5303`으로 main에 반영됐다. PR #35의 schedule closure는 exact Preview에서 11:50 -> 12:00과 선택 보존으로 PASS했고, runtime head `636458e`는 CONTINUE pending beat의 새 NPC 행동/대사 replay도 막았다. direct review의 optional event_progress P1도 exact-minute authoritative event-title evidence fallback으로 닫았고, exact code head `e4de523`는 Safety #282/Vercel/Preview rerun이 PASS다. final docs checkpoint -> hosted gates -> fresh direct P0/P1=0 -> protected manual merge gate까지 진행한 뒤, human merge 후 Scene Purpose -> Scene Exit -> Turn Hook -> Event Consequence로 계속한다.`

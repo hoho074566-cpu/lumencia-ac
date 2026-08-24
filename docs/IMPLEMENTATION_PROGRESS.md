@@ -210,6 +210,7 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Local closure removes unstarted pending beats from both the synthetic CONTINUE action and routed SAVE_STATE while retaining the original queue for post-response consumption. It also explicitly forbids replaying prior NPC dialogue. CONTINUE/Event/Context/Schedule focused tests and the full PR check pass.
 - Final runtime exact HEAD `636458e2aef899022d320324aa14b0f654e72ea5` passed both affected Preview reruns. CONTINUE kept 09:15/the library entrance and added only static light/shelf detail with no new dialogue/action; the schedule case again reached exactly 12:00 in the room with the orientation active, incomplete, and player choice preserved.
 - Direct review thread `PRRT_kwDOT8LCAs6bj9L0` found one remaining P1: a valid boundary response may omit optional `event_progress` while still identifying the schedule in prose, which would leave the clock unaligned. The local closure accepts either the exact structured occurrence ID or a bounded two-token match to an authoritative event scheduled at that exact minute; unrelated Director/choice interruptions still do not advance.
+- Exact code HEAD `e4de523b37f3508d4fc6534ff4aa49df3fd74b05`: Safety #282 PASS, Vercel Ready, and the Preview schedule rerun PASS. World time reached exactly 12:00, location remained the room, `knight_orientation` stayed active/incomplete at `arrival_decision`, and player choices remained open.
 
 ## Permanent HF1 Test Suites
 - `scripts/tests/context-router-authority-tail.test.mjs`
@@ -240,8 +241,8 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
 
 ## NEXT ACTION
-1. Run the full PR check, commit/publish the final optional-event-progress clock closure on PR #35, and wait for exact-head Safety + Vercel.
-2. Rerun the schedule-boundary Preview case, then obtain a fresh exact-current-HEAD/current-main Codex review. Direct P0/P1 must be zero; P2/P3 remain non-blocking unless newly reproduced.
+1. Publish this final exact-live-evidence docs checkpoint and wait for exact-head Safety + Vercel.
+2. Obtain a fresh exact-current-HEAD/current-main Codex review. Direct P0/P1 must be zero; P2/P3 remain non-blocking unless newly reproduced.
 3. Re-fetch main/PR and verify behind=0, base commit=merge-base=current main, open/non-draft/mergeable, clean/synced, Safety/Vercel PASS; then stop at the protected-core manual merge gate.
 4. After human merge, rerun production acceptance and implement **Scene Purpose** with bounded purpose state and no automatic player choice, followed by Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence chaining/lifetime.
 
@@ -259,6 +260,7 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed local CONTINUE closure: pending-beat prompt removal, prior-dialogue replay prohibition, original queue consumption preserved; focused/full tests PASS.
 - Completed on final runtime head `636458e...`: Vercel Ready; exact Preview CONTINUE and schedule reruns PASS.
 - Completed local direct-review closure: schedule-title evidence can align the exact boundary without optional `event_progress`; unrelated choices remain unforced; focused/full tests PASS.
-- Unfinished: revised exact-head publish/live rerun, hosted gates/fresh review, protected manual merge, Scene Purpose and later phases.
-- Blocker: current remote exact head does not yet include the direct-review P1 closure.
-- NEXT ACTION: commit/publish -> schedule Preview -> Safety/Vercel -> fresh review -> protected manual-merge gate.
+- Completed on exact code head `e4de523...`: Safety #282/Vercel PASS and final schedule Preview rerun PASS.
+- Unfinished: final docs-only checkpoint hosted gates/fresh review, protected manual merge, Scene Purpose and later phases.
+- Blocker: no demonstrated code/live blocker; final docs-head hosted/review authority remains pending.
+- NEXT ACTION: docs checkpoint -> Safety/Vercel -> fresh review -> protected manual-merge gate.
