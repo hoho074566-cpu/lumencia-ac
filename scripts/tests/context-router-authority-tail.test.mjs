@@ -108,6 +108,7 @@ const denseSave={
     exit_condition:{version:'1.0',kind:'interaction-turn',target:'EXIT_DENSE_SENTINEL',source:'scene-purpose',status:'open',established_turn:8,purpose_established_turn:8},
     turn_hook:{version:'1.0',kind:'npc-address',anchor:'TURN_HOOK_DENSE_SENTINEL',source:'scene-dialogue',status:'awaiting-player',established_turn:8,speaker_key:'guide'},
     momentum:{stall_streak:2},
+    novelty:{version:'1.0',repetition_streak:2,recent_terms:['게시판','배정','창구','정정','목록','기량평가','안내'],repeated_terms:['게시판','목록','안내'],recent_axes:['information'],last_turn:8},
   },
   scheduleContext:{
     due:denseEvents.slice(0,4),upcoming:denseEvents,
@@ -120,6 +121,8 @@ assert.ok(denseRouted.params.input.length<=9000,`dense routine authority input e
 assert.match(denseRouted.params.input,/SCHEDULE ENGINE \(ROUTED\)/);
 assert.match(denseRouted.params.input,/NOTE_DENSE_0/);
 assert.match(denseRouted.params.input,/STRONGER TURN HOOK V1/);
+assert.match(denseRouted.params.input,/DETERMINISTIC SCENE NOVELTY V1/);
+assert.match(denseRouted.params.input,/REPEAT_GUARD=required/);
 assert.match(denseRouted.params.input,/TURN_HOOK_DENSE_SENTINEL/);
 assert.match(denseRouted.params.input,/대도서관으로 간다\./);
 
