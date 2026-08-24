@@ -98,6 +98,8 @@ assert.equal(route('주변을 살펴본다.',{npcInnerStates:{p1:{active_goal:{.
 
 assert.equal(route('도서관으로 간다.').telemetry.event_director_v2.result,'NO_RANDOM_EVENT_DUE','committed travel must not be displaced by a present Goal Tick');
 assert.equal(route('p2에게 질문한다.').telemetry.event_director_v2.result,'DIRECT_USER_FOCUS','direct NPC focus must remain authoritative');
+assert.equal(route('그녀에게 질문한다.').telemetry.event_director_v2.result,'DIRECT_USER_FOCUS','pronoun-based direct NPC focus must remain ahead of unrelated Goal Tick initiative');
+assert.equal(route('ask her about the result.').telemetry.event_director_v2.result,'DIRECT_USER_FOCUS','English pronoun-based direct NPC focus must also remain authoritative');
 assert.equal(route('주변을 살펴본다.',{sceneRuntime:{participants:['p1'],turn_hook:{kind:'player-choice',status:'awaiting-player',anchor:'대답을 고른다.'}}}).telemetry.event_director_v2.result,'NO_RANDOM_EVENT_DUE','an awaiting-player hook must block proactive Goal Tick');
 assert.equal(route('주변을 살펴본다.',{sceneRuntime:{participants:['p1'],unresolved_question:'대답할 선택이 남아 있다.'}}).telemetry.event_director_v2.result,'NO_RANDOM_EVENT_DUE','legacy unresolved player choice state must block proactive Goal Tick');
 assert.equal(route('주변을 살펴본다.',{sceneRuntime:{participants:['p1'],eventProgress:{eventInstanceId:'active:test',activeBeat:'choice',paused:false}}}).telemetry.event_director_v2.result,'NO_RANDOM_EVENT_DUE','an active event beat must remain ahead of proactive Goal Tick');
@@ -134,6 +136,16 @@ const bookkeepingTick=deriveGoalTickState({
 });
 assert.equal(bookkeepingTick.manifested,false,'unchanged NPC bookkeeping must not start the manifested cooldown');
 assert.equal(bookkeepingTick.progress_evidence,false,'repeated goal metadata is not Goal V2 evidence');
+const relationshipBookkeepingTick=deriveGoalTickState({
+  previousRuntime:{},directorTelemetry:proactive.telemetry.event_director_v2,saveState:{relationships:{p1:{status:'중립'}}},turnNumber:9,
+  turn:{scene:[],state_delta:{relationship_changes:[{npc_key:'p1',affinity_delta:0,trust_delta:0,status:'중립'}]}},
+});
+assert.equal(relationshipBookkeepingTick.manifested,false,'an unchanged zero-delta relationship status must not start cooldown');
+const relationshipChangeTick=deriveGoalTickState({
+  previousRuntime:{},directorTelemetry:proactive.telemetry.event_director_v2,saveState:{relationships:{p1:{status:'중립'}}},turnNumber:9,
+  turn:{scene:[],state_delta:{relationship_changes:[{npc_key:'p1',affinity_delta:0,trust_delta:0,status:'경계'}]}},
+});
+assert.equal(relationshipChangeTick.manifested,true,'an actual selected-NPC relationship status change may start cooldown');
 const movedTick=deriveGoalTickState({
   previousRuntime:{},directorTelemetry:proactive.telemetry.event_director_v2,saveState:unchangedSave,turnNumber:9,
   turn:{scene:[],state_delta:{npc_state_updates:[{npc_key:'p1',location:'courtyard',status:'이동 중'}]}},

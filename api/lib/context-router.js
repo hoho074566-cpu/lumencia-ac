@@ -19,6 +19,7 @@ const IMPORTANT_RE = /(전투|공격|기습|결투|도망|추적|구출|협상|�
 const CRITICAL_ACTION_RE = /(L5|마신|델피렘|Delphirem|대죄주교|사도|심검|8서클|9서클|국가\s*전략|암살|살해|죽음|치명|대규모|전면전|성유물|마유물)/i;
 const COMBAT_RE = /(전투|공격|베어|베고|찌르|쏘|회피|막아|막고|패링|결투|대련|검기|오러|마법을?\s*쏘|주먹|발차기|기습|제압|살해|죽이)/i;
 const SECRET_RE = /(L4|L5|비밀|기밀|진실|정체|흑막|마신|델피렘|Delphirem|대죄주교|사도|어비스|심연)/i;
+const DIRECT_NPC_PRONOUN_RE = /(?:(?:그녀|그이|그|그\s*사람|그\s*학생|상대|저\s*사람|너|당신)(?:에게|한테|께|와|과|랑|이랑|을|를)\s*(?:질문|묻|말|대답|대화|부르|다가가|접근|따라가|쫓|붙잡|바라보|살펴보|도와|건네|보여|확인)|(?:ask|question|tell|talk\s+to|speak\s+to|follow|approach|help)\s+(?:her|him|them)\b)/i;
 
 const PROFILES = Object.freeze({
   continue: {
@@ -287,7 +288,7 @@ function buildEventDirectorV2(incoming,originalInput,registry,mode='game'){
   const fixedDirective=(reason)=>({telemetry:{...base,result:reason},selectedKey:null,directive:`[EVENT DIRECTOR V2.1]\nMODE=FIXED_FLOW\n${reason}. 기존 일정·사용자 직접 행동·진행 중인 훅을 우선하고, 이 지시 때문에 새 우연 사건을 추가하지 마라.`});
   if(['meta','continue'].includes(mode))return fixedDirective(`RNG_DISABLED_${mode.toUpperCase()}`);
   const explicit=mentionedNpcKeys(incoming.action||'',registry);
-  if(explicit.length||plan.focused.length)return fixedDirective('DIRECT_USER_FOCUS');
+  if(explicit.length||plan.focused.length||DIRECT_NPC_PRONOUN_RE.test(String(incoming.action||'')))return fixedDirective('DIRECT_USER_FOCUS');
   if(plan.payoffDue||plan.callbacks)return fixedDirective('CALLBACK_PRIORITY');
   if(plan.intervention==='aftermath')return fixedDirective('AFTERMATH_FIXED_FLOW');
   if(plan.intervention==='combat'||plan.intervention==='critical'||hasAffirmedActionKeyword(incoming.action||'',COMBAT_RE))return fixedDirective('ACTIVE_COMBAT_FIXED_FLOW');
