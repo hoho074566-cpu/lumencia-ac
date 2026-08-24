@@ -13,9 +13,11 @@ Repository: `hoho074566-cpu/lumencia-ac`
 # 0. SESSION STOP CHECKPOINT — 가장 먼저 읽을 것
 
 ## Live state immediately before this handover update
-- Branch: `codex/scene-purpose-v1`
-- PR #37: **open**. Docs checkpoint `df3b9077d093a270ffebf52e04283a1adf1846f0` closed the production multiline AUTO misclassification and passed Safety #298, Vercel, clean-LF checks, and focused signed-in AUTO Preview acceptance. Fresh review then found that direct `decision-sensitive` questions still used continuity mode and could be steered by stale focus. Current code candidate `c9d5a0fc54826ae804a39df4412beaa19ce9b741` gives every real current action/question priority while separately preserving PC choice sovereignty; the final docs checkpoint is the branch HEAD containing this record.
-- Base/current main: `1faadd105cf7b7780544abb5ca5276af04198796`
+- Branch: `codex/scene-purpose-event-focus-refresh`
+- PR #38: **open**. Code candidate `47b5e050a7f4217a2f5d4a51cf16d4685f554f98` refreshes an event purpose only when the same occurrence's authoritative active/completed/omitted progress signature changes; unchanged progress still retains the exact prior purpose object. Focused regressions and the full clean-LF PR check pass; the final docs checkpoint is the branch HEAD containing this record.
+- Base/current main: `cf05c43604e3ff9c7af03dc4cd09111cae27d729` (`Merge pull request #37`).
+- PR #37: **merged** from exact head `acebe72f6297f44d5f08e820b8c6dc12a4fa00ae` after Safety #299, Vercel, AUTO/direct-question Preview acceptance, and one exact-head Codex P0/P1=0 result. Merge commit parents are prior main `1faadd105...` + reviewed head `acebe72...`, and its tree exactly equals the reviewed tree. Production `/api/health` is 200/configured on app `1.5.6`, adapter `0.8.3`.
+- A duplicate same-head Codex request completed only after the merge and found that unchanged occurrence authority also preserved stale focus after `activeBeat`/completion progress. PR #38 is the focused remediation; do not start Explicit Scene Exit until it is resolved.
 - PR #36: **merged** after exact Preview acceptance; reviewed code HEAD `c7881f4c31758d0350833f31c37d116f3ff4c18d`, exact docs checkpoint/merge parent `c347744858300359ab8d6da204cb5d9277d366be`.
 - PR #36 exact-head gates: Safety #290 PASS, Vercel Ready, fresh exact-head Codex P0/P1=0. Door/location and NPC-initiative reruns passed first, followed by the full isolated 12-case acceptance at 12/12 PASS.
 - PR #36 merge commit parents are `6a717e5...` + `c347744...`; merge tree `fbe68c4a3b2207542bd0dd5a41cb8d75e0efa64b` exactly matches the reviewed checkpoint tree. Production `/api/health` is 200/configured on adapter `0.8.3` and app `1.5.6`.
@@ -43,8 +45,8 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - The persisted object is allowlisted and length-bounded; choices themselves are not persisted as an automatic player action.
 - The reserved model directive treats purpose focus as data and explicitly forbids creating PC action, dialogue, emotion, thought, acceptance, rejection, or choice.
 - CONTINUE preserves the existing purpose object and receives a purpose-specific freeze. META is untouched.
-- The current candidate uses nonempty player input evidence for same-scene routing, treats both `[AUTO FLOW: PC 새 행동 없음]` and `[LUMENSIA V1.5.6 AUTO FLOW — SCENE MOMENTUM HF1]` routed input as no player action, and emits `PURPOSE_MODE=current-action-first` before real actions and direct questions so prior focus cannot redirect them.
-- Current-action mode separately forbids inventing any additional PC action, dialogue, emotion, thought, acceptance, rejection, or choice. Empty descriptive churn and both AUTO forms retain continuity; active-event authority, explicit decisions, NPC interaction precedence, and CONTINUE freeze are unchanged. Focused regressions and the full clean-LF PR check pass. Final docs checkpoint push, fresh exact-head hosted authority, affected direct-question Preview rerun, and guarded merge remain.
+- The merged feature uses nonempty player input evidence for same-scene routing, treats both AUTO forms as no player action, and emits `PURPOSE_MODE=current-action-first` before real actions and direct questions so prior focus cannot redirect them. Current-action mode separately forbids inventing additional PC behavior or choice.
+- PR #38 compares the previous and current same-occurrence event progress signatures without adding save fields. Active-beat advances and beat completions refresh the purpose focus from the current turn summary; identical event progress retains the previous object. Event occurrence authority, explicit decisions, NPC interaction precedence, AUTO continuity, and CONTINUE freeze are unchanged. Final docs checkpoint push, fresh exact-head hosted authority, affected event-progress Preview acceptance, and guarded merge remain.
 
 ### Historical PR #36 diagnosis and closure
 - The PR #35 post-merge production 12-case run is **10 PASS / 2 FAIL**. Schedule boundary, question sovereignty, CONTINUE hard freeze, and completed-event forward progression all pass.

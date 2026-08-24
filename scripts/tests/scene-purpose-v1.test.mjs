@@ -42,8 +42,18 @@ assert.equal(eventPurpose.kind,'event');
 assert.equal(eventPurpose.source,'event-progress');
 assert.equal(eventPurpose.event_instance_id,'sealed_archive#12');
 
-const eventRetained=deriveScenePurpose({previousRuntime:{scene_key:turn.scene_title,purpose:eventPurpose},turn:{...turn,scene_summary:'같은 해제 절차에서 안내인이 다음 봉인을 가리킨다.'},sceneDelta:{...baseDelta,intent:'committed-consequence',flags:{...baseDelta.flags,npcAction:true}},eventProgress:{eventInstanceId:'sealed_archive#12',activeBeat:'unlock'},sceneKey:turn.scene_title,turnNumber:15});
+const eventRetained=deriveScenePurpose({previousRuntime:{scene_key:turn.scene_title,purpose:eventPurpose,eventProgress:{eventInstanceId:'sealed_archive#12',activeBeat:'unlock',completedBeats:[]}},turn:{...turn,scene_summary:'같은 해제 절차에서 안내인이 다음 봉인을 가리킨다.'},sceneDelta:{...baseDelta,intent:'committed-consequence',flags:{...baseDelta.flags,npcAction:true}},eventProgress:{eventInstanceId:'sealed_archive#12',activeBeat:'unlock',completedBeats:[]},sceneKey:turn.scene_title,turnNumber:15});
 assert.deepEqual(eventRetained,eventPurpose,'the same active occurrence must remain authoritative across actions and NPC interaction');
+
+const eventAdvanced=deriveScenePurpose({previousRuntime:{scene_key:turn.scene_title,purpose:eventPurpose,eventProgress:{eventInstanceId:'sealed_archive#12',activeBeat:'unlock',completedBeats:[]}},turn:{...turn,scene_summary:'첫 봉인이 풀리고 안내인이 내부 각인을 확인하기 시작했다.'},sceneDelta:{...baseDelta,flags:{...baseDelta.flags,eventProgress:true}},eventProgress:{eventInstanceId:'sealed_archive#12',activeBeat:'inspect_rune',completedBeats:['unlock']},sceneKey:turn.scene_title,turnNumber:15});
+assert.equal(eventAdvanced.kind,'event');
+assert.equal(eventAdvanced.event_instance_id,'sealed_archive#12');
+assert.equal(eventAdvanced.focus,'첫 봉인이 풀리고 안내인이 내부 각인을 확인하기 시작했다.');
+assert.equal(eventAdvanced.established_turn,15,'an advanced beat must refresh the purpose checkpoint');
+
+const eventCompletionAdvanced=deriveScenePurpose({previousRuntime:{scene_key:turn.scene_title,purpose:eventAdvanced,eventProgress:{eventInstanceId:'sealed_archive#12',activeBeat:'inspect_rune',completedBeats:['unlock']}},turn:{...turn,scene_summary:'내부 각인 확인이 끝나고 다음 봉인만 남았다.'},sceneDelta:{...baseDelta,flags:{...baseDelta.flags,eventProgress:true}},eventProgress:{eventInstanceId:'sealed_archive#12',activeBeat:null,completedBeats:['unlock','inspect_rune']},sceneKey:turn.scene_title,turnNumber:16});
+assert.equal(eventCompletionAdvanced.focus,'내부 각인 확인이 끝나고 다음 봉인만 남았다.');
+assert.equal(eventCompletionAdvanced.established_turn,16,'completing a beat must not preserve stale focus');
 
 const decision=deriveScenePurpose({previousRuntime:{scene_key:turn.scene_title,purpose:eventPurpose},turn:{...turn,scene_summary:'어느 봉인을 먼저 풀지 선택해야 한다.',choices:['왼쪽 봉인을 푼다.','오른쪽 봉인을 푼다.','아직 건드리지 않는다.']},sceneDelta:baseDelta,eventProgress:{eventInstanceId:'sealed_archive#12',activeBeat:'choice'},sceneKey:turn.scene_title,turnNumber:16});
 assert.equal(decision.kind,'decision');
