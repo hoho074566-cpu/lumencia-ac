@@ -13,11 +13,11 @@ Repository: `hoho074566-cpu/lumencia-ac`
 # 0. SESSION STOP CHECKPOINT — 가장 먼저 읽을 것
 
 ## Live state immediately before this handover update
-- Branch: `codex/scene-purpose-event-focus-refresh`
-- PR #38: **open**. Code candidate `47b5e050a7f4217a2f5d4a51cf16d4685f554f98` refreshes an event purpose only when the same occurrence's authoritative active/completed/omitted progress signature changes; unchanged progress still retains the exact prior purpose object. Focused regressions and the full clean-LF PR check pass; the final docs checkpoint is the branch HEAD containing this record.
-- Base/current main: `cf05c43604e3ff9c7af03dc4cd09111cae27d729` (`Merge pull request #37`).
+- Branch: `codex/scene-exit-condition-v1`
+- PR #39: **open**. Code candidate `6a8065019263fc8dece4b952f77acc8fcbd87ced` adds deterministic Explicit Scene Exit Condition V1 on top of Scene Purpose without another model call or save migration. Focused regressions and the full clean-LF PR check pass; hosted exact-head authority and Preview acceptance remain.
+- Base/current main: `227bcf23ace6ad7dca38b5d02d50a8652dd13a38` (`Merge pull request #38`).
+- PR #38: **merged** as `227bcf23ace6ad7dca38b5d02d50a8652dd13a38`. Same-occurrence event purpose focus now refreshes only when the authoritative active/completed/omitted progress signature changes; unchanged progress retains the exact prior purpose object.
 - PR #37: **merged** from exact head `acebe72f6297f44d5f08e820b8c6dc12a4fa00ae` after Safety #299, Vercel, AUTO/direct-question Preview acceptance, and one exact-head Codex P0/P1=0 result. Merge commit parents are prior main `1faadd105...` + reviewed head `acebe72...`, and its tree exactly equals the reviewed tree. Production `/api/health` is 200/configured on app `1.5.6`, adapter `0.8.3`.
-- A duplicate same-head Codex request completed only after the merge and found that unchanged occurrence authority also preserved stale focus after `activeBeat`/completion progress. PR #38 is the focused remediation; do not start Explicit Scene Exit until it is resolved.
 - PR #36: **merged** after exact Preview acceptance; reviewed code HEAD `c7881f4c31758d0350833f31c37d116f3ff4c18d`, exact docs checkpoint/merge parent `c347744858300359ab8d6da204cb5d9277d366be`.
 - PR #36 exact-head gates: Safety #290 PASS, Vercel Ready, fresh exact-head Codex P0/P1=0. Door/location and NPC-initiative reruns passed first, followed by the full isolated 12-case acceptance at 12/12 PASS.
 - PR #36 merge commit parents are `6a717e5...` + `c347744...`; merge tree `fbe68c4a3b2207542bd0dd5a41cb8d75e0efa64b` exactly matches the reviewed checkpoint tree. Production `/api/health` is 200/configured on adapter `0.8.3` and app `1.5.6`.
@@ -39,14 +39,15 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Production `/api/health`: healthy; app `1.5.6`, canonical `/api/chat`, adapter `/api/chat-router`, `24h` prompt-cache retention.
 - Full post-merge `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
-## Current active work — Scene Purpose V1
-- The focused branch adds bounded `sceneRuntime.purpose` continuity without a save migration or a second model call.
-- Same-scene descriptive churn retains the purpose. Active event occurrence, real scene/location transition, and explicit player decision points replace it deterministically.
-- The persisted object is allowlisted and length-bounded; choices themselves are not persisted as an automatic player action.
-- The reserved model directive treats purpose focus as data and explicitly forbids creating PC action, dialogue, emotion, thought, acceptance, rejection, or choice.
-- CONTINUE preserves the existing purpose object and receives a purpose-specific freeze. META is untouched.
-- The merged feature uses nonempty player input evidence for same-scene routing, treats both AUTO forms as no player action, and emits `PURPOSE_MODE=current-action-first` before real actions and direct questions so prior focus cannot redirect them. Current-action mode separately forbids inventing additional PC behavior or choice.
-- PR #38 compares the previous and current same-occurrence event progress signatures without adding save fields. Active-beat advances and beat completions refresh the purpose focus from the current turn summary; identical event progress retains the previous object. Event occurrence authority, explicit decisions, NPC interaction precedence, AUTO continuity, and CONTINUE freeze are unchanged. Final docs checkpoint push, fresh exact-head hosted authority, affected event-progress Preview acceptance, and guarded merge remain.
+## Current active work — Explicit Scene Exit Condition V1
+- `sceneRuntime.exit_condition` is a bounded allowlisted runtime checkpoint containing condition kind, target, source, status, establishment turn, linked purpose turn, and optional event occurrence ID.
+- Current real user input always outranks a saved exit condition. Travel/exterior movement, exploration, observation, downtime, wait, committed action, and direct questions each receive an explicit deterministic stop boundary.
+- A trivial corridor step does not satisfy an exterior destination. A destination/location change, meaningful discovery, new information, elapsed downtime, event-step progress, interaction response, or actual state change satisfies the corresponding boundary.
+- If the model stops prematurely, an open condition remains linked to the same Scene Purpose checkpoint so AUTO can continue it. A new user action replaces it immediately.
+- Important choices persist as `awaiting-player` and cannot be auto-resolved. Direct questions end after a direct answer without executing the contemplated action. CONTINUE preserves the condition unchanged; META remains untouched.
+- Context routing reserves the exit directive under 9k pressure and exposes the compact condition in authoritative minimum state. Pipeline/route telemetry reports the condition for Preview evidence.
+- No `app.js` or canonical `api/chat.js` rewrite, schema migration, extra API entrypoint, or extra model call. Focused Scene Exit/Purpose/Momentum/CONTINUE/Event/router suites and the full clean-LF PR check pass.
+- Turn Hook and Event Consequence remain separate later phases and must not be mixed into PR #39.
 
 ### Historical PR #36 diagnosis and closure
 - The PR #35 post-merge production 12-case run is **10 PASS / 2 FAIL**. Schedule boundary, question sovereignty, CONTINUE hard freeze, and completed-event forward progression all pass.
@@ -591,13 +592,13 @@ Gameplay roadmap discussed but not DONE:
 # 12. NEXT ACTION — CURRENT START POINT
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
-2. Confirm main contains PR #36 merge commit `1faadd105cf7b7780544abb5ca5276af04198796`; do **not** redo completed HF1/HF2/HF3 diagnosis or the 12-case acceptance.
-3. Continue only code candidate `c7e0a8b...` plus this focused PR #37 docs checkpoint: run the full check and final regression/scope review, and keep Scene Exit/Turn Hook/Event Consequence out of this change.
-4. Commit/push the docs checkpoint, then require hosted Safety/Vercel plus fresh exact-current-HEAD P0/P1 authority and rerun the affected current-action-priority Exact Preview case.
-5. The user has explicitly authorized merge when no special issue remains. Revalidate the exact head/base/mergeability immediately before merge, then verify the merge tree and production health.
+2. Confirm main contains PR #38 merge commit `227bcf23ace6ad7dca38b5d02d50a8652dd13a38`; do **not** redo completed HF1/HF2/HF3, Scene Purpose, or the prior 12-case acceptance diagnosis.
+3. Continue only PR #39 Explicit Scene Exit Condition V1. Commit/push this docs checkpoint, rerun the clean-LF full check, and perform a second exact-diff regression/scope review. Keep Turn Hook and Event Consequence out of this PR.
+4. Require hosted Safety/Vercel plus fresh exact-current-HEAD P0/P1 authority. On the exact Preview, rerun at minimum: exterior movement must not stop in the corridor; current user action overrides a stale open exit; direct question does not execute the contemplated action; AUTO continues an open boundary; decision and CONTINUE remain frozen.
+5. If every exact-current-head gate is green and no special blocker appears, use the user's explicit merge authorization. Revalidate head/base/mergeability immediately before merge, then verify the merge tree and production health.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #36은 Exact Preview 12/12 acceptance와 exact-head gates 후 merge commit 1faadd1로 병합되었고 production health도 정상이다. PR #37 exact head 906bd3d는 Safety/Vercel과 AUTO focused Exact Preview를 통과했지만, fresh review가 saved focus의 pre-response current-action priority P1과 stale docs를 지적했다. 현재 code candidate c7e0a8b는 committed USER ACTION을 saved PURPOSE_FOCUS보다 우선시키고 direct/authority-tail regressions를 추가했다. 이 문서를 포함한 final docs checkpoint를 full check/final review -> commit/push -> hosted Safety/Vercel/fresh exact-head P0/P1 -> affected current-action Preview rerun 순서로 검증하고, 이상이 없으면 사용자의 명시적 권한으로 exact-head merge한다. Scene Exit/Turn Hook/Event Consequence는 이 PR에 섞지 않는다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #38까지 main `227bcf2`로 병합되었고 HF1/HF2/HF3, 12-case acceptance, Scene Purpose/event-focus 진단은 완료됐다. 현재 PR #39 branch `codex/scene-exit-condition-v1`, code candidate `6a80650...`는 bounded `sceneRuntime.exit_condition`과 current-action priority, premature-stop AUTO continuity, question/decision/CONTINUE sovereignty를 추가했고 focused/full clean-LF checks가 통과했다. 이 docs checkpoint를 commit/push한 뒤 exact-current-head Safety/Vercel/fresh P0/P1과 affected Exact Preview cases를 검증하고, 이상이 없으면 사용자의 명시적 권한으로 exact-head merge한다. Turn Hook/Event Consequence는 PR #39에 섞지 않는다.`
