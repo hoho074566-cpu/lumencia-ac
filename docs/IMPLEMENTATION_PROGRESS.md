@@ -1,13 +1,15 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Post-merge Narrative Engine continuation — PR #36 NPC Initiative HF3 is merged after exact Preview acceptance. The active work is **Scene Purpose V1** with bounded purpose state and no automatic player choice. Explicit Scene Exit Condition, Stronger Turn Hook, and Event Consequence chaining remain separate later phases.
+Post-merge Narrative Engine continuation — PR #37 Scene Purpose V1 is merged, and PR #38 is the focused same-occurrence event-focus refresh follow-up. Explicit Scene Exit Condition, Stronger Turn Hook, and Event Consequence chaining remain separate later phases.
 
 ## Current GitHub State
 - Repo: `hoho074566-cpu/lumencia-ac`
-- Main: `1faadd105cf7b7780544abb5ca5276af04198796` (`Merge pull request #36`)
-- Working branch: `codex/scene-purpose-v1`
-- PR #37: **open**. Docs checkpoint `df3b9077d093a270ffebf52e04283a1adf1846f0` closed the production multiline AUTO misclassification and passed Safety #298, Vercel, clean-LF checks, and focused signed-in AUTO Preview acceptance. Fresh review then found that direct `decision-sensitive` questions could still be steered by stale focus. Current code candidate `c9d5a0fc54826ae804a39df4412beaa19ce9b741` gives real actions and direct questions current-action priority while separately preserving PC choice sovereignty; the final docs checkpoint is the branch HEAD containing this record.
+- Main: `cf05c43604e3ff9c7af03dc4cd09111cae27d729` (`Merge pull request #37`)
+- Working branch: `codex/scene-purpose-event-focus-refresh`
+- PR #38: **open**. Code candidate `47b5e050a7f4217a2f5d4a51cf16d4685f554f98` refreshes a same-occurrence event purpose only when its authoritative active/completed/omitted progress signature changes. Focused regressions and the full clean-LF PR check pass; the final docs checkpoint is the branch HEAD containing this record.
+- PR #37: **merged** from exact head `acebe72f6297f44d5f08e820b8c6dc12a4fa00ae` as merge commit `cf05c43604e3ff9c7af03dc4cd09111cae27d729`. The merge tree exactly equals the reviewed head tree; production `/api/health` is 200/configured on app `1.5.6`, adapter `0.8.3`.
+- A duplicate same-head Codex request completed after merge and found stale focus when an active event advanced under the same occurrence ID. PR #38 is the focused remediation; later Scene Exit work remains blocked until it closes.
 - PR #36: **merged** from exact docs checkpoint HEAD `c347744858300359ab8d6da204cb5d9277d366be`; reviewed code HEAD `c7881f4c31758d0350833f31c37d116f3ff4c18d`.
 - PR #36 final checkpoint Safety Gate #290: **PASS**; Vercel: **PASS / Ready**.
 - Fresh reviewed-code Codex result on `c7881f4...`: direct P0/P1 = 0 (`Didn't find any major issues`). The docs-only checkpoint did not change that code tree. The previously reported committed-action priority P1 is closed by limiting present-NPC stall recovery to passive `wait` / `downtime` intents.
@@ -37,7 +39,7 @@ Post-merge Narrative Engine continuation — PR #36 NPC Initiative HF3 is merged
 - No schema migration, extra model call, new API entrypoint, `app.js` rewrite, or `api/chat.js` rewrite.
 - Focused syntax, purpose, context authority-tail, CONTINUE, event, continuity, and Scene Momentum suites: PASS.
 - Full `scripts/lumensia-pr-check.mjs`: PASS in a clean LF checkout. The normal Windows working tree still exposes the known CRLF-only false negative in five pre-existing workflow string assertions; canonical Git blobs and hosted Linux checks use LF.
-- The current candidate distinguishes empty descriptive churn, the short AUTO sentinel, and the production multiline routed AUTO header from real player input. Its pre-response directive uses `PURPOSE_MODE=current-action-first` for real actions and direct questions; both AUTO forms use continuity. Saved focus becomes compatible NPC/world/event context only and cannot redirect the current request. A separate sovereignty rule forbids inventing additional PC action, dialogue, emotion, thought, acceptance, rejection, or choice. Active events, decisions, NPC interaction precedence, and CONTINUE freeze remain unchanged. This candidate is not merge-authoritative until the final docs checkpoint is pushed and freshly reviewed.
+- The merged feature distinguishes descriptive churn and both AUTO forms from real player input, gives actions and direct questions current-action priority, and separately preserves player sovereignty. PR #38 adds no save field: it compares previous/current same-occurrence event progress and refreshes purpose focus only on active-beat or completion progress. Unchanged event progress retains the exact prior object. Active-event occurrence authority, decisions, NPC interaction precedence, AUTO continuity, and CONTINUE freeze remain unchanged. This candidate is not merge-authoritative until the final docs checkpoint is pushed and freshly reviewed.
 
 ## Completed Foundation
 Already merged before PR #33:
