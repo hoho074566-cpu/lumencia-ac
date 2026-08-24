@@ -76,7 +76,7 @@ const GM_RULES = `너는 판타지 아카데미 장기 RPG 「루멘시아 아�
 5. LEVEL 4~5 정보는 정당한 발견 전 PC나 일반 NPC의 지식으로 사용하지 않는다. 객관적 사실·소문·추정·기관 분석·종교 해석을 구분한다.
 6. 시도는 자동 성공하지 않는다. 전투·판정은 능력, 준비, 정보, 경험, 상성, 거리, 타이밍, 지형, 피로, 부상, 심리를 종합한다. 억지 성공/억지 실패 금지.
 7. 성장·스킬 경험은 실제 훈련·실전·실패·교정·통찰과 관련될 때만 천천히 누적한다. 의미 없는 반복이나 자해성 꼼수에 보상하지 않는다.
-8. 관계는 실제 사건으로 서서히 변한다. 정치적 동맹과 개인 감정을 구분한다. relationship_changes를 기록할 때 cause=변화 원인, expression=이번 장면에서 드러난 행동/표정/말투, followup=다음 행동에 실제로 남는 변화(없으면 null)를 함께 반환한다.
+8. 관계는 실제 사건으로 서서히 변한다. 정치적 동맹과 개인 감정을 구분한다. relationship_changes는 NPC와 PC 사이의 변화만 기록하고 cause=변화 원인, expression=이번 장면에서 드러난 행동/표정/말투, followup=다음 행동에 실제로 남는 변화(없으면 null)를 함께 반환한다. npc_relationship_changes는 NPC가 다른 NPC를 향해 실제로 보인 방향성 변화만 기록한다. 직접 상호작용하거나 권위 있는 공동 사건의 인과가 있을 때만 쓰며, 같은 장면에 있었다는 이유만으로 관계를 바꾸지 않는다.
 9. 시간은 자연스럽고 일관되게 흐른다. 정해진 학사 일정과 세계 사건은 PC를 기다리지 않는다.
 10. 판타지 소설처럼 몰입감 있게 쓰되 불필요하게 늘이지 않는다. 감정은 표정·몸짓·말투·행동으로 보여준다.
 11. 매 응답은 제공된 JSON 구조만 반환한다. Markdown 이미지 링크를 출력하지 않는다. 화면에 표시할 NPC는 speaker_key로 지정한다.
@@ -1197,6 +1197,15 @@ const RelationshipChange = z.object({
   followup: z.string().max(260).nullable(),
 });
 
+const NpcRelationshipChange = z.object({
+  source_npc_key: z.string().min(1).max(64),
+  target_npc_key: z.string().min(1).max(64),
+  affinity_delta: z.number().int().min(-10).max(10),
+  trust_delta: z.number().int().min(-10).max(10),
+  status: z.string().max(80).nullable(),
+  reason: z.string().min(1).max(300),
+});
+
 const IntimacyChange = z.object({
   npc_key: z.string().min(1).max(64),
   level_delta: z.number().int().min(-1).max(1),
@@ -1297,6 +1306,7 @@ const TurnSchema = z.object({
     fatigue_delta: z.number().int().min(-10).max(10),
     gold_delta: z.number().int().min(-10000).max(10000),
     relationship_changes: z.array(RelationshipChange).max(10),
+    npc_relationship_changes: z.array(NpcRelationshipChange).max(6),
     intimacy_changes: z.array(IntimacyChange).max(6),
     stat_progress: z.array(StatProgress).max(4),
     skill_experience: z.array(SkillExperience).max(12),
@@ -1463,6 +1473,11 @@ function sanitizeTurn(turn, { allowedCgIds = [] } = {}) {
       expression: String(row?.expression || '').slice(0,260) || null,
       followup: String(row?.followup || '').slice(0,260) || null,
     }));
+  d.npc_relationship_changes = arrays(d.npc_relationship_changes, 6)
+    .filter((row) => REGISTERED_SPEAKER_KEYS.has(row?.source_npc_key)
+      && REGISTERED_SPEAKER_KEYS.has(row?.target_npc_key)
+      && row.source_npc_key !== row.target_npc_key
+      && (Number(row?.affinity_delta || 0) !== 0 || Number(row?.trust_delta || 0) !== 0 || Boolean(String(row?.status || '').trim())));
   d.intimacy_changes = arrays(d.intimacy_changes, 6).filter((row) => REGISTERED_SPEAKER_KEYS.has(row?.npc_key));
   d.stat_progress = arrays(d.stat_progress, 4);
   d.skill_experience = arrays(d.skill_experience, 12);
@@ -1621,7 +1636,7 @@ export default async function handler(req, res) {
       }));
       turn.state_delta = {
         advance_minutes:0, new_location:null, pc_status:null, fatigue_delta:0, gold_delta:0,
-        relationship_changes:[], intimacy_changes:[], stat_progress:[], skill_experience:[],
+        relationship_changes:[], npc_relationship_changes:[], intimacy_changes:[], stat_progress:[], skill_experience:[],
         items_add:[], items_remove:[], active_events_add:[], active_events_remove:[],
         completed_events_add:[], pc_knowledge_add:[], memories_add:[],
         scheduled_events_add:[], scheduled_events_complete:[], hooks_add:[], hooks_update:[],
