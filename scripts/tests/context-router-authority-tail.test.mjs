@@ -59,7 +59,7 @@ const originalInput=`===== TURN OPTIONS =====\nnormal
 ===== GM EVENT DIRECTOR (SERVER GUIDANCE) =====
 INTERVENTION: light\nDIRECTOR_SENTINEL=KEEP
 ===== SCHEDULE ENGINE (AUTHORITATIVE) =====\nSCHEDULE_SENTINEL`;
-const routed=routeOpenAIParams({instructions,input:originalInput},{mode:'game',incoming:{action:longAction,rollingSummary:'old '.repeat(5000),recentTurns:[],saveState:{turnNumber:8,world:{date:'1285-03-01',time:'09:00',location:'SAVE_WORLD_SENTINEL'},pc:{name:'SAVE_PC_SENTINEL'},npcStates:{guide:{location:'hall'}},sceneRuntime:{participants:['guide'],purpose:{version:'1.0',kind:'interaction',focus:'PURPOSE_RUNTIME_SENTINEL',source:'npc-interaction',established_turn:8},momentum:{stall_streak:2}},scheduleContext:{due:[{id:'SCHEDULE_SENTINEL',title:'ceremony',note:'NOTE_SENTINEL',time:'09:10',participants:['guide']}],npc_schedule:{guide:{location:'hall',activity:'class',commitment:'fixed class',confidence:'fixed',time:'09:10'}}}}}});
+const routed=routeOpenAIParams({instructions,input:originalInput},{mode:'game',incoming:{action:longAction,rollingSummary:'old '.repeat(5000),recentTurns:[],saveState:{turnNumber:8,world:{date:'1285-03-01',time:'09:00',location:'SAVE_WORLD_SENTINEL'},pc:{name:'SAVE_PC_SENTINEL'},npcStates:{guide:{location:'hall'}},sceneRuntime:{participants:['guide'],purpose:{version:'1.0',kind:'interaction',focus:'PURPOSE_RUNTIME_SENTINEL',source:'npc-interaction',established_turn:8},exit_condition:{version:'1.0',kind:'interaction-turn',target:'EXIT_RUNTIME_SENTINEL',source:'scene-purpose',status:'open',established_turn:8,purpose_established_turn:8},momentum:{stall_streak:2}},scheduleContext:{due:[{id:'SCHEDULE_SENTINEL',title:'ceremony',note:'NOTE_SENTINEL',time:'09:10',participants:['guide']}],npc_schedule:{guide:{location:'hall',activity:'class',commitment:'fixed class',confidence:'fixed',time:'09:10'}}}}}});
 assert.ok(routed.params.input.length<=9000,`long-action routine input exceeded budget: ${routed.params.input.length}`);
 assert.match(routed.params.input,/AUTHORITATIVE SAVE_STATE \(ROUTED MINIMUM\)/);
 assert.match(routed.params.input,/SAVE_WORLD_SENTINEL/);
@@ -77,6 +77,9 @@ assert.match(routed.params.input,/===== SCENE PURPOSE V1 =====/,'Scene Purpose h
 assert.match(routed.params.input,/PURPOSE_RUNTIME_SENTINEL/,'bounded Scene Purpose must reach the model under long-action pressure');
 assert.match(routed.params.input,/PURPOSE_MODE=current-action-first/,'current committed action must outrank the saved purpose under long-action pressure');
 assert.match(routed.params.input,/USER ACTION이 저장된 PURPOSE_FOCUS보다 우선한다/,'saved purpose must be explicitly subordinate to the current action');
+assert.match(routed.params.input,/===== EXPLICIT SCENE EXIT CONDITION V1 =====/,'Scene Exit heading must survive long-action pressure');
+assert.match(routed.params.input,/EXIT_KIND=semantic-destination/,'the current travel action must set the active exit boundary');
+assert.match(routed.params.input,/EXIT_RUNTIME_SENTINEL/,'the bounded saved exit checkpoint must remain in authoritative minimum state');
 assert.match(routed.params.input,/도서관에 간다\./,'the bounded USER ACTION must retain its committed travel predicate');
 assert.ok(routed.params.input.lastIndexOf('===== USER ACTION =====')>routed.params.input.lastIndexOf('===== SCHEDULE ENGINE (ROUTED) ====='),'USER ACTION marker must remain final');
 
