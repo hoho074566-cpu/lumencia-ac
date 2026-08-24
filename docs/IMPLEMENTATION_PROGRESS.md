@@ -1,12 +1,18 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Post-merge Narrative Engine continuation — PR #34 Live-play acceptance is merged and post-merge verification exposed one remaining schedule-boundary gap. The active work is the focused **Schedule Boundary HF2** closure, followed by Scene Purpose, Explicit Scene Exit Condition, Stronger Turn Hook, and Event Consequence chaining.
+Post-merge Narrative Engine continuation — PR #35 Schedule Boundary HF2 is merged. Production Live-play acceptance exposed one harness false negative and one present-NPC initiative failure; the active work is **NPC Initiative HF3 on PR #36**, followed by Scene Purpose, Explicit Scene Exit Condition, Stronger Turn Hook, and Event Consequence chaining.
 
 ## Current GitHub State
 - Repo: `hoho074566-cpu/lumencia-ac`
-- Main: `88fa53036c58324ffd5012ab7b5ed0cd3099dd6d` (`Merge pull request #34`)
-- Working branch: `codex/live-schedule-boundary-hf2`
+- Main: `6a717e5fb612a75d70334eb5b40a461ead36587d` (`Merge pull request #35`)
+- Working branch: `codex/live-acceptance-npc-initiative-hf3`
+- PR #36: **open / unmerged**; reviewed code HEAD `c7881f4c31758d0350833f31c37d116f3ff4c18d`.
+- PR #36 exact-head Safety Gate #289: **PASS**; Vercel: **PASS / Ready**.
+- Fresh exact-head Codex review on `c7881f4...`: direct P0/P1 = 0 (`Didn't find any major issues`). The previously reported committed-action priority P1 is closed by limiting present-NPC stall recovery to passive `wait` / `downtime` intents.
+- Exact-head compare: ahead 3 / behind 0; PR base and merge-base are current main `6a717e5...`; branch was clean and synchronized before this docs-only checkpoint.
+- PR #35: **merged** at 2026-08-24 03:08:35 UTC using exact expected head `acee0ef8bbff62ec9ee819c6715a0419d74e896e`; merge commit `6a717e5fb612a75d70334eb5b40a461ead36587d` exactly preserved the reviewed tree.
+- PR #35 post-merge full regression and production Vercel: **PASS**; production 12-case acceptance: **10 PASS / 2 FAIL**, producing the PR #36 work below.
 - PR #34: **merged** at 2026-08-24 01:47:23 UTC using exact expected head `4479615f4904c74ee9e3dfd349b809136706808e`
 - PR #34 exact-head authority: Safety Gate #274 PASS, Vercel PASS / Ready, fresh Codex review `PRR_kwDOT8LCAs8AAAABKkLd6w` with direct P0/P1 = 0; its two new comments were P2 only.
 - PR #34 merge commit tree is identical to the reviewed PR HEAD; no unexpected merge delta.
@@ -220,6 +226,19 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Permanent regressions reproduce all three prior failures. Focused Scene Momentum/router/Event tests and the full `node scripts/lumensia-pr-check.mjs` pass locally.
 - Published exact HEAD `fc94fa55af1adfbcd921c2b919236d017c5503e3` passed Safety Gate #285 and Vercel Ready. Its fresh direct review found no P0, two policy-nonblocking P2s, and one P1: the UI advertised the intentionally model-hidden legacy queue as executable `이어서 생성 · N` content even though frozen CONTINUE cannot safely drain it.
 - The P1 closure keeps the hidden queue non-consuming, removes the false queue count/execution promise, and labels CONTINUE only as static same-moment elaboration. A permanent runtime regression proves that flow controls cannot mention `remaining_beats`, an executable beat count, or a next-beat promise.
+- Final exact HEAD `acee0ef8bbff62ec9ee819c6715a0419d74e896e` passed Safety #286, Vercel Ready, and fresh exact-head direct P0/P1=0. Final compare was ahead 10 / behind 0 with base commit and merge-base at `88fa53036c58324ffd5012ab7b5ed0cd3099dd6d`.
+- Guarded merge with the unchanged full `expected_head_sha` succeeded as merge commit `6a717e5fb612a75d70334eb5b40a461ead36587d`. Its parents are the fetched main and exact reviewed head; the merge tree exactly equals the reviewed head tree.
+- Merged-main full PR check and production Vercel passed. The next production 12-case run produced 10 PASS / 2 FAIL while schedule boundary, question sovereignty, CONTINUE freeze, and completed-event progression stayed green.
+- Door/location was a harness false negative: the model compressed directly to canon's `시작의 광장`, while the evaluator required the noncanon fixture alias `중앙광장`. The evaluator now accepts both without weakening the no-door/corridor-stop assertion.
+- NPC initiative was a real orchestration failure: a new Chloe Director cameo displaced present Isabel even though she had a PC-targeted active goal and the scene had stall pressure.
+- The local HF3 closure reserves `PRESENT_NPC_GOAL_PRIORITY` fixed flow for a present NPC's feasible PC/present-NPC goal under momentum pressure, suppressing a competing random cameo without creating a new occurrence or deciding any PC choice. Permanent Goal/Director tests reproduce and close the failure.
+- PR #36 initial exact HEAD `6ee2fb74d207ee20e9880fbdcd0c7fc3af87f981` passed Safety #287 and Vercel Ready. Its fresh direct review found one P1: a stalled `decision-sensitive` question could still receive unrelated present-NPC goal initiative ahead of the requested answer. One separate P2 remains non-blocking and is not in this fix scope.
+- Published exact HEAD `8e83c4a298d92d9846aceda4132e21d5d6d01896` imports the same authoritative `classifySceneIntent` result used by Scene Momentum and disables `PRESENT_NPC_GOAL_PRIORITY` for `decision-sensitive` input. Safety #288 and Vercel Ready passed.
+- Fresh exact-head review `5004348673` found a follow-up P1: every non-question intent still qualified, allowing a previous stall to make unrelated NPC initiative preempt committed travel, observation, or consequential action.
+- The current local closure restricts present-goal stall recovery to authoritative passive `wait` / `downtime` intents. Permanent tests prove ordinary waiting keeps NPC-first fixed flow while question, travel, observation, and contract-signing inputs cannot be displaced. Focused Scene Momentum/Context Router/Goal suites and full `node scripts/lumensia-pr-check.mjs` are **PASS**.
+- Exact Preview URL for this code head is `https://lumencia-ac-git-codex-live-acceptance-npc-initia-c273ba-ah-203c.vercel.app`.
+- Cloud Browser was rechecked in a fresh session: Chrome/CDP selection succeeds, but both tab discovery and new-tab creation time out even after the documented recovery retry. The dedicated `LUMENSIA_LIVE_ACCESS_TOKEN` is not injected, so the protected Preview cannot be substituted with the CLI harness. No token extraction, protection bypass, or merge was attempted.
+- The full local `node scripts/lumensia-pr-check.mjs`, syntax checks for every changed JS/MJS file, and `git diff --check origin/main...HEAD` were rerun at `c7881f4...` and **PASS**.
 
 ## Permanent HF1 Test Suites
 - `scripts/tests/context-router-authority-tail.test.mjs`
@@ -250,10 +269,10 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
 
 ## NEXT ACTION
-1. Publish the fresh-review CONTINUE UI P1 closure to PR #35; rerun focused/full tests and exact-head hosted checks.
-2. Require a fresh exact-current-HEAD/current-main Codex review with direct P0/P1=0 plus Safety/Vercel PASS.
-3. Re-fetch every merge gate immediately before mutation. Merge only with the unchanged full `expected_head_sha`; stop without merging if any condition changed.
-4. Fetch merged main, run the full post-merge suite and production acceptance, then implement **Scene Purpose** with bounded purpose state and no automatic player choice, followed by Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence chaining/lifetime.
+1. Publish this docs-only checkpoint without changing the reviewed code tree; re-require Safety/Vercel and exact-current-HEAD review authority for the resulting head.
+2. When the signed-in Preview browser connection is available, rerun door/location and NPC-initiative acceptance; if both pass, rerun all 12 cases against the PR #36 Exact Preview.
+3. Only after Exact Preview acceptance, mark Live-play acceptance complete and implement **Scene Purpose** with bounded purpose state and no automatic player choice.
+4. Do not merge PR #36 without separate exact-merge authorization; afterward continue Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence chaining/lifetime.
 
 ## Stop Record
 - Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.
@@ -273,6 +292,8 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed direct audit: fresh review `PRR_kwDOT8LCAs8AAAABKkUk7Q` identified three current P1s after the second automatic remediation round.
 - Completed human authorization and local remediation: PC-relevant schedule filtering, short-action cap-vs-target semantics, and frozen CONTINUE queue preservation all have permanent regressions.
 - Tests at this checkpoint: focused regressions and full `node scripts/lumensia-pr-check.mjs` PASS; the diff is limited to the shared momentum helper, stable adapter, tests, and these progress documents.
-- Unfinished: hosted exact-head checks, Preview acceptance, fresh review, guarded merge, post-merge verification, Scene Purpose and later phases.
-- Blocker: none locally. Merge remains forbidden until hosted Safety/Vercel, exact Preview evidence, and fresh direct P0/P1=0 all pass on the final exact head.
-- NEXT ACTION: publish the new exact head and complete hosted/live/review gates.
+- Completed on PR #36 code head `c7881f4...`: passive-only initiative closure published; Safety #289/Vercel Ready; fresh direct P0/P1=0; ahead 3 / behind 0; current-base and merge-base match main.
+- Completed locally this session: branch/head verification, Cloud Browser recovery retries, protected-Preview URL confirmation, dedicated live-token availability check, syntax/static checks, `git diff --check`, and full PR check PASS.
+- Unfinished: Exact Preview door/location and NPC-initiative reruns, full 12-case acceptance, separately authorized guarded merge, post-merge verification, Scene Purpose and later phases.
+- Blocker: Exact Preview live acceptance cannot run while the protected deployment's signed-in cloud-browser tab connection is unavailable and no dedicated CLI live-access token is injected. Merge also remains forbidden without separate exact-merge authorization.
+- NEXT ACTION: publish this docs-only checkpoint and revalidate its hosted/review gates; rerun Preview acceptance as soon as the signed-in browser connection becomes available.

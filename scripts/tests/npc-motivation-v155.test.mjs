@@ -142,6 +142,45 @@ const cooldown = route('기다린다.', {
 assert.equal(cooldown.telemetry.event_director_v2.eligible_keys.includes('p2'), false, 'goal must not bypass surprise cooldown');
 assert.equal(Object.hasOwn(cooldown.telemetry.event_director_v2.weights||{}, 'p2'), false, 'ineligible goal candidate must receive no weight');
 
+const presentGoalPriority = route('10분 기다린다.', {
+  sceneRuntime: { participants:['p1'], momentum:{ stall_streak:2, pressure:'required', recent_deltas:[] } },
+  npcInnerStates: {
+    p1: { active_goal:{ desire:'PC의 실력을 직접 확인한다.', priority:5, urgency:4, progress:30, state:'active', target_type:'pc', target_key:'pc' } },
+  },
+});
+assert.equal(presentGoalPriority.telemetry.event_director_v2.result, 'PRESENT_NPC_GOAL_PRIORITY', 'a present NPC with a feasible PC goal must beat a new random cameo under stall pressure');
+assert.equal(presentGoalPriority.telemetry.event_director_v2.selected_key, 'p1', 'the fixed-flow telemetry must identify the present initiative owner');
+assert.equal(presentGoalPriority.telemetry.event_director_v2.occurrence_id, undefined, 'present initiative must not invent a new Director occurrence');
+assert.match(presentGoalPriority.params.input, /PRESENT_NPC=p1\(One\)/, 'the routed prompt must reserve the present NPC initiative owner');
+assert.match(presentGoalPriority.params.input, /PC의 실력을 직접 확인한다\./, 'the already-authoritative goal must reach the fixed-flow directive');
+const stalledQuestion = route('지금 몇 시야?', {
+  sceneRuntime: { participants:['p1'], momentum:{ stall_streak:2, pressure:'required', recent_deltas:[] } },
+  npcInnerStates: {
+    p1: { active_goal:{ desire:'PC의 실력을 직접 확인한다.', priority:5, urgency:4, progress:30, state:'active', target_type:'pc', target_key:'pc' } },
+  },
+});
+assert.notEqual(stalledQuestion.telemetry.event_director_v2.result, 'PRESENT_NPC_GOAL_PRIORITY', 'question sovereignty must suppress present-goal stall recovery');
+assert.match(stalledQuestion.params.input, /INTENT=decision-sensitive/, 'the stalled-question fixture must use the authoritative decision-sensitive classification');
+for (const [action, intent] of [
+  ['도서관에 간다.', 'travel'],
+  ['게시판을 확인한다.', 'observe'],
+  ['계약에 서명한다.', 'committed-consequence'],
+]) {
+  const committedAction = route(action, {
+    sceneRuntime: { participants:['p1'], momentum:{ stall_streak:2, pressure:'required', recent_deltas:[] } },
+    npcInnerStates: {
+      p1: { active_goal:{ desire:'PC의 실력을 직접 확인한다.', priority:5, urgency:4, progress:30, state:'active', target_type:'pc', target_key:'pc' } },
+    },
+  });
+  assert.notEqual(committedAction.telemetry.event_director_v2.result, 'PRESENT_NPC_GOAL_PRIORITY', `${intent} must remain ahead of present-goal stall recovery`);
+  assert.match(committedAction.params.input, new RegExp(`INTENT=${intent}`), `${action} must retain its authoritative ${intent} classification`);
+}
+const scheduledPresentGoal = routeOpenAIParams(
+  { instructions, input:directorInput.replace('INTERVENTION: medium', 'INTERVENTION: scheduled') },
+  { incoming:{ action:'10분 기다린다.', saveState:{ id:'scheduled-present-goal', turnNumber:8, world:{ date:'1285-03-01', time:'10:00', location:'academy' }, sceneRuntime:{ participants:['p1'], momentum:{ stall_streak:2 } }, npcInnerStates:{ p1:{ active_goal:{ desire:'PC의 실력을 직접 확인한다.', priority:5, urgency:4, progress:30, state:'active', target_type:'pc', target_key:'pc' } } } }, recentTurns:[] }, mode:'game' },
+);
+assert.notEqual(scheduledPresentGoal.telemetry.event_director_v2.result, 'PRESENT_NPC_GOAL_PRIORITY', 'a fixed schedule boundary must remain ahead of present-goal stall recovery');
+
 const chatRouter = readFileSync('api/chat-router.js','utf8');
 const runtime = readFileSync('app-runtime.js','utf8');
 const health = readFileSync('api/health.js','utf8');
