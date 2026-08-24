@@ -168,7 +168,11 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - The user completed Vercel SSO in Cloud Browser and explicitly authorized adding Preview scope to the existing `OPENAI_API_KEY`.
 - The key value was not viewed, copied, replaced, or exposed. Production remained selected and Preview was added; Vercel confirmed the environment-variable update.
 - Exact head `58f00adf3fccc071afe59bd4134471874fe14b39` was redeployed as Preview deployment `F4Zua1Ud7EQDazJcvwSB2ZjgryeG`, which reached Ready. The authenticated branch alias then reported `API 0.8.3 연결 준비됨 · gpt-5.6-luna / gpt-5.6-terra · Q3 · CR · MOT2 · MOM`.
-- The runtime-configuration blocker is resolved. No live model case has run yet: opening the first test fixture triggered a native file chooser that locked the Cloud Browser control session before the fixture was applied or a request was sent.
+- The runtime-configuration blocker is resolved. The native file chooser could not be driven reliably, so candidate evidence continued through the same exact Preview UI with a naturally constructed sequential state instead of substituting production.
+- Exact Preview live results before the next patch: short travel, long-action travel, explicit wait, explicit rest, repeated observation, NPC approach/question, door/location transition, pre-schedule rest, and NPC-first initiative behaved correctly. Movement compressed to the destination, wait/rest hit their requested boundary, repeated observation produced a new clue and NPC action, and no player action was invented.
+- A new live P1 was reproduced: `지금 오리엔테이션이 끝난 뒤 대장간에 들를 시간이 있을까?` was classified `generic`, advanced 12:00 -> 12:40, and completed the active orientation even though the player only asked a feasibility question.
+- Root cause: the question guard recognized direct travel deliberations such as `도서관에 갈까?`, but not indirect terminal questions without a travel predicate. The local fix classifies terminal question forms as `decision-sensitive` and adds an explicit same-moment/no-location/no-event-completion sovereignty directive. The live harness now requires `advance_minutes === 0` for this case.
+- Focused intent/correctness/HF1 integration tests and full `node scripts/lumensia-pr-check.mjs`: **PASS** after the question-sovereignty fix.
 
 ## Permanent HF1 Test Suites
 - `scripts/tests/context-router-authority-tail.test.mjs`
@@ -199,10 +203,10 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PR #33 manual merge safety.
 
 ## NEXT ACTION
-1. Dismiss the currently open native file chooser in the Cloud Browser with Cancel/Esc, then reconnect to the authenticated PR #34 Preview.
-2. Import the first stateless QA fixture through the supported file-chooser path and rerun all 12 real acceptance cases against the exact deployment; production main is not candidate evidence.
+1. Publish the question-sovereignty patch and this checkpoint to PR #34, then wait for exact-head Safety + Vercel.
+2. On that exact Preview, rerun the indirect question and require the same 12:00 moment/location with no active-event completion; then verify CONTINUE hard freeze and completed-event forward progression in the same live session.
 3. Resolve only reproduced P0/P1 blockers. P2/P3 remain non-blocking without live reproduction.
-4. If code or docs change, repeat exact-head Safety + Vercel + fresh exact-current-HEAD/current-main Codex review; then stop at the protected-core manual merge gate and never auto-merge.
+4. Record final acceptance, repeat full tests, publish docs, and obtain a fresh exact-current-HEAD/current-main Codex review; then stop at the protected-core manual merge gate and never auto-merge.
 5. After the acceptance fix is human-merged, rerun all 12 cases on production and smoke `/api/health`, then implement **Scene Purpose** with bounded purpose state and no automatic player choice.
 6. Continue through Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence chaining/lifetime -> NPC Initiative/Goal Tick refinement.
 
@@ -211,6 +215,7 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed after merge: first 12-case production Live-play run, four demonstrated classifier fixes, permanent regressions, full local PR check.
 - Completed on PR #34 candidate `cd5b711`: hosted Safety #265 PASS, Vercel Ready, fresh exact-head direct P0/P1=0; branch is clean/synchronized and base/merge-base remain current main.
 - Completed environment recovery: user-authorized Preview scope was added without exposing the key; exact-head redeploy `F4Zua1Ud7EQDazJcvwSB2ZjgryeG` is Ready and authenticated health is configured.
-- Unfinished: authenticated 12-case exact-candidate rerun, renewed exact-head gates after this docs checkpoint, protected manual merge, production 12-case acceptance, Scene Purpose and subsequent Narrative Engine phases.
-- Blocker: a native file chooser opened while importing the first stateless fixture and currently prevents Cloud Browser control. No fixture was applied and no model request was sent.
-- NEXT ACTION: user dismisses that chooser with Cancel/Esc; immediately resume fixture import and the 12-case exact Preview run.
+- Completed in exact Preview sequential live play: nine behavior classes through the question-form case; eight passed and the indirect question reproduced a real sovereignty failure.
+- Unfinished: publish/redeploy the question fix, rerun that live case plus CONTINUE/completed-event forward, renew exact-head gates, protected manual merge, production acceptance, Scene Purpose and later phases.
+- Blocker: current hosted head still lacks the local indirect-question sovereignty fix. The native chooser is no longer a user-action blocker.
+- NEXT ACTION: publish the tested patch, wait for exact Preview readiness, and rerun the failed question at the same active-event boundary.

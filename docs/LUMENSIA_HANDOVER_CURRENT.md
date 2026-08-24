@@ -397,7 +397,9 @@ PR #34 candidate authority:
 
 Vercel runtime recovery is complete. The user explicitly authorized Preview scope for the existing `OPENAI_API_KEY`; the value was not viewed, copied, replaced, or exposed. Production scope remained selected. Exact head `58f00adf3fccc071afe59bd4134471874fe14b39` was redeployed as Preview deployment `F4Zua1Ud7EQDazJcvwSB2ZjgryeG` and reached Ready. The authenticated branch alias now reports API 0.8.3 configured with Luna/Terra, Q3, Context Router, Motivation V2, and Scene Momentum.
 
-Current blocker: importing the first stateless QA save opened a native file chooser and locked the Cloud Browser control session before the file was applied or a model request was sent. The user only needs to dismiss that chooser with Cancel/Esc; then resume the exact Preview run. Do not substitute production main for candidate evidence.
+The native chooser was dismissed, but its event could not be driven reliably. Candidate validation therefore continued through the same exact Preview UI with a naturally constructed sequential game state. Short/long travel, wait, rest, repeated observation, NPC question/initiative, door transition, and schedule-boundary rest passed visibly.
+
+A new live P1 was reproduced: the indirect question `지금 오리엔테이션이 끝난 뒤 대장간에 들를 시간이 있을까?` advanced 12:00 -> 12:40 and completed the active orientation. Root cause was a narrow question classifier that only guarded direct travel predicates. The current local patch classifies terminal question forms as `decision-sensitive`, injects an explicit same-moment/no-location/no-event-completion sovereignty rule, strengthens the live assertion to zero minutes, and passes focused plus full PR checks. Current blocker is publishing and redeploying that tested patch; the user does not need to operate a file chooser.
 
 ---
 
@@ -522,15 +524,15 @@ Gameplay roadmap discussed but not DONE:
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
 2. Confirm main still contains merge commit `8d378b532910dfecaf5226118bffabdddbe74289`; do **not** redo completed HF1 diagnosis.
-3. Preserve the already-gated PR #34 code head `cd5b711f47be99fbe321fb2eddc6c5d8d3eff568`; its Safety #265, Vercel Ready, and fresh direct P0/P1=0 evidence are recorded above.
-4. Dismiss the currently open native file chooser in Cloud Browser with Cancel/Esc; Preview scope and exact-head redeploy are already complete.
-5. Reconnect to the authenticated exact Preview and rerun all 12 stateless cases; production main is not candidate evidence.
+3. Preserve the recorded earlier gates, but do not treat them as authority for the new local question-sovereignty patch.
+4. Publish the tested patch and docs to PR #34 and wait for exact-head Safety + Vercel.
+5. On that exact Preview rerun the failed indirect question at an active-event boundary, then verify CONTINUE hard freeze and completed-event forward progression.
 6. Fix only reproduced P0/P1 failures and repeat the full exact-head gates after any head change.
-7. Stop at protected-core manual merge readiness; do not auto-merge.
+7. Obtain a fresh exact-current-HEAD/current-main Codex review and stop at protected-core manual merge readiness; do not auto-merge.
 8. After a human merge, run all 12 cases plus `/api/health` on production, then proceed to **Scene Purpose -> Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence**.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 긴빠이/Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. Scene Momentum Recovery HF1은 guarded merge commit `8d378b532910dfecaf5226118bffabdddbe74289`로 main에 반영되고 post-merge PASS했다. Live-play Round 1은 production에서 12건을 실행해 7 PASS / 5 flag를 냈고, 실제 결함은 한글 수사 휴식 duration, `다시 확인한다` observe, travel deliberation 분류였다. PR #34의 code head `cd5b711`은 Safety #265/Vercel/fresh exact-head P0/P1=0이었고 docs checkpoint `58f00ad`는 Safety #266/Vercel Ready다. 사용자가 `OPENAI_API_KEY` Preview scope를 승인했고 exact-head redeploy `F4Zua1Ud7EQDazJcvwSB2ZjgryeG` health가 정상이다. 현재 Cloud Browser의 native file chooser만 Cancel/Esc로 닫은 뒤 12-case candidate rerun -> fresh exact-head gates -> protected manual merge gate에서 멈춰라. human merge 뒤 production 12-case smoke -> Scene Purpose -> Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence로 계속한다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. HF1은 merge commit `8d378b532910dfecaf5226118bffabdddbe74289`로 main에 반영됐다. PR #34 Preview 환경은 정상이며 순차 UI live-play에서 이동/대기/휴식/반복 관찰/NPC initiative/장소·일정 경계는 통과했다. 간접 질문이 active event를 자동 완료하는 새 P1을 재현했고, terminal question을 decision-sensitive same-moment freeze로 강화한 로컬 수정과 전체 PR check가 PASS했다. 이 패치를 publish/redeploy한 뒤 실패 질문 + CONTINUE + 완료 이벤트 전진을 exact Preview에서 재검증하고 fresh exact-head gates를 받은 다음 protected manual merge gate에서 멈춰라. human merge 뒤 production acceptance -> Scene Purpose -> Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence로 계속한다.`

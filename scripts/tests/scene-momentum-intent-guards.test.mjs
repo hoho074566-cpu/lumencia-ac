@@ -33,6 +33,12 @@ assert.equal(classifySceneIntent('도서관에 갈지 고민한다.',{location:'
 for(const action of ['도서관에 갈까 말까?','도서관에 가야 할까?','도서관에 갈까요?']){
   assert.equal(classifySceneIntent(action,{location:'기숙사'}).kind,'decision-sensitive',`${action} must remain an unresolved player decision`);
 }
+const indirectScheduleQuestion='지금 오리엔테이션이 끝난 뒤 대장간에 들를 시간이 있을까?';
+assert.equal(classifySceneIntent(indirectScheduleQuestion,{location:'기사과 강의실'}).kind,'decision-sensitive','an indirect feasibility question must not become generic scene progression');
+const indirectQuestionDirective=buildSceneMomentumDirective({action:indirectScheduleQuestion,saveState:{world:{location:'기사과 강의실'},sceneRuntime:{}}});
+assert.match(indirectQuestionDirective,/QUESTION \/ DELIBERATION 규칙/,'question-only turns must receive an explicit sovereignty freeze');
+assert.match(indirectQuestionDirective,/advance_minutes=0/,'question-only turns must keep the same moment');
+assert.match(indirectQuestionDirective,/진행 중인 일정\/이벤트를 완료하지 않는다/,'question-only turns must not complete an active event');
 assert.equal(classifySceneIntent('기다린다.',{location:'광장'}).kind,'wait');
 assert.equal(classifySceneIntent('공격한다.',{location:'광장'}).kind,'committed-consequence');
 

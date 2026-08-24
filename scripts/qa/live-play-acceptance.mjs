@@ -266,7 +266,7 @@ const cases = [
   },
   {
     id: 'question-form',
-    action: '도서관에 갈까?',
+    action: '지금 오리엔테이션이 끝난 뒤 대장간에 들를 시간이 있을까?',
     saveState: baseSave(),
     recentTurns: [],
     rollingSummary: '아직 기숙사 개인실에 있다.',
@@ -275,7 +275,7 @@ const cases = [
       return {
         decision_sensitive: data?.pipeline?.scene_momentum?.intent === 'decision-sensitive',
         no_travel_execution: delta.new_location == null,
-        no_travel_time_floor: Number(delta.advance_minutes) <= 5,
+        same_moment_preserved: Number(delta.advance_minutes) === 0,
       };
     },
   },
