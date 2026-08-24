@@ -1,13 +1,13 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Narrative Engine continuation — live acceptance, Scene Purpose, Scene Exit, Stronger Turn Hook, and Event Consequence V1 are merged. NPC Initiative / Goal Tick V1 is the active separate phase.
+Narrative Engine continuation — live acceptance, Scene Purpose, Scene Exit, Stronger Turn Hook, Event Consequence V1, and NPC Goal Tick V1 are merged. Bounded Off-screen Progression V1 is the active separate phase.
 
 ## Current GitHub State
 - Repo: `hoho074566-cpu/lumencia-ac`
-- Main: `da248a2df0985d9196232149893a0b196020c0f9` (`Event Consequence V1`, PR #41 merge)
-- Working branch: `codex/npc-goal-tick-v1`
-- PR #42: **open**, title `NPC Goal Tick V1 guarded present-NPC initiative`; protected runtime/API paths keep it human-merge only. Initial published head `1fc90a0627b7b22a077038500e61c34261262b59` is mergeable against current main. Code checkpoint `c9efe50bfc95d5093acbe36aef88f2cc98024a3f` passes the full clean-LF repository check; this status update will become the next exact PR head.
+- Main: `8c5ca35a463356f375a4171148268a08abf0c83a` (`NPC Goal Tick V1`, PR #42 merge)
+- Working branch: `codex/bounded-offscreen-progression-v1`
+- PR #42: **merged** from exact reviewed head `6c115e661ed7257b3787b74d5f142a1c0b39e38d`. Safety #32741095125, Vercel, exact-head Codex P0/P1=0, and targeted Exact Preview acceptance passed. Merge `8c5ca35...` and reviewed head share tree `22195b469f2ccb1b3afdc7c197f5259fb110d59a`.
 - PR #41: **merged** from exact reviewed head `06617b3ffe11d83bc512d7e4f520c17946d7bdf0`; Safety/Vercel/fresh P0/P1=0 and targeted Preview lifecycle acceptance passed. Merge `da248a2...` and reviewed head share tree `2bac9dd94468d37ff0cb7787ad6c42cdba478b27`.
 - PR #40: **merged** as squash commit `5f2073a2874a9b8ee45a6aa34d6e4508997c3cb3` from reviewed exact head `85af592b8baae57958eb16d88da83f946d26a2e0`. Safety #313, Vercel, fresh exact-head Codex P0/P1=0, and affected Exact Preview acceptance passed; reviewed and merged trees both equal `2354a0db58c6405beec40fcfaae885fd8850c0db`.
 - PR #39: **merged** as squash commit `4516cc162ef34426ef94d29cf5aa6489013927ec` from reviewed exact head `ba64f9f779cda39f91ef41abfddf3c47f823606c`. Safety #307, Vercel, fresh exact-head Codex P0/P1=0, and affected Chrome Preview acceptance passed. Merge and reviewed-head trees both equal `dfce564cc6b457a5258d5165ea05ce496acf99c6`; production Vercel and `/api/health` are healthy.
@@ -34,7 +34,16 @@ Narrative Engine continuation — live acceptance, Scene Purpose, Scene Exit, St
 - Production `/api/health`: `ok=true`, API configured, app `1.5.6`, adapter `/api/chat-router`, canonical core `/api/chat`, prompt cache retention `24h`.
 - Post-merge full `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
-## NPC Goal Tick V1 — Current Candidate
+## Bounded Off-screen Progression V1 — Current Candidate
+- Extends the existing local `backgroundDigest` path without adding a model call, API entrypoint, save root, or migration.
+- A real time advance may materialize at most two already-known, currently absent NPCs entering a public non-PC scheduled event that starts inside the elapsed interval.
+- Current-scene NPCs, model-authored NPC updates, unknown/unseen NPCs, PC-relevant schedules, secret/private schedules, completed/cancelled occurrences, META, CONTINUE, and disabled background simulation are excluded.
+- Only bounded NPC `location`/`status` may change. Goal V2 progress, relationships, memories, faction state, event completion, secrets, and player decisions are never synthesized.
+- Starts older than 60 minutes are retained only as bounded historical background evidence and do not claim that an NPC is still at the event location.
+- Dedicated regressions cover PC priority, current/model-update protection, known-NPC and secrecy guards, completion guards, cross-midnight clocks, long-skip history, two-NPC/two-event caps, digest bounds, frontend persistence, and one-call architecture.
+
+## NPC Goal Tick V1 — Completed
+- Final reviewed head `6c115e661ed7257b3787b74d5f142a1c0b39e38d` merged as `8c5ca35a463356f375a4171148268a08abf0c83a`; targeted Preview acceptance and all exact-head gates passed.
 - High-drive active goals on currently present NPCs may produce `PRESENT_NPC_GOAL_TICK` on generic/observe/explore/wait/downtime turns without requiring a prior two-turn stall.
 - The model must finish the declared USER ACTION first, then may add one physically feasible present-NPC goal action as the same turn's world response.
 - Valid local targets are the PC, another present NPC, the current place, or a currently due matching event. Remote targets and terminal/blocked goals do not qualify.
@@ -334,11 +343,11 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
 
 ## NEXT ACTION
-1. Push this final PR #42 status checkpoint, then require exact-current-HEAD Safety/Vercel and a fresh P0/P1=0 Codex review; revalidate base/main and merge-base.
-2. Keep the exact current head immutable while hosted review and Preview evidence are collected.
-3. Run exact Preview acceptance for proactive observe/explore/wait initiative, manifestation/cooldown/no-repeat, and protected question/travel/schedule boundaries.
-4. Do not merge from a Codex task. Protected runtime/API paths make this PR human-only.
-5. Start bounded off-screen progression only after Goal Tick V1 closes.
+1. Finish the Bounded Off-screen Progression V1 diff on `codex/bounded-offscreen-progression-v1` and run the authoritative clean-LF full repository check.
+2. Perform the required second regression/scope review, commit, push, and open one focused protected-path PR.
+3. Require exact-current-HEAD Safety/Vercel and a fresh P0/P1=0 Codex review; revalidate current main, merge-base, and no conflict.
+4. On the exact Preview, exercise one eligible other-department schedule crossing plus disabled-background, PC-schedule, and current-scene/model-update protection as applicable.
+5. Keep the PR human-merge only. Do not expand this phase into goal progress, relationships, factions, rumors, arbitrary event completion, or a second model call.
 
 ## Stop Record
 - Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.

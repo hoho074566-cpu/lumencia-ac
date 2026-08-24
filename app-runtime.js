@@ -325,6 +325,18 @@ function applyRuntimeStateStable(data, isContinue = false) {
       lastUpdatedTurn: save.turnNumber + (isContinue ? 0 : 1),
     };
   }
+  save.npcStates = save.npcStates || {};
+  for (const row of (Array.isArray(runtime.offscreen_npc_updates) ? runtime.offscreen_npc_updates : []).slice(0, 2)) {
+    const key = String(row?.npc_key || '').trim().slice(0, 80);
+    if (!/^[a-z0-9_-]+$/i.test(key) || ['__proto__', 'prototype', 'constructor'].includes(key)) continue;
+    const old = save.npcStates[key] || {};
+    save.npcStates[key] = {
+      ...old,
+      ...(row.location ? { location: String(row.location).slice(0, 100) } : {}),
+      ...(row.status ? { status: String(row.status).slice(0, 140) } : {}),
+      updatedAtTurn: save.turnNumber,
+    };
+  }
   if (runtime.scene_runtime && typeof runtime.scene_runtime === 'object') {
     save.sceneRuntime = { ...(save.sceneRuntime || {}), ...runtime.scene_runtime };
   }
