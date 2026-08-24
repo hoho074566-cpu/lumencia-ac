@@ -15,6 +15,7 @@ Repository: `hoho074566-cpu/lumencia-ac`
 ## Live state immediately before this handover update
 - Branch: `codex/event-consequence-v1`
 - Base/current main: `5f2073a2874a9b8ee45a6aa34d6e4508997c3cb3` (`Stronger Turn Hook V1 (#40)`).
+- PR #41: **open; protected-path human merge only**. Published checkpoint `dbdc54b68d33dd095475ff8cecfe09cc6bdea277` passed Safety #316 and Vercel Ready with no merge conflict. Exact Preview: `https://lumencia-ac-git-codex-event-consequence-v1-ah-203c.vercel.app`.
 - PR #40 is **merged** from reviewed exact head `85af592b8baae57958eb16d88da83f946d26a2e0`. Safety #313, Vercel, fresh exact-head Codex P0/P1=0, and affected Exact Preview acceptance passed. Squash merge `5f2073a...` exactly preserves reviewed tree `2354a0db58c6405beec40fcfaae885fd8850c0db`; production is healthy.
 - PR #39: **merged** from exact reviewed head `ba64f9f779cda39f91ef41abfddf3c47f823606c`. Safety #307, Vercel, fresh exact-head Codex P0/P1=0, and affected Chrome Preview acceptance passed. Squash merge commit `4516cc1...` has the exact reviewed tree `dfce564cc6b457a5258d5165ea05ce496acf99c6`; production Vercel and `/api/health` are healthy.
 - PR #38: **merged** as `227bcf23ace6ad7dca38b5d02d50a8652dd13a38`. Same-occurrence event purpose focus now refreshes only when the authoritative active/completed/omitted progress signature changes; unchanged progress retains the exact prior purpose object.
@@ -50,8 +51,9 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - A realized consequence may add at most one genuinely new delayed consequence. Fingerprints block the same causal result from being rescheduled.
 - Permanent tests cover materialization, dedupe, due lookahead, schedule priority, direct-question sovereignty, visible completion, false acknowledgement, expiry, secret masking, legacy structured-output preservation, dynamic runtime insertion, one-call architecture, and minimum adaptive input authority.
 - No second model call, new API entrypoint, canonical `app.js`/`api/chat.js` rewrite, persistence migration, faction/reputation system, or off-screen expansion.
-- Code commit `9bf5d24...` passes the full clean-LF repository check. A clean-LF Chrome smoke boots the assembled app as V1.5.6, loads `/lib/event-consequence.js` with HTTP 200, and has no console error. The ordinary Windows checkout's initial loader failure was only its known CRLF marker mismatch and disappears in the authoritative LF worktree.
+- Code commit `9bf5d24...` and published checkpoint `dbdc54b...` pass the full clean-LF repository check. A clean-LF Chrome smoke boots the assembled app as V1.5.6, loads `/lib/event-consequence.js` with HTTP 200, and has no console error. The ordinary Windows checkout's initial loader failure was only its known CRLF marker mismatch and disappears in the authoritative LF worktree.
 - Second review found no P0/P1 blocker across schema compatibility, queue bounds, duplicate/expiry ordering, secret routing, schedule/player priority, META/CONTINUE freeze, or the one-call invariant.
+- Exact Preview lifecycle acceptance passed on `dbdc54b...`: the risky sigil edit stopped before execution for an explicit three-way player choice; the chosen delayed malfunction did not fire during the immediate 08:50→08:52 move; a 40-minute wait surfaced the persistent result at 10:02 as a visible record signal plus caretaker reaction; the following departure turn did not repeat the result. The live run also preserved the fixed admission-ceremony flow before the due result.
 
 ## Completed active predecessor — Stronger Turn Hook V1
 - `sceneRuntime.turn_hook` is a bounded next-direction checkpoint: allowlisted kind/source/status, a 220-character single-line anchor, bounded turn, and only applicable speaker/event IDs.
@@ -621,12 +623,12 @@ Gameplay roadmap discussed but not DONE:
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
 2. Confirm main contains PR #40 squash merge `5f2073a2874a9b8ee45a6aa34d6e4508997c3cb3`; do **not** redo completed HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, or Stronger Turn Hook diagnosis.
-3. Continue only Event Consequence V1 on `codex/event-consequence-v1`. Candidate `9bf5d24...` has clean-LF full-check, second-review, and clean-LF Chrome boot authority; push/open the focused PR.
-4. Require exact-current-HEAD Safety/Vercel and fresh Codex P0/P1 authority. Exact Preview must verify delayed-result creation/persistence, no early fire, due manifestation, and player-choice protection, plus one quiet Turn Hook/NPC direct-response regression.
-5. Do not start NPC Initiative / Goal Tick refinement until acceptance closes. Because this candidate changes protected runtime/API paths, repository policy keeps the eventual merge human-only.
+3. Continue only PR #41 on `codex/event-consequence-v1`. Published checkpoint `dbdc54b...` has clean-LF full-check, second-review, Safety #316, Vercel Ready, and Exact Preview lifecycle acceptance authority.
+4. After this documentation checkpoint is pushed, require exact-current-HEAD Safety/Vercel and a fresh Codex P0/P1=0 review. Re-run only a targeted smoke if the hosted docs-only deployment changes; do not repeat completed lifecycle acceptance without a code change.
+5. Do not start NPC Initiative / Goal Tick refinement until PR #41 closes. Because this PR changes protected runtime/API paths, repository policy keeps merge human-only; do not merge it from a Codex task.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #40은 reviewed head `85af592...`에서 main `5f2073a...`로 squash merge됐고 Safety #313/Vercel/fresh P0/P1=0/affected Preview/production까지 통과했다. HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Stronger Turn Hook 진단을 다시 하지 않는다. 현재 branch는 `codex/event-consequence-v1`; commit `9bf5d24...`가 기존 `delayed_consequences_add`를 새 저장 스키마 없이 `save.hooks`의 bounded queue로 연결하고 due/expiry/visible completion/duplicate denial/secret masking/player+schedule priority를 구현한다. Focused regressions, full clean-LF check, second review, clean-LF Chrome V1.5.6 boot smoke PASS. push/PR, hosted exact-head gates/review, lifecycle Preview acceptance를 진행한다. NPC Initiative / Goal Tick refinement는 그 뒤이며 protected runtime/API merge는 human-only다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #40은 reviewed head `85af592...`에서 main `5f2073a...`로 squash merge됐고 Safety #313/Vercel/fresh P0/P1=0/affected Preview/production까지 통과했다. HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Stronger Turn Hook 진단을 다시 하지 않는다. 현재 branch는 `codex/event-consequence-v1`, open PR은 #41이다. Published checkpoint `dbdc54b...`는 Safety #316/Vercel Ready/clean-LF full check/second review를 통과했고 Exact Preview에서 no-early-fire, due manifestation, player-choice stop, no-repeat lifecycle acceptance가 통과했다. 이 문서 체크포인트의 exact-head hosted Safety/Vercel/fresh P0/P1=0만 닫는다. NPC Initiative / Goal Tick refinement는 PR #41 이후이며 protected runtime/API merge는 human-only다.`
