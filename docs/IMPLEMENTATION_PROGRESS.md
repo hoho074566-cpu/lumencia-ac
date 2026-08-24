@@ -177,6 +177,9 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - CONTINUE follow-up exposed a separate UI P1 after reload: two `#flowControlsStable` wrappers survived and the old duplicate suppressor marked both CONTINUE buttons hidden. The local fix collapses duplicate wrappers, never suppresses buttons inside a stable wrapper, and explicitly clears stale `hidden` / `aria-hidden` state. Focused CONTINUE/runtime/core tests: **PASS**.
 - Published UI head `c90616815c9d058c0c185a87402460803df5b0d8`: Safety #269 **PASS**, Vercel **PASS**; reload showed exactly one visible/enabled CONTINUE button. Live CONTINUE preserved 12:40/location and used CONTINUE routing, but added a new Artemis line plus NPC actions. That violates the narrative side of hard freeze despite a zero state delta.
 - The local follow-up explicitly forbids new NPC speech/gesture/movement/decisions/arrival/departure during CONTINUE and permits only expression-level expansion of an already-started beat or static sensory prose. Permanent correctness assertions cover this rule.
+- Published narrative-freeze head `96230915c651b7c2d1d436f46f04442813014e6e`: Safety #270 **PASS**, Vercel **PASS**. Exact Preview CONTINUE kept 12:40 and the designated classroom, added only static room/light detail, and introduced no new speech/action.
+- Completed-event forward then moved 12:40 -> 12:48 and the classroom -> 기사과 대장간 without replaying the orientation. Isabel and the smith initiated naturally, and the turn ended on a meaningful response hook without choosing for the player.
+- Candidate live acceptance is sufficient across all 12 requested behavior classes: short travel, long-action travel, wait, rest, repeated observation, NPC approach/question, door/location transition, pre-schedule rest, question form, CONTINUE, completed-event forward, and NPC initiative.
 
 ## Permanent HF1 Test Suites
 - `scripts/tests/context-router-authority-tail.test.mjs`
@@ -207,19 +210,18 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PR #33 manual merge safety.
 
 ## NEXT ACTION
-1. Run the full PR check, commit/publish the strengthened CONTINUE narrative freeze, then wait for exact-head Safety + Vercel.
-2. Reload that exact Preview, execute CONTINUE, and require same moment/location with no new NPC speech/action; then verify completed-event forward progression in the same live session.
-3. Resolve only reproduced P0/P1 blockers. P2/P3 remain non-blocking without live reproduction.
-4. Record final acceptance, repeat full tests, publish docs, and obtain a fresh exact-current-HEAD/current-main Codex review; then stop at the protected-core manual merge gate and never auto-merge.
-5. After the acceptance fix is human-merged, rerun all 12 cases on production and smoke `/api/health`, then implement **Scene Purpose** with bounded purpose state and no automatic player choice.
-6. Continue through Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence chaining/lifetime -> NPC Initiative/Goal Tick refinement.
+1. Repeat the full PR check, commit/publish this final live-acceptance checkpoint, and wait for exact-head Safety + Vercel.
+2. Obtain a fresh exact-current-HEAD/current-main Codex review. Direct P0/P1 must be zero; P2/P3 remain non-blocking unless newly reproduced.
+3. Re-fetch main/PR and verify behind=0, base commit=merge-base=current main, open/non-draft/mergeable, clean/synced, Safety/Vercel PASS; then stop at the protected-core manual merge gate and never auto-merge.
+4. After the acceptance fix is human-merged, rerun all 12 cases on production and smoke `/api/health`, then implement **Scene Purpose** with bounded purpose state and no automatic player choice.
+5. Continue through Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence chaining/lifetime -> NPC Initiative/Goal Tick refinement.
 
 ## Stop Record
 - Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.
 - Completed after merge: first 12-case production Live-play run, four demonstrated classifier fixes, permanent regressions, full local PR check.
 - Completed on PR #34 candidate `cd5b711`: hosted Safety #265 PASS, Vercel Ready, fresh exact-head direct P0/P1=0; branch is clean/synchronized and base/merge-base remain current main.
 - Completed environment recovery: user-authorized Preview scope was added without exposing the key; exact-head redeploy `F4Zua1Ud7EQDazJcvwSB2ZjgryeG` is Ready and authenticated health is configured.
-- Completed in exact Preview sequential live play: question sovereignty and CONTINUE button lifecycle verified; earlier movement/wait/rest/observe/NPC/location/schedule cases remain PASS evidence.
-- Unfinished: publish/redeploy the narrative hard-freeze follow-up, rerun live CONTINUE/completed-event forward, renew exact-head gates, protected manual merge, production acceptance, Scene Purpose and later phases.
-- Blocker: current hosted CONTINUE keeps state frozen but can invent new same-minute NPC speech/action; the strengthened prompt is local only.
-- NEXT ACTION: publish the hard-freeze prompt, wait for exact Preview readiness, and rerun CONTINUE before completed-event forward.
+- Completed in exact Preview sequential live play: all 12 requested behavior classes, including question sovereignty, reload-safe CONTINUE UI, narrative hard freeze, completed-event no-replay, and NPC-first follow-up.
+- Unfinished: final docs checkpoint hosted gates, fresh exact-head review, protected manual merge, production acceptance, Scene Purpose and later phases.
+- Blocker: none in code/live behavior. Merge remains prohibited until the final docs head has fresh exact-head authority.
+- NEXT ACTION: publish this checkpoint, obtain Safety/Vercel + fresh direct P0/P1=0, then perform final manual-merge readiness verification.

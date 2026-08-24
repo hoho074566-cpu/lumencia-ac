@@ -405,6 +405,8 @@ That patch was published as `9972c26a4db39b29fd92bd77824e71a2e802126d`; Safety #
 
 The UI fix was published as `c90616815c9d058c0c185a87402460803df5b0d8`; Safety #269 and Vercel passed, and reload produced exactly one visible/enabled CONTINUE control. The live CONTINUE kept 12:40/location and the correct route but invented a new Artemis quote and NPC actions. The current local follow-up strengthens the narrative freeze to prohibit new NPC speech/actions and allow only an already-started beat's expression or static sensory detail. Publish and rerun CONTINUE next.
 
+The narrative freeze was published as `96230915c651b7c2d1d436f46f04442813014e6e`; Safety #270 and Vercel passed. Exact Preview CONTINUE kept 12:40/location and produced static sensory prose only. The next committed travel reached 기사과 대장간 at 12:48 without replaying the completed orientation, while Isabel/the smith initiated and left a player response hook. All 12 requested live behavior classes now have sufficient candidate evidence. No code/live blocker remains; only the final docs head gates, fresh exact-head review, and protected manual merge checkpoint remain.
+
 ---
 
 # 9. PERMANENT TEST COVERAGE
@@ -529,14 +531,13 @@ Gameplay roadmap discussed but not DONE:
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
 2. Confirm main still contains merge commit `8d378b532910dfecaf5226118bffabdddbe74289`; do **not** redo completed HF1 diagnosis.
 3. Preserve the recorded earlier gates, but do not treat them as authority for the new local question-sovereignty patch.
-4. Publish the strengthened CONTINUE narrative-freeze directive and wait for exact-head Safety + Vercel.
-5. On that exact Preview execute CONTINUE and require no new NPC speech/action plus unchanged time/location, then verify completed-event forward progression.
-6. Fix only reproduced P0/P1 failures and repeat the full exact-head gates after any head change.
-7. Obtain a fresh exact-current-HEAD/current-main Codex review and stop at protected-core manual merge readiness; do not auto-merge.
-8. After a human merge, run all 12 cases plus `/api/health` on production, then proceed to **Scene Purpose -> Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence**.
+4. Run the full PR check and publish this final acceptance checkpoint.
+5. Wait for exact-head Safety/Vercel, then obtain a fresh exact-current-HEAD/current-main Codex review with direct P0/P1=0.
+6. Re-fetch main/PR and verify every merge gate, then stop at protected-core manual merge readiness; do not auto-merge.
+7. After a human merge, run all 12 cases plus `/api/health` on production, then proceed to **Scene Purpose -> Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence**.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. HF1은 main에 반영됐다. PR #34 exact Preview에서 이동/대기/휴식/관찰/NPC/장소·일정 경계가 통과했고, 간접 질문 sovereignty 수정 head `9972c26`도 Safety/Vercel/live rerun PASS했다. reload 뒤 duplicate stable controls가 CONTINUE를 숨기는 새 UI P1을 재현해 wrapper dedupe/visibility 복구를 로컬 수정했고 focused tests가 PASS했다. 이 UI 패치를 publish/redeploy한 뒤 CONTINUE hard freeze + 완료 이벤트 전진을 검증하고 fresh exact-head gates를 받은 다음 protected manual merge gate에서 멈춰라. human merge 뒤 production acceptance -> Scene Purpose -> Scene Exit -> Turn Hook -> Event Consequence로 계속한다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. HF1은 main에 반영됐다. PR #34 exact Preview의 12개 live behavior class가 모두 충분히 통과했고, 간접 질문 sovereignty·reload-safe CONTINUE UI·새 NPC 행동 없는 narrative hard freeze·완료 이벤트 no-replay까지 검증됐다. Code head `9623091`은 Safety #270/Vercel/live PASS다. 최종 문서 checkpoint를 publish하고 fresh exact-head Safety/Vercel/Codex direct P0/P1=0 및 behind/base/merge-base/mergeable/clean을 확인한 뒤 protected manual merge gate에서 멈춰라. human merge 뒤 production acceptance -> Scene Purpose -> Scene Exit -> Turn Hook -> Event Consequence로 계속한다.`
