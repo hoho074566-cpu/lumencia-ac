@@ -59,7 +59,7 @@ const ROUTER_GM_RULES = String.raw`너는 판타지 아카데미 장기 RPG 「�
 5) NPC는 실제로 아는 정보만 사용한다. L4~L5/비밀/메타정보를 정당한 발견 없이 PC나 일반 NPC 지식으로 쓰지 않는다.
 6) 시도는 자동 성공하지 않는다. 전투·판정은 능력, 준비, 정보, 경험, 상성, 거리, 타이밍, 지형, 피로, 부상, 심리를 종합한다.
 7) 성장·스킬 경험은 실제 훈련·실전·실패·교정·통찰이 있을 때만 천천히 누적한다. 즉흥 각성/스킬/혈통/유물 생성 금지.
-8) 관계는 실제 사건으로 서서히 변한다. state_delta에는 실제 발생한 변화만 기록한다.
+8) 관계는 실제 사건으로 서서히 변한다. relationship_changes는 NPC와 PC 사이, npc_relationship_changes는 NPC가 다른 NPC를 향해 보인 방향성 변화다. NPC 간 변화는 직접 상호작용이나 권위 있는 공동 사건의 인과가 있을 때만 기록하며 공동 장면에 있었다는 이유만으로 관계를 바꾸지 않는다. state_delta에는 실제 발생한 변화만 기록한다.
 9) 시간·학사일정·세계 사건은 PC를 기다리지 않지만 일정 때문에 PC 행동을 강제로 결정하지 않는다.
 10) 등록 NPC speaker_key는 CHARACTER REGISTRY의 정확한 키만 쓴다. 단역은 speaker_key=null과 표시명 사용.
 11) choices는 PC 선택이 실제로 필요한 지점에서만 정확히 3개, 아니면 빈 배열.
@@ -263,7 +263,15 @@ function goalSignalFor(save,key){
   const multiplier=Math.max(.84,Math.min(1.48,drive*relevance));
   return{id:clampText(active.id||'',80)||null,desire,priority,urgency,progress,state:'active',target_type:targetType,target_key:targetKey,next_action:clampText(array(active.next_actions)[0]||'',120),obstacle:clampText(active.obstacle||'',120),updated_turn:Number(active.updated_turn||0),multiplier:Number(multiplier.toFixed(3)),source:active.desire?'runtime-active-goal':'npc-state-current_goal'};
 }
-function compactInnerNpc(row={}){
+function compactNpcRelationships(value={},relevantKeys=[],registry={},sourceKey=''){
+  const relevant=new Set(array(relevantKeys).map(String));
+  return Object.fromEntries(Object.entries(object(value))
+    .filter(([target])=>target!==sourceKey&&relevant.has(target)&&Object.prototype.hasOwnProperty.call(registry,target)&&/^[a-z0-9_-]{1,64}$/i.test(target)&&!['__proto__','prototype','constructor'].includes(target))
+    .sort((a,b)=>Number(relevant.has(b[0]))-Number(relevant.has(a[0]))||Number(b[1]?.updated_turn||0)-Number(a[1]?.updated_turn||0)||(Math.abs(Number(b[1]?.affinity||0))+Math.abs(Number(b[1]?.trust||0)))-(Math.abs(Number(a[1]?.affinity||0))+Math.abs(Number(a[1]?.trust||0)))||a[0].localeCompare(b[0]))
+    .slice(0,6)
+    .map(([target,row])=>[target,{affinity:boundedNumber(row?.affinity,-100,100,0),trust:boundedNumber(row?.trust,-100,100,0),status:clampText(row?.status||'중립',80),reason:clampText(row?.reason||'',180),updated_turn:Number(row?.updated_turn||0),history:array(row?.history).slice(-2).map(item=>typeof item==='string'?clampText(item,180):{turn:Number(item?.turn||0),affinity_delta:boundedNumber(item?.affinity_delta,-10,10,0),trust_delta:boundedNumber(item?.trust_delta,-10,10,0),status:clampText(item?.status||'',60)||null,reason:clampText(item?.reason||'',180),source_event:clampText(item?.source_event||'',100)||null})}]));
+}
+function compactInnerNpc(row={},relevantKeys=[],registry={},sourceKey=''){
   const src=object(row),goal=object(src.active_goal),reason=object(src.relationship_reason);
   const out={
     mood:clampText(src.mood||'',80),social_stance:clampText(src.social_stance||'',80),opinion_of_pc:clampText(src.opinion_of_pc||'',180),
@@ -271,6 +279,7 @@ function compactInnerNpc(row={}){
   };
   if(goal.desire)out.active_goal={id:clampText(goal.id||'',80),target_type:goal.target_type||'event',target_key:goal.target_key||null,desire:clampText(goal.desire,180),priority:boundedNumber(goal.priority,1,5,3),urgency:boundedNumber(goal.urgency,1,5,3),progress:boundedNumber(goal.progress,0,100,0),state:goal.state||'active',reasons:array(goal.reasons).slice(-4).map(x=>clampText(x,120)),next_actions:array(goal.next_actions).slice(-4).map(x=>clampText(x,120)),obstacle:clampText(goal.obstacle||'',140)};
   if(reason.cause||reason.followup)out.relationship_reason={turn:Number(reason.turn||0),dimensions:object(reason.dimensions),status:reason.status||null,cause:clampText(reason.cause||'',150),expression:clampText(reason.expression||'',150),followup:clampText(reason.followup||'',150),source_event:clampText(reason.source_event||'',120)};
+  const npcRelationships=compactNpcRelationships(src.npc_relationships,relevantKeys,registry,sourceKey);if(Object.keys(npcRelationships).length)out.npc_relationships=npcRelationships;
   return out;
 }
 function presentGoalTargetIsFeasible(goal,save,present){
@@ -443,7 +452,7 @@ function fitAuthorityTail({director='',directorV2='',schedule={},maxChars=2400,r
 }
 function compactSave(incoming,keys,registry,profile,keywords){
   const save=incoming.saveState||{},names=keys.map(k=>registry[k]).filter(Boolean),rel={},intimacy={},npcStates={},emotions={},inner={},npcMem={};
-  for(const k of keys){if(save?.relationships?.[k]!=null)rel[k]=save.relationships[k];if(save?.intimacyStates?.[k]!=null)intimacy[k]=save.intimacyStates[k];if(save?.npcStates?.[k]!=null)npcStates[k]=save.npcStates[k];if(save?.emotionStates?.[k]!=null)emotions[k]=save.emotionStates[k];if(save?.npcInnerStates?.[k]!=null)inner[k]=compactInnerNpc(save.npcInnerStates[k]);if(save?.memories?.npc?.[k])npcMem[k]=selectMemories(save.memories.npc[k],keywords,names,profile.memoriesPerNpc);}
+  for(const k of keys){if(save?.relationships?.[k]!=null)rel[k]=save.relationships[k];if(save?.intimacyStates?.[k]!=null)intimacy[k]=save.intimacyStates[k];if(save?.npcStates?.[k]!=null)npcStates[k]=save.npcStates[k];if(save?.emotionStates?.[k]!=null)emotions[k]=save.emotionStates[k];if(save?.npcInnerStates?.[k]!=null)inner[k]=compactInnerNpc(save.npcInnerStates[k],keys,registry,k);if(save?.memories?.npc?.[k])npcMem[k]=selectMemories(save.memories.npc[k],keywords,names,profile.memoriesPerNpc);}
   const globalMem=selectMemories(save?.memories?.global,keywords,names,profile.memoriesGlobal);
   const knowledge=selectMemories(array(save?.pcKnowledge).map(x=>typeof x==='string'?{fact:x,importance:2}:x),keywords,names,Math.max(6,profile.memoriesGlobal)).map(x=>x?.fact||x);
   const relevantEvents=array(save?.activeEvents).filter(ev=>{const t=norm(ev);return keywords.some(k=>k.length>=2&&t.includes(k));}).slice(0,6);

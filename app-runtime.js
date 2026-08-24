@@ -286,7 +286,7 @@ function accumulateUsageStable(usage) {
 function zeroStateDeltaStable() {
   return {
     advance_minutes: 0, new_location: null, pc_status: null, fatigue_delta: 0, gold_delta: 0,
-    relationship_changes: [], intimacy_changes: [], stat_progress: [], skill_experience: [],
+    relationship_changes: [], npc_relationship_changes: [], intimacy_changes: [], stat_progress: [], skill_experience: [],
     items_add: [], items_remove: [], active_events_add: [], active_events_remove: [], completed_events_add: [],
     pc_knowledge_add: [], scheduled_events_add: [], scheduled_events_complete: [], hooks_add: [], hooks_update: [],
     memories_add: [], npc_state_updates: [],
@@ -314,9 +314,33 @@ function compactStateStable() {
   };
 }
 
+function applyNpcRelationshipDeltaStable(turn, runtime = {}) {
+  const serverBacked = new Set(Object.entries(runtime?.npc_updates || {}).filter(([, row]) => row?.npc_relationships && typeof row.npc_relationships === 'object').map(([key]) => key));
+  const rows = Array.isArray(turn?.state_delta?.npc_relationship_changes) ? turn.state_delta.npc_relationship_changes.slice(0, 6) : [];
+  const turnNo = Math.max(0, Number(save.turnNumber || 0));
+  for (const raw of rows) {
+    const sourceKey = String(raw?.source_npc_key || '').trim();
+    const targetKey = String(raw?.target_npc_key || '').trim();
+    const reason = String(raw?.reason || '').trim().slice(0, 300);
+    if (!reason || sourceKey === targetKey || serverBacked.has(sourceKey) || !ASSETS.characters?.[sourceKey] || !ASSETS.characters?.[targetKey]) continue;
+    const affinityDelta = Math.trunc(clamp(raw?.affinity_delta, -10, 10));
+    const trustDelta = Math.trunc(clamp(raw?.trust_delta, -10, 10));
+    const status = String(raw?.status || '').trim().slice(0, 80) || null;
+    const source = save.npcInnerStates[sourceKey] && typeof save.npcInnerStates[sourceKey] === 'object' ? save.npcInnerStates[sourceKey] : {};
+    const links = source.npc_relationships && typeof source.npc_relationships === 'object' ? { ...source.npc_relationships } : {};
+    const old = links[targetKey] && typeof links[targetKey] === 'object' ? links[targetKey] : {};
+    if (affinityDelta === 0 && trustDelta === 0 && (!status || status === String(old.status || '중립'))) continue;
+    const historyRow = { turn:turnNo, affinity_delta:affinityDelta, trust_delta:trustDelta, status, reason, source_event:String(turn?.event_progress?.event_instance_id || turn?.director?.callback_key || turn?.scene_title || '').slice(0, 120) || null };
+    links[targetKey] = { affinity:Math.trunc(clamp(Number(old.affinity || 0) + affinityDelta, -100, 100)), trust:Math.trunc(clamp(Number(old.trust || 0) + trustDelta, -100, 100)), status:status || String(old.status || '중립').slice(0, 80), reason, updated_turn:turnNo, history:[...(Array.isArray(old.history) ? old.history : []), historyRow].slice(-8) };
+    source.npc_relationships = Object.fromEntries(Object.entries(links).filter(([key]) => key !== sourceKey && ASSETS.characters?.[key]).sort((a, b) => Number(b[1]?.updated_turn || 0) - Number(a[1]?.updated_turn || 0) || (Math.abs(Number(b[1]?.affinity || 0)) + Math.abs(Number(b[1]?.trust || 0))) - (Math.abs(Number(a[1]?.affinity || 0)) + Math.abs(Number(a[1]?.trust || 0))) || a[0].localeCompare(b[0])).slice(0, 16));
+    save.npcInnerStates[sourceKey] = source;
+  }
+}
+
 function applyRuntimeStateStable(data, isContinue = false) {
   const runtime = data?.runtime_state || {};
   save.npcInnerStates = save.npcInnerStates || {};
+  applyNpcRelationshipDeltaStable(data?.turn, runtime);
   for (const [key, row] of Object.entries(runtime.npc_updates || {})) {
     const old = save.npcInnerStates[key] || {};
     save.npcInnerStates[key] = {
@@ -704,6 +728,7 @@ async function boot() {
       accumulateUsageStable.toString(),
       zeroStateDeltaStable.toString(),
       compactStateStable.toString(),
+      applyNpcRelationshipDeltaStable.toString(),
       applyRuntimeStateStable.toString(),
       materializeEventConsequencesStable.toString(),
     ].join('\n\n');

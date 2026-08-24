@@ -1,13 +1,13 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Narrative Engine continuation — live acceptance, Scene Purpose, Scene Exit, Stronger Turn Hook, Event Consequence V1, NPC Goal Tick V1, and Bounded Off-screen Progression V1 are merged. Deterministic Scene Novelty V1 is the active separate phase.
+Narrative Engine continuation — Deterministic Scene Novelty V1 is merged. NPC↔NPC Relationship V1 is the active separate phase.
 
 ## Current GitHub State
 - Repo: `hoho074566-cpu/lumencia-ac`
-- Main: `fd2bcff13007fdf66c04477b9f69066f7c9b871e` (`Bounded Off-screen Progression V1`, PR #43 merge)
-- Working branch: `codex/deterministic-scene-novelty-v1`
-- PR #44: **open / protected-path / human-merge only**. Initial code checkpoint `6eada327ea91afecdb3fa9655f917ddb65781f7b` passed the full clean-LF and focused checks. Hosted review found a P1 recap false positive and an adjacent P2 action-budget truncation; closure checkpoint `3395454e2d50d6a30db7911825394274ce52bb8c` narrows recap detection and preserves moderate actions without dropping dense schedule authority. Fresh exact-head Safety/Vercel/Codex review and affected Exact Preview acceptance remain required after the final docs checkpoint.
+- Main: `fe6b4a5dcc0f0a96b71d8fcffcf8666caeefd82b` (`Deterministic Scene Novelty V1`, PR #44 merge)
+- Working branch: `codex/npc-npc-relationship-v1`
+- PR #44: **merged** from exact reviewed head `e5fae96ac271a617db42627a99d53a720299a213` as `fe6b4a5dcc0f0a96b71d8fcffcf8666caeefd82b`. Merge and reviewed trees both equal `f4aeadd44c116682d60385c265e3f35f3b48ea0e`; production health is green.
 - PR #43: **merged** from exact reviewed/accepted head `6b4f5990278ce8d3446c7b5be94a899a72d9fc80` as `fd2bcff13007fdf66c04477b9f69066f7c9b871e`. Merge and reviewed-head trees both equal `5b6b56b272de438e3db6a53027ce13b75ff7cace`; merged-main Vercel, production `/api/health`, and the clean-LF full PR check pass.
 - PR #42: **merged** from exact reviewed head `6c115e661ed7257b3787b74d5f142a1c0b39e38d`. Safety #32741095125, Vercel, exact-head Codex P0/P1=0, and targeted Exact Preview acceptance passed. Merge `8c5ca35...` and reviewed head share tree `22195b469f2ccb1b3afdc7c197f5259fb110d59a`.
 - PR #41: **merged** from exact reviewed head `06617b3ffe11d83bc512d7e4f520c17946d7bdf0`; Safety/Vercel/fresh P0/P1=0 and targeted Preview lifecycle acceptance passed. Merge `da248a2...` and reviewed head share tree `2bac9dd94468d37ff0cb7787ad6c42cdba478b27`.
@@ -36,7 +36,17 @@ Narrative Engine continuation — live acceptance, Scene Purpose, Scene Exit, St
 - Production `/api/health`: `ok=true`, API configured, app `1.5.6`, adapter `/api/chat-router`, canonical core `/api/chat`, prompt cache retention `24h`.
 - Post-merge full `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
-## Deterministic Scene Novelty V1 — Current Candidate
+## NPC↔NPC Relationship V1 — Current Candidate
+- Adds a bounded `state_delta.npc_relationship_changes` contract with directional registered source/target NPC keys, affinity/trust deltas, optional status, and a causal reason.
+- Persists inside `npcInnerStates[source].npc_relationships[target]`; there is no new save root/migration, API entrypoint, model call, or `app.js` change.
+- Each direction clamps affinity/trust to ±100, keeps 8 causal rows and 16 targets, and routes only 6 target links with 2 recent causes for currently relevant NPCs.
+- A client fallback persists the structured delta only when no server-backed relationship row exists, covering the quality-pipeline-off path without double application.
+- Reverse directions are independent. Self/unregistered/no-op rows are rejected, and prompt rules prohibit changing a relationship from co-presence alone.
+- Existing `relationship_changes` remains PC↔NPC only. META/CONTINUE clear the new field, while a real mutation contributes once to Scene Momentum's existing relationship axis.
+- `scripts/tests/npc-relationship-v1.test.mjs` covers schema, directionality, accumulation, clamps, bounds, invalid/no-op rejection, causal context, freeze, health, and one-call preservation. Focused NPC Goal/Motivation, Context Router, Scene Momentum, and CONTINUE regressions pass.
+- Exact code checkpoint `ec7228a` passes the authoritative clean-LF full PR check. The normal-checkout run's two automation failures were confirmed as the existing CRLF-only workflow-string false positives; every game/API/runtime suite passed in both runs.
+
+## Deterministic Scene Novelty V1 — Completed
 - Adds a bounded `sceneRuntime.novelty` checkpoint inside the existing flexible runtime root; there is no save root, migration, endpoint, rewrite pass, or additional model call.
 - The checkpoint retains at most 16 recently visible terms, 8 repeated terms, 6 real change axes, a bounded similarity score, and a repetition streak. It never stores hidden canon or grants broader secret access.
 - Repetition pressure rises only when the next visible response overlaps at least three prior terms by 65% or more while structural State Delta remains zero. Location/time/NPC/event/information/relationship/objective/resource/schedule/world changes clear the streak.
@@ -360,11 +370,11 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
 
 ## NEXT ACTION
-1. Commit/push the `3395454...` review closure plus this final docs checkpoint and rerun the authoritative clean-LF full check at that exact HEAD.
-2. Require fresh exact-current-HEAD Safety/Vercel and Codex P0/P1=0 review; revalidate current main, merge-base, no conflict, and the bounded runtime/one-call invariants.
-3. Rerun affected Exact Preview acceptance with `본다` → `돌아다닌다` → `본다`. PASS requires no unchanged re-enumeration, real world/scene progress by the second or third turn, and no generic false choice.
-4. Separately verify explicit recap, a direct question, CONTINUE, and `다시 자리에서 일어나 경비에게 말을 건다`: recap must work, question/CONTINUE boundaries must hold, and the ordinary action must execute instead of being treated as recap.
-5. If every gate is green, report protected-path PR #44 ready for the user's human merge. Do not merge it from a Codex task and do not expand this phase into arbitrary events, secrets, relationships/factions, or a second model call.
+1. Push the current exact code/docs head and open the protected-path NPC↔NPC Relationship V1 PR.
+2. Require fresh current-head Safety/Vercel/Codex P0/P1=0.
+3. Revalidate current main, merge-base, no conflict, one-call architecture, bounded storage/context, META/CONTINUE freeze, and unchanged PC↔NPC behavior.
+4. Run Exact Preview acceptance for causal directional persistence, reload retention, explicit-only reverse mutation, and META/CONTINUE zero mutation.
+5. If every gate passes, report the protected-path PR ready for human merge. Do not begin Faction / Social Consequence V1 before this phase is accepted.
 
 ## Stop Record
 - Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.
@@ -400,4 +410,5 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Opened PR #42 from `codex/npc-goal-tick-v1` against current main; the initial published head is mergeable with no behind delta.
 - Historical PR #43 NEXT ACTION (completed): publish the P2-closure checkpoint, require fresh exact-head hosted authority/review and the three affected Preview cases, then leave the protected-path PR for human merge.
 - Completed: PR #43 exact head `6b4f599...` passed clean-LF/Safety/Vercel/Codex/Preview gates and was merged by the user as `fd2bcff...`; merge-tree equality, merged-main Vercel, production health, and clean-LF full regression pass.
-- Current candidate: PR #44 initial code `6eada32...` plus hosted-review closure `3395454...` implements bounded visible-term repetition detection, explicit recap boundaries, and pressure-only action compaction. Dedicated/affected regressions pass; final docs exact-head clean-LF/hosted/Preview authority remain.
+- Completed: PR #44 exact reviewed head `e5fae96...` merged as `fe6b4a5...`; merge-tree equality and production health pass.
+- Current candidate: NPC↔NPC Relationship V1 on `codex/npc-npc-relationship-v1`; local implementation checkpoint `ec7228a` completed the exact diff and second review, and its focused plus authoritative clean-LF full PR checks PASS. Hosted/review/Preview authority remain.

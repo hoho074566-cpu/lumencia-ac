@@ -150,7 +150,7 @@ installResponsesRouter();
 function emptyStateDelta() {
   return {
     advance_minutes:0,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0,
-    relationship_changes:[],intimacy_changes:[],stat_progress:[],skill_experience:[],
+    relationship_changes:[],npc_relationship_changes:[],intimacy_changes:[],stat_progress:[],skill_experience:[],
     items_add:[],items_remove:[],active_events_add:[],active_events_remove:[],completed_events_add:[],
     pc_knowledge_add:[],scheduled_events_add:[],scheduled_events_complete:[],hooks_add:[],hooks_update:[],
     memories_add:[],npc_state_updates:[],delayed_consequences_add:[],
@@ -190,6 +190,43 @@ function relationChangeFor(turn,key){return array(turn?.state_delta?.relationshi
 function npcStateUpdateFor(turn,key){return array(turn?.state_delta?.npc_state_updates).find(x=>String(x?.npc_key||x?.key||'')===key)||null;}
 function emotionFor(turn,key){return array(turn?.emotion_updates).find(x=>String(x?.npc_key||x?.key||x?.speaker_key||'')===key)||null;}
 function bounded(value,min,max,fallback){if(value==null||value==='')return fallback;const n=Number(value);return Number.isFinite(n)?Math.max(min,Math.min(max,n)):fallback;}
+
+function npcRelationshipRuntimeFor(sourceKey,previousLinks={},changes=[],turnNo=0,sourceEvent=''){
+  const links={},safeTurnNo=Math.trunc(bounded(turnNo,0,1e9,0));
+  for(const [targetKey,raw] of Object.entries(object(previousLinks))){
+    if(targetKey===sourceKey||!Object.prototype.hasOwnProperty.call(CHARACTER_REGISTRY,targetKey))continue;
+    const row=object(raw);
+    links[targetKey]={
+      affinity:Math.trunc(bounded(row.affinity,-100,100,0)),trust:Math.trunc(bounded(row.trust,-100,100,0)),status:clampText(row.status||'중립',80)||'중립',
+      reason:clampText(row.reason||'',300),updated_turn:Math.trunc(bounded(row.updated_turn,0,1e9,0)),
+      history:array(row.history).slice(-8).map(item=>typeof item==='string'?clampText(item,300):{
+        turn:Math.trunc(bounded(item?.turn,0,1e9,0)),affinity_delta:Math.trunc(bounded(item?.affinity_delta,-10,10,0)),trust_delta:Math.trunc(bounded(item?.trust_delta,-10,10,0)),
+        status:clampText(item?.status||'',80)||null,reason:clampText(item?.reason||'',300),source_event:clampText(item?.source_event||'',120)||null,
+      }),
+    };
+  }
+  for(const raw of array(changes).slice(0,6)){
+    const targetKey=String(raw?.target_npc_key||'').trim(),reason=clampText(raw?.reason||'',300).trim();
+    if(!reason||targetKey===sourceKey||!Object.prototype.hasOwnProperty.call(CHARACTER_REGISTRY,targetKey))continue;
+    const old=object(links[targetKey]),affinityDelta=Math.trunc(bounded(raw?.affinity_delta,-10,10,0)),trustDelta=Math.trunc(bounded(raw?.trust_delta,-10,10,0));
+    const historyRow={turn:safeTurnNo,affinity_delta:affinityDelta,trust_delta:trustDelta,status:clampText(raw?.status||'',80)||null,reason,source_event:clampText(sourceEvent||'',120)||null};
+    if(affinityDelta===0&&trustDelta===0&&(!historyRow.status||historyRow.status===String(old.status||'중립')))continue;
+    links[targetKey]={affinity:Math.trunc(bounded(Number(old.affinity||0)+affinityDelta,-100,100,0)),trust:Math.trunc(bounded(Number(old.trust||0)+trustDelta,-100,100,0)),status:historyRow.status||clampText(old.status||'중립',80)||'중립',reason,updated_turn:safeTurnNo,history:[...array(old.history),historyRow].slice(-8)};
+  }
+  return Object.fromEntries(Object.entries(links).sort((a,b)=>Number(b[1]?.updated_turn||0)-Number(a[1]?.updated_turn||0)||(Math.abs(Number(b[1]?.affinity||0))+Math.abs(Number(b[1]?.trust||0)))-(Math.abs(Number(a[1]?.affinity||0))+Math.abs(Number(a[1]?.trust||0)))||a[0].localeCompare(b[0])).slice(0,16));
+}
+
+function localNpcRelationshipUpdates(incoming,turn){
+  const rows=array(turn?.state_delta?.npc_relationship_changes).slice(0,6),grouped={};
+  for(const row of rows){
+    const sourceKey=String(row?.source_npc_key||'').trim(),targetKey=String(row?.target_npc_key||'').trim();
+    if(sourceKey===targetKey||!Object.prototype.hasOwnProperty.call(CHARACTER_REGISTRY,sourceKey)||!Object.prototype.hasOwnProperty.call(CHARACTER_REGISTRY,targetKey)||(Number(row?.affinity_delta||0)===0&&Number(row?.trust_delta||0)===0&&!String(row?.status||'').trim()))continue;
+    (grouped[sourceKey]||(grouped[sourceKey]=[])).push(row);
+  }
+  const out={},previous=object(incoming.saveState?.npcInnerStates),turnNo=Number(incoming.saveState?.turnNumber||0)+1,sourceEvent=turn?.event_progress?.event_instance_id||turn?.director?.callback_key||turn?.scene_title||'';
+  for(const [sourceKey,changes] of Object.entries(grouped))out[sourceKey]={npc_relationships:npcRelationshipRuntimeFor(sourceKey,object(previous[sourceKey]).npc_relationships,changes,turnNo,sourceEvent)};
+  return out;
+}
 function scheduleTimestamp(date='',time=''){
   const dm=String(date||'').trim().match(/^(\d{1,4})-(\d{1,2})-(\d{1,2})$/),tm=String(time||'').trim().match(/^(\d{1,2}):(\d{2})$/);if(!dm||!tm)return null;
   const year=Number(dm[1]),month=Number(dm[2]),day=Number(dm[3]),hour=Number(tm[1]),minute=Number(tm[2]);if(month<1||month>12||day<1||day>31||hour<0||hour>23||minute<0||minute>59)return null;
@@ -372,9 +409,10 @@ function relationshipReasonFor(incoming,turn,key,rel){
 
 function localNpcUpdates(incoming,turn){
   const previous=object(incoming.saveState?.npcInnerStates);
+  const npcRelationshipUpdates=localNpcRelationshipUpdates(incoming,turn);
   const speakerRows=array(turn?.scene).filter(x=>x?.speaker_key);
-  const relationKeys=array(turn?.state_delta?.relationship_changes).map(x=>String(x?.npc_key||x?.key||'')).filter(Boolean);
-  const stateKeys=array(turn?.state_delta?.npc_state_updates).map(x=>String(x?.npc_key||x?.key||'')).filter(Boolean);
+  const relationKeys=[...Object.keys(npcRelationshipUpdates),...array(turn?.state_delta?.relationship_changes).map(x=>String(x?.npc_key||x?.key||'')).filter(Boolean)];
+  const stateKeys=[...Object.keys(npcRelationshipUpdates),...array(turn?.state_delta?.npc_state_updates).map(x=>String(x?.npc_key||x?.key||'')).filter(Boolean)];
   const explicitKeys=[...new Set(stateKeys)].slice(0,12);
   const passiveKeys=[...new Set([...relationKeys,...speakerRows.map(x=>String(x.speaker_key)).filter(Boolean)])].filter(key=>!explicitKeys.includes(key)).slice(0,6);
   const keys=[...explicitKeys,...passiveKeys].slice(0,12);
@@ -408,6 +446,7 @@ function localNpcUpdates(incoming,turn){
       goal_history:goalResult.history,
       ...(relationshipReason?{relationship_reason:relationshipReason}:{}),
       relationship_history:relationshipHistory,
+      ...object(npcRelationshipUpdates[key]),
     };
   }
   return out;
