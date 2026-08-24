@@ -38,7 +38,8 @@ assert.ok(text.endsWith(actionBlock),'USER ACTION must remain the final authorit
 
 const source=readFileSync('api/lib/context-router.js','utf8');
 assert.match(source,/function compactScheduleAuthority\(/,'schedule authority must be structurally compacted before reservation');
-assert.match(source,/const authorityTail=`===== GM EVENT DIRECTOR \(ROUTED\) =====/,'buildInput must create a reserved authority tail');
+assert.match(source,/function formatAuthorityTail\(/,'router must construct a labeled reserved authority tail');
+assert.match(source,/const authorityTail=fitAuthorityTail\(/,'buildInput must budget the reserved authority tail against fixed context');
 assert.match(source,/composeRoutedInput\(\{saveState,optionalContext,reservedContext,authorityTail,actionBlock,inputChars:profile\.inputChars\}\)/,'buildInput must use the reserved-state-and-tail composer');
 assert.doesNotMatch(source,/clampText\(variableContext,variableBudget\)/,'legacy prefix-only clamp must stay removed');
 
@@ -89,7 +90,7 @@ assert.match(routed.params.input,/도서관에 간다\./,'the bounded USER ACTIO
 assert.ok(routed.params.input.lastIndexOf('===== USER ACTION =====')>routed.params.input.lastIndexOf('===== SCHEDULE ENGINE (ROUTED) ====='),'USER ACTION marker must remain final');
 
 const denseActionSuffix='대도서관으로 간다.';
-const denseAction=`${'밀집 행동 설명 '.repeat(600)}`.slice(0,3800-denseActionSuffix.length)+denseActionSuffix;
+const denseAction=`${'밀집 행동 설명 '.repeat(600)}`.slice(0,3900-denseActionSuffix.length)+denseActionSuffix;
 const denseEvents=Array.from({length:5},(_,index)=>({id:`dense-${index}`,title:`기사과 필수 일정 ${index} ${'상세 '.repeat(20)}`,note:`NOTE_DENSE_${index} ${'권위 일정 설명 '.repeat(30)}`,date:'1285-03-01',time:`${String(10+index).padStart(2,'0')}:00`,location:`DENSE_LOCATION_${index}`,status:'scheduled',participants:['guide']}));
 const denseOriginalInput=`===== TURN OPTIONS =====\nnormal
 ===== AUTHORITATIVE SAVE_STATE =====\n{}
@@ -121,6 +122,16 @@ assert.match(denseRouted.params.input,/NOTE_DENSE_0/);
 assert.match(denseRouted.params.input,/STRONGER TURN HOOK V1/);
 assert.match(denseRouted.params.input,/TURN_HOOK_DENSE_SENTINEL/);
 assert.match(denseRouted.params.input,/대도서관으로 간다\./);
+
+const maximumActionSuffix='대도서관으로 간다.';
+const maximumAction=`${'최대 행동 압력 '.repeat(900)}`.slice(0,5200-maximumActionSuffix.length)+maximumActionSuffix;
+const maximumRouted=routeOpenAIParams({instructions,input:denseOriginalInput},{mode:'game',incoming:{action:maximumAction,rollingSummary:'dense old '.repeat(1000),recentTurns:[],saveState:denseSave}});
+assert.ok(maximumRouted.params.input.length<=9000,`maximum fixed authority input exceeded budget: ${maximumRouted.params.input.length}`);
+assert.match(maximumRouted.params.input,/GM EVENT DIRECTOR \(ROUTED\)/);
+assert.match(maximumRouted.params.input,/EVENT DIRECTOR V2\.1 \(ROUTED\)/);
+assert.match(maximumRouted.params.input,/SCHEDULE ENGINE \(ROUTED\)/);
+assert.match(maximumRouted.params.input,/STRONGER TURN HOOK V1/);
+assert.match(maximumRouted.params.input,/대도서관으로 간다\./);
 
 const aftermath=source.indexOf("AFTERMATH_FIXED_FLOW");
 const combat=source.indexOf("ACTIVE_COMBAT_FIXED_FLOW");

@@ -28,6 +28,11 @@ const npcAddress=deriveTurnHook({turn:{scene:[{kind:'dialogue',speaker_key:'isab
 assert.equal(npcAddress.kind,'npc-address');
 assert.equal(npcAddress.status,'awaiting-player');
 assert.equal(npcAddress.speaker_key,'isabel');
+const interruptedExit=deriveTurnHook({turn:{scene:[{kind:'dialogue',speaker_key:'isabel',text:'잠깐, 어디로 가는 거야?'}],choices:[]},sceneDelta:{flags:{npcAction:true}},purpose:{kind:'interaction',focus:'이사벨이 이동을 막고 물었다.'},exitCondition:{...reachedExit,status:'open',target:'대도서관에 도착한 때'},turnNumber:11});
+assert.equal(interruptedExit.kind,'npc-address','a direct NPC question outranks an unfinished travel exit');
+assert.equal(interruptedExit.status,'awaiting-player');
+const declarativeDialogue=deriveTurnHook({turn:{scene:[{kind:'dialogue',speaker_key:'isabel',text:'알겠어.'},{kind:'dialogue',speaker_key:'isabel',text:'그 부탁은 이미 처리했어.'}],choices:[],scene_summary:'이사벨이 처리를 마쳤다.'},sceneDelta:{flags:{npcAction:true}},purpose:{kind:'interaction',focus:'처리 결과를 확인했다.'},exitCondition:reachedExit,turnNumber:11});
+assert.notEqual(declarativeDialogue.status,'awaiting-player','ordinary declarative dialogue must not create a false player boundary');
 
 const nonverbalNpc=deriveTurnHook({turn:{scene:[{kind:'narration',text:'이사벨이 봉인된 상자를 건네고 한 걸음 물러섰다.'}],scene_summary:'이사벨이 봉인 상자를 넘겼다.'},sceneDelta:{flags:{npcStateChanged:true,resourceChanged:true}},purpose:{kind:'interaction',focus:'봉인 상자가 전달되었다.'},exitCondition:reachedExit,turnNumber:12});
 assert.equal(nonverbalNpc.kind,'world-response','authoritative nonverbal NPC/world mutation is an active hook');
@@ -46,6 +51,8 @@ assert.equal(event.kind,'event-pressure');
 assert.equal(event.event_instance_id,'sealed_archive#9');
 
 const saveState={turnNumber:15,sceneRuntime:{turn_hook:decision}};
+const preservedAuto=deriveTurnHook({turn:{scene:[{kind:'narration',text:'주변의 소음만 이어졌다.'}],choices:[]},sceneDelta:{flags:{}},purpose:actionPurpose,exitCondition:reachedExit,previousRuntime:saveState.sceneRuntime,mode:'auto',turnNumber:16});
+assert.deepEqual(preservedAuto,decision,'AUTO must retain an unanswered player hook even if the response contains only narration');
 const actionDirective=buildTurnHookDirective({action:'대도서관으로 간다.',saveState});
 assert.match(actionDirective,/HOOK_MODE=current-action-first/);
 assert.match(actionDirective,/현재 USER ACTION 우선/);
