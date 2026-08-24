@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 const BASE_URL = String(process.env.LUMENSIA_LIVE_BASE_URL || 'https://lumencia-ac.vercel.app').replace(/\/$/, '');
 const ENDPOINT = `${BASE_URL}/api/chat-router`;
 const TIMEOUT_MS = Number(process.env.LUMENSIA_LIVE_TIMEOUT_MS || 120000);
+const ACCESS_TOKEN = String(process.env.LUMENSIA_LIVE_ACCESS_TOKEN || '').trim();
 
 function array(value) {
   return Array.isArray(value) ? value : [];
@@ -374,7 +375,10 @@ async function callCase(testCase) {
   try {
     const response = await fetch(ENDPOINT, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(ACCESS_TOKEN ? { 'x-lumensia-token': ACCESS_TOKEN } : {}),
+      },
       body: JSON.stringify(payload),
       signal: controller.signal,
     });

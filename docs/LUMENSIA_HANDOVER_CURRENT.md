@@ -407,6 +407,8 @@ The UI fix was published as `c90616815c9d058c0c185a87402460803df5b0d8`; Safety #
 
 The narrative freeze was published as `96230915c651b7c2d1d436f46f04442813014e6e`; Safety #270 and Vercel passed. Exact Preview CONTINUE kept 12:40/location and produced static sensory prose only. The next committed travel reached 기사과 대장간 at 12:48 without replaying the completed orientation, while Isabel/the smith initiated and left a player response hook. All 12 requested live behavior classes now have sufficient candidate evidence. No code/live blocker remains; only the final docs head gates, fresh exact-head review, and protected manual merge checkpoint remain.
 
+The final direct-thread audit found one applicable P1 before requesting review: the CLI harness did not forward the protected deployment token and could receive `401 BAD_ACCESS_TOKEN`. The current local fix accepts a dedicated `LUMENSIA_LIVE_ACCESS_TOKEN`, conditionally sends `x-lumensia-token`, never logs it, and adds a permanent regression. No token value was read or exposed.
+
 ---
 
 # 9. PERMANENT TEST COVERAGE
