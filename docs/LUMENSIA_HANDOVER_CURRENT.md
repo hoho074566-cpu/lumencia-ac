@@ -13,9 +13,10 @@ Repository: `hoho074566-cpu/lumencia-ac`
 # 0. SESSION STOP CHECKPOINT — 가장 먼저 읽을 것
 
 ## Live state immediately before this handover update
-- Branch: `codex/scene-exit-condition-v1`
-- PR #39: **open**. Current code candidate `be88e14...` adds deterministic Explicit Scene Exit Condition V1 and closes the exact-head review P1 by requiring the actual destination to match the stored semantic target before a travel/exterior boundary can become `reached`. Focused regressions pass; final docs-head checks, hosted exact-head authority, and the affected Preview rerun remain.
-- Base/current main: `227bcf23ace6ad7dca38b5d02d50a8652dd13a38` (`Merge pull request #38`).
+- Branch: `codex/stronger-turn-hook-v1`
+- PR #40 is open on `codex/stronger-turn-hook-v1`; current published HEAD is `c18f9ab80cfab0540ae57f45ebc94956c4de8276`. Safety #311 and Vercel are green, and the affected Exact Preview cases passed. The fresh exact-head Codex review found one P1 choice-filter false negative and one P2 adaptive input-budget overflow; the newly authorized local remediation below closes both and is not published yet.
+- Base/current main: `4516cc162ef34426ef94d29cf5aa6489013927ec` (`Scene Exit Condition V1 (#39)`).
+- PR #39: **merged** from exact reviewed head `ba64f9f779cda39f91ef41abfddf3c47f823606c`. Safety #307, Vercel, fresh exact-head Codex P0/P1=0, and affected Chrome Preview acceptance passed. Squash merge commit `4516cc1...` has the exact reviewed tree `dfce564cc6b457a5258d5165ea05ce496acf99c6`; production Vercel and `/api/health` are healthy.
 - PR #38: **merged** as `227bcf23ace6ad7dca38b5d02d50a8652dd13a38`. Same-occurrence event purpose focus now refreshes only when the authoritative active/completed/omitted progress signature changes; unchanged progress retains the exact prior purpose object.
 - PR #37: **merged** from exact head `acebe72f6297f44d5f08e820b8c6dc12a4fa00ae` after Safety #299, Vercel, AUTO/direct-question Preview acceptance, and one exact-head Codex P0/P1=0 result. Merge commit parents are prior main `1faadd105...` + reviewed head `acebe72...`, and its tree exactly equals the reviewed tree. Production `/api/health` is 200/configured on app `1.5.6`, adapter `0.8.3`.
 - PR #36: **merged** after exact Preview acceptance; reviewed code HEAD `c7881f4c31758d0350833f31c37d116f3ff4c18d`, exact docs checkpoint/merge parent `c347744858300359ab8d6da204cb5d9277d366be`.
@@ -39,7 +40,20 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Production `/api/health`: healthy; app `1.5.6`, canonical `/api/chat`, adapter `/api/chat-router`, `24h` prompt-cache retention.
 - Full post-merge `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
-## Current active work — Explicit Scene Exit Condition V1
+## Current active work — Stronger Turn Hook V1
+- `sceneRuntime.turn_hook` is a bounded next-direction checkpoint: allowlisted kind/source/status, a 220-character single-line anchor, bounded turn, and only applicable speaker/event IDs.
+- Fresh player choices become `player-choice/awaiting-player`; an unsatisfied Exit becomes an active continuation; direct NPC questions/requests remain player-owned; active events, new leads, and authoritative NPC/world mutations become active hooks. Plain location change or generic dialogue is only a soft next step.
+- Current USER ACTION outranks an old hook. AUTO cannot resolve an awaiting-player hook. CONTINUE preserves the prior object unchanged and cannot add a new question, choice, or NPC action.
+- The prompt asks for a concrete next direction after `EXIT_TARGET` without forcing every turn into a question or three choices. It explicitly rejects static re-description, known-information relisting, and fake questions as hooks.
+- Initial exact Preview on `4a24a77...` compressed `밖으로 간다` through corridor/stairs to the true A-building exterior, but still returned three generic destination suggestions. Later affected reruns on `c18f9ab...` passed room-to-exterior compression, preserved Isabel/Lilia direct questions, kept AUTO and CONTINUE boundaries, removed generic travel choices, and answered a contemplated-action question without moving the PC.
+- The fresh reviews correctly found that earlier filters could delete legitimate nonverbal choices and implicit destination forks. The local closure now rejects choices only when the complete set is demonstrably routine under the shared Scene Momentum intent classifier or a narrow routine-action fallback. Nonverbal manipulation choices survive without keyword membership; travel alternatives also survive when every semantic destination is grounded in the current scene, without requiring `선택/갈림길` vocabulary.
+- Initial Codex review on `4a24a77...` added two P1s: an open Exit could hide an interrupting NPC question, and AUTO could replace a saved unanswered hook. The local closure checks direct NPC address first and retains the exact prior `awaiting-player` hook for AUTO until explicit player input.
+- Earlier P2s are handled: declarative `알겠어.` / `그 부탁은 이미 처리했어.` no longer match direct requests, and the labeled Director/Schedule tail compacts dynamically. The new adaptive-pressure closure budgets the USER ACTION block as part of all fixed authority, preserving its beginning and committed ending while compacting only the middle when necessary; the minimum `.76` feedback scale with a 5,200-character action now stays within the actual 6,840-character routine input limit.
+- The authoritative minimum save carries only kind/status/anchor. Permanent 5,000-character, dense 3,900-character, maximum 5,200-character, routine adaptive `.76`, and scheduled adaptive `.76` fixtures preserve Scene Momentum, Purpose, Exit, Turn Hook, the first mandatory schedule occurrence, and the committed action ending.
+- No long-lived `saveState.hooks` mutation, Event Consequence chaining, schema migration, extra model call, new endpoint, `app.js` rewrite, or canonical `api/chat.js` rewrite.
+- Focused choice-filter and adaptive authority-budget regressions pass. The clean-LF full run, second exact-diff review, commit/push, fresh hosted gates/review, and affected Preview rerun remain.
+
+## Completed active predecessor — Explicit Scene Exit Condition V1
 - `sceneRuntime.exit_condition` is a bounded allowlisted runtime checkpoint containing condition kind, target, source, status, establishment turn, linked purpose turn, and optional event occurrence ID.
 - Current real user input always outranks a saved exit condition. Travel/exterior movement, exploration, observation, downtime, wait, committed action, and direct questions each receive an explicit deterministic stop boundary.
 - A trivial corridor step does not satisfy an exterior destination. A destination/location change, meaningful discovery, new information, elapsed downtime, event-step progress, interaction response, or actual state change satisfies the corresponding boundary.
@@ -48,7 +62,7 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Important choices persist as `awaiting-player` and cannot be auto-resolved. Direct questions end after a direct answer without executing the contemplated action. CONTINUE preserves the condition unchanged; META remains untouched.
 - Context routing reserves the exit directive under 9k pressure and exposes the compact condition in authoritative minimum state. Pipeline/route telemetry reports the condition for Preview evidence.
 - No `app.js` or canonical `api/chat.js` rewrite, schema migration, extra API entrypoint, or extra model call. Focused Scene Exit/Purpose/Momentum/CONTINUE/Event/router suites and the full clean-LF PR check pass.
-- Turn Hook and Event Consequence remain separate later phases and must not be mixed into PR #39.
+- Turn Hook was kept out of PR #39 and now lives on its own branch. Event Consequence remains a later separate phase.
 
 ### Historical PR #36 diagnosis and closure
 - The PR #35 post-merge production 12-case run is **10 PASS / 2 FAIL**. Schedule boundary, question sovereignty, CONTINUE hard freeze, and completed-event forward progression all pass.
@@ -593,13 +607,13 @@ Gameplay roadmap discussed but not DONE:
 # 12. NEXT ACTION — CURRENT START POINT
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
-2. Confirm main contains PR #38 merge commit `227bcf23ace6ad7dca38b5d02d50a8652dd13a38`; do **not** redo completed HF1/HF2/HF3, Scene Purpose, or the prior 12-case acceptance diagnosis.
-3. Continue only PR #39 Explicit Scene Exit Condition V1. Commit/push this docs checkpoint, rerun the clean-LF full check, and perform a second exact-diff regression/scope review. Keep Turn Hook and Event Consequence out of this PR.
-4. Require hosted Safety/Vercel plus fresh exact-current-HEAD P0/P1 authority. On the exact Preview, rerun at minimum: exterior movement must not stop in the corridor; current user action overrides a stale open exit; direct question does not execute the contemplated action; AUTO continues an open boundary; decision and CONTINUE remain frozen.
+2. Confirm main contains PR #39 squash merge `4516cc162ef34426ef94d29cf5aa6489013927ec`; do **not** redo completed HF1/HF2/HF3, 12-case acceptance, Scene Purpose, or Scene Exit diagnosis.
+3. Continue only PR #40 Stronger Turn Hook V1 on `codex/stronger-turn-hook-v1`. Run the clean-LF full check and second exact-diff regression/scope review, then commit and push the local deny-only-routine choice filter plus adaptive authority-floor closure. Keep Event Consequence out.
+4. Require new exact-current-HEAD Safety/Vercel and fresh Codex P0/P1 authority. Exact Preview must rerun quiet-scene no-fake-choice behavior and NPC direct-response sovereignty; deterministic tests own the nonverbal-choice and adaptive maximum-action edge cases.
 5. If every exact-current-head gate is green and no special blocker appears, use the user's explicit merge authorization. Revalidate head/base/mergeability immediately before merge, then verify the merge tree and production health.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #38까지 main `227bcf2`로 병합되었고 HF1/HF2/HF3, 12-case acceptance, Scene Purpose/event-focus 진단은 완료됐다. 현재 PR #39 branch `codex/scene-exit-condition-v1`; initial exact review on `1bc0e96...` found one P1 where any intermediate location could close a semantic destination. Code candidate `be88e14...` stores the bounded destination and requires actual exterior/named-target match, with a real `A동 복도` location-change regression. Commit/push the final docs checkpoint, run the full clean-LF check and exact-current-head Safety/Vercel/fresh P0/P1, rerun affected Exact Preview cases, and if all gates pass use the user's explicit merge authorization. Turn Hook/Event Consequence는 PR #39에 섞지 않는다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #39는 main `4516cc1...`로 병합됐고 production까지 통과했다. HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit 진단을 다시 하지 않는다. 현재 PR #40 branch `codex/stronger-turn-hook-v1`, published head `c18f9ab...`; Safety #311/Vercel/affected Preview는 통과했지만 fresh review가 keyword allowlist P1과 adaptive `.76` fixed-input overflow P2를 찾았다. Local remediation은 shared intent classifier로 complete routine set만 제거하고 비언어/갈림길 선택을 보존하며, 5,200-character action의 앞/끝 의미를 보존한 채 중간만 압축해 실제 6,840-character adaptive input budget을 지킨다. focused regressions PASS. clean-LF full rerun, commit/push, fresh exact gates/review, affected Preview를 진행한다. Event Consequence는 이 PR에 섞지 않는다.`

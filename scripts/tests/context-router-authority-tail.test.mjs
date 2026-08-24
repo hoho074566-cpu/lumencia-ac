@@ -15,7 +15,7 @@ const authorityTail=[
   '===== SCHEDULE ENGINE (ROUTED) =====',
   '{"due":[{"id":"SCHEDULE_SENTINEL","title":"반드시 보존"}]}',
 ].join('\n');
-const reservedContext='===== SCENE MOMENTUM HF1 =====\nINTENT=travel\nMOMENTUM_SENTINEL=KEEP\n\n===== SCENE PURPOSE V1 =====\nPURPOSE_SENTINEL=KEEP';
+const reservedContext='===== SCENE MOMENTUM HF1 =====\nINTENT=travel\nMOMENTUM_SENTINEL=KEEP\n\n===== SCENE PURPOSE V1 =====\nPURPOSE_SENTINEL=KEEP\n\n===== STRONGER TURN HOOK V1 =====\nTURN_HOOK_SENTINEL=KEEP';
 const actionBlock='===== USER ACTION =====\n돌아다닌다.\n\n의미적 목표를 완료한다.';
 const text=composeRoutedInput({optionalContext,reservedContext,authorityTail,actionBlock,inputChars:9000});
 
@@ -26,6 +26,8 @@ assert.match(text,/INTENT=travel/);
 assert.match(text,/MOMENTUM_SENTINEL=KEEP/,'reserved Scene Momentum payload must survive prefix pressure');
 assert.match(text,/===== SCENE PURPOSE V1 =====/);
 assert.match(text,/PURPOSE_SENTINEL=KEEP/,'reserved Scene Purpose payload must survive prefix pressure');
+assert.match(text,/===== STRONGER TURN HOOK V1 =====/);
+assert.match(text,/TURN_HOOK_SENTINEL=KEEP/,'reserved Turn Hook payload must survive prefix pressure');
 assert.match(text,/===== GM EVENT DIRECTOR \(ROUTED\) =====/);
 assert.match(text,/DIRECTOR_SENTINEL=KEEP/);
 assert.match(text,/===== EVENT DIRECTOR V2\.1 \(ROUTED\) =====/);
@@ -36,7 +38,8 @@ assert.ok(text.endsWith(actionBlock),'USER ACTION must remain the final authorit
 
 const source=readFileSync('api/lib/context-router.js','utf8');
 assert.match(source,/function compactScheduleAuthority\(/,'schedule authority must be structurally compacted before reservation');
-assert.match(source,/const authorityTail=`===== GM EVENT DIRECTOR \(ROUTED\) =====/,'buildInput must create a reserved authority tail');
+assert.match(source,/function formatAuthorityTail\(/,'router must construct a labeled reserved authority tail');
+assert.match(source,/const authorityTail=fitAuthorityTail\(/,'buildInput must budget the reserved authority tail against fixed context');
 assert.match(source,/composeRoutedInput\(\{saveState,optionalContext,reservedContext,authorityTail,actionBlock,inputChars:profile\.inputChars\}\)/,'buildInput must use the reserved-state-and-tail composer');
 assert.doesNotMatch(source,/clampText\(variableContext,variableBudget\)/,'legacy prefix-only clamp must stay removed');
 
@@ -59,7 +62,7 @@ const originalInput=`===== TURN OPTIONS =====\nnormal
 ===== GM EVENT DIRECTOR (SERVER GUIDANCE) =====
 INTERVENTION: light\nDIRECTOR_SENTINEL=KEEP
 ===== SCHEDULE ENGINE (AUTHORITATIVE) =====\nSCHEDULE_SENTINEL`;
-const routed=routeOpenAIParams({instructions,input:originalInput},{mode:'game',incoming:{action:longAction,rollingSummary:'old '.repeat(5000),recentTurns:[],saveState:{turnNumber:8,world:{date:'1285-03-01',time:'09:00',location:'SAVE_WORLD_SENTINEL'},pc:{name:'SAVE_PC_SENTINEL'},npcStates:{guide:{location:'hall'}},sceneRuntime:{participants:['guide'],purpose:{version:'1.0',kind:'interaction',focus:'PURPOSE_RUNTIME_SENTINEL',source:'npc-interaction',established_turn:8},exit_condition:{version:'1.0',kind:'interaction-turn',target:'EXIT_RUNTIME_SENTINEL',source:'scene-purpose',status:'open',established_turn:8,purpose_established_turn:8},momentum:{stall_streak:2}},scheduleContext:{due:[{id:'SCHEDULE_SENTINEL',title:'ceremony',note:'NOTE_SENTINEL',time:'09:10',participants:['guide']}],npc_schedule:{guide:{location:'hall',activity:'class',commitment:'fixed class',confidence:'fixed',time:'09:10'}}}}}});
+const routed=routeOpenAIParams({instructions,input:originalInput},{mode:'game',incoming:{action:longAction,rollingSummary:'old '.repeat(5000),recentTurns:[],saveState:{turnNumber:8,world:{date:'1285-03-01',time:'09:00',location:'SAVE_WORLD_SENTINEL'},pc:{name:'SAVE_PC_SENTINEL'},npcStates:{guide:{location:'hall'}},sceneRuntime:{participants:['guide'],purpose:{version:'1.0',kind:'interaction',focus:'PURPOSE_RUNTIME_SENTINEL',source:'npc-interaction',established_turn:8},exit_condition:{version:'1.0',kind:'interaction-turn',target:'EXIT_RUNTIME_SENTINEL',source:'scene-purpose',status:'open',established_turn:8,purpose_established_turn:8},turn_hook:{version:'1.0',kind:'npc-address',anchor:'TURN_HOOK_RUNTIME_SENTINEL',source:'scene-dialogue',status:'awaiting-player',established_turn:8,speaker_key:'guide'},momentum:{stall_streak:2}},scheduleContext:{due:[{id:'SCHEDULE_SENTINEL',title:'ceremony',note:'NOTE_SENTINEL',time:'09:10',participants:['guide']}],npc_schedule:{guide:{location:'hall',activity:'class',commitment:'fixed class',confidence:'fixed',time:'09:10'}}}}}});
 assert.ok(routed.params.input.length<=9000,`long-action routine input exceeded budget: ${routed.params.input.length}`);
 assert.match(routed.params.input,/AUTHORITATIVE SAVE_STATE \(ROUTED MINIMUM\)/);
 assert.match(routed.params.input,/SAVE_WORLD_SENTINEL/);
@@ -80,8 +83,79 @@ assert.match(routed.params.input,/USER ACTION이 저장된 PURPOSE_FOCUS보다 �
 assert.match(routed.params.input,/===== EXPLICIT SCENE EXIT CONDITION V1 =====/,'Scene Exit heading must survive long-action pressure');
 assert.match(routed.params.input,/EXIT_KIND=semantic-destination/,'the current travel action must set the active exit boundary');
 assert.match(routed.params.input,/EXIT_RUNTIME_SENTINEL/,'the bounded saved exit checkpoint must remain in authoritative minimum state');
+assert.match(routed.params.input,/===== STRONGER TURN HOOK V1 =====/,'Turn Hook heading must survive long-action pressure');
+assert.match(routed.params.input,/TURN_HOOK_RUNTIME_SENTINEL/,'the bounded saved Turn Hook must remain in authoritative minimum state');
+assert.match(routed.params.input,/HOOK_MODE=current-action-first/,'current committed action must outrank the saved Turn Hook');
 assert.match(routed.params.input,/도서관에 간다\./,'the bounded USER ACTION must retain its committed travel predicate');
 assert.ok(routed.params.input.lastIndexOf('===== USER ACTION =====')>routed.params.input.lastIndexOf('===== SCHEDULE ENGINE (ROUTED) ====='),'USER ACTION marker must remain final');
+
+const denseActionSuffix='대도서관으로 간다.';
+const denseAction=`${'밀집 행동 설명 '.repeat(600)}`.slice(0,3900-denseActionSuffix.length)+denseActionSuffix;
+const denseEvents=Array.from({length:5},(_,index)=>({id:`dense-${index}`,title:`기사과 필수 일정 ${index} ${'상세 '.repeat(20)}`,note:`NOTE_DENSE_${index} ${'권위 일정 설명 '.repeat(30)}`,date:'1285-03-01',time:`${String(10+index).padStart(2,'0')}:00`,location:`DENSE_LOCATION_${index}`,status:'scheduled',participants:['guide']}));
+const denseOriginalInput=`===== TURN OPTIONS =====\nnormal
+===== AUTHORITATIVE SAVE_STATE =====\n{}
+===== GM EVENT DIRECTOR (SERVER GUIDANCE) =====
+${'DIRECTOR_DENSE '.repeat(80)}
+===== SCHEDULE ENGINE (AUTHORITATIVE) =====\nSCHEDULE_DENSE_SENTINEL`;
+const denseSave={
+  turnNumber:8,
+  world:{date:'1285-03-01',time:'09:00',location:'SAVE_WORLD_DENSE'},
+  pc:{name:'SAVE_PC_DENSE',department:'기사과'},
+  npcStates:{guide:{location:'hall',status:'waiting'}},
+  sceneRuntime:{
+    participants:['guide'],
+    purpose:{version:'1.0',kind:'interaction',focus:'PURPOSE_DENSE_SENTINEL',source:'npc-interaction',established_turn:8},
+    exit_condition:{version:'1.0',kind:'interaction-turn',target:'EXIT_DENSE_SENTINEL',source:'scene-purpose',status:'open',established_turn:8,purpose_established_turn:8},
+    turn_hook:{version:'1.0',kind:'npc-address',anchor:'TURN_HOOK_DENSE_SENTINEL',source:'scene-dialogue',status:'awaiting-player',established_turn:8,speaker_key:'guide'},
+    momentum:{stall_streak:2},
+  },
+  scheduleContext:{
+    due:denseEvents.slice(0,4),upcoming:denseEvents,
+    npc_schedule:{guide:{location:'hall',activity:'DENSE_ACTIVITY '.repeat(20),commitment:'DENSE_COMMITMENT '.repeat(20),confidence:'fixed',time:'10:00'}},
+  },
+  scheduledEvents:denseEvents,
+};
+const denseRouted=routeOpenAIParams({instructions,input:denseOriginalInput},{mode:'game',incoming:{action:denseAction,rollingSummary:'dense old '.repeat(1000),recentTurns:[],saveState:denseSave}});
+assert.ok(denseRouted.params.input.length<=9000,`dense routine authority input exceeded budget: ${denseRouted.params.input.length}`);
+assert.match(denseRouted.params.input,/SCHEDULE ENGINE \(ROUTED\)/);
+assert.match(denseRouted.params.input,/NOTE_DENSE_0/);
+assert.match(denseRouted.params.input,/STRONGER TURN HOOK V1/);
+assert.match(denseRouted.params.input,/TURN_HOOK_DENSE_SENTINEL/);
+assert.match(denseRouted.params.input,/대도서관으로 간다\./);
+
+const maximumActionSuffix='대도서관으로 간다.';
+const maximumAction=`${'최대 행동 압력 '.repeat(900)}`.slice(0,5200-maximumActionSuffix.length)+maximumActionSuffix;
+const maximumRouted=routeOpenAIParams({instructions,input:denseOriginalInput},{mode:'game',incoming:{action:maximumAction,rollingSummary:'dense old '.repeat(1000),recentTurns:[],saveState:denseSave}});
+assert.ok(maximumRouted.params.input.length<=9000,`maximum fixed authority input exceeded budget: ${maximumRouted.params.input.length}`);
+assert.match(maximumRouted.params.input,/GM EVENT DIRECTOR \(ROUTED\)/);
+assert.match(maximumRouted.params.input,/EVENT DIRECTOR V2\.1 \(ROUTED\)/);
+assert.match(maximumRouted.params.input,/SCHEDULE ENGINE \(ROUTED\)/);
+assert.match(maximumRouted.params.input,/STRONGER TURN HOOK V1/);
+assert.match(maximumRouted.params.input,/대도서관으로 간다\./);
+
+const adaptiveSave={...denseSave,routerFeedback:{routerVersion:'1.5.6-hf1',profile:'routine-17k-v154',lastInputTokens:100000}};
+const adaptiveRouted=routeOpenAIParams({instructions,input:denseOriginalInput},{mode:'game',incoming:{action:maximumAction,rollingSummary:'dense old '.repeat(1000),recentTurns:[],saveState:adaptiveSave}});
+assert.equal(adaptiveRouted.telemetry.adaptive_scale,.76,'pressure fixture must exercise the minimum supported adaptive scale');
+assert.ok(adaptiveRouted.params.input.length<=6840,`adaptive routine input exceeded its 0.76 profile budget: ${adaptiveRouted.params.input.length}`);
+assert.match(adaptiveRouted.params.input,/AUTHORITATIVE SAVE_STATE \(ROUTED MINIMUM\)/);
+assert.match(adaptiveRouted.params.input,/SCENE MOMENTUM HF1/);
+assert.match(adaptiveRouted.params.input,/STRONGER TURN HOOK V1/);
+assert.match(adaptiveRouted.params.input,/SCHEDULE ENGINE \(ROUTED\)/);
+assert.match(adaptiveRouted.params.input,/"id":"dense-0"/,'adaptive pressure must retain the first authoritative schedule occurrence');
+assert.match(adaptiveRouted.params.input,/최대 행동 압력/,'adaptive middle compaction must retain the beginning of USER ACTION');
+assert.match(adaptiveRouted.params.input,/대도서관으로 간다\./,'adaptive pressure must retain the committed USER ACTION predicate');
+assert.equal(adaptiveRouted.params.input.includes(maximumAction),false,'adaptive pressure fixture must actually exercise bounded middle compaction');
+assert.ok(adaptiveRouted.params.input.lastIndexOf('===== USER ACTION =====')>adaptiveRouted.params.input.lastIndexOf('===== SCHEDULE ENGINE (ROUTED) ====='),'adaptive USER ACTION marker must remain final');
+
+const mandatoryEvents=denseEvents.map((event,index)=>({...event,importance:4,id:`mandatory-${index}`}));
+const scheduledSave={...denseSave,scheduleContext:{...denseSave.scheduleContext,due:mandatoryEvents.slice(0,4),upcoming:mandatoryEvents},scheduledEvents:mandatoryEvents,routerFeedback:{routerVersion:'1.5.6-hf1',profile:'scheduled-18k-v154',lastInputTokens:100000}};
+const scheduledRouted=routeOpenAIParams({instructions,input:denseOriginalInput},{mode:'game',incoming:{action:maximumAction,rollingSummary:'dense old '.repeat(1000),recentTurns:[],saveState:scheduledSave}});
+assert.equal(scheduledRouted.telemetry.profile,'scheduled-18k-v154');
+assert.equal(scheduledRouted.telemetry.adaptive_scale,.76,'scheduled fixture must exercise the minimum supported adaptive scale');
+assert.ok(scheduledRouted.params.input.length<=7220,`adaptive scheduled input exceeded its 0.76 profile budget: ${scheduledRouted.params.input.length}`);
+assert.match(scheduledRouted.params.input,/SCHEDULE ENGINE \(ROUTED\)/);
+assert.match(scheduledRouted.params.input,/"id":"mandatory-0"/,'adaptive scheduled pressure must retain the first mandatory occurrence');
+assert.match(scheduledRouted.params.input,/대도서관으로 간다\./,'adaptive scheduled pressure must retain the committed USER ACTION predicate');
 
 const aftermath=source.indexOf("AFTERMATH_FIXED_FLOW");
 const combat=source.indexOf("ACTIVE_COMBAT_FIXED_FLOW");

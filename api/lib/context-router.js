@@ -6,6 +6,7 @@
 import { buildSceneMomentumDirective, classifySceneIntent } from '../../lib/scene-momentum.js';
 import { buildScenePurposeDirective, normalizeScenePurpose } from '../../lib/scene-purpose.js';
 import { buildSceneExitDirective, normalizeSceneExitCondition } from '../../lib/scene-exit.js';
+import { buildTurnHookDirective, normalizeTurnHook } from '../../lib/turn-hook.js';
 
 const VERSION = '1.5.6-hf1';
 const DIRECTOR_V2_VERSION = '2.1';
@@ -68,7 +69,8 @@ const ROUTER_GM_RULES = String.raw`너는 판타지 아카데미 장기 RPG 「�
 20) NPC는 자기 일정·목표·욕망·관계·감정에 따라 PC 입력을 기다리지 않고 먼저 말 걸기, 이동/퇴장, 다른 NPC와 상호작용, 조사·파벌 행동·사건 개입을 할 수 있다. 단 물리 위치·일정·지식 제약을 지킨다.
 21) 사건/행동의 직접 결과 뒤에는 자연스러운 세계 반응과 다음 가능성까지 이어갈 수 있다. 낮은 가치의 이동·대기·휴식은 압축하고 시간도 실제로 진행한다. 매 턴 대형 사건을 강제하지 않는다.
 22) STOP은 전투 돌입, 되돌리기 어려운 위험, 중요한 관계/대화 선택, 갈림길, 능력·스킬 사용 여부처럼 플레이어 판단 자체가 콘텐츠인 첫 지점에서 한다. 문/계단/복도/현관/평범한 길 같은 중간 단계에서 재입력을 요구하지 않는다. choices는 실제 STOP 지점에서만 정확히 3개다.
-23) 사용자에게 보이는 narration/dialogue에서 내부 명칭 'PC' 또는 자리표시자 'Aaa'를 주어로 출력하지 않는다. 실제 플레이어 이름을 쓰거나 자연스럽게 주어를 생략한다.`;
+23) 사용자에게 보이는 narration/dialogue에서 내부 명칭 'PC' 또는 자리표시자 'Aaa'를 주어로 출력하지 않는다. 실제 플레이어 이름을 쓰거나 자연스럽게 주어를 생략한다.
+24) TURN HOOK은 행동 결과와 EXIT_TARGET 뒤에 남는 구체적인 다음 방향이다. 진짜 판단점, NPC의 의도 있는 접근·요청·행동, 새 정보·목표·위험, 사건/세계 압력 중 하나를 우선하되, 단순 재묘사·기존 정보·가짜 질문으로 훅을 만들지 않는다.`;
 
 const NATURAL_STYLE = String.raw`[NATURAL NPC / SCENE]
 - NPC 대사는 설정집 낭독이 아니라 직전 말/행동에 대한 실제 반응이어야 한다.
@@ -377,7 +379,21 @@ function compactScheduleAuthority(schedule,max=2400){
   let text=safeJson(value);if(text.length<=max)return text;
   const smaller={truncated:true,due:value.due.slice(0,3),upcoming:value.upcoming.slice(0,3),npc_schedule:Object.fromEntries(Object.entries(value.npc_schedule).slice(0,3))};
   text=safeJson(smaller);if(text.length<=max)return text;
-  return safeJson({truncated:true,due:smaller.due.slice(0,2).map(({id,title,note,time,location,participants})=>({id,title,note:clampText(note,100),time,location,participants})),upcoming:smaller.upcoming.slice(0,1).map(({id,title,note,time,location,participants})=>({id,title,note:clampText(note,100),time,location,participants})),npc_schedule:Object.fromEntries(Object.entries(smaller.npc_schedule).slice(0,2).map(([key,row])=>[key,{location:row.location,activity:clampText(row.activity,80),commitment:clampText(row.commitment,80),confidence:row.confidence,time:row.time}]))});
+  const focused={truncated:true,due:smaller.due.slice(0,2).map(({id,title,note,time,location,participants})=>({id,title,note:clampText(note,100),time,location,participants})),upcoming:smaller.upcoming.slice(0,1).map(({id,title,note,time,location,participants})=>({id,title,note:clampText(note,100),time,location,participants})),npc_schedule:Object.fromEntries(Object.entries(smaller.npc_schedule).slice(0,2).map(([key,row])=>[key,{location:row.location,activity:clampText(row.activity,80),commitment:clampText(row.commitment,80),confidence:row.confidence,time:row.time}]))};
+  text=safeJson(focused);if(text.length<=max)return text;
+  const minimal={truncated:true,due:focused.due.map(({id,title,time,location})=>({id:clampText(id,50),title:clampText(title,70),time,location:clampText(location,60)})),upcoming:focused.upcoming.map(({id,title,time})=>({id:clampText(id,50),title:clampText(title,60),time})),npc_schedule:Object.fromEntries(Object.entries(focused.npc_schedule).slice(0,1).map(([key,row])=>[key,{location:clampText(row.location,50),activity:clampText(row.activity,60),time:row.time}]))};
+  text=safeJson(minimal);if(text.length<=max)return text;
+  const tiny={truncated:true,due:minimal.due.slice(0,1).map(({id,title,time})=>({id,title:clampText(title,50),time})),upcoming:[]};
+  text=safeJson(tiny);if(text.length<=max)return text;
+  return safeJson({truncated:true});
+}
+function formatAuthorityTail(director,directorV2,scheduleText){return`===== GM EVENT DIRECTOR (ROUTED) =====\n${director||'없음'}\n\n===== EVENT DIRECTOR V2.1 (ROUTED) =====\n${directorV2||'없음'}\n\n===== SCHEDULE ENGINE (ROUTED) =====\n${scheduleText||'없음'}`;}
+function fitAuthorityTail({director='',directorV2='',schedule={},maxChars=2400,routine=false}={}){
+  const fullSchedule=compactScheduleAuthority(schedule,routine?1300:Math.min(2400,Math.max(1600,Math.floor(maxChars*.55)))),full=formatAuthorityTail(director,directorV2,fullSchedule);
+  if(full.length<=maxChars)return full;
+  const emptyMarkerChars='없음'.length*3,baseChars=formatAuthorityTail('','','').length-emptyMarkerChars,payload=Math.max(0,maxChars-baseChars);
+  const directorBudget=Math.max(0,Math.floor(payload*.15)),directorV2Budget=Math.max(0,Math.floor(payload*.25)),scheduleBudget=Math.max(0,payload-directorBudget-directorV2Budget);
+  return formatAuthorityTail(clampText(director,directorBudget),clampText(directorV2,directorV2Budget),compactScheduleAuthority(schedule,scheduleBudget));
 }
 function compactSave(incoming,keys,registry,profile,keywords){
   const save=incoming.saveState||{},names=keys.map(k=>registry[k]).filter(Boolean),rel={},intimacy={},npcStates={},emotions={},inner={},npcMem={};
@@ -416,6 +432,12 @@ function cleanDirector(originalInput,limit){
   let d=sectionBetween(originalInput,'===== GM EVENT DIRECTOR (SERVER GUIDANCE) =====','===== SCHEDULE ENGINE (AUTHORITATIVE) =====');
   d=d.split('\n').filter(line=>!/candidate|후보|planCandidates|candidates=/i.test(line)).join('\n');return clampText(d,limit);
 }
+function clampMiddleText(value,max=5200){
+  const text=String(value??''),limit=Math.max(0,Math.floor(Number(max)||0));
+  if(text.length<=limit)return text;if(limit===0)return'';if(limit<=5)return text.slice(-limit);
+  const marker=' … ',tail=Math.max(1,Math.min(900,Math.floor((limit-marker.length)*.36))),head=Math.max(1,limit-marker.length-tail);
+  return`${text.slice(0,head)}${marker}${text.slice(-tail)}`;
+}
 export function composeRoutedInput({saveState='',optionalContext='',reservedContext='',authorityTail='',actionBlock='',inputChars=9000}={}){
   const save=String(saveState||''),headSource=String(optionalContext||''),reserved=String(reservedContext||''),tail=String(authorityTail||''),action=String(actionBlock||''),maxChars=Math.max(0,Number(inputChars)||0);
   const fixed=[save,reserved,tail,action].filter(Boolean).join('\n\n');
@@ -424,16 +446,18 @@ export function composeRoutedInput({saveState='',optionalContext='',reservedCont
   return [save,head,reserved,tail,action].filter(Boolean).join('\n\n');
 }
 function buildInput(incoming,originalInput,profile,routed){
-  const routine=profile.name.includes('routine'),save=compactSave(incoming,routed.keys,routed.registry,profile,routed.keywords),recent=compactRecent(incoming.recentTurns,profile.recentTurns),opts=clampText(sectionBetween(originalInput,'===== TURN OPTIONS =====','===== AUTHORITATIVE SAVE_STATE ====='),700),director=cleanDirector(originalInput,routine?400:900),directorV2=clampText(routed.directorV2?.directive||'',routine?600:1000),schedule=compactSchedule(incoming.saveState||{},routed.keys),runtime={npcInnerStates:Object.fromEntries(routed.keys.filter(k=>incoming.saveState?.npcInnerStates?.[k]).map(k=>[k,compactInnerNpc(incoming.saveState.npcInnerStates[k])])),sceneRuntime:incoming.saveState?.sceneRuntime||{},backgroundDigest:clampText(incoming.saveState?.backgroundDigest||'',350)},action=String(incoming.action||''),cg=array(incoming.availableCgIds).slice(0,60).join(', '),momentumDirective=clampText(buildSceneMomentumDirective({action,saveState:incoming.saveState||{}}),2800),purposeDirective=clampText(buildScenePurposeDirective({action,saveState:incoming.saveState||{}}),1400),exitDirective=clampText(buildSceneExitDirective({action,saveState:incoming.saveState||{}}),1600);
+  const routine=profile.name.includes('routine'),save=compactSave(incoming,routed.keys,routed.registry,profile,routed.keywords),recent=compactRecent(incoming.recentTurns,profile.recentTurns),opts=clampText(sectionBetween(originalInput,'===== TURN OPTIONS =====','===== AUTHORITATIVE SAVE_STATE ====='),700),director=cleanDirector(originalInput,routine?400:900),directorV2=clampText(routed.directorV2?.directive||'',routine?600:1000),schedule=compactSchedule(incoming.saveState||{},routed.keys),runtime={npcInnerStates:Object.fromEntries(routed.keys.filter(k=>incoming.saveState?.npcInnerStates?.[k]).map(k=>[k,compactInnerNpc(incoming.saveState.npcInnerStates[k])])),sceneRuntime:incoming.saveState?.sceneRuntime||{},backgroundDigest:clampText(incoming.saveState?.backgroundDigest||'',350)},action=String(incoming.action||''),cg=array(incoming.availableCgIds).slice(0,60).join(', '),momentumDirective=clampText(buildSceneMomentumDirective({action,saveState:incoming.saveState||{}}),2800),purposeDirective=clampText(buildScenePurposeDirective({action,saveState:incoming.saveState||{}}),1400),exitDirective=clampText(buildSceneExitDirective({action,saveState:incoming.saveState||{}}),1600),turnHookDirective=clampText(buildTurnHookDirective({action,saveState:incoming.saveState||{}}),900);
   const world=object(save.world),pc=object(save.pc),scene=object(save.sceneRuntime);
-  const momentum=object(scene.momentum),eventProgress=object(scene.eventProgress);
-  const essentialSave={version:save.version,turnNumber:save.turnNumber,world:{date:world.date||null,time:world.time||null,location:clampText(world.location||'',140)},pc:{name:clampText(pc.name||'',80),department:clampText(pc.department||'',100),status:clampText(pc.status||'',160)},relevantNpcKeys:array(save.relevantNpcKeys).slice(0,4),npcStates:Object.fromEntries(Object.entries(object(save.npcStates)).slice(0,4).map(([key,row])=>[key,{location:clampText(row?.location||'',100),status:clampText(row?.status||row?.state||'',120)}])),sceneRuntime:{participants:array(scene.participants).slice(0,6),purpose:normalizeScenePurpose(scene.purpose),exit_condition:normalizeSceneExitCondition(scene.exit_condition),momentum:{stall_streak:Number(momentum.stall_streak||0),last_intent:clampText(momentum.last_intent||'',60)},eventProgress:scene.eventProgress==null?null:{eventInstanceId:clampText(eventProgress.eventInstanceId||'',100),activeBeat:clampText(eventProgress.activeBeat||'',100)}}};
+  const momentum=object(scene.momentum),eventProgress=object(scene.eventProgress),turnHook=normalizeTurnHook(scene.turn_hook);
+  const essentialSave={version:save.version,turnNumber:save.turnNumber,world:{date:world.date||null,time:world.time||null,location:clampText(world.location||'',140)},pc:{name:clampText(pc.name||'',80),department:clampText(pc.department||'',100),status:clampText(pc.status||'',160)},relevantNpcKeys:array(save.relevantNpcKeys).slice(0,4),npcStates:Object.fromEntries(Object.entries(object(save.npcStates)).slice(0,4).map(([key,row])=>[key,{location:clampText(row?.location||'',100),status:clampText(row?.status||row?.state||'',120)}])),sceneRuntime:{participants:array(scene.participants).slice(0,6),purpose:normalizeScenePurpose(scene.purpose),exit_condition:normalizeSceneExitCondition(scene.exit_condition),turn_hook:turnHook?{kind:turnHook.kind,status:turnHook.status,anchor:clampText(turnHook.anchor,140)}:null,momentum:{stall_streak:Number(momentum.stall_streak||0),last_intent:clampText(momentum.last_intent||'',60)},eventProgress:scene.eventProgress==null?null:{eventInstanceId:clampText(eventProgress.eventInstanceId||'',100),activeBeat:clampText(eventProgress.activeBeat||'',100)}}};
   const saveState=`===== AUTHORITATIVE SAVE_STATE (ROUTED MINIMUM) =====\n${safeJson(essentialSave)}`;
   const optionalContext=`===== TURN OPTIONS =====\n${opts}\n\n===== AUTHORITATIVE SAVE_STATE (ROUTED DETAIL) =====\n${safeJson(save)}\n\n===== ROLLING SUMMARY TAIL =====\n${clampText(incoming.rollingSummary||'아직 없음',1500)}\n\n===== RECENT TURNS =====\n${safeJson(recent)}\n\n===== CURRENT NPC/SCENE RUNTIME =====\n${clampText(runtime,1800)}\n\n===== AVAILABLE_CG_IDS =====\n${cg||'없음'}`;
-  const reservedContext=`===== SCENE MOMENTUM HF1 =====\n${momentumDirective}\n\n===== SCENE PURPOSE V1 =====\n${purposeDirective}\n\n===== EXPLICIT SCENE EXIT CONDITION V1 =====\n${exitDirective}`;
-  const scheduleText=compactScheduleAuthority(schedule,routine?1300:Math.min(2400,Math.max(1600,Math.floor(profile.inputChars*.24))));
-  const authorityTail=`===== GM EVENT DIRECTOR (ROUTED) =====\n${director||'없음'}\n\n===== EVENT DIRECTOR V2.1 (ROUTED) =====\n${directorV2||'없음'}\n\n===== SCHEDULE ENGINE (ROUTED) =====\n${scheduleText}`;
-  const actionBlock=`===== USER ACTION =====\n${clampText(action,5200)}\n\nUSER ACTION이 이미 선언한 의미적 목표는 결정 가치 없는 중간 단계를 압축해 완료하되, 그 이후의 새로운 PC 선택·대사·감정은 만들지 마라. 플레이어 판단이 실제로 필요한 첫 지점에서 멈춰라. ROUTINE은 빠르고 변화 중심으로 진행하고 주요 NPC 대사에는 감정 태그/강도/근거를 일치시켜라.`;
+  const reservedContext=`===== SCENE MOMENTUM HF1 =====\n${momentumDirective}\n\n===== SCENE PURPOSE V1 =====\n${purposeDirective}\n\n===== EXPLICIT SCENE EXIT CONDITION V1 =====\n${exitDirective}\n\n===== STRONGER TURN HOOK V1 =====\n${turnHookDirective}`;
+  const actionFrame=(text)=>`===== USER ACTION =====\n${text}\n\nUSER ACTION의 의미 목표를 압축 완료하고 새 PC 선택 없이 EXIT_TARGET 뒤의 첫 판단점에서 멈춰라. ROUTINE은 변화 중심, 주요 NPC 감정 태그·강도·근거를 일치시켜라.`,fixedSeparators=6,emptyActionFrame=actionFrame(''),scheduledProfile=profile.name.includes('scheduled'),desiredAuthorityBudget=routine||scheduledProfile?900:180,continueProfile=profile.name.includes('continue');
+  const actionTextBudget=continueProfile?5200:Math.max(0,Math.min(5200,profile.inputChars-saveState.length-reservedContext.length-emptyActionFrame.length-fixedSeparators-desiredAuthorityBudget));
+  const actionBlock=actionFrame(clampMiddleText(action,actionTextBudget));
+  const authorityBudget=Math.max(0,profile.inputChars-saveState.length-reservedContext.length-actionBlock.length-fixedSeparators);
+  const authorityTail=fitAuthorityTail({director,directorV2,schedule,maxChars:authorityBudget,routine});
   return{text:composeRoutedInput({saveState,optionalContext,reservedContext,authorityTail,actionBlock,inputChars:profile.inputChars})};
 }
 

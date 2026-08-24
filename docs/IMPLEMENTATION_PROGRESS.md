@@ -1,13 +1,14 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Narrative Engine continuation — PR #38 event-focus refresh is merged. PR #39 implements Explicit Scene Exit Condition V1; Stronger Turn Hook and Event Consequence chaining remain separate later phases.
+Narrative Engine continuation — PR #39 Explicit Scene Exit Condition V1 is merged. Stronger Turn Hook V1 is the active separate phase; Event Consequence chaining remains later and is not part of this change.
 
 ## Current GitHub State
 - Repo: `hoho074566-cpu/lumencia-ac`
-- Main: `227bcf23ace6ad7dca38b5d02d50a8652dd13a38` (`Merge pull request #38`)
-- Working branch: `codex/scene-exit-condition-v1`
-- PR #39: **open**. Current code candidate `be88e14...` adds bounded explicit scene exit boundaries and closes the initial exact-head P1 by matching actual location against the semantic destination. Focused regressions pass; final docs-head checks, hosted authority, and affected Preview rerun remain.
+- Main: `4516cc162ef34426ef94d29cf5aa6489013927ec` (`Scene Exit Condition V1 (#39)`)
+- Working branch: `codex/stronger-turn-hook-v1`
+- PR #40 is open on `codex/stronger-turn-hook-v1`; current published HEAD `c18f9ab80cfab0540ae57f45ebc94956c4de8276` has Safety #311 and Vercel green plus affected Exact Preview passes. Its fresh review found one P1 keyword-allowlist choice loss and one P2 adaptive fixed-input overflow; the local newly authorized remediation closes both and is not published yet.
+- PR #39: **merged** as squash commit `4516cc162ef34426ef94d29cf5aa6489013927ec` from reviewed exact head `ba64f9f779cda39f91ef41abfddf3c47f823606c`. Safety #307, Vercel, fresh exact-head Codex P0/P1=0, and affected Chrome Preview acceptance passed. Merge and reviewed-head trees both equal `dfce564cc6b457a5258d5165ea05ce496acf99c6`; production Vercel and `/api/health` are healthy.
 - PR #38: **merged** as `227bcf23ace6ad7dca38b5d02d50a8652dd13a38`; same-occurrence event focus refreshes on authoritative beat/completion progress and remains stable when progress is unchanged.
 - PR #37: **merged** from exact head `acebe72f6297f44d5f08e820b8c6dc12a4fa00ae` as merge commit `cf05c43604e3ff9c7af03dc4cd09111cae27d729`. The merge tree exactly equals the reviewed head tree; production `/api/health` is 200/configured on app `1.5.6`, adapter `0.8.3`.
 - PR #36: **merged** from exact docs checkpoint HEAD `c347744858300359ab8d6da204cb5d9277d366be`; reviewed code HEAD `c7881f4c31758d0350833f31c37d116f3ff4c18d`.
@@ -31,7 +32,20 @@ Narrative Engine continuation — PR #38 event-focus refresh is merged. PR #39 i
 - Production `/api/health`: `ok=true`, API configured, app `1.5.6`, adapter `/api/chat-router`, canonical core `/api/chat`, prompt cache retention `24h`.
 - Post-merge full `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
-## Explicit Scene Exit Condition V1 — Current Candidate
+## Stronger Turn Hook V1 — Current Candidate
+- New bounded `sceneRuntime.turn_hook` records allowlisted kind/source/status, a single-line 220-character anchor, bounded establishment turn, and only applicable speaker/event IDs.
+- Strong hooks require concrete evidence: fresh choices, an open Exit boundary, a direct NPC question/request, active event pressure, authoritative new information/objective/world-thread change, or nonverbal NPC/world state mutation. A mere location change or generic dialogue is only a soft next step.
+- The reserved Context Router rule makes current USER ACTION outrank an old hook, preserves player-owned `awaiting-player` boundaries under AUTO, forbids fake questions/repeated information, and asks for exactly three choices only at a real important decision.
+- Initial exact Preview on `4a24a77...` passed room -> exterior compression but exposed generic destination suggestions being rendered as a three-choice decision. Exact Preview on `c18f9ab...` then passed room-to-exterior compression, Isabel/Lilia direct questions, AUTO/CONTINUE preservation, generic travel-choice removal, and contemplated-action question sovereignty.
+- Fresh reviews found that earlier filters could delete valid nonverbal choices and implicit destination forks. The local closure removes only complete sets that the shared Scene Momentum classifier or a narrow fallback proves routine. Red/blue bottle manipulation survives without keyword membership; destination alternatives survive when all semantic targets are grounded in the scene, without relying on decision vocabulary; routine travel/preparation/rest sets remain suppressed.
+- Codex review on initial head `4a24a77...` found two P1s: an open Exit could outrank a direct NPC question, and AUTO could overwrite a saved `awaiting-player` hook. The local closure prioritizes direct NPC addresses before continuation and passes prior runtime/mode so AUTO retains the exact unanswered hook until real player input.
+- Earlier fixed-budget findings are closed by a dynamically compacted labeled Director/Schedule tail and fixed-section budgeting. A `.76` routine profile with a 5,200-character action stays within 6,840 characters, while the scheduled `.76` profile reserves enough authority for the first mandatory occurrence within 7,220 characters; both retain the action beginning and committed ending.
+- CONTINUE clones the prior hook unchanged and receives a hook-specific hard freeze. META remains untouched.
+- The authoritative 9k minimum state keeps only hook kind/status/anchor. Both a 5,000-character action and a dense 3,800-character action with maximum routine Schedule/Director authority preserve Scene Momentum, Purpose, Exit, Turn Hook, and the final committed predicate within budget.
+- No long-lived story-hook mutation, Event Consequence chaining, schema migration, second model call, new API entrypoint, `app.js` rewrite, or canonical `api/chat.js` rewrite.
+- Focused Turn Hook and adaptive authority-tail regressions: PASS. Full clean-LF PR check, second regression/scope review, commit/push, fresh exact gates/review, and affected Preview rerun remain.
+
+## Explicit Scene Exit Condition V1 — Completed
 - New bounded `sceneRuntime.exit_condition` records an allowlisted condition kind/source/status, 180-character single-line target, bounded establishment and purpose turns, and optional event occurrence ID.
 - Current user input outranks saved boundaries. Exterior/travel, explore, observe, downtime, wait, committed action, and direct-question intents each receive a deterministic stop target.
 - Post-response evaluation distinguishes `open`, `reached`, and `awaiting-player`. Prematurely open boundaries survive AUTO only for the same purpose checkpoint; a new user action replaces them.
@@ -39,7 +53,7 @@ Narrative Engine continuation — PR #38 event-focus refresh is merged. PR #39 i
 - Important decisions remain player-owned, direct questions do not execute contemplated actions, and CONTINUE preserves the prior condition without progression.
 - The Context Router reserves both the directive and compact authoritative condition under long-action pressure. Route/pipeline telemetry exposes the evaluated condition.
 - No schema migration, second model call, new API entrypoint, `app.js` rewrite, or canonical `api/chat.js` rewrite.
-- Focused Scene Exit/Purpose/Momentum/CONTINUE/Event/router tests and the full clean-LF `scripts/lumensia-pr-check.mjs`: PASS.
+- Focused Scene Exit/Purpose/Momentum/CONTINUE/Event/router tests and the full clean-LF `scripts/lumensia-pr-check.mjs`: PASS. Exact Preview confirmed room -> corridor/stairs -> actual exterior in one turn, direct-question non-execution, CONTINUE freeze, and AUTO/NPC initiative before guarded merge.
 
 ## Scene Purpose V1 — Completed
 - New bounded `sceneRuntime.purpose` keeps only canonical version, allowlisted kind/source, a 180-character single-line focus, bounded establishment turn, and an optional 100-character event occurrence ID.
@@ -294,11 +308,11 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
 
 ## NEXT ACTION
-1. Commit/push the PR #39 docs checkpoint, rerun the full clean-LF PR check, and complete a second exact-diff/scope review.
-2. Require hosted Safety/Vercel and fresh exact-current-HEAD P0/P1 authority.
-3. On the exact Preview rerun exterior completion, stale-open current-action priority, question non-execution, AUTO open-boundary continuation, decision sovereignty, and CONTINUE freeze.
-4. If every exact-current-head gate is green and no special blocker appears, use the user's explicit merge authorization and verify the merge tree plus production health.
-5. Only after PR #39 closes, start Stronger Turn Hook as a separate change. Do not mix Event Consequence into this PR.
+1. Run the full check from a clean LF worktree and perform the second exact-diff/scope review for the deny-only-routine choice filter and stable adaptive input authority floor.
+2. Commit/push to PR #40, then require hosted Safety/Vercel and fresh exact-current-HEAD P0/P1 authority.
+3. On the exact Preview rerun quiet-transition no-fake-choice behavior and an NPC direct request/question; deterministic tests cover nonverbal choices, contextual forks, and the 5,200-character adaptive pressure boundary.
+4. If every exact-current-head gate is green and no special blocker appears, use the user's explicit merge authorization, then verify the merge tree, production Vercel, and `/api/health`.
+5. Keep Event Consequence chaining out of this PR. Start it only after Stronger Turn Hook closes.
 
 ## Stop Record
 - Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.
@@ -325,4 +339,7 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Fresh exact-head review found one remaining pre-response priority path. Code candidate `c7e0a8b...` makes the current committed action outrank saved focus and adds direct plus reserved-authority-tail regressions. The stale handover finding is closed by this docs checkpoint.
 - Unfinished: final clean-LF check/review, docs checkpoint commit/push, fresh exact-head gates/review, affected current-action Preview rerun, guarded merge, merge-tree verification, and production health; all later narrative phases remain separate.
 - Blocker: none locally.
-- NEXT ACTION: validate and publish code `c7e0a8b...` plus this docs checkpoint, then revalidate every exact-current-head gate.
+- Completed: PR #39 exact-head Safety/Vercel/Codex/Preview gates, expected-head squash merge, exact tree verification, production Vercel, and health smoke.
+- Initial published candidate: `4a24a77...`; Vercel PASS, Safety #308 initially in progress. Its first live travel rerun found the generic-choice issue above, so it is not merge-authoritative.
+- Current local remediation: deny-only-routine choice filtering, nonverbal/fork preservation, direct-question priority, AUTO hook persistence, strict request syntax, dynamic authority-tail compaction, and stable adaptive input authority-floor regressions pass; clean-LF full rerun, commit/push, fresh hosted gates/review, and affected Preview rerun remain.
+- NEXT ACTION: validate and publish this second authorized review closure, then revalidate every exact-current-head gate.
