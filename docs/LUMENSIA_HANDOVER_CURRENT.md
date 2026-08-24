@@ -13,9 +13,9 @@ Repository: `hoho074566-cpu/lumencia-ac`
 # 0. SESSION STOP CHECKPOINT — 가장 먼저 읽을 것
 
 ## Live state immediately before this handover update
-- Branch: `codex/event-consequence-v1`
-- Base/current main: `5f2073a2874a9b8ee45a6aa34d6e4508997c3cb3` (`Stronger Turn Hook V1 (#40)`).
-- PR #41: **open; protected-path human merge only**. Published acceptance checkpoint `dbdc54b68d33dd095475ff8cecfe09cc6bdea277` passed Safety #316 and Vercel Ready with no merge conflict. Exact Preview: `https://lumencia-ac-git-codex-event-consequence-v1-ah-203c.vercel.app`. The current branch includes the focused review closure described below and therefore needs new exact-head hosted authority.
+- Branch: `codex/npc-goal-tick-v1`
+- Base/current main: `da248a2df0985d9196232149893a0b196020c0f9` (`Event Consequence V1`, PR #41 merge).
+- PR #41: **merged** from exact reviewed head `06617b3ffe11d83bc512d7e4f520c17946d7bdf0`. Safety/Vercel passed, fresh exact-head Codex P0/P1=0, and the targeted delayed-result player-choice/no-early-fire/due/no-repeat Preview lifecycle passed. Merge commit `da248a2...` has tree `2bac9dd94468d37ff0cb7787ad6c42cdba478b27`, exactly equal to the reviewed head tree.
 - PR #40 is **merged** from reviewed exact head `85af592b8baae57958eb16d88da83f946d26a2e0`. Safety #313, Vercel, fresh exact-head Codex P0/P1=0, and affected Exact Preview acceptance passed. Squash merge `5f2073a...` exactly preserves reviewed tree `2354a0db58c6405beec40fcfaae885fd8850c0db`; production is healthy.
 - PR #39: **merged** from exact reviewed head `ba64f9f779cda39f91ef41abfddf3c47f823606c`. Safety #307, Vercel, fresh exact-head Codex P0/P1=0, and affected Chrome Preview acceptance passed. Squash merge commit `4516cc1...` has the exact reviewed tree `dfce564cc6b457a5258d5165ea05ce496acf99c6`; production Vercel and `/api/health` are healthy.
 - PR #38: **merged** as `227bcf23ace6ad7dca38b5d02d50a8652dd13a38`. Same-occurrence event purpose focus now refreshes only when the authoritative active/completed/omitted progress signature changes; unchanged progress retains the exact prior purpose object.
@@ -41,7 +41,19 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Production `/api/health`: healthy; app `1.5.6`, canonical `/api/chat`, adapter `/api/chat-router`, `24h` prompt-cache retention.
 - Full post-merge `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
-## Current active work — Event Consequence V1
+## Current active work — NPC Goal Tick V1
+- Candidate code commit: `c9efe50bfc95d5093acbe36aef88f2cc98024a3f` on `codex/npc-goal-tick-v1`, based directly on main `da248a2...`.
+- A present NPC with an active high-drive goal (priority + urgency >= 8) may now act proactively after an ordinary generic/observe/explore/wait/downtime USER ACTION, without waiting for `stall_streak >= 2`.
+- Existing HF3 stall recovery remains available for lower-drive present goals on passive wait/downtime turns.
+- Goal Tick is limited to physically feasible current-scene targets: the PC, another present NPC, the current place, or a currently due matching event. Remote place/event goals do not authorize a local action.
+- Direct NPC focus, awaiting-player choices, active event beats, fixed schedules, callbacks, AFTERMATH, combat, due consequences, AUTO, CONTINUE, and committed travel remain ahead of proactive Goal Tick.
+- The selected directive requires the current USER ACTION to complete first, forbids deciding PC action/dialogue/emotion/important choice, and forbids goal progress from selection alone. Existing evidence-based Goal V2 fields remain the only progress authority.
+- A bounded `sceneRuntime.goal_tick` checkpoint records the selected NPC/goal/turn, visible manifestation, and real Goal V2 evidence. Manifested goals use a 2-3 turn cadence; ignored instructions may retry on the following turn, and another eligible present NPC may act while the prior owner cools down.
+- No off-screen simulation, new save root/migration, second model call, new API entrypoint, canonical `app.js`/`api/chat.js` rewrite, or broader L4/L5 access.
+- Permanent regressions cover proactive/no-stall initiative, low-drive fallback, cooldown/retry/alternate owner, PC/NPC/place/event feasibility, travel/direct-focus/choice/event/schedule/AUTO/CONTINUE guards, minimum `.76` authority retention, runtime manifestation evidence, and one-call architecture.
+- Focused suites and the full clean-LF `node scripts/lumensia-pr-check.mjs origin/main HEAD` pass at `c9efe50...`. The normal Windows CRLF checkout still produces only the known workflow-string false positives; the authoritative clean-LF worktree is fully green.
+
+## Completed active predecessor — Event Consequence V1
 - The existing model-side `delayed_consequences_add` concept was not connected to the actual stable save/app flow. V1 patches the routed structured schema, then materializes delayed results into the existing flexible `save.hooks` store; it does not create a new save root or migration.
 - Each queued result has a deterministic ID/fingerprint, causal source, due clock, bounded lifetime, target bucket, and secret level. Active results live for 3 days, world results for 7 days after due; at most 3 are added per turn and 12 unresolved consequence hooks are retained.
 - The router selects one due result only after player direct focus, important decision/committed action, callbacks, AFTERMATH, combat, and an earlier fixed schedule have been protected. An already-due result may surface under AUTO; META and CONTINUE remain frozen.
@@ -624,13 +636,14 @@ Gameplay roadmap discussed but not DONE:
 # 12. NEXT ACTION — CURRENT START POINT
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
-2. Confirm main contains PR #40 squash merge `5f2073a2874a9b8ee45a6aa34d6e4508997c3cb3`; do **not** redo completed HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, or Stronger Turn Hook diagnosis.
-3. Continue only PR #41 on `codex/event-consequence-v1`. Acceptance checkpoint `dbdc54b...` has clean-LF full-check, Safety #316, Vercel Ready, and Exact Preview lifecycle authority; the current review-closure code needs exact-head authority.
-4. Run the full clean-LF check, push the closure, then require exact-current-HEAD Safety/Vercel and a fresh Codex P0/P1=0 review. Because code changed, re-run the targeted delayed-result due/no-repeat/player-choice smoke on its Exact Preview.
-5. Do not start NPC Initiative / Goal Tick refinement until PR #41 closes. Because this PR changes protected runtime/API paths, repository policy keeps merge human-only; do not merge it from a Codex task.
+2. Confirm main contains PR #41 merge `da248a2df0985d9196232149893a0b196020c0f9`; do **not** redo completed HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Stronger Turn Hook, or Event Consequence diagnosis.
+3. Continue only NPC Goal Tick V1 on `codex/npc-goal-tick-v1`. Local code commit `c9efe50...` and the full clean-LF repository check pass.
+4. Push/open the focused PR, then require exact-current-HEAD Safety/Vercel and a fresh Codex P0/P1=0 review.
+5. On the exact Preview, target the new proactive observe/explore/wait path plus no-repeat/cooldown and the protected question/travel/schedule boundaries. Do not run the later bounded off-screen phase yet.
+6. This work changes protected runtime/API paths; keep the PR human-merge only and do not merge it from a Codex task.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #40은 reviewed head `85af592...`에서 main `5f2073a...`로 squash merge됐고 Safety #313/Vercel/fresh P0/P1=0/affected Preview/production까지 통과했다. HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Stronger Turn Hook 진단을 다시 하지 않는다. 현재 branch는 `codex/event-consequence-v1`, open PR은 #41이다. Acceptance checkpoint `dbdc54b...`는 Safety #316/Vercel Ready/clean-LF full check를 통과했고 Exact Preview에서 no-early-fire, due manifestation, player-choice stop, no-repeat lifecycle acceptance가 통과했다. P0/P1=0인 첫 review의 P2 여섯 건도 현재 closure에서 영구 회귀와 함께 보강했다. Closure exact-head의 full check, hosted Safety/Vercel/fresh P0/P1=0, targeted Preview만 닫는다. NPC Initiative / Goal Tick refinement는 PR #41 이후이며 protected runtime/API merge는 human-only다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #41은 reviewed head `06617b3...`에서 main `da248a2...`로 merge됐고 merge tree가 reviewed tree와 정확히 같다. HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Stronger Turn Hook, Event Consequence 진단을 다시 하지 않는다. 현재 branch는 `codex/npc-goal-tick-v1`이고 code checkpoint `c9efe50...`에서 현장 고우선 목표의 proactive Goal Tick, 물리적 target 제한, 2-3턴 cadence, player/schedule/event/AUTO/CONTINUE guards, evidence-only Goal V2 progression을 구현했다. Focused tests와 full clean-LF PR check는 PASS다. 브랜치를 게시해 exact-head Safety/Vercel/fresh P0/P1=0과 targeted Preview를 닫고, protected runtime/API PR은 human-only로 유지한다. Off-screen progression은 이 PR 이후 별도 단계다.`
