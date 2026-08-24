@@ -161,11 +161,13 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Full `node scripts/lumensia-pr-check.mjs`: PASS.
 
 ### Candidate hosted/review evidence
-- Published candidate `52819d3c31f30afe2a9b0e9d4ded03033b31d10b` on PR #34.
-- Safety Gate #264: **PASS**; Vercel: **PASS / Ready**; compare: ahead 1 / behind 0 with base commit and merge-base at current main `8d378b532910dfecaf5226118bffabdddbe74289`.
-- Fresh exact-head Codex review: direct P0/P1 = 0. Seven P2 findings identified acceptance false-PASS gaps plus common travel-deliberation endings.
+- Published follow-up candidate `cd5b711f47be99fbe321fb2eddc6c5d8d3eff568` on PR #34.
+- Safety Gate #265: **PASS**; Vercel: **PASS / Ready**; compare: ahead 2 / behind 0 with base commit and merge-base at current main `8d378b532910dfecaf5226118bffabdddbe74289`.
+- Fresh exact-head Codex review `PRR_kwDOT8LCAs8AAAABKj3Erw`: direct P0/P1 = 0. New suggestions are P2 only and remain non-blocking without a live reproduction.
 - Follow-up closes those P2s because acceptance accuracy is the purpose of this phase: explicit wait/rest durations are exact, pre-schedule no-op is rejected, CONTINUE checks scalar and array deltas, completed-event reactivation checks event arrays, all visible fields are scanned for internal names, repeated-known-fact paraphrases require a hook, and `갈까 말까` / `가야 할까` / `갈까요` remain decision-sensitive.
-- Exact preview live-play is externally blocked: both the harness and Cloud Browser reach Vercel SSO (HTTP 401/302), and no protection-bypass secret is available in the environment or repository. This is deployment access, not a runtime test failure.
+- The user completed Vercel SSO in Cloud Browser and the exact Preview app now loads at head `cd5b711f47be99fbe321fb2eddc6c5d8d3eff568`.
+- Exact Preview `/api/health` then reported `apiConfigured=false`. Read-only inspection of Vercel Environment Variables confirmed `OPENAI_API_KEY` is scoped to **Production only**, while `OPENAI_MODEL_LUNA`, `OPENAI_MODEL_TERRA`, and `LUMENSIA_ACCESS_TOKEN` are scoped to Production and Preview.
+- Therefore the 12 real model-backed candidate cases remain blocked by Preview runtime configuration, not by gameplay code or Deployment Protection. Extending a production secret to Preview is a security-scope change and was not performed automatically.
 
 ## Permanent HF1 Test Suites
 - `scripts/tests/context-router-authority-tail.test.mjs`
@@ -196,17 +198,18 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PR #33 manual merge safety.
 
 ## NEXT ACTION
-1. Publish the acceptance-hardening follow-up and require new exact-head Safety + Vercel + fresh exact-current-HEAD/current-main Codex review.
-2. Once the Vercel Preview SSO is satisfied in the Cloud Browser (or a legitimate protection-bypass value is made available), rerun all 12 real acceptance cases against that exact deployment; production main is not candidate evidence.
-3. Resolve only reproduced P0/P1 blockers. P2/P3 remain non-blocking after their acceptance-harness false-PASS cases are covered.
-4. Stop at the protected-core manual merge gate; never auto-merge.
+1. With explicit user authorization, extend the existing Vercel `OPENAI_API_KEY` environment variable from Production-only to Preview as well, then redeploy the exact PR #34 head. Do not reveal, copy, or replace the secret value.
+2. Reconfirm the authenticated exact Preview `/api/health` reports `apiConfigured=true`, then rerun all 12 real acceptance cases against that exact deployment; production main is not candidate evidence.
+3. Resolve only reproduced P0/P1 blockers. P2/P3 remain non-blocking without live reproduction.
+4. If code or docs change, repeat exact-head Safety + Vercel + fresh exact-current-HEAD/current-main Codex review; then stop at the protected-core manual merge gate and never auto-merge.
 5. After the acceptance fix is human-merged, rerun all 12 cases on production and smoke `/api/health`, then implement **Scene Purpose** with bounded purpose state and no automatic player choice.
-6. Then continue through Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence chaining/lifetime -> NPC Initiative/Goal Tick refinement.
+6. Continue through Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence chaining/lifetime -> NPC Initiative/Goal Tick refinement.
 
 ## Stop Record
 - Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.
 - Completed after merge: first 12-case production Live-play run, four demonstrated classifier fixes, permanent regressions, full local PR check.
-- Completed on PR #34 candidate `52819d3`: hosted Safety #264 PASS, Vercel Ready, fresh exact-head direct P0/P1=0; all seven P2 acceptance-hardening findings are addressed in the follow-up.
-- Unfinished: publish/final hosted verification of the follow-up, authenticated 12-case exact-candidate rerun, final exact-head review, protected manual merge, production 12-case acceptance, Scene Purpose and subsequent Narrative Engine phases.
-- Blocker: Vercel Preview Deployment Protection redirects the exact candidate to SSO; no bypass credential is available. Do not count the HTTP 401 as a gameplay failure and do not use production as candidate evidence.
-- NEXT ACTION: publish and fully gate the acceptance-hardening follow-up; then authenticate the Preview in Cloud Browser and rerun the 12 cases on the exact deployment.
+- Completed on PR #34 candidate `cd5b711`: hosted Safety #265 PASS, Vercel Ready, fresh exact-head direct P0/P1=0; branch is clean/synchronized and base/merge-base remain current main.
+- Completed environment diagnosis: Vercel SSO is satisfied, but exact Preview health reports no API key; project settings show `OPENAI_API_KEY` is Production-only.
+- Unfinished: make the existing key available to Preview with explicit authorization, redeploy, authenticated 12-case exact-candidate rerun, renewed exact-head gates after this docs checkpoint, protected manual merge, production 12-case acceptance, Scene Purpose and subsequent Narrative Engine phases.
+- Blocker: the exact Preview runtime has no `OPENAI_API_KEY`. This is not a gameplay failure. Do not substitute production main for candidate evidence and do not broaden secret scope automatically.
+- NEXT ACTION: explicitly authorize the Production-to-Preview scope extension for the existing Vercel `OPENAI_API_KEY`; then redeploy and rerun `/api/health` plus all 12 cases on the exact deployment.
