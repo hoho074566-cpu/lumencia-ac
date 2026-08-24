@@ -53,7 +53,7 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Group reputation never auto-mutates PC↔NPC or NPC↔NPC relationships. Delayed retaliation, invitation, summons, or administrative response continues through the existing bounded `delayed_consequences_add` lifecycle rather than a new queue.
 - META and CONTINUE clear the new delta field. A real faction mutation counts once on Scene Momentum's existing social-relationship axis; no-op rows cannot fake momentum.
 - Permanent coverage lives in `scripts/tests/faction-social-consequence-v1.test.mjs` and covers schema, evidence gates, opposite faction polarity, clamping/history/context bounds, invalid/no-op rejection, personal-relation isolation, runtime persistence wiring, freeze paths, health visibility, and the one-call invariant.
-- Exact code checkpoint `7713d58` passes all dedicated and affected gameplay/API/runtime suites. The final clean-LF full check, docs checkpoint, protected-path hosted review/gates, and Exact Preview acceptance remain.
+- Exact code checkpoint `193e12a` also rejects invalid or unsupported saved history evidence instead of relabeling it as public evidence. Dedicated and affected gameplay/API/runtime suites pass; the final clean-LF full check, docs checkpoint, protected-path hosted review/gates, and Exact Preview acceptance remain.
 
 ## Completed active predecessor — NPC↔NPC Relationship V1
 - PR #45 merged after exact-head hosted gates/review and Preview acceptance. It persists bounded directional affinity/trust/status plus causal history inside `npcInnerStates[source].npc_relationships[target]` without auto-mutating the reverse direction or PC relationships.
