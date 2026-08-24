@@ -232,7 +232,7 @@ const cases = [
       const delta = object(data.turn?.state_delta);
       return {
         intent_travel: data?.pipeline?.scene_momentum?.intent === 'travel',
-        final_destination: /중앙광장/.test(String(delta.new_location || '')),
+        final_destination: /(?:중앙|시작의)\s*광장/.test(String(delta.new_location || '')),
         no_door_corridor_stop: !/방문 앞|복도|계단|현관/.test(String(delta.new_location || '')),
         time_advanced: Number(delta.advance_minutes) >= 3,
       };

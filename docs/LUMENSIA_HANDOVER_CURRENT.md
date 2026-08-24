@@ -13,8 +13,12 @@ Repository: `hoho074566-cpu/lumencia-ac`
 # 0. SESSION STOP CHECKPOINT — 가장 먼저 읽을 것
 
 ## Live state immediately before this handover update
-- Branch: `codex/live-schedule-boundary-hf2`
-- Current main: `88fa53036c58324ffd5012ab7b5ed0cd3099dd6d`
+- Branch: `codex/live-acceptance-npc-initiative-hf3`
+- Current main: `6a717e5fb612a75d70334eb5b40a461ead36587d`
+- PR #35: **merged** at 2026-08-24 03:08:35 UTC using `expected_head_sha=acee0ef8bbff62ec9ee819c6715a0419d74e896e`.
+- PR #35 final gates: Safety #286 PASS, Vercel Ready, fresh exact-head direct P0/P1=0, ahead 10 / behind 0, base commit and merge-base equal then-current main `88fa53036c58324ffd5012ab7b5ed0cd3099dd6d`.
+- Merge commit parents and tree are exact: the merge tree equals reviewed head tree `6d7d44bf891187ad8b88a715544f23004267e005` with no unexpected files.
+- Merged-main full `node scripts/lumensia-pr-check.mjs`: **PASS**; merge-commit production Vercel: **PASS**.
 - PR #34: **merged** at 2026-08-24 01:47:23 UTC using `expected_head_sha=4479615f4904c74ee9e3dfd349b809136706808e`.
 - PR #34 exact-head gates: Safety #274 PASS, Vercel PASS / Ready, fresh direct P0/P1=0, ahead 11 / behind 0, base commit and merge-base equal then-current main.
 - Merge commit tree exactly equals the reviewed PR #34 head tree; no unexpected merge delta.
@@ -30,6 +34,13 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Full post-merge `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
 ## Current blocker / active fix
+- The PR #35 post-merge production 12-case run is **10 PASS / 2 FAIL**. Schedule boundary, question sovereignty, CONTINUE hard freeze, and completed-event forward progression all pass.
+- `door-location-transition` is a harness false negative: the turn reached canon's `시작의 광장` and skipped every door/corridor microstep, while the evaluator accepted only the fixture alias `중앙광장`. The evaluator now accepts the canon destination.
+- `npc-initiative` exposed a real orchestration issue: Isabel was already present with a PC-targeted active goal and stall pressure, but a new Chloe Director cameo displaced her initiative.
+- The local fixed-flow closure emits `PRESENT_NPC_GOAL_PRIORITY` when a present NPC has an already-feasible PC/present-NPC goal under momentum pressure. It forbids a new random cameo, lets that NPC act first when physically/canonically possible, and still forbids deciding the PC's action, speech, emotion, or important choice.
+- Permanent NPC Goal/Director regressions and focused Context Router/Scene Momentum tests pass. Exact Preview rerun and the full suite remain before Scene Purpose.
+
+### Historical HF2 diagnosis and closure
 - The merged-main production 12-case rerun produced 11 PASS / 1 FAIL.
 - `두 시간 쉰다.` at 11:50 advanced 120 minutes and auto-completed the mandatory 12:00 orientation, deciding PC nonattendance despite the schedule payload being present.
 - Root cause: `EXPLICIT_DURATION=120min` had no exact earlier schedule hard-stop priority in the reserved Scene Momentum directive. The local adapter only raises a missing time floor and intentionally does not shrink positive model output, so it could not repair this without prose/state divergence.
