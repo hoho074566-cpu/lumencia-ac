@@ -15,6 +15,7 @@ Repository: `hoho074566-cpu/lumencia-ac`
 ## Live state immediately before this handover update
 - Branch: `codex/npc-goal-tick-v1`
 - Base/current main: `da248a2df0985d9196232149893a0b196020c0f9` (`Event Consequence V1`, PR #41 merge).
+- PR #42: **open; protected-path human merge only**, title `NPC Goal Tick V1 guarded present-NPC initiative`. Initial published head `1fc90a0627b7b22a077038500e61c34261262b59` is mergeable against current main; this documentation status update will become the next exact head.
 - PR #41: **merged** from exact reviewed head `06617b3ffe11d83bc512d7e4f520c17946d7bdf0`. Safety/Vercel passed, fresh exact-head Codex P0/P1=0, and the targeted delayed-result player-choice/no-early-fire/due/no-repeat Preview lifecycle passed. Merge commit `da248a2...` has tree `2bac9dd94468d37ff0cb7787ad6c42cdba478b27`, exactly equal to the reviewed head tree.
 - PR #40 is **merged** from reviewed exact head `85af592b8baae57958eb16d88da83f946d26a2e0`. Safety #313, Vercel, fresh exact-head Codex P0/P1=0, and affected Exact Preview acceptance passed. Squash merge `5f2073a...` exactly preserves reviewed tree `2354a0db58c6405beec40fcfaae885fd8850c0db`; production is healthy.
 - PR #39: **merged** from exact reviewed head `ba64f9f779cda39f91ef41abfddf3c47f823606c`. Safety #307, Vercel, fresh exact-head Codex P0/P1=0, and affected Chrome Preview acceptance passed. Squash merge commit `4516cc1...` has the exact reviewed tree `dfce564cc6b457a5258d5165ea05ce496acf99c6`; production Vercel and `/api/health` are healthy.
@@ -638,7 +639,7 @@ Gameplay roadmap discussed but not DONE:
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
 2. Confirm main contains PR #41 merge `da248a2df0985d9196232149893a0b196020c0f9`; do **not** redo completed HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Stronger Turn Hook, or Event Consequence diagnosis.
 3. Continue only NPC Goal Tick V1 on `codex/npc-goal-tick-v1`. Local code commit `c9efe50...` and the full clean-LF repository check pass.
-4. Push/open the focused PR, then require exact-current-HEAD Safety/Vercel and a fresh Codex P0/P1=0 review.
+4. On open PR #42, require exact-current-HEAD Safety/Vercel and a fresh Codex P0/P1=0 review; revalidate current main/merge-base/no-conflict.
 5. On the exact Preview, target the new proactive observe/explore/wait path plus no-repeat/cooldown and the protected question/travel/schedule boundaries. Do not run the later bounded off-screen phase yet.
 6. This work changes protected runtime/API paths; keep the PR human-merge only and do not merge it from a Codex task.
 
@@ -646,4 +647,4 @@ Gameplay roadmap discussed but not DONE:
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #41은 reviewed head `06617b3...`에서 main `da248a2...`로 merge됐고 merge tree가 reviewed tree와 정확히 같다. HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Stronger Turn Hook, Event Consequence 진단을 다시 하지 않는다. 현재 branch는 `codex/npc-goal-tick-v1`이고 code checkpoint `c9efe50...`에서 현장 고우선 목표의 proactive Goal Tick, 물리적 target 제한, 2-3턴 cadence, player/schedule/event/AUTO/CONTINUE guards, evidence-only Goal V2 progression을 구현했다. Focused tests와 full clean-LF PR check는 PASS다. 브랜치를 게시해 exact-head Safety/Vercel/fresh P0/P1=0과 targeted Preview를 닫고, protected runtime/API PR은 human-only로 유지한다. Off-screen progression은 이 PR 이후 별도 단계다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #41은 reviewed head `06617b3...`에서 main `da248a2...`로 merge됐고 merge tree가 reviewed tree와 정확히 같다. HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Stronger Turn Hook, Event Consequence 진단을 다시 하지 않는다. 현재 branch는 `codex/npc-goal-tick-v1`, open protected-path PR은 #42다. Code checkpoint `c9efe50...`에서 현장 고우선 목표의 proactive Goal Tick, 물리적 target 제한, 2-3턴 cadence, player/schedule/event/AUTO/CONTINUE guards, evidence-only Goal V2 progression을 구현했고 focused/full clean-LF checks가 PASS다. PR #42 exact-head Safety/Vercel/fresh P0/P1=0과 targeted Preview를 닫고 human-only로 유지한다. Off-screen progression은 이 PR 이후 별도 단계다.`

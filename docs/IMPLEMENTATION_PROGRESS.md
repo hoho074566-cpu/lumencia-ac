@@ -7,7 +7,7 @@ Narrative Engine continuation — live acceptance, Scene Purpose, Scene Exit, St
 - Repo: `hoho074566-cpu/lumencia-ac`
 - Main: `da248a2df0985d9196232149893a0b196020c0f9` (`Event Consequence V1`, PR #41 merge)
 - Working branch: `codex/npc-goal-tick-v1`
-- NPC Goal Tick V1 PR: pending branch publication. Code checkpoint `c9efe50bfc95d5093acbe36aef88f2cc98024a3f` is ahead 1 / behind 0 from current main and passes the full clean-LF repository check.
+- PR #42: **open**, title `NPC Goal Tick V1 guarded present-NPC initiative`; protected runtime/API paths keep it human-merge only. Initial published head `1fc90a0627b7b22a077038500e61c34261262b59` is mergeable against current main. Code checkpoint `c9efe50bfc95d5093acbe36aef88f2cc98024a3f` passes the full clean-LF repository check; this status update will become the next exact PR head.
 - PR #41: **merged** from exact reviewed head `06617b3ffe11d83bc512d7e4f520c17946d7bdf0`; Safety/Vercel/fresh P0/P1=0 and targeted Preview lifecycle acceptance passed. Merge `da248a2...` and reviewed head share tree `2bac9dd94468d37ff0cb7787ad6c42cdba478b27`.
 - PR #40: **merged** as squash commit `5f2073a2874a9b8ee45a6aa34d6e4508997c3cb3` from reviewed exact head `85af592b8baae57958eb16d88da83f946d26a2e0`. Safety #313, Vercel, fresh exact-head Codex P0/P1=0, and affected Exact Preview acceptance passed; reviewed and merged trees both equal `2354a0db58c6405beec40fcfaae885fd8850c0db`.
 - PR #39: **merged** as squash commit `4516cc162ef34426ef94d29cf5aa6489013927ec` from reviewed exact head `ba64f9f779cda39f91ef41abfddf3c47f823606c`. Safety #307, Vercel, fresh exact-head Codex P0/P1=0, and affected Chrome Preview acceptance passed. Merge and reviewed-head trees both equal `dfce564cc6b457a5258d5165ea05ce496acf99c6`; production Vercel and `/api/health` are healthy.
@@ -334,8 +334,8 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
 
 ## NEXT ACTION
-1. Push `codex/npc-goal-tick-v1` and open its focused PR from local code checkpoint `c9efe50...` plus this documentation checkpoint.
-2. Require exact-current-HEAD Safety/Vercel and a fresh P0/P1=0 Codex review; revalidate base/main and merge-base.
+1. Push this final PR #42 status checkpoint, then require exact-current-HEAD Safety/Vercel and a fresh P0/P1=0 Codex review; revalidate base/main and merge-base.
+2. Keep the exact current head immutable while hosted review and Preview evidence are collected.
 3. Run exact Preview acceptance for proactive observe/explore/wait initiative, manifestation/cooldown/no-repeat, and protected question/travel/schedule boundaries.
 4. Do not merge from a Codex task. Protected runtime/API paths make this PR human-only.
 5. Start bounded off-screen progression only after Goal Tick V1 closes.
@@ -371,4 +371,5 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Acceptance checkpoint `dbdc54b...`: bounded delayed-result materialization into existing hooks, due selection, schedule/player sovereignty guards, visible-result completion, open retry, expiry, duplicate rejection, secret-cause masking, and adaptive authority preservation passed full clean-LF check, Safety #316, Vercel Ready, clean-LF Chrome boot, and Exact Preview lifecycle acceptance. Its hosted review had P0/P1=0; the current closure addresses all six P2 hardening comments.
 - Completed: PR #41 exact reviewed head `06617b3...` merged as `da248a2...`; merge and reviewed trees are identical.
 - Completed locally on NPC Goal Tick V1 code `c9efe50...`: guarded proactive present-NPC tick, bounded cooldown checkpoint, feasibility filters, player/event/schedule/freeze guards, permanent regressions, substantive second review, and full clean-LF PR check PASS.
-- NEXT ACTION: publish/open the Goal Tick PR, require exact-head hosted authority, then run targeted Exact Preview acceptance and leave the protected-path PR for human merge.
+- Opened PR #42 from `codex/npc-goal-tick-v1` against current main; the initial published head is mergeable with no behind delta.
+- NEXT ACTION: push this final status checkpoint, require exact-head hosted authority, then run targeted Exact Preview acceptance and leave protected-path PR #42 for human merge.
