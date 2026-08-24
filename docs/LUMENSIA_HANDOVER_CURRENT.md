@@ -13,9 +13,10 @@ Repository: `hoho074566-cpu/lumencia-ac`
 # 0. SESSION STOP CHECKPOINT — 가장 먼저 읽을 것
 
 ## Live state immediately before this handover update
-- Branch: `codex/bounded-offscreen-progression-v1`
-- Base/current main: `8c5ca35a463356f375a4171148268a08abf0c83a` (`NPC Goal Tick V1`, PR #42 merge).
-- PR #43: **open / protected-path / human-merge only**. Initial exact head `5431bbb7d19ad3dd2b0086d3d69814ed040f8062` passed Safety #32745369252, Vercel Ready, mergeability/no-conflict, targeted Exact Preview acceptance, and fresh Codex P0/P1=0 review. Four focused P2 findings are closed locally in code checkpoint `21e0279b126135cdf5d3122bbbe4df7ef002fd03`; the new exact head still requires fresh hosted gates/review and the affected Preview rerun.
+- Branch: `codex/deterministic-scene-novelty-v1`
+- Base/current main: `fd2bcff13007fdf66c04477b9f69066f7c9b871e` (`Bounded Off-screen Progression V1`, PR #43 merge).
+- PR #44: **open / protected-path / human-merge only**. Initial code checkpoint `6eada327ea91afecdb3fa9655f917ddb65781f7b` implemented bounded visible-term repetition tracking. Hosted review found one P1 recap-classifier false positive and one adjacent P2 action-budget issue; closure checkpoint `3395454e2d50d6a30db7911825394274ce52bb8c` narrows recap detection to explicit requests and preserves 2,000-character actions when overall routed capacity is available while retaining dense schedule authority. Fresh exact-head hosted gates/review and affected Exact Preview acceptance remain required after the final docs checkpoint.
+- PR #43: **merged** from exact reviewed/accepted head `6b4f5990278ce8d3446c7b5be94a899a72d9fc80` as `fd2bcff13007fdf66c04477b9f69066f7c9b871e`. Its merge tree exactly equals reviewed head tree `5b6b56b272de438e3db6a53027ce13b75ff7cace`; merged-main Vercel, production `/api/health`, and the clean-LF full PR check pass.
 - PR #42: **merged** from exact reviewed head `6c115e661ed7257b3787b74d5f142a1c0b39e38d`. Safety #32741095125, Vercel, exact-head Codex P0/P1=0, and targeted Exact Preview acceptance passed. Merge `8c5ca35...` and reviewed head share tree `22195b469f2ccb1b3afdc7c197f5259fb110d59a`.
 - PR #41: **merged** from exact reviewed head `06617b3ffe11d83bc512d7e4f520c17946d7bdf0`. Safety/Vercel passed, fresh exact-head Codex P0/P1=0, and the targeted delayed-result player-choice/no-early-fire/due/no-repeat Preview lifecycle passed. Merge commit `da248a2...` has tree `2bac9dd94468d37ff0cb7787ad6c42cdba478b27`, exactly equal to the reviewed head tree.
 - PR #40 is **merged** from reviewed exact head `85af592b8baae57958eb16d88da83f946d26a2e0`. Safety #313, Vercel, fresh exact-head Codex P0/P1=0, and affected Exact Preview acceptance passed. Squash merge `5f2073a...` exactly preserves reviewed tree `2354a0db58c6405beec40fcfaae885fd8850c0db`; production is healthy.
@@ -43,7 +44,18 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Production `/api/health`: healthy; app `1.5.6`, canonical `/api/chat`, adapter `/api/chat-router`, `24h` prompt-cache retention.
 - Full post-merge `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
-## Current active work — Bounded Off-screen Progression V1
+## Current active work — Deterministic Scene Novelty V1
+- Uses the existing flexible `sceneRuntime` root and adds no save migration, new endpoint, rewrite pass, or model call.
+- Stores only bounded user-visible evidence: at most 16 recent visible terms, 8 repeated terms, 6 change axes, a similarity score, and a repetition streak. Hidden canon and broader secret access remain out of scope.
+- A repeat is counted only when at least three terms overlap by 65% or more and structural State Delta is zero. Real location/time/NPC/event/information/relationship/objective/resource/schedule/world changes reset pressure.
+- The reserved prompt marks recent terms as a do-not-relist reference, never as a checklist to reproduce. It remains absent when no recent evidence exists.
+- Explicit recap requests are exempt. Direct questions cannot be converted into world progression, while CONTINUE preserves the exact prior novelty checkpoint and its hard freeze.
+- Active novelty no longer subtracts its directive length unconditionally from USER ACTION. Only real overall input pressure compacts the middle of a long action, while the beginning, committed ending, mandatory schedule payload, Purpose, Exit, Turn Hook, and minimum `.76` budget remain present.
+- Permanent tests cover Korean lexical endings, overlap thresholds, structural reset, different material, recap/question/CONTINUE boundaries, malicious bounds, runtime persistence, one-call wiring, and active-novelty authority pressure.
+- Code checkpoint `6eada32...` passes all dedicated/affected tests and the full authoritative clean-LF PR check.
+- Review closure `3395454...` rejects recap false positives such as `다시 자리에서 일어나 경비에게 말을 건다`, `repeatedly`, and `Repeat the attack`, while still recognizing explicit Korean/English recap requests. It also removes unconditional directive-length action truncation and covers both moderate-action preservation and dense schedule/action authority pressure.
+
+## Completed active predecessor — Bounded Off-screen Progression V1
 - Uses the existing local `backgroundDigest`/runtime path; it adds no model call, endpoint, save root, or migration.
 - When time really advances across a public schedule start that is not PC-relevant, at most two already-known absent NPCs may receive bounded `location`/`status` updates and a compact background record.
 - Present NPCs, model-authored state updates, unseen NPCs, PC schedules, secret/private schedules, completed/cancelled occurrences, disabled background simulation, META, and CONTINUE remain frozen or excluded.
@@ -52,6 +64,7 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Permanent tests cover secrecy/knowledge/current-scene/model-update guards, all visible speakers beyond the participant cap, PC priority, explicit restricted visibility, invalid calendar dates, cross-midnight clocks, long skips/latest-start precedence, hard caps, digest bounds, frontend application, and the single-call architecture.
 - Initial checkpoint `5431bbb...` passed full clean-LF checks and all three targeted Exact Preview cases: eligible other-department transition 1 update/1 digest, disabled background 0/0, and PC-schedule boundary with no off-screen mutation.
 - Fresh review on `5431bbb...` reported P0/P1=0 and four P2 edge cases. Code checkpoint `21e0279...` closes them with calendar round-trip validation, explicit-public-only visibility/access, every-turn-speaker protection, and latest-start precedence. Focused tests, syntax checks, `git diff --check`, and the substantive second review pass locally.
+- Final exact head `6b4f599...` passed Safety #329, Vercel Ready, fresh exact-head Codex P0/P1=0, all three affected Exact Preview cases, and the clean-LF full check before the user merged PR #43.
 
 ## Completed active predecessor — NPC Goal Tick V1
 - Final reviewed head `6c115e661ed7257b3787b74d5f142a1c0b39e38d` merged as `8c5ca35a463356f375a4171148268a08abf0c83a`; initial code checkpoint `c9efe50bfc95d5093acbe36aef88f2cc98024a3f` carried the core candidate.
@@ -617,8 +630,8 @@ Immediately continue:
 4. stronger **Turn Hook**;
 5. **Event Consequence** chaining / lifetime;
 6. NPC Initiative / Goal Tick refinement;
-7. bounded off-screen progression;
-8. deterministic novelty/repetition suppression if live loops remain;
+7. bounded off-screen progression — completed in PR #43;
+8. deterministic novelty/repetition suppression — active in PR #44;
 9. multi-system scene orchestration.
 
 Longer roadmap:
@@ -648,14 +661,14 @@ Gameplay roadmap discussed but not DONE:
 # 12. NEXT ACTION — CURRENT START POINT
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
-2. Confirm main contains PR #42 merge `8c5ca35a463356f375a4171148268a08abf0c83a`; do **not** redo completed HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Stronger Turn Hook, Event Consequence, or NPC Goal Tick diagnosis.
-3. Continue only PR #43 / Bounded Off-screen Progression V1 on `codex/bounded-offscreen-progression-v1`; code checkpoint `21e0279...` is the P2 closure.
-4. Commit/push the docs checkpoint, run the full clean-LF check at exact HEAD, then require fresh exact-current-HEAD Safety/Vercel and Codex P0/P1=0 review.
-5. Revalidate current main/merge-base/no-conflict and rerun only the three affected Preview schedule-crossing/background-disabled/PC-schedule cases.
-6. If all gates pass, tell the user PR #43 is ready for human merge. This PR changes protected runtime/API paths, so do not merge it from a Codex task and do not expand it into arbitrary off-screen goal/relationship/faction progression.
+2. Confirm main contains PR #43 merge `fd2bcff13007fdf66c04477b9f69066f7c9b871e`; do **not** redo completed HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Stronger Turn Hook, Event Consequence, NPC Goal Tick, or Bounded Off-screen Progression diagnosis.
+3. Continue only PR #44 / Deterministic Scene Novelty V1 on `codex/deterministic-scene-novelty-v1`; initial code checkpoint is `6eada32...` and hosted-review closure checkpoint is `3395454...`.
+4. Commit/push this final docs checkpoint, run the full clean-LF check at exact HEAD, then require fresh exact-current-HEAD Safety/Vercel and Codex P0/P1=0 review.
+5. Revalidate current main/merge-base/no-conflict and rerun the affected Preview sequence `본다` → `돌아다닌다` → `본다`, explicit recap, direct question, CONTINUE, and the false-recap action `다시 자리에서 일어나 경비에게 말을 건다`.
+6. If all gates pass, tell the user PR #44 is ready for human merge. This PR changes protected runtime/API paths, so do not merge it from a Codex task and do not expand it into arbitrary events, secrets, relationships/factions, or a second model call.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #42는 reviewed head `6c115e6...`에서 main `8c5ca35...`로 merge됐고 merge tree가 reviewed tree와 정확히 같다. HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Stronger Turn Hook, Event Consequence, NPC Goal Tick 진단을 다시 하지 않는다. 현재 branch는 `codex/bounded-offscreen-progression-v1`, open PR은 #43, P2 closure code는 `21e0279...`다. 활성 범위는 시간이 실제로 공개 비-PC 일정 시작을 지날 때 이미 알려진 부재 NPC 최대 2명의 위치/상태와 bounded digest만 갱신하는 Bounded Off-screen Progression V1이다. Goal V2 진행, 관계, 파벌, 소문, 비밀, 사건 완료, 추가 모델 호출, 저장 마이그레이션은 이 PR 범위가 아니다. exact-head clean-LF/hosted/review/Preview 3-case를 모두 재검증하고 protected-path human-only PR로 진행한다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #43은 reviewed/accepted head `6b4f599...`에서 main `fd2bcff...`로 merge됐고 merge tree가 reviewed tree와 정확히 같다. HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Stronger Turn Hook, Event Consequence, NPC Goal Tick, Bounded Off-screen Progression 진단을 다시 하지 않는다. 현재 branch는 `codex/deterministic-scene-novelty-v1`, open PR은 #44, initial code checkpoint는 `6eada32...`, hosted-review P1/P2 closure checkpoint는 `3395454...`다. 활성 범위는 사용자에게 이미 보인 장면 용어가 구조 변화 없이 반복되는 경우에만 bounded repetition pressure를 만들고 다음 응답에서 변화 우선/재열거 금지 지침을 예약하는 Deterministic Scene Novelty V1이다. 명시적 recap, 질문, CONTINUE, 플레이어 선택권, 필수 일정, 단일 모델 호출을 보존하며 arbitrary events/secrets/relationships/factions/save migration은 범위 밖이다. final docs exact-head clean-LF/hosted/review/affected Preview를 모두 재검증하고 protected-path human-only PR로 진행한다.`

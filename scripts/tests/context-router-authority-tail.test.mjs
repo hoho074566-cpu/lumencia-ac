@@ -108,6 +108,7 @@ const denseSave={
     exit_condition:{version:'1.0',kind:'interaction-turn',target:'EXIT_DENSE_SENTINEL',source:'scene-purpose',status:'open',established_turn:8,purpose_established_turn:8},
     turn_hook:{version:'1.0',kind:'npc-address',anchor:'TURN_HOOK_DENSE_SENTINEL',source:'scene-dialogue',status:'awaiting-player',established_turn:8,speaker_key:'guide'},
     momentum:{stall_streak:2},
+    novelty:{version:'1.0',repetition_streak:2,recent_terms:['게시판','배정','창구','정정','목록','기량평가','안내'],repeated_terms:['게시판','목록','안내'],recent_axes:['information'],last_turn:8},
   },
   scheduleContext:{
     due:denseEvents.slice(0,4),upcoming:denseEvents,
@@ -120,8 +121,15 @@ assert.ok(denseRouted.params.input.length<=9000,`dense routine authority input e
 assert.match(denseRouted.params.input,/SCHEDULE ENGINE \(ROUTED\)/);
 assert.match(denseRouted.params.input,/NOTE_DENSE_0/);
 assert.match(denseRouted.params.input,/STRONGER TURN HOOK V1/);
+assert.match(denseRouted.params.input,/DETERMINISTIC SCENE NOVELTY V1/);
+assert.match(denseRouted.params.input,/REPEAT_GUARD=required/);
 assert.match(denseRouted.params.input,/TURN_HOOK_DENSE_SENTINEL/);
 assert.match(denseRouted.params.input,/대도서관으로 간다\./);
+
+const moderateAction=`${'중간 길이 행동 설명 '.repeat(260)}`.slice(0,2000);
+const moderateSave={turnNumber:8,world:{date:'1285-03-01',time:'09:00',location:'SAVE_WORLD_MODERATE'},pc:{name:'SAVE_PC_MODERATE'},sceneRuntime:{novelty:denseSave.sceneRuntime.novelty}};
+const moderateRouted=routeOpenAIParams({instructions,input:originalInput},{mode:'game',incoming:{action:moderateAction,rollingSummary:'',recentTurns:[],saveState:moderateSave}});
+assert.ok(moderateRouted.params.input.includes(moderateAction),'an active novelty directive must not truncate a 2,000-character action when the routed input has room');
 
 const maximumActionSuffix='대도서관으로 간다.';
 const maximumAction=`${'최대 행동 압력 '.repeat(900)}`.slice(0,5200-maximumActionSuffix.length)+maximumActionSuffix;

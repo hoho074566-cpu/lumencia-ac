@@ -21,6 +21,7 @@ export default async function handler(req, res) {
     npcMotivation: 'V2 evidence-gated active_goal lifecycle + progress/replacement/history + eligible-candidate Director weighting',
     relationshipReason: 'V1 cause/expression/followup + turn/source persistence',
     sceneMomentum: 'HF1 semantic action compression + deterministic State Delta/stall + NPC initiative + meaningful-stop policy',
+    sceneNovelty: 'V1 bounded visible-term repetition tracking + change-first suppression',
     tokenBudget: { routine: 17000, routineSoftMax: 20000, scheduled: 18000, important: 20000, critical: 24000 },
   });
 }
