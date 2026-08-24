@@ -147,6 +147,16 @@ assert.match(adaptiveRouted.params.input,/대도서관으로 간다\./,'adaptive
 assert.equal(adaptiveRouted.params.input.includes(maximumAction),false,'adaptive pressure fixture must actually exercise bounded middle compaction');
 assert.ok(adaptiveRouted.params.input.lastIndexOf('===== USER ACTION =====')>adaptiveRouted.params.input.lastIndexOf('===== SCHEDULE ENGINE (ROUTED) ====='),'adaptive USER ACTION marker must remain final');
 
+const mandatoryEvents=denseEvents.map((event,index)=>({...event,importance:4,id:`mandatory-${index}`}));
+const scheduledSave={...denseSave,scheduleContext:{...denseSave.scheduleContext,due:mandatoryEvents.slice(0,4),upcoming:mandatoryEvents},scheduledEvents:mandatoryEvents,routerFeedback:{routerVersion:'1.5.6-hf1',profile:'scheduled-18k-v154',lastInputTokens:100000}};
+const scheduledRouted=routeOpenAIParams({instructions,input:denseOriginalInput},{mode:'game',incoming:{action:maximumAction,rollingSummary:'dense old '.repeat(1000),recentTurns:[],saveState:scheduledSave}});
+assert.equal(scheduledRouted.telemetry.profile,'scheduled-18k-v154');
+assert.equal(scheduledRouted.telemetry.adaptive_scale,.76,'scheduled fixture must exercise the minimum supported adaptive scale');
+assert.ok(scheduledRouted.params.input.length<=7220,`adaptive scheduled input exceeded its 0.76 profile budget: ${scheduledRouted.params.input.length}`);
+assert.match(scheduledRouted.params.input,/SCHEDULE ENGINE \(ROUTED\)/);
+assert.match(scheduledRouted.params.input,/"id":"mandatory-0"/,'adaptive scheduled pressure must retain the first mandatory occurrence');
+assert.match(scheduledRouted.params.input,/대도서관으로 간다\./,'adaptive scheduled pressure must retain the committed USER ACTION predicate');
+
 const aftermath=source.indexOf("AFTERMATH_FIXED_FLOW");
 const combat=source.indexOf("ACTIVE_COMBAT_FIXED_FLOW");
 const momentum=source.indexOf('const momentumDue=momentumPressure');
