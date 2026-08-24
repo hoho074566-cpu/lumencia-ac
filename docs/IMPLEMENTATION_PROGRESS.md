@@ -1,16 +1,19 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Post-merge Narrative Engine continuation — PR #35 Schedule Boundary HF2 is merged. Production Live-play acceptance exposed one harness false negative and one present-NPC initiative failure; the active work is **NPC Initiative HF3 on PR #36**, followed by Scene Purpose, Explicit Scene Exit Condition, Stronger Turn Hook, and Event Consequence chaining.
+Post-merge Narrative Engine continuation — PR #36 NPC Initiative HF3 is merged after exact Preview acceptance. The active work is **Scene Purpose V1** with bounded purpose state and no automatic player choice. Explicit Scene Exit Condition, Stronger Turn Hook, and Event Consequence chaining remain separate later phases.
 
 ## Current GitHub State
 - Repo: `hoho074566-cpu/lumencia-ac`
-- Main: `6a717e5fb612a75d70334eb5b40a461ead36587d` (`Merge pull request #35`)
-- Working branch: `codex/live-acceptance-npc-initiative-hf3`
-- PR #36: **open / unmerged**; reviewed code HEAD `c7881f4c31758d0350833f31c37d116f3ff4c18d`.
-- PR #36 exact-head Safety Gate #289: **PASS**; Vercel: **PASS / Ready**.
-- Fresh exact-head Codex review on `c7881f4...`: direct P0/P1 = 0 (`Didn't find any major issues`). The previously reported committed-action priority P1 is closed by limiting present-NPC stall recovery to passive `wait` / `downtime` intents.
-- Exact-head compare: ahead 3 / behind 0; PR base and merge-base are current main `6a717e5...`; branch was clean and synchronized before this docs-only checkpoint.
+- Main: `1faadd105cf7b7780544abb5ca5276af04198796` (`Merge pull request #36`)
+- Working branch: `codex/scene-purpose-v1`
+- PR #37: **open**. Docs checkpoint `df3b9077d093a270ffebf52e04283a1adf1846f0` closed the production multiline AUTO misclassification and passed Safety #298, Vercel, clean-LF checks, and focused signed-in AUTO Preview acceptance. Fresh review then found that direct `decision-sensitive` questions could still be steered by stale focus. Current code candidate `c9d5a0fc54826ae804a39df4412beaa19ce9b741` gives real actions and direct questions current-action priority while separately preserving PC choice sovereignty; the final docs checkpoint is the branch HEAD containing this record.
+- PR #36: **merged** from exact docs checkpoint HEAD `c347744858300359ab8d6da204cb5d9277d366be`; reviewed code HEAD `c7881f4c31758d0350833f31c37d116f3ff4c18d`.
+- PR #36 final checkpoint Safety Gate #290: **PASS**; Vercel: **PASS / Ready**.
+- Fresh reviewed-code Codex result on `c7881f4...`: direct P0/P1 = 0 (`Didn't find any major issues`). The docs-only checkpoint did not change that code tree. The previously reported committed-action priority P1 is closed by limiting present-NPC stall recovery to passive `wait` / `downtime` intents.
+- Exact Preview rerun: door/location-transition PASS, NPC initiative PASS, then full isolated `scripts/qa/live-play-acceptance.mjs` 12-case set **12/12 PASS** through the signed-in Chrome tab. No deployment token was extracted and no protection was bypassed.
+- PR #36 merge commit `1faadd105cf7b7780544abb5ca5276af04198796` has parents `6a717e5fb612a75d70334eb5b40a461ead36587d` and `c347744858300359ab8d6da204cb5d9277d366be`; its tree exactly equals the reviewed checkpoint tree `fbe68c4a3b2207542bd0dd5a41cb8d75e0efa64b`.
+- Post-merge production `/api/health`: 200, configured, app `1.5.6`, adapter `0.8.3`; merge-commit status checks passed.
 - PR #35: **merged** at 2026-08-24 03:08:35 UTC using exact expected head `acee0ef8bbff62ec9ee819c6715a0419d74e896e`; merge commit `6a717e5fb612a75d70334eb5b40a461ead36587d` exactly preserved the reviewed tree.
 - PR #35 post-merge full regression and production Vercel: **PASS**; production 12-case acceptance: **10 PASS / 2 FAIL**, producing the PR #36 work below.
 - PR #34: **merged** at 2026-08-24 01:47:23 UTC using exact expected head `4479615f4904c74ee9e3dfd349b809136706808e`
@@ -25,6 +28,16 @@ Post-merge Narrative Engine continuation — PR #35 Schedule Boundary HF2 is mer
 - Post-merge Vercel on main: **PASS**.
 - Production `/api/health`: `ok=true`, API configured, app `1.5.6`, adapter `/api/chat-router`, canonical core `/api/chat`, prompt cache retention `24h`.
 - Post-merge full `node scripts/lumensia-pr-check.mjs`: **PASS**.
+
+## Scene Purpose V1 — Current Candidate
+- New bounded `sceneRuntime.purpose` keeps only canonical version, allowlisted kind/source, a 180-character single-line focus, bounded establishment turn, and an optional 100-character event occurrence ID.
+- Purpose persists across same-scene descriptive churn, switches on authoritative event/decision/scene transitions, and never stores a selected player action.
+- Reserved Context Router guidance treats the focus as data, advances it only through NPC/world/event response, and explicitly forbids automatic PC action, dialogue, emotion, thought, acceptance, rejection, or choice.
+- CONTINUE preserves the purpose object and receives a purpose-specific hard freeze; META remains unchanged.
+- No schema migration, extra model call, new API entrypoint, `app.js` rewrite, or `api/chat.js` rewrite.
+- Focused syntax, purpose, context authority-tail, CONTINUE, event, continuity, and Scene Momentum suites: PASS.
+- Full `scripts/lumensia-pr-check.mjs`: PASS in a clean LF checkout. The normal Windows working tree still exposes the known CRLF-only false negative in five pre-existing workflow string assertions; canonical Git blobs and hosted Linux checks use LF.
+- The current candidate distinguishes empty descriptive churn, the short AUTO sentinel, and the production multiline routed AUTO header from real player input. Its pre-response directive uses `PURPOSE_MODE=current-action-first` for real actions and direct questions; both AUTO forms use continuity. Saved focus becomes compatible NPC/world/event context only and cannot redirect the current request. A separate sovereignty rule forbids inventing additional PC action, dialogue, emotion, thought, acceptance, rejection, or choice. Active events, decisions, NPC interaction precedence, and CONTINUE freeze remain unchanged. This candidate is not merge-authoritative until the final docs checkpoint is pushed and freshly reviewed.
 
 ## Completed Foundation
 Already merged before PR #33:
@@ -269,10 +282,11 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
 
 ## NEXT ACTION
-1. Publish this docs-only checkpoint without changing the reviewed code tree; re-require Safety/Vercel and exact-current-HEAD review authority for the resulting head.
-2. When the signed-in Preview browser connection is available, rerun door/location and NPC-initiative acceptance; if both pass, rerun all 12 cases against the PR #36 Exact Preview.
-3. Only after Exact Preview acceptance, mark Live-play acceptance complete and implement **Scene Purpose** with bounded purpose state and no automatic player choice.
-4. Do not merge PR #36 without separate exact-merge authorization; afterward continue Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence chaining/lifetime.
+1. Run the full clean-LF PR check and final exact-diff/scope review for code candidate `c7e0a8b...` plus this docs checkpoint.
+2. Commit/push the docs checkpoint, then require hosted Safety/Vercel and fresh exact-current-HEAD P0/P1 authority.
+3. Rerun the affected current-action-priority case on the exact Preview; retain the already-completed AUTO/generic-action/transition/event/decision/CONTINUE evidence unless the reviewed code path changes again.
+4. If every exact-current-head gate is green and no special blocker appears, use the user's explicit merge authorization and verify the merge tree plus production health.
+5. Only after Scene Purpose is complete, start Explicit Scene Exit Condition as a separate change. Do not mix Turn Hook or Event Consequence into this PR.
 
 ## Stop Record
 - Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.
@@ -294,6 +308,9 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Tests at this checkpoint: focused regressions and full `node scripts/lumensia-pr-check.mjs` PASS; the diff is limited to the shared momentum helper, stable adapter, tests, and these progress documents.
 - Completed on PR #36 code head `c7881f4...`: passive-only initiative closure published; Safety #289/Vercel Ready; fresh direct P0/P1=0; ahead 3 / behind 0; current-base and merge-base match main.
 - Completed locally this session: branch/head verification, Cloud Browser recovery retries, protected-Preview URL confirmation, dedicated live-token availability check, syntax/static checks, `git diff --check`, and full PR check PASS.
-- Unfinished: Exact Preview door/location and NPC-initiative reruns, full 12-case acceptance, separately authorized guarded merge, post-merge verification, Scene Purpose and later phases.
-- Blocker: Exact Preview live acceptance cannot run while the protected deployment's signed-in cloud-browser tab connection is unavailable and no dedicated CLI live-access token is injected. Merge also remains forbidden without separate exact-merge authorization.
-- NEXT ACTION: publish this docs-only checkpoint and revalidate its hosted/review gates; rerun Preview acceptance as soon as the signed-in browser connection becomes available.
+- Completed: Exact Preview door/location and NPC-initiative reruns plus the full 12-case acceptance, PR #36 authorized merge, exact merge-tree verification, and production health smoke.
+- Completed on PR #37 exact head `906bd3d`: AUTO sentinel closure, hosted Safety/Vercel, and focused signed-in AUTO Preview acceptance; AUTO produced `decision/player-decision`, not `player-action`.
+- Fresh exact-head review found one remaining pre-response priority path. Code candidate `c7e0a8b...` makes the current committed action outrank saved focus and adds direct plus reserved-authority-tail regressions. The stale handover finding is closed by this docs checkpoint.
+- Unfinished: final clean-LF check/review, docs checkpoint commit/push, fresh exact-head gates/review, affected current-action Preview rerun, guarded merge, merge-tree verification, and production health; all later narrative phases remain separate.
+- Blocker: none locally.
+- NEXT ACTION: validate and publish code `c7e0a8b...` plus this docs checkpoint, then revalidate every exact-current-head gate.

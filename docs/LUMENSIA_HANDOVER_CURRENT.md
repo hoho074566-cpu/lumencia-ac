@@ -13,11 +13,12 @@ Repository: `hoho074566-cpu/lumencia-ac`
 # 0. SESSION STOP CHECKPOINT — 가장 먼저 읽을 것
 
 ## Live state immediately before this handover update
-- Branch: `codex/live-acceptance-npc-initiative-hf3`
-- Reviewed code HEAD: `c7881f4c31758d0350833f31c37d116f3ff4c18d`
-- Current main: `6a717e5fb612a75d70334eb5b40a461ead36587d`
-- PR #36: **open / unmerged**, mergeable, ahead 3 / behind 0; base commit and merge-base equal current main.
-- PR #36 exact-head gates on `c7881f4...`: Safety #289 PASS, Vercel Ready, fresh direct Codex P0/P1=0. The branch was clean and synchronized before this docs-only checkpoint.
+- Branch: `codex/scene-purpose-v1`
+- PR #37: **open**. Docs checkpoint `df3b9077d093a270ffebf52e04283a1adf1846f0` closed the production multiline AUTO misclassification and passed Safety #298, Vercel, clean-LF checks, and focused signed-in AUTO Preview acceptance. Fresh review then found that direct `decision-sensitive` questions still used continuity mode and could be steered by stale focus. Current code candidate `c9d5a0fc54826ae804a39df4412beaa19ce9b741` gives every real current action/question priority while separately preserving PC choice sovereignty; the final docs checkpoint is the branch HEAD containing this record.
+- Base/current main: `1faadd105cf7b7780544abb5ca5276af04198796`
+- PR #36: **merged** after exact Preview acceptance; reviewed code HEAD `c7881f4c31758d0350833f31c37d116f3ff4c18d`, exact docs checkpoint/merge parent `c347744858300359ab8d6da204cb5d9277d366be`.
+- PR #36 exact-head gates: Safety #290 PASS, Vercel Ready, fresh exact-head Codex P0/P1=0. Door/location and NPC-initiative reruns passed first, followed by the full isolated 12-case acceptance at 12/12 PASS.
+- PR #36 merge commit parents are `6a717e5...` + `c347744...`; merge tree `fbe68c4a3b2207542bd0dd5a41cb8d75e0efa64b` exactly matches the reviewed checkpoint tree. Production `/api/health` is 200/configured on adapter `0.8.3` and app `1.5.6`.
 - PR #35: **merged** at 2026-08-24 03:08:35 UTC using `expected_head_sha=acee0ef8bbff62ec9ee819c6715a0419d74e896e`.
 - PR #35 final gates: Safety #286 PASS, Vercel Ready, fresh exact-head direct P0/P1=0, ahead 10 / behind 0, base commit and merge-base equal then-current main `88fa53036c58324ffd5012ab7b5ed0cd3099dd6d`.
 - Merge commit parents and tree are exact: the merge tree equals reviewed head tree `6d7d44bf891187ad8b88a715544f23004267e005` with no unexpected files.
@@ -36,7 +37,16 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Production `/api/health`: healthy; app `1.5.6`, canonical `/api/chat`, adapter `/api/chat-router`, `24h` prompt-cache retention.
 - Full post-merge `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
-## Current blocker / active fix
+## Current active work — Scene Purpose V1
+- The focused branch adds bounded `sceneRuntime.purpose` continuity without a save migration or a second model call.
+- Same-scene descriptive churn retains the purpose. Active event occurrence, real scene/location transition, and explicit player decision points replace it deterministically.
+- The persisted object is allowlisted and length-bounded; choices themselves are not persisted as an automatic player action.
+- The reserved model directive treats purpose focus as data and explicitly forbids creating PC action, dialogue, emotion, thought, acceptance, rejection, or choice.
+- CONTINUE preserves the existing purpose object and receives a purpose-specific freeze. META is untouched.
+- The current candidate uses nonempty player input evidence for same-scene routing, treats both `[AUTO FLOW: PC 새 행동 없음]` and `[LUMENSIA V1.5.6 AUTO FLOW — SCENE MOMENTUM HF1]` routed input as no player action, and emits `PURPOSE_MODE=current-action-first` before real actions and direct questions so prior focus cannot redirect them.
+- Current-action mode separately forbids inventing any additional PC action, dialogue, emotion, thought, acceptance, rejection, or choice. Empty descriptive churn and both AUTO forms retain continuity; active-event authority, explicit decisions, NPC interaction precedence, and CONTINUE freeze are unchanged. Focused regressions and the full clean-LF PR check pass. Final docs checkpoint push, fresh exact-head hosted authority, affected direct-question Preview rerun, and guarded merge remain.
+
+### Historical PR #36 diagnosis and closure
 - The PR #35 post-merge production 12-case run is **10 PASS / 2 FAIL**. Schedule boundary, question sovereignty, CONTINUE hard freeze, and completed-event forward progression all pass.
 - `door-location-transition` is a harness false negative: the turn reached canon's `시작의 광장` and skipped every door/corridor microstep, while the evaluator accepted only the fixture alias `중앙광장`. The evaluator now accepts the canon destination.
 - `npc-initiative` exposed a real orchestration issue: Isabel was already present with a PC-targeted active goal and stall pressure, but a new Chloe Director cameo displaced her initiative.
@@ -46,7 +56,7 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Fresh exact-head review `5004348673` found one follow-up P1: committed travel, observation, and consequential actions still qualified for present-NPC stall recovery and could be preempted by an unrelated NPC action.
 - Published code head `c7881f4c31758d0350833f31c37d116f3ff4c18d` limits `PRESENT_NPC_GOAL_PRIORITY` to passive `wait` / `downtime` intents. Waiting still triggers NPC initiative, while permanent question/travel/observe/contract-signing regressions preserve the player's committed action. Safety #289, Vercel Ready, fresh direct P0/P1=0, nine focused suites, and the full PR check pass.
 - Exact Preview for this head is `https://lumencia-ac-git-codex-live-acceptance-npc-initia-c273ba-ah-203c.vercel.app`.
-- Cloud Browser was rechecked in a fresh session. Chrome/CDP selection succeeds, but tab discovery and new-tab creation repeatedly time out after the documented recovery retry. `LUMENSIA_LIVE_ACCESS_TOKEN` is not injected, so the protected Preview cannot be run through the CLI harness either. No token extraction/protection bypass is attempted; PR #36 is not merge-ready and Scene Purpose has not started.
+- A later fresh Chrome connection succeeded. The signed-in Exact Preview tab was used directly; no token extraction or protection bypass occurred. The two priority cases and all 12 cases passed before PR #36 was merged.
 
 ### Historical HF2 diagnosis and closure
 - The merged-main production 12-case rerun produced 11 PASS / 1 FAIL.
@@ -576,16 +586,16 @@ Gameplay roadmap discussed but not DONE:
 
 ---
 
-# 12. NEXT ACTION — NEW CHAT STARTS HERE
+# 12. NEXT ACTION — CURRENT START POINT
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
-2. Confirm main still contains PR #35 merge commit `6a717e5fb612a75d70334eb5b40a461ead36587d`; do **not** redo completed HF1/HF2 diagnosis.
-3. The passive-intent-only code closure is complete on reviewed code head `c7881f4...` with Safety #289, Vercel Ready, and fresh direct P0/P1=0. Publish this docs-only checkpoint and revalidate the resulting exact head without changing the code tree.
-4. When the signed-in cloud-browser connection becomes available, rerun exact Preview door/location and NPC-initiative cases, then all 12 cases. Do not bypass deployment protection.
-5. Do not merge PR #36 without separate exact-merge authorization. After exact Preview acceptance and a later authorized merge, proceed to **Scene Purpose -> Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence**.
+2. Confirm main contains PR #36 merge commit `1faadd105cf7b7780544abb5ca5276af04198796`; do **not** redo completed HF1/HF2/HF3 diagnosis or the 12-case acceptance.
+3. Continue only code candidate `c7e0a8b...` plus this focused PR #37 docs checkpoint: run the full check and final regression/scope review, and keep Scene Exit/Turn Hook/Event Consequence out of this change.
+4. Commit/push the docs checkpoint, then require hosted Safety/Vercel plus fresh exact-current-HEAD P0/P1 authority and rerun the affected current-action-priority Exact Preview case.
+5. The user has explicitly authorized merge when no special issue remains. Revalidate the exact head/base/mergeability immediately before merge, then verify the merge tree and production health.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #35는 exact merge/post-merge 검증까지 끝났고, PR #36의 passive wait/downtime-only initiative closure는 reviewed code head c7881f4에서 Safety #289/Vercel/fresh direct P0/P1=0까지 통과했다. 현재 blocker는 protected Exact Preview의 signed-in cloud-browser tab 연결 실패이며 전용 CLI live token도 주입되지 않았다. 이 docs-only checkpoint의 hosted/review gate를 재검증한 뒤, browser가 가능해지면 door/location + NPC initiative -> 전체 12-case acceptance를 끝낸다. PR #36은 별도 exact-merge 승인 없이 병합하지 말고, acceptance/authorized merge 뒤 Scene Purpose -> Scene Exit -> Turn Hook -> Event Consequence로 계속한다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #36은 Exact Preview 12/12 acceptance와 exact-head gates 후 merge commit 1faadd1로 병합되었고 production health도 정상이다. PR #37 exact head 906bd3d는 Safety/Vercel과 AUTO focused Exact Preview를 통과했지만, fresh review가 saved focus의 pre-response current-action priority P1과 stale docs를 지적했다. 현재 code candidate c7e0a8b는 committed USER ACTION을 saved PURPOSE_FOCUS보다 우선시키고 direct/authority-tail regressions를 추가했다. 이 문서를 포함한 final docs checkpoint를 full check/final review -> commit/push -> hosted Safety/Vercel/fresh exact-head P0/P1 -> affected current-action Preview rerun 순서로 검증하고, 이상이 없으면 사용자의 명시적 권한으로 exact-head merge한다. Scene Exit/Turn Hook/Event Consequence는 이 PR에 섞지 않는다.`
