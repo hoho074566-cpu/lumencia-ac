@@ -53,6 +53,22 @@ test('duplicate npc_state_updates stay row-aligned after legacy parsing',()=>{
   assert.equal(parsed.state_delta.npc_state_updates[1].goal_replace,true);
 });
 
+test('legacy structured output preserves the Event Consequence queue field added by the adapter',()=>{
+  const format={
+    schema:{type:'object',properties:{state_delta:{type:'object',properties:{
+      hooks_add:{type:'array',items:{type:'object'}},
+      npc_state_updates:{type:'array',items:{type:'object',properties:{npc_key:{type:'string'},current_goal:{anyOf:[{type:'string'},{type:'null'}]}},required:['npc_key','current_goal'],additionalProperties:false}},
+    },required:['hooks_add','npc_state_updates'],additionalProperties:false}}},
+    $parseRaw:(content)=>{const raw=JSON.parse(content);return{state_delta:{hooks_add:raw.state_delta.hooks_add,npc_state_updates:raw.state_delta.npc_state_updates.map(r=>({npc_key:r.npc_key,current_goal:r.current_goal}))}};},
+  };
+  const patched=patchGoalV2StructuredFormat({instructions:'base',text:{format}});
+  assert.ok(patched.text.format.schema.properties.state_delta.properties.delayed_consequences_add);
+  assert.ok(patched.text.format.schema.properties.state_delta.required.includes('delayed_consequences_add'));
+  const consequence={event_name:'교수 호출',target_bucket:'active',delay_minutes:30,reason:'결투 여파',secret_level:0};
+  const raw={state_delta:{hooks_add:[],npc_state_updates:[],delayed_consequences_add:[consequence]}};
+  assert.deepEqual(patched.text.format.$parseRaw(JSON.stringify(raw)).state_delta.delayed_consequences_add,[consequence]);
+});
+
 test('rephrasing preserves persisted priority and urgency even with due schedule and active hook',()=>{
   const old=oldGoal({priority:5,urgency:2,progress:61});
   const inc=incoming(old,{
