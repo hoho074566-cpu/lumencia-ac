@@ -399,7 +399,9 @@ Vercel runtime recovery is complete. The user explicitly authorized Preview scop
 
 The native chooser was dismissed, but its event could not be driven reliably. Candidate validation therefore continued through the same exact Preview UI with a naturally constructed sequential game state. Short/long travel, wait, rest, repeated observation, NPC question/initiative, door transition, and schedule-boundary rest passed visibly.
 
-A new live P1 was reproduced: the indirect question `지금 오리엔테이션이 끝난 뒤 대장간에 들를 시간이 있을까?` advanced 12:00 -> 12:40 and completed the active orientation. Root cause was a narrow question classifier that only guarded direct travel predicates. The current local patch classifies terminal question forms as `decision-sensitive`, injects an explicit same-moment/no-location/no-event-completion sovereignty rule, strengthens the live assertion to zero minutes, and passes focused plus full PR checks. Current blocker is publishing and redeploying that tested patch; the user does not need to operate a file chooser.
+A new live P1 was reproduced: the indirect question `지금 오리엔테이션이 끝난 뒤 대장간에 들를 시간이 있을까?` advanced 12:00 -> 12:40 and completed the active orientation. Root cause was a narrow question classifier that only guarded direct travel predicates. The fix classifies terminal question forms as `decision-sensitive`, injects an explicit same-moment/no-location/no-event-completion sovereignty rule, strengthens the live assertion to zero minutes, and passes focused plus full PR checks. The user does not need to operate a file chooser.
+
+That patch was published as `9972c26a4db39b29fd92bd77824e71a2e802126d`; Safety #268 and Vercel passed, and the exact Preview kept 12:40/location unchanged while answering the indirect question. The next CONTINUE check exposed a reload-only UI P1: duplicate stable flow wrappers caused both CONTINUE buttons to be hidden. The current local fix collapses duplicate wrappers and restores stable button visibility; focused CONTINUE/integration/core tests pass. Publish/redeploy this UI fix next, then run live CONTINUE and completed-event forward.
 
 ---
 
@@ -525,8 +527,8 @@ Gameplay roadmap discussed but not DONE:
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
 2. Confirm main still contains merge commit `8d378b532910dfecaf5226118bffabdddbe74289`; do **not** redo completed HF1 diagnosis.
 3. Preserve the recorded earlier gates, but do not treat them as authority for the new local question-sovereignty patch.
-4. Publish the tested patch and docs to PR #34 and wait for exact-head Safety + Vercel.
-5. On that exact Preview rerun the failed indirect question at an active-event boundary, then verify CONTINUE hard freeze and completed-event forward progression.
+4. Publish the tested CONTINUE control-lifecycle fix and wait for exact-head Safety + Vercel.
+5. On that exact Preview require one visible CONTINUE button, execute it, verify hard freeze, then verify completed-event forward progression.
 6. Fix only reproduced P0/P1 failures and repeat the full exact-head gates after any head change.
 7. Obtain a fresh exact-current-HEAD/current-main Codex review and stop at protected-core manual merge readiness; do not auto-merge.
 8. After a human merge, run all 12 cases plus `/api/health` on production, then proceed to **Scene Purpose -> Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence**.
@@ -535,4 +537,4 @@ Gameplay roadmap discussed but not DONE:
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. HF1은 merge commit `8d378b532910dfecaf5226118bffabdddbe74289`로 main에 반영됐다. PR #34 Preview 환경은 정상이며 순차 UI live-play에서 이동/대기/휴식/반복 관찰/NPC initiative/장소·일정 경계는 통과했다. 간접 질문이 active event를 자동 완료하는 새 P1을 재현했고, terminal question을 decision-sensitive same-moment freeze로 강화한 로컬 수정과 전체 PR check가 PASS했다. 이 패치를 publish/redeploy한 뒤 실패 질문 + CONTINUE + 완료 이벤트 전진을 exact Preview에서 재검증하고 fresh exact-head gates를 받은 다음 protected manual merge gate에서 멈춰라. human merge 뒤 production acceptance -> Scene Purpose -> Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence로 계속한다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. HF1은 main에 반영됐다. PR #34 exact Preview에서 이동/대기/휴식/관찰/NPC/장소·일정 경계가 통과했고, 간접 질문 sovereignty 수정 head `9972c26`도 Safety/Vercel/live rerun PASS했다. reload 뒤 duplicate stable controls가 CONTINUE를 숨기는 새 UI P1을 재현해 wrapper dedupe/visibility 복구를 로컬 수정했고 focused tests가 PASS했다. 이 UI 패치를 publish/redeploy한 뒤 CONTINUE hard freeze + 완료 이벤트 전진을 검증하고 fresh exact-head gates를 받은 다음 protected manual merge gate에서 멈춰라. human merge 뒤 production acceptance -> Scene Purpose -> Scene Exit -> Turn Hook -> Event Consequence로 계속한다.`

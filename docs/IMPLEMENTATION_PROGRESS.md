@@ -173,6 +173,8 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - A new live P1 was reproduced: `지금 오리엔테이션이 끝난 뒤 대장간에 들를 시간이 있을까?` was classified `generic`, advanced 12:00 -> 12:40, and completed the active orientation even though the player only asked a feasibility question.
 - Root cause: the question guard recognized direct travel deliberations such as `도서관에 갈까?`, but not indirect terminal questions without a travel predicate. The local fix classifies terminal question forms as `decision-sensitive` and adds an explicit same-moment/no-location/no-event-completion sovereignty directive. The live harness now requires `advance_minutes === 0` for this case.
 - Focused intent/correctness/HF1 integration tests and full `node scripts/lumensia-pr-check.mjs`: **PASS** after the question-sovereignty fix.
+- Published exact head `9972c26a4db39b29fd92bd77824e71a2e802126d`: Safety Gate #268 **PASS**, Vercel **PASS**. Exact Preview rerun preserved 12:40 and the designated classroom, answered only the feasibility question, and did not execute either contemplated trip.
+- CONTINUE follow-up exposed a separate UI P1 after reload: two `#flowControlsStable` wrappers survived and the old duplicate suppressor marked both CONTINUE buttons hidden. The local fix collapses duplicate wrappers, never suppresses buttons inside a stable wrapper, and explicitly clears stale `hidden` / `aria-hidden` state. Focused CONTINUE/runtime/core tests: **PASS**.
 
 ## Permanent HF1 Test Suites
 - `scripts/tests/context-router-authority-tail.test.mjs`
@@ -203,8 +205,8 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PR #33 manual merge safety.
 
 ## NEXT ACTION
-1. Publish the question-sovereignty patch and this checkpoint to PR #34, then wait for exact-head Safety + Vercel.
-2. On that exact Preview, rerun the indirect question and require the same 12:00 moment/location with no active-event completion; then verify CONTINUE hard freeze and completed-event forward progression in the same live session.
+1. Run the full PR check, commit/publish the CONTINUE control-lifecycle fix, then wait for exact-head Safety + Vercel.
+2. Reload that exact Preview and require exactly one visible enabled CONTINUE control; execute it and verify same moment/location, then verify completed-event forward progression in the same live session.
 3. Resolve only reproduced P0/P1 blockers. P2/P3 remain non-blocking without live reproduction.
 4. Record final acceptance, repeat full tests, publish docs, and obtain a fresh exact-current-HEAD/current-main Codex review; then stop at the protected-core manual merge gate and never auto-merge.
 5. After the acceptance fix is human-merged, rerun all 12 cases on production and smoke `/api/health`, then implement **Scene Purpose** with bounded purpose state and no automatic player choice.
@@ -215,7 +217,7 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed after merge: first 12-case production Live-play run, four demonstrated classifier fixes, permanent regressions, full local PR check.
 - Completed on PR #34 candidate `cd5b711`: hosted Safety #265 PASS, Vercel Ready, fresh exact-head direct P0/P1=0; branch is clean/synchronized and base/merge-base remain current main.
 - Completed environment recovery: user-authorized Preview scope was added without exposing the key; exact-head redeploy `F4Zua1Ud7EQDazJcvwSB2ZjgryeG` is Ready and authenticated health is configured.
-- Completed in exact Preview sequential live play: nine behavior classes through the question-form case; eight passed and the indirect question reproduced a real sovereignty failure.
-- Unfinished: publish/redeploy the question fix, rerun that live case plus CONTINUE/completed-event forward, renew exact-head gates, protected manual merge, production acceptance, Scene Purpose and later phases.
-- Blocker: current hosted head still lacks the local indirect-question sovereignty fix. The native chooser is no longer a user-action blocker.
-- NEXT ACTION: publish the tested patch, wait for exact Preview readiness, and rerun the failed question at the same active-event boundary.
+- Completed in exact Preview sequential live play: question-sovereignty fix verified on head `9972c26`; earlier movement/wait/rest/observe/NPC/location/schedule cases remain PASS evidence.
+- Unfinished: publish/redeploy the CONTINUE UI fix, run live CONTINUE/completed-event forward, renew exact-head gates, protected manual merge, production acceptance, Scene Purpose and later phases.
+- Blocker: current hosted head still has duplicate-hidden CONTINUE controls after reload; the tested UI fix is local only.
+- NEXT ACTION: publish the UI fix, wait for exact Preview readiness, and run the remaining CONTINUE/completed-event cases.

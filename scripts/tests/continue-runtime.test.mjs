@@ -56,8 +56,12 @@ assert.equal((renderAllSource.match(/renderFlowControlsStable\(\)/g) || []).leng
 assert.match(renderAllSource, /const flowControls = \$\('flowControlsStable'\);[\s\S]*if \(flowControls\) story\.append\(flowControls\);/, 'full render must preserve the existing wrapper and its listeners');
 
 const flowSource = functionSource('renderFlowControlsStable');
-assert.match(flowSource, /let wrap = \$\('flowControlsStable'\);[\s\S]*if \(!wrap\) \{/, 'flow recreation must reuse an existing wrapper');
+assert.match(flowSource, /querySelectorAll\('#flowControlsStable'\)[\s\S]*existing\.shift\(\)[\s\S]*duplicate\.remove\(\)/, 'flow recreation must collapse duplicate wrappers to one canonical control');
 assert.equal((flowSource.match(/addEventListener\('click'/g) || []).length, 2, 'AUTO and CONTINUE listeners must only be installed in the creation branch');
+assert.match(flowSource, /auto\.hidden\s*=\s*false;[\s\S]*auto\.removeAttribute\('aria-hidden'\)/, 'AUTO must recover from a stale duplicate-hidden state');
+assert.match(flowSource, /cont\.hidden\s*=\s*false;[\s\S]*cont\.removeAttribute\('aria-hidden'\)/, 'CONTINUE must recover from a stale duplicate-hidden state');
+const suppressSource = functionSource('suppressDuplicateFlowControlsStable');
+assert.match(suppressSource, /button\.closest\('#flowControlsStable'\)/, 'duplicate suppression must never hide a stable flow-control button');
 assert.match(runtime, /'renderAll flow controls lifecycle'/, 'the runtime transformation must install the central renderAll hook');
 
 console.log('PASS CONTINUE runtime regressions (anchor, merge, full-render controls)');
