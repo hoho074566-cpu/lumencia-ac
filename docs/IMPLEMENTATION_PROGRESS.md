@@ -226,6 +226,9 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Door/location was a harness false negative: the model compressed directly to canon's `시작의 광장`, while the evaluator required the noncanon fixture alias `중앙광장`. The evaluator now accepts both without weakening the no-door/corridor-stop assertion.
 - NPC initiative was a real orchestration failure: a new Chloe Director cameo displaced present Isabel even though she had a PC-targeted active goal and the scene had stall pressure.
 - The local HF3 closure reserves `PRESENT_NPC_GOAL_PRIORITY` fixed flow for a present NPC's feasible PC/present-NPC goal under momentum pressure, suppressing a competing random cameo without creating a new occurrence or deciding any PC choice. Permanent Goal/Director tests reproduce and close the failure.
+- PR #36 initial exact HEAD `6ee2fb74d207ee20e9880fbdcd0c7fc3af87f981` passed Safety #287 and Vercel Ready. Its fresh direct review found one P1: a stalled `decision-sensitive` question could still receive unrelated present-NPC goal initiative ahead of the requested answer. One separate P2 remains non-blocking and is not in this fix scope.
+- The local P1 closure imports the same authoritative `classifySceneIntent` result used by Scene Momentum and disables `PRESENT_NPC_GOAL_PRIORITY` for `decision-sensitive` input. A permanent stalled-question regression proves the question remains frozen while ordinary wait initiative still receives the fixed flow.
+- Exact Preview live rerun is currently blocked by the protected deployment plus an unavailable cloud-browser tab connection; Safety/Vercel and deterministic tests are unaffected. No token extraction, protection bypass, or merge is attempted.
 
 ## Permanent HF1 Test Suites
 - `scripts/tests/context-router-authority-tail.test.mjs`
@@ -256,11 +259,11 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
 
 ## NEXT ACTION
-1. Run the full suite, commit, and publish `codex/live-acceptance-npc-initiative-hf3`.
-2. On its exact Preview, rerun door/location and NPC-initiative acceptance; if both pass, rerun all 12 cases.
-3. Mark Live-play acceptance complete, then implement **Scene Purpose** with bounded purpose state and no automatic player choice.
-4. After Scene Purpose focused/full tests and progress commits, prepare the protected-core PR through Safety/Vercel and fresh exact-head review. Do not merge that new PR without a separate exact-merge authorization.
-5. Continue afterward with Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence chaining/lifetime.
+1. Run the full suite, commit, and publish the decision-sensitive P1 closure on PR #36.
+2. Require exact-head Safety/Vercel plus fresh direct P0/P1=0.
+3. When the signed-in Preview browser connection is available, rerun door/location and NPC-initiative acceptance; if both pass, rerun all 12 cases.
+4. Only after exact Preview acceptance, mark Live-play acceptance complete and implement **Scene Purpose** with bounded purpose state and no automatic player choice.
+5. Do not merge PR #36 without separate exact-merge authorization; afterward continue Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence chaining/lifetime.
 
 ## Stop Record
 - Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.

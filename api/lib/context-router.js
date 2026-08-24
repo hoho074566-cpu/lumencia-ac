@@ -3,7 +3,7 @@
 // V1.5.5: NPC Motivation + Relationship Reason V1 (goal-aware eligible-candidate weighting).
 // Stable path: api/lib/context-router.js
 
-import { buildSceneMomentumDirective } from '../../lib/scene-momentum.js';
+import { buildSceneMomentumDirective, classifySceneIntent } from '../../lib/scene-momentum.js';
 
 const VERSION = '1.5.6-hf1';
 const DIRECTOR_V2_VERSION = '2.1';
@@ -264,7 +264,7 @@ function compactInnerNpc(row={}){
   return out;
 }
 function buildEventDirectorV2(incoming,originalInput,registry,mode='game'){
-  const save=incoming.saveState||{}, plan=parseDirectorV2Guidance(originalInput), turn=Number(save.turnNumber||0), momentum=object(save?.sceneRuntime?.momentum), stallStreak=Math.max(0,Number(momentum.stall_streak||0)), momentumPressure=stallStreak>=2;
+  const save=incoming.saveState||{}, plan=parseDirectorV2Guidance(originalInput), turn=Number(save.turnNumber||0), momentum=object(save?.sceneRuntime?.momentum), stallStreak=Math.max(0,Number(momentum.stall_streak||0)), momentumPressure=stallStreak>=2,sceneIntent=classifySceneIntent(incoming.action||'',{location:save?.world?.location||''});
   const seedRaw=String(save?.director?.rngSeed||save?.directorSeed||save?.id||`${save?.pc?.name||'pc'}|${save?.pc?.origin||''}|legacy`);
   const seedBase=`${seedRaw}|T${turn}|${save?.world?.date||''}|${save?.world?.time||''}|${save?.world?.location||''}`;
   const seedTag=hash32(seedRaw).toString(16).padStart(8,'0').slice(0,8);
@@ -285,7 +285,7 @@ function buildEventDirectorV2(incoming,originalInput,registry,mode='game'){
   const exposure=object(save?.director?.npcExposure),recent=recentSpeakerCountsV2(incoming.recentTurns),present=new Set(array(save?.sceneRuntime?.participants).map(String));
   const dueFixed=new Set(array(save?.scheduleContext?.due).flatMap(ev=>array(ev?.participants)).map(String));
   const presentGoalRows=[...present].map(key=>({key,goal:goalSignalFor(save,key)})).filter(({goal})=>goal&&(goal.target_type==='pc'||(goal.target_type==='npc'&&goal.target_key&&present.has(String(goal.target_key))))).sort((a,b)=>b.goal.priority-a.goal.priority||b.goal.urgency-a.goal.urgency||b.goal.multiplier-a.goal.multiplier||a.key.localeCompare(b.key));
-  if(momentumDue&&!scheduled&&presentGoalRows.length){
+  if(momentumDue&&!scheduled&&sceneIntent.kind!=='decision-sensitive'&&presentGoalRows.length){
     const {key,goal}=presentGoalRows[0],name=registry[key]||key;
     const telemetry={...base,result:'PRESENT_NPC_GOAL_PRIORITY',mode:'fixed-flow',selected_key:key,selected_name:name,goal_signals:{[key]:goal},selected_goal:goal};
     const directive=`[EVENT DIRECTOR V2.1]\nMODE=FIXED_FLOW\nRESULT=PRESENT_NPC_GOAL_PRIORITY\nPRESENT_NPC=${key}(${name})\nACTIVE_GOAL=${clampText(goal.desire,160)}\nGOAL_TARGET=${goal.target_type}:${goal.target_key||'-'} / P${goal.priority} U${goal.urgency}\n- 새 우연 조우나 카메오를 추가하지 마라. 현재 장면의 NPC initiative가 우선이다.\n- 위치·지식·성격·관계상 이미 가능한 경우, 이 NPC가 목표에 맞는 짧고 구체적인 말이나 행동을 먼저 하게 하라.\n- 목표는 이미 가능한 행동의 우선순위만 조정한다. PC의 행동·대사·감정·중요 선택을 대신 결정하지 마라.\n- 지금 실행이 불가능하면 억지로 행동시키지 말고 현재 장면의 자연스러운 변화나 반응 hook만 남겨라.`;

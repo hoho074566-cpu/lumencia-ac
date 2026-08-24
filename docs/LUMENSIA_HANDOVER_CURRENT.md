@@ -38,7 +38,9 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - `door-location-transition` is a harness false negative: the turn reached canon's `시작의 광장` and skipped every door/corridor microstep, while the evaluator accepted only the fixture alias `중앙광장`. The evaluator now accepts the canon destination.
 - `npc-initiative` exposed a real orchestration issue: Isabel was already present with a PC-targeted active goal and stall pressure, but a new Chloe Director cameo displaced her initiative.
 - The local fixed-flow closure emits `PRESENT_NPC_GOAL_PRIORITY` when a present NPC has an already-feasible PC/present-NPC goal under momentum pressure. It forbids a new random cameo, lets that NPC act first when physically/canonically possible, and still forbids deciding the PC's action, speech, emotion, or important choice.
-- Permanent NPC Goal/Director regressions and focused Context Router/Scene Momentum tests pass. Exact Preview rerun and the full suite remain before Scene Purpose.
+- PR #36 initial exact HEAD `6ee2fb74d207ee20e9880fbdcd0c7fc3af87f981` passed Safety #287 and Vercel Ready. Fresh review found one P1: `decision-sensitive` questions under stall pressure could still be displaced by unrelated present-NPC initiative. Its separate P2 is policy-nonblocking and remains out of scope.
+- The current P1 closure shares Scene Momentum's authoritative `classifySceneIntent` result and suppresses present-goal initiative for `decision-sensitive` input. Ordinary wait initiative and fixed schedule priority remain intact in permanent tests.
+- Exact Preview live rerun remains blocked only by deployment protection plus the unavailable signed-in cloud-browser tab connection. No token extraction/protection bypass is attempted; PR #36 is not merge-ready and Scene Purpose has not started.
 
 ### Historical HF2 diagnosis and closure
 - The merged-main production 12-case rerun produced 11 PASS / 1 FAIL.
