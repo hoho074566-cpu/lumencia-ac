@@ -14,6 +14,7 @@ import { deriveScenePurpose } from '../lib/scene-purpose.js';
 import { deriveSceneExitCondition, evaluateSceneExitCondition } from '../lib/scene-exit.js';
 import { deriveTurnHook, filterTurnHookChoices } from '../lib/turn-hook.js';
 import { compactEventProgress, mergeContinuationEventProgressState, mergeRoutedEventProgressState, occurrenceIdFromStartEvidence, promotePausedEventProgress, scheduledIdsDueByTurnEnd, unscheduledPausedIdsForResume } from '../lib/event-progress.js';
+import { findEventConsequence, minutesUntilEventConsequence, reconcileEventConsequenceLifecycle } from '../lib/event-consequence.js';
 
 export const config = { maxDuration: 300 };
 
@@ -47,6 +48,22 @@ function goalV2FieldSchema(){
     goal_replace:{anyOf:[{type:'boolean'},{type:'null'}]},
   };
 }
+function delayedConsequenceFieldSchema(){
+  return {
+    type:'array',maxItems:6,
+    items:{
+      type:'object',additionalProperties:false,
+      properties:{
+        event_name:{type:'string',minLength:1,maxLength:220},
+        target_bucket:{type:'string',enum:['active','world']},
+        delay_minutes:{type:'integer',minimum:1,maximum:43200},
+        reason:{type:'string',minLength:1,maxLength:320},
+        secret_level:{type:'integer',minimum:0,maximum:5},
+      },
+      required:['event_name','target_bucket','delay_minutes','reason','secret_level'],
+    },
+  };
+}
 function extendGoalV2JsonSchema(schema){
   if(!schema||typeof schema!=='object')return false;
   let changed=false;
@@ -57,6 +74,12 @@ function extendGoalV2JsonSchema(schema){
     if(item?.properties?.npc_key&&item?.properties?.current_goal){
       Object.assign(item.properties,goalV2FieldSchema());
       item.required=[...new Set([...(Array.isArray(item.required)?item.required:[]),'goal_progress_delta','goal_state','goal_reason','goal_next_action','goal_replace'])];
+      changed=true;
+    }
+    const stateDelta=node?.properties?.state_delta;
+    if(stateDelta?.properties?.hooks_add&&!stateDelta.properties.delayed_consequences_add){
+      stateDelta.properties.delayed_consequences_add=delayedConsequenceFieldSchema();
+      stateDelta.required=[...new Set([...(Array.isArray(stateDelta.required)?stateDelta.required:[]),'delayed_consequences_add'])];
       changed=true;
     }
     for(const value of Object.values(node)){
@@ -70,17 +93,20 @@ function extendGoalV2JsonSchema(schema){
 function mergeRawGoalV2Fields(parsed,raw){
   const parsedRows=parsed?.state_delta?.npc_state_updates;
   const rawRows=raw?.state_delta?.npc_state_updates;
-  if(!Array.isArray(parsedRows)||!Array.isArray(rawRows))return parsed;
-  const limit=Math.min(parsedRows.length,rawRows.length);
-  for(let i=0;i<limit;i++){
-    const row=parsedRows[i];
-    const source=rawRows[i];
-    if(!row||typeof row!=='object'||!source||typeof source!=='object')continue;
-    if(String(row.npc_key||'')!==String(source.npc_key||''))continue;
-    for(const field of ['goal_progress_delta','goal_state','goal_reason','goal_next_action','goal_replace']){
-      if(Object.prototype.hasOwnProperty.call(source,field))row[field]=source[field];
+  if(Array.isArray(parsedRows)&&Array.isArray(rawRows)){
+    const limit=Math.min(parsedRows.length,rawRows.length);
+    for(let i=0;i<limit;i++){
+      const row=parsedRows[i];
+      const source=rawRows[i];
+      if(!row||typeof row!=='object'||!source||typeof source!=='object')continue;
+      if(String(row.npc_key||'')!==String(source.npc_key||''))continue;
+      for(const field of ['goal_progress_delta','goal_state','goal_reason','goal_next_action','goal_replace']){
+        if(Object.prototype.hasOwnProperty.call(source,field))row[field]=source[field];
+      }
     }
   }
+  const rawConsequences=raw?.state_delta?.delayed_consequences_add;
+  if(parsed?.state_delta&&Array.isArray(rawConsequences))parsed.state_delta.delayed_consequences_add=rawConsequences.slice(0,6);
   return parsed;
 }
 function patchGoalV2StructuredFormat(params){
@@ -124,7 +150,7 @@ function emptyStateDelta() {
     relationship_changes:[],intimacy_changes:[],stat_progress:[],skill_experience:[],
     items_add:[],items_remove:[],active_events_add:[],active_events_remove:[],completed_events_add:[],
     pc_knowledge_add:[],scheduled_events_add:[],scheduled_events_complete:[],hooks_add:[],hooks_update:[],
-    memories_add:[],npc_state_updates:[],
+    memories_add:[],npc_state_updates:[],delayed_consequences_add:[],
   };
 }
 
@@ -177,22 +203,26 @@ function scheduleRowMentioned(turn,row={}){
   const generic=new Set(['필수','일정','시작','종료','예정','행사','event','required']),raw=String(row.title||'').toLowerCase().match(/[가-힣a-z0-9]+/g)||[],tokens=[...new Set(raw.filter(token=>token.length>=2&&!generic.has(token)))];if(!tokens.length)return false;
   const matched=tokens.filter(token=>visible.includes(token)).length;return matched>=Math.min(2,tokens.length);
 }
-function applySceneMomentumTimeFloor(incoming,turn,mode='game'){
+function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecycle=null){
   const intent=classifySceneIntent(incoming?.action||'',{location:incoming?.saveState?.world?.location||''});
   if(mode!=='game'||!turn?.state_delta||!intent.compression||intent.minAdvanceMinutes<=0)return intent;
   const hasMeaningfulStop=array(turn?.choices).length>0;
   const current=Math.max(0,Number(turn.state_delta.advance_minutes||0));
   const requestedFloor=Math.min(1440,Math.max(0,Number(intent.minAdvanceMinutes||0)));
-  const boundary=nextScheduleBoundaryMinutes(incoming?.saveState||{},{futureOnly:true});
+  const scheduleBoundary=nextScheduleBoundaryMinutes(incoming?.saveState||{},{futureOnly:true});
+  const consequenceBoundary=consequenceLifecycle?.selected_id?minutesUntilEventConsequence(incoming?.saveState||{},consequenceLifecycle.selected_id):null;
+  const boundaries=[scheduleBoundary,consequenceBoundary].filter(value=>value!=null&&Number.isFinite(Number(value))).map(Number);
+  const boundary=boundaries.length?Math.min(...boundaries):null;
   const boundedFloor=boundary==null?requestedFloor:Math.min(requestedFloor,Math.max(0,boundary));
   const allowedMax=scheduleBoundaryLimitMinutes(intent);
   const eventId=String(turn?.event_progress?.event_instance_id||turn?.event_progress?.eventInstanceId||'').trim().toLowerCase();
-  const dueAtBoundary=new Set(boundary==null?[]:scheduledIdsDueByTurnEnd(incoming?.saveState||{},boundary).map(value=>String(value).trim().toLowerCase()));
-  const dueBeforeBoundary=new Set(boundary==null?[]:scheduledIdsDueByTurnEnd(incoming?.saveState||{},Math.max(0,boundary-1)).map(value=>String(value).trim().toLowerCase()));
-  const boundaryRows=scheduleRowsAtBoundary(incoming?.saveState||{},boundary),boundaryIds=new Set(boundaryRows.map(row=>String(row?.id||'').trim().toLowerCase()).filter(Boolean)),structuredBoundary=Boolean(eventId&&boundaryIds.has(eventId)&&dueAtBoundary.has(eventId)&&!dueBeforeBoundary.has(eventId)),visibleBoundary=Boolean(!eventId&&boundaryRows.some(row=>scheduleRowMentioned(turn,row)));
-  const reachedScheduledBoundary=Boolean(boundary!=null&&boundary<=allowedMax&&(structuredBoundary||visibleBoundary));
-  if(!hasMeaningfulStop||reachedScheduledBoundary){
-    turn.state_delta.advance_minutes=Math.max(current,reachedScheduledBoundary?boundary:boundedFloor);
+  const dueAtBoundary=new Set(scheduleBoundary==null?[]:scheduledIdsDueByTurnEnd(incoming?.saveState||{},scheduleBoundary).map(value=>String(value).trim().toLowerCase()));
+  const dueBeforeBoundary=new Set(scheduleBoundary==null?[]:scheduledIdsDueByTurnEnd(incoming?.saveState||{},Math.max(0,scheduleBoundary-1)).map(value=>String(value).trim().toLowerCase()));
+  const boundaryRows=scheduleRowsAtBoundary(incoming?.saveState||{},scheduleBoundary),boundaryIds=new Set(boundaryRows.map(row=>String(row?.id||'').trim().toLowerCase()).filter(Boolean)),structuredBoundary=Boolean(eventId&&boundaryIds.has(eventId)&&dueAtBoundary.has(eventId)&&!dueBeforeBoundary.has(eventId)),visibleBoundary=Boolean(!eventId&&boundaryRows.some(row=>scheduleRowMentioned(turn,row)));
+  const reachedScheduledBoundary=Boolean(scheduleBoundary!=null&&scheduleBoundary===boundary&&boundary<=allowedMax&&(structuredBoundary||visibleBoundary));
+  const reachedConsequenceBoundary=Boolean(consequenceBoundary!=null&&consequenceBoundary===boundary&&boundary<=allowedMax&&consequenceLifecycle?.status==='resolved');
+  if(!hasMeaningfulStop||reachedScheduledBoundary||reachedConsequenceBoundary){
+    turn.state_delta.advance_minutes=Math.max(current,reachedScheduledBoundary||reachedConsequenceBoundary?boundary:boundedFloor);
   }
   return intent;
 }
@@ -440,7 +470,7 @@ function classifyExtendedExpression(item,saveState){
 function applyExtendedExpressions(turn,saveState){if(!turn||!Array.isArray(turn.scene))return turn;turn.scene=turn.scene.map(item=>item?.kind==='dialogue'?{...item,display_expression:classifyExtendedExpression(item,saveState),stable_extended_expression:true}:item);return turn;}
 function isCombatLike(action=''){return /(전투|공격|베어|베고|찌르|쏘|회피|막아|막고|패링|결투|대련|검기|오러|마법을?\s*쏘|주먹|발차기|기습|제압|죽이|살해)/i.test(String(action));}
 function makeCaptureResponse(){return{statusCode:200,payload:null,headers:{},status(code){this.statusCode=Number(code)||200;return this;},json(payload){this.payload=payload;return this;},setHeader(name,value){this.headers[String(name).toLowerCase()]=value;return this;},getHeader(name){return this.headers[String(name).toLowerCase()];}};}
-function setAdapterRoute(data,mode,pipeline,telemetry){data.route={...(data.route||{}),input_mode:mode,adapter_version:ADAPTER_VERSION,app_version:APP_VERSION,core_server_version:data.server_version||data.route?.server_version||'0.5.6',quality_pipeline:pipeline?.pipeline||'legacy',qa_result:pipeline?.qa_result||'SKIP',rewrite_applied:false,context_router:telemetry||null,scene_momentum:pipeline?.scene_momentum||null,scene_purpose:pipeline?.scene_purpose||null,scene_exit_condition:pipeline?.scene_exit_condition||null,turn_hook:pipeline?.turn_hook||null};data.server_version=ADAPTER_VERSION;return data;}
+function setAdapterRoute(data,mode,pipeline,telemetry){data.route={...(data.route||{}),input_mode:mode,adapter_version:ADAPTER_VERSION,app_version:APP_VERSION,core_server_version:data.server_version||data.route?.server_version||'0.5.6',quality_pipeline:pipeline?.pipeline||'legacy',qa_result:pipeline?.qa_result||'SKIP',rewrite_applied:false,context_router:telemetry||null,scene_momentum:pipeline?.scene_momentum||null,scene_purpose:pipeline?.scene_purpose||null,scene_exit_condition:pipeline?.scene_exit_condition||null,turn_hook:pipeline?.turn_hook||null,event_consequence:pipeline?.event_consequence||null};data.server_version=ADAPTER_VERSION;return data;}
 async function runCore(req,incoming,mode){const capture=makeCaptureResponse();const routedReq={method:req.method,headers:req.headers||{},body:incoming};const ctx={enabled:true,incoming,mode,telemetry:null};await ROUTER_CONTEXT.run(ctx,()=>coreHandler(routedReq,capture));return{status:capture.statusCode,data:capture.payload||{},telemetry:ctx.telemetry};}
 
 export default async function handler(req,res){
@@ -456,9 +486,9 @@ export default async function handler(req,res){
     let telemetry=result.telemetry||{routerVersion:routerVersion(),enabled:false,profile:'unknown'};telemetry={...telemetry,actual_input_tokens:Number(data?.usage?.input_tokens||0),actual_output_tokens:Number(data?.usage?.output_tokens||0)};if(Number(telemetry.soft_max_tokens||0)>0)telemetry.budget_status=telemetry.actual_input_tokens<=telemetry.soft_max_tokens?'OK':'OVER';
     if(mode==='continue'){lockContinueTurn(data.turn);applyExtendedExpressions(data.turn,incoming0.saveState||{});data.runtime_state=consumeContinuationRuntime({...incoming,saveState:object(incoming0.saveState)},data.turn);data.background_digest=String(incoming.saveState?.backgroundDigest||'').slice(-1800);const pipeline={pipeline:'continue-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,scene_purpose:data.runtime_state.scene_runtime?.purpose||null,scene_purpose_v1:true,scene_exit_condition:data.runtime_state.scene_runtime?.exit_condition||null,scene_exit_condition_v1:true,turn_hook:data.runtime_state.scene_runtime?.turn_hook||null,turn_hook_v1:true,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true};data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);}
     if(mode==='meta'){const pipeline={pipeline:'meta-full-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true};data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);}
-    applyExtendedExpressions(data.turn,incoming0.saveState||{});data.turn.choices=filterTurnHookChoices(incoming.action,{...data.turn,choices:freshChoices(incoming.action,data.turn)});const sceneIntent=applySceneMomentumTimeFloor({...incoming0,saveState:incoming.saveState,action:incoming0.action||''},data.turn,mode);const sceneRuntime=localSceneRuntime({...incoming0,saveState:incoming.saveState,action:incoming0.action||''},data.turn,telemetry?.event_director_v2,mode);const npcUpdates=incoming0.qualityPipeline===false?{}:localNpcUpdates(incoming0,data.turn);data.runtime_state={npc_updates:npcUpdates,scene_runtime:sceneRuntime};data.background_digest=localBackgroundDigest(incoming0,data.turn,sceneRuntime.participants);
+    applyExtendedExpressions(data.turn,incoming0.saveState||{});data.turn.choices=filterTurnHookChoices(incoming.action,{...data.turn,choices:freshChoices(incoming.action,data.turn)});const consequenceId=String(telemetry?.event_director_v2?.event_consequence_id||'');const selectedConsequence=findEventConsequence(incoming.saveState,consequenceId);const consequenceLifecycle=reconcileEventConsequenceLifecycle({saveState:incoming.saveState,turn:data.turn,selectedConsequence});const sceneIntent=applySceneMomentumTimeFloor({...incoming0,saveState:incoming.saveState,action:incoming0.action||''},data.turn,mode,consequenceLifecycle);const sceneRuntime=localSceneRuntime({...incoming0,saveState:incoming.saveState,action:incoming0.action||''},data.turn,telemetry?.event_director_v2,mode);const npcUpdates=incoming0.qualityPipeline===false?{}:localNpcUpdates(incoming0,data.turn);data.runtime_state={npc_updates:npcUpdates,scene_runtime:sceneRuntime};data.background_digest=localBackgroundDigest(incoming0,data.turn,sceneRuntime.participants);
     const sceneMomentum={version:SCENE_MOMENTUM_VERSION,intent:sceneIntent?.kind||sceneRuntime?.momentum?.last_intent||'generic',score:Number(sceneRuntime?.momentum?.last_score||0),structural_score:Number(sceneRuntime?.momentum?.last_structural_score||0),target:Number(sceneRuntime?.momentum?.last_target||0),stall_streak:Number(sceneRuntime?.momentum?.stall_streak||0),pressure:sceneRuntime?.momentum?.pressure||'normal'};
-    const pipeline={pipeline:incoming0.qualityPipeline===false?'single-writer-stable-v156-hf1':'single-pass-q3-stable-v156-hf1',stages:1,qa_result:incoming0.qualityPipeline===false?'SKIP':'LOCAL_GUARD',rewrite_applied:false,background_sim:false,background_local:incoming0.backgroundSim!==false,combat_engine:isCombatLike(incoming.action),runtime_synthesized:true,continuation_beats:array(sceneRuntime.remaining_beats).length,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,scene_momentum:sceneMomentum,scene_momentum_v1:true,scene_purpose:sceneRuntime.purpose||null,scene_purpose_v1:true,scene_exit_condition:sceneRuntime.exit_condition||null,scene_exit_condition_v1:true,turn_hook:sceneRuntime.turn_hook||null,turn_hook_v1:true,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true,note:'V1.5.6 Scene Momentum Recovery HF1 keeps one core model call while restoring semantic action compression, deterministic State Delta/stall tracking, NPC initiative, downtime skip, and meaningful stop points. Scene Purpose V1 adds bounded scene-focus continuity; Explicit Scene Exit Condition V1 adds deterministic stop boundaries; Stronger Turn Hook V1 keeps a concrete next direction without taking player-choice authority.'};
+    const pipeline={pipeline:incoming0.qualityPipeline===false?'single-writer-stable-v156-hf1':'single-pass-q3-stable-v156-hf1',stages:1,qa_result:incoming0.qualityPipeline===false?'SKIP':'LOCAL_GUARD',rewrite_applied:false,background_sim:false,background_local:incoming0.backgroundSim!==false,combat_engine:isCombatLike(incoming.action),runtime_synthesized:true,continuation_beats:array(sceneRuntime.remaining_beats).length,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,scene_momentum:sceneMomentum,scene_momentum_v1:true,scene_purpose:sceneRuntime.purpose||null,scene_purpose_v1:true,scene_exit_condition:sceneRuntime.exit_condition||null,scene_exit_condition_v1:true,turn_hook:sceneRuntime.turn_hook||null,turn_hook_v1:true,event_consequence:consequenceLifecycle,event_consequence_v1:true,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true,note:'V1.5.6 Scene Momentum Recovery HF1 keeps one core model call while restoring semantic action compression, deterministic State Delta/stall tracking, NPC initiative, downtime skip, and meaningful stop points. Scene Purpose V1 adds bounded scene-focus continuity; Explicit Scene Exit Condition V1 adds deterministic stop boundaries; Stronger Turn Hook V1 keeps a concrete next direction; Event Consequence V1 gives delayed causal results a bounded persisted lifecycle without taking player-choice authority.'};
     data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);
   }catch(error){console.error('[V1.5.6]',error);return res.status(Number.isInteger(error?.status)?error.status:500).json({error:error?.message||String(error),code:error?.code||'STABLE_ROUTER_V156_ERROR',server_version:ADAPTER_VERSION});}
 }

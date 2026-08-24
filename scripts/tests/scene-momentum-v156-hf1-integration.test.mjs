@@ -15,6 +15,7 @@ assert.match(context,/SCENE MOMENTUM HF1/);
 assert.match(context,/SCENE PURPOSE V1/);
 assert.match(context,/EXPLICIT SCENE EXIT CONDITION V1/);
 assert.match(context,/STRONGER TURN HOOK V1/);
+assert.match(context,/EVENT CONSEQUENCE V1/);
 assert.doesNotMatch(context,/위 행동까지만 처리하고 PC의 다음 행동을 정하지 마라/);
 assert.match(context,/결정 가치 없는 중간 단계/);
 assert.match(context,/SCENE CHANGE 우선/);
@@ -40,9 +41,12 @@ assert.match(chat,/purpose,exit_condition:exitCondition,turn_hook:turnHook,momen
 assert.match(chat,/scene_purpose_v1:true/);
 assert.match(chat,/scene_exit_condition_v1:true/);
 assert.match(chat,/turn_hook_v1:true/);
+assert.match(chat,/event_consequence_v1:true/);
 assert.match(chat,/const ADAPTER_VERSION = '0\.8\.3'/);
 assert.equal((chat.match(/coreHandler\(/g)||[]).length,1,'stable adapter must keep exactly one canonical coreHandler call site');
 assert.match(chat,/const hasMeaningfulStop=array\(turn\?\.choices\)\.length>0/,'time-floor stop evidence must come from an explicit player decision');
+assert.match(chat,/const reachedConsequenceBoundary=/,'manifested delayed results must be recognized as compression boundaries');
+assert.match(chat,/applySceneMomentumTimeFloor\([^;]+consequenceLifecycle\)/,'the selected consequence lifecycle must reach the elapsed-time guard');
 assert.doesNotMatch(chat,/hasMeaningfulStop[^;\n]*importance[^;\n]*critical/i,'critical scene severity must not suppress deterministic elapsed time');
 
 assert.match(health,/version: '0\.8\.3'/);
@@ -50,6 +54,10 @@ assert.match(health,/appVersion: '1\.5\.6'/);
 assert.match(health,/sceneMomentum:/);
 assert.match(runtime,/suppressDuplicateFlowControlsStable/);
 assert.match(runtime,/Scene Momentum Recovery HF1/);
+assert.match(runtime,/materializeEventConsequencesStable\(data\.turn\)/,'delayed consequences must materialize before canonical applyDelta persists hooks');
+assert.match(runtime,/materializeDelayedConsequences/,'stable runtime must use the bounded Event Consequence queue helper');
+assert.match(runtime,/materializeEventConsequencesStable\.toString\(\)/,'the delayed-result adapter must be inserted into the patched app module');
+assert.match(runtime,/lib\/event-consequence\.js\?v=156/,'the patched app module must import the shared queue helper');
 assert.match(runtime,/· MOM/);
 
 console.log('PASS Scene Momentum HF1 production wiring (router, runtime State Delta, one-call invariant, time-floor stop evidence, health/debug/UI)');

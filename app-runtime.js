@@ -338,6 +338,25 @@ function applyRuntimeStateStable(data, isContinue = false) {
   }
 }
 
+function materializeEventConsequencesStable(turn) {
+  const delta = turn?.state_delta;
+  if (!delta || typeof delta !== 'object') return [];
+  const sourceEvent = save?.sceneRuntime?.eventProgress?.eventInstanceId
+    || save?.sceneRuntime?.turn_hook?.event_instance_id
+    || null;
+  const additions = materializeDelayedConsequences({
+    rows: delta.delayed_consequences_add,
+    world: save.world,
+    advanceMinutes: delta.advance_minutes,
+    turnNumber: save.turnNumber + 1,
+    existingHooks: save.hooks,
+    sourceEvent,
+  });
+  if (!additions.length) return additions;
+  delta.hooks_add = [...(Array.isArray(delta.hooks_add) ? delta.hooks_add : []), ...additions].slice(0, 8);
+  return additions;
+}
+
 async function sendActionStable(action, requestedMode = null) {
   action = String(action || '').trim();
   const requested = ['auto', 'continue'].includes(requestedMode) ? requestedMode : null;
@@ -448,6 +467,7 @@ async function sendActionStable(action, requestedMode = null) {
 
     let notices = [];
     if (!isMeta && !isContinue) {
+      materializeEventConsequencesStable(data.turn);
       notices = applyDelta(data.turn.state_delta);
       applyEmotionUpdates(data.turn.emotion_updates || []);
       updateDirectorState(data.turn);
@@ -584,7 +604,7 @@ async function boot() {
     source = replaceOnce(
       source,
       "import { migrateLegacyNpcKeys } from './save-migrations.js';",
-      `import { migrateLegacyNpcKeys } from '${location.origin}/save-migrations.js?v=156';`,
+      `import { migrateLegacyNpcKeys } from '${location.origin}/save-migrations.js?v=156';\nimport { materializeDelayedConsequences } from '${location.origin}/lib/event-consequence.js?v=156';`,
       'save migration import'
     );
 
@@ -667,6 +687,7 @@ async function boot() {
       zeroStateDeltaStable.toString(),
       compactStateStable.toString(),
       applyRuntimeStateStable.toString(),
+      materializeEventConsequencesStable.toString(),
     ].join('\n\n');
 
     source = replaceOnce(source, 'async function sendAction(action) {', `${helperSource}\n\nasync function sendAction(action) {`, 'flow helper insertion');

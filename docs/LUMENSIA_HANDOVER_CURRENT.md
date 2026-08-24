@@ -13,9 +13,9 @@ Repository: `hoho074566-cpu/lumencia-ac`
 # 0. SESSION STOP CHECKPOINT — 가장 먼저 읽을 것
 
 ## Live state immediately before this handover update
-- Branch: `codex/stronger-turn-hook-v1`
-- PR #40 is open on `codex/stronger-turn-hook-v1`; current published HEAD is `c18f9ab80cfab0540ae57f45ebc94956c4de8276`. Safety #311 and Vercel are green, and the affected Exact Preview cases passed. The fresh exact-head Codex review found one P1 choice-filter false negative and one P2 adaptive input-budget overflow; the newly authorized local remediation below closes both and is not published yet.
-- Base/current main: `4516cc162ef34426ef94d29cf5aa6489013927ec` (`Scene Exit Condition V1 (#39)`).
+- Branch: `codex/event-consequence-v1`
+- Base/current main: `5f2073a2874a9b8ee45a6aa34d6e4508997c3cb3` (`Stronger Turn Hook V1 (#40)`).
+- PR #40 is **merged** from reviewed exact head `85af592b8baae57958eb16d88da83f946d26a2e0`. Safety #313, Vercel, fresh exact-head Codex P0/P1=0, and affected Exact Preview acceptance passed. Squash merge `5f2073a...` exactly preserves reviewed tree `2354a0db58c6405beec40fcfaae885fd8850c0db`; production is healthy.
 - PR #39: **merged** from exact reviewed head `ba64f9f779cda39f91ef41abfddf3c47f823606c`. Safety #307, Vercel, fresh exact-head Codex P0/P1=0, and affected Chrome Preview acceptance passed. Squash merge commit `4516cc1...` has the exact reviewed tree `dfce564cc6b457a5258d5165ea05ce496acf99c6`; production Vercel and `/api/health` are healthy.
 - PR #38: **merged** as `227bcf23ace6ad7dca38b5d02d50a8652dd13a38`. Same-occurrence event purpose focus now refreshes only when the authoritative active/completed/omitted progress signature changes; unchanged progress retains the exact prior purpose object.
 - PR #37: **merged** from exact head `acebe72f6297f44d5f08e820b8c6dc12a4fa00ae` after Safety #299, Vercel, AUTO/direct-question Preview acceptance, and one exact-head Codex P0/P1=0 result. Merge commit parents are prior main `1faadd105...` + reviewed head `acebe72...`, and its tree exactly equals the reviewed tree. Production `/api/health` is 200/configured on app `1.5.6`, adapter `0.8.3`.
@@ -40,7 +40,18 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Production `/api/health`: healthy; app `1.5.6`, canonical `/api/chat`, adapter `/api/chat-router`, `24h` prompt-cache retention.
 - Full post-merge `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
-## Current active work — Stronger Turn Hook V1
+## Current active work — Event Consequence V1
+- The existing model-side `delayed_consequences_add` concept was not connected to the actual stable save/app flow. V1 patches the routed structured schema, then materializes delayed results into the existing flexible `save.hooks` store; it does not create a new save root or migration.
+- Each queued result has a deterministic ID/fingerprint, causal source, due clock, bounded lifetime, target bucket, and secret level. Active results live for 3 days, world results for 7 days after due; at most 3 are added per turn and 12 unresolved consequence hooks are retained.
+- The router selects one due result only after player direct focus, important decision/committed action, callbacks, AFTERMATH, combat, and an earlier fixed schedule have been protected. An already-due result may surface under AUTO; META and CONTINUE remain frozen.
+- Wait/downtime look ahead only inside their bounded compressed duration, allowing a consequence to interrupt at its due clock instead of forcing the whole otherwise-empty interval.
+- Completion requires visible narrative/structured evidence. A result ignored by the model or accompanied only by a false `hooks_update` acknowledgement remains open; expiration is deterministic and duplicate updates are collapsed.
+- Secret causes at level 3+ are masked in the due directive and all queued consequence hooks are omitted from generic routed hook detail before they are selected. This does not grant broader L4/L5 access.
+- A realized consequence may add at most one genuinely new delayed consequence. Fingerprints block the same causal result from being rescheduled.
+- Permanent tests cover materialization, dedupe, due lookahead, schedule priority, direct-question sovereignty, visible completion, false acknowledgement, expiry, secret masking, legacy structured-output preservation, dynamic runtime insertion, one-call architecture, and minimum adaptive input authority.
+- No second model call, new API entrypoint, canonical `app.js`/`api/chat.js` rewrite, persistence migration, faction/reputation system, or off-screen expansion.
+
+## Completed active predecessor — Stronger Turn Hook V1
 - `sceneRuntime.turn_hook` is a bounded next-direction checkpoint: allowlisted kind/source/status, a 220-character single-line anchor, bounded turn, and only applicable speaker/event IDs.
 - Fresh player choices become `player-choice/awaiting-player`; an unsatisfied Exit becomes an active continuation; direct NPC questions/requests remain player-owned; active events, new leads, and authoritative NPC/world mutations become active hooks. Plain location change or generic dialogue is only a soft next step.
 - Current USER ACTION outranks an old hook. AUTO cannot resolve an awaiting-player hook. CONTINUE preserves the prior object unchanged and cannot add a new question, choice, or NPC action.
@@ -50,8 +61,8 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Initial Codex review on `4a24a77...` added two P1s: an open Exit could hide an interrupting NPC question, and AUTO could replace a saved unanswered hook. The local closure checks direct NPC address first and retains the exact prior `awaiting-player` hook for AUTO until explicit player input.
 - Earlier P2s are handled: declarative `알겠어.` / `그 부탁은 이미 처리했어.` no longer match direct requests, and the labeled Director/Schedule tail compacts dynamically. The new adaptive-pressure closure budgets the USER ACTION block as part of all fixed authority, preserving its beginning and committed ending while compacting only the middle when necessary; the minimum `.76` feedback scale with a 5,200-character action now stays within the actual 6,840-character routine input limit.
 - The authoritative minimum save carries only kind/status/anchor. Permanent 5,000-character, dense 3,900-character, maximum 5,200-character, routine adaptive `.76`, and scheduled adaptive `.76` fixtures preserve Scene Momentum, Purpose, Exit, Turn Hook, the first mandatory schedule occurrence, and the committed action ending.
-- No long-lived `saveState.hooks` mutation, Event Consequence chaining, schema migration, extra model call, new endpoint, `app.js` rewrite, or canonical `api/chat.js` rewrite.
-- Focused choice-filter and adaptive authority-budget regressions pass. The clean-LF full run, second exact-diff review, commit/push, fresh hosted gates/review, and affected Preview rerun remain.
+- PR #40 contained no long-lived `saveState.hooks` mutation, Event Consequence chaining, schema migration, extra model call, new endpoint, `app.js` rewrite, or canonical `api/chat.js` rewrite.
+- Its focused/full regressions, exact-head gates/review, affected Preview acceptance, merge tree, production Vercel, and health smoke passed.
 
 ## Completed active predecessor — Explicit Scene Exit Condition V1
 - `sceneRuntime.exit_condition` is a bounded allowlisted runtime checkpoint containing condition kind, target, source, status, establishment turn, linked purpose turn, and optional event occurrence ID.
@@ -607,13 +618,13 @@ Gameplay roadmap discussed but not DONE:
 # 12. NEXT ACTION — CURRENT START POINT
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
-2. Confirm main contains PR #39 squash merge `4516cc162ef34426ef94d29cf5aa6489013927ec`; do **not** redo completed HF1/HF2/HF3, 12-case acceptance, Scene Purpose, or Scene Exit diagnosis.
-3. Continue only PR #40 Stronger Turn Hook V1 on `codex/stronger-turn-hook-v1`. Run the clean-LF full check and second exact-diff regression/scope review, then commit and push the local deny-only-routine choice filter plus adaptive authority-floor closure. Keep Event Consequence out.
-4. Require new exact-current-HEAD Safety/Vercel and fresh Codex P0/P1 authority. Exact Preview must rerun quiet-scene no-fake-choice behavior and NPC direct-response sovereignty; deterministic tests own the nonverbal-choice and adaptive maximum-action edge cases.
-5. If every exact-current-head gate is green and no special blocker appears, use the user's explicit merge authorization. Revalidate head/base/mergeability immediately before merge, then verify the merge tree and production health.
+2. Confirm main contains PR #40 squash merge `5f2073a2874a9b8ee45a6aa34d6e4508997c3cb3`; do **not** redo completed HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, or Stronger Turn Hook diagnosis.
+3. Continue only Event Consequence V1 on `codex/event-consequence-v1`. Run the clean-LF full check and second exact-diff regression/scope review, then commit/push/open the focused PR.
+4. Require exact-current-HEAD Safety/Vercel and fresh Codex P0/P1 authority. Exact Preview must verify delayed-result creation/persistence, no early fire, due manifestation, and player-choice protection, plus one quiet Turn Hook/NPC direct-response regression.
+5. Do not start NPC Initiative / Goal Tick refinement until acceptance closes. Because this candidate changes protected runtime/API paths, repository policy keeps the eventual merge human-only.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #39는 main `4516cc1...`로 병합됐고 production까지 통과했다. HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit 진단을 다시 하지 않는다. 현재 PR #40 branch `codex/stronger-turn-hook-v1`, published head `c18f9ab...`; Safety #311/Vercel/affected Preview는 통과했지만 fresh review가 keyword allowlist P1과 adaptive `.76` fixed-input overflow P2를 찾았다. Local remediation은 shared intent classifier로 complete routine set만 제거하고 비언어/갈림길 선택을 보존하며, 5,200-character action의 앞/끝 의미를 보존한 채 중간만 압축해 실제 6,840-character adaptive input budget을 지킨다. focused regressions PASS. clean-LF full rerun, commit/push, fresh exact gates/review, affected Preview를 진행한다. Event Consequence는 이 PR에 섞지 않는다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #40은 reviewed head `85af592...`에서 main `5f2073a...`로 squash merge됐고 Safety #313/Vercel/fresh P0/P1=0/affected Preview/production까지 통과했다. HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Stronger Turn Hook 진단을 다시 하지 않는다. 현재 branch는 `codex/event-consequence-v1`; 기존 `delayed_consequences_add`를 새 저장 스키마 없이 `save.hooks`의 bounded queue로 연결하고 due/expiry/visible completion/duplicate denial/secret masking/player+schedule priority를 구현한 local candidate다. Focused regressions PASS. clean-LF full check, second review, commit/push/PR, hosted exact-head gates/review, lifecycle Preview acceptance를 진행한다. NPC Initiative / Goal Tick refinement는 그 뒤이며 protected runtime/API merge는 human-only다.`
