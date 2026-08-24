@@ -1,10 +1,18 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
-import { buildTurnHookDirective, deriveTurnHook, normalizeTurnHook, TURN_HOOK_VERSION } from '../../lib/turn-hook.js';
+import { buildTurnHookDirective, deriveTurnHook, filterTurnHookChoices, normalizeTurnHook, TURN_HOOK_VERSION } from '../../lib/turn-hook.js';
 
 const reachedExit={version:'1.0',kind:'action-resolved',target:'행동 결과 뒤의 다음 실질 지점',source:'current-action',status:'reached',established_turn:10,purpose_established_turn:10};
 const actionPurpose={version:'1.0',kind:'action',focus:'도서관에서 발견한 단서를 확인한다.',source:'player-action',established_turn:10};
+
+const genericTravelChoices=['학생식당으로 간다.','호숫가를 둘러본다.','기숙사 공용공간을 살핀다.'];
+assert.deepEqual(filterTurnHookChoices('밖으로 간다.',{importance:'routine',scene:[{kind:'narration',text:'A동 현관 밖에 도착했다.'}],state_delta:{new_location:'A동 기숙사 외부'},choices:genericTravelChoices}),[],'routine travel options are not an important decision boundary');
+assert.deepEqual(filterTurnHookChoices('주변을 본다.',{importance:'routine',scene:[{kind:'narration',text:'중앙광장에 도착했다.'}],state_delta:{},choices:['마법과 건물로 간다.','기사과 건물로 간다.','학생식당으로 간다.']}),[],'department names containing magic are not mistaken for combat decisions');
+assert.deepEqual(filterTurnHookChoices('문을 연다.',{importance:'routine',resolution_log:{outcome:'failure'},scene:[{kind:'narration',text:'잠긴 문은 열리지 않았다.'}],state_delta:{},choices:['다시 문을 연다.']}),['다시 문을 연다.'],'structured failure keeps its retry choice');
+assert.deepEqual(filterTurnHookChoices('기다린다.',{importance:'routine',event_progress:{event_instance_id:'orientation#1',active_beat:'arrival'},scene:[{kind:'narration',text:'오리엔테이션 시작 종이 울렸다.'}],state_delta:{},choices:['참석한다.','남는다.','다른 일을 한다.']}),['참석한다.','남는다.','다른 일을 한다.'],'an authoritative event boundary keeps player choices');
+assert.deepEqual(filterTurnHookChoices('주변을 본다.',{importance:'routine',scene:[{kind:'dialogue',speaker_key:'isabel',text:'너도 정오 일정 때문에 나온 거야?'}],state_delta:{},choices:['기사과라고 답한다.','되묻는다.','대답하지 않는다.']}),['기사과라고 답한다.','되묻는다.','대답하지 않는다.'],'a direct NPC question keeps its response choices');
+assert.deepEqual(filterTurnHookChoices('적을 공격한다.',{importance:'routine',scene:[{kind:'narration',text:'전투가 계속된다.'}],state_delta:{},choices:['다시 공격한다.']}),['다시 공격한다.'],'combat keeps its tactical choice');
 
 const decision=deriveTurnHook({turn:{choices:['경비에게 사실을 말한다.','단서를 숨긴다.','대답을 미룬다.']},purpose:actionPurpose,exitCondition:reachedExit,turnNumber:10});
 assert.equal(decision.kind,'player-choice');

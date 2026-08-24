@@ -36,6 +36,7 @@ Narrative Engine continuation — PR #39 Explicit Scene Exit Condition V1 is mer
 - New bounded `sceneRuntime.turn_hook` records allowlisted kind/source/status, a single-line 220-character anchor, bounded establishment turn, and only applicable speaker/event IDs.
 - Strong hooks require concrete evidence: fresh choices, an open Exit boundary, a direct NPC question/request, active event pressure, authoritative new information/objective/world-thread change, or nonverbal NPC/world state mutation. A mere location change or generic dialogue is only a soft next step.
 - The reserved Context Router rule makes current USER ACTION outrank an old hook, preserves player-owned `awaiting-player` boundaries under AUTO, forbids fake questions/repeated information, and asks for exactly three choices only at a real important decision.
+- Initial exact Preview on `4a24a77...` passed room -> exterior compression but exposed generic destination suggestions being rendered as a three-choice decision. The local remediation filters post-response choices unless they have structured failure, combat, event/schedule, high-importance, decision-language, or direct-NPC-question evidence; department names such as `마법과` are not mistaken for combat.
 - CONTINUE clones the prior hook unchanged and receives a hook-specific hard freeze. META remains untouched.
 - The authoritative 9k minimum state keeps only hook kind/status/anchor. Both a 5,000-character action and a dense 3,800-character action with maximum routine Schedule/Director authority preserve Scene Momentum, Purpose, Exit, Turn Hook, and the final committed predicate within budget.
 - No long-lived story-hook mutation, Event Consequence chaining, schema migration, second model call, new API entrypoint, `app.js` rewrite, or canonical `api/chat.js` rewrite.
@@ -336,5 +337,6 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Unfinished: final clean-LF check/review, docs checkpoint commit/push, fresh exact-head gates/review, affected current-action Preview rerun, guarded merge, merge-tree verification, and production health; all later narrative phases remain separate.
 - Blocker: none locally.
 - Completed: PR #39 exact-head Safety/Vercel/Codex/Preview gates, expected-head squash merge, exact tree verification, production Vercel, and health smoke.
-- Current code checkpoint: `8fbab9a...` Stronger Turn Hook V1 focused and adjacent regressions PASS; clean-LF full check, docs checkpoint, publication, hosted gates, and focused Preview acceptance remain.
-- NEXT ACTION: validate and publish `8fbab9a...` plus this docs checkpoint, then revalidate every exact-current-head gate.
+- Initial published candidate: `4a24a77...`; Vercel PASS, Safety #308 initially in progress. Its first live travel rerun found the generic-choice issue above, so it is not merge-authoritative.
+- Current local remediation: deterministic meaningful-choice filter and classifier edge regressions pass; clean-LF full rerun, commit/push, fresh hosted gates/review, and affected Preview rerun remain.
+- NEXT ACTION: publish the choice-filter remediation, then revalidate every exact-current-head gate.

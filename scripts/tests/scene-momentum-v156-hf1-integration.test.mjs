@@ -33,6 +33,7 @@ assert.match(chat,/deriveScenePurpose/);
 assert.match(chat,/deriveSceneExitCondition/);
 assert.match(chat,/evaluateSceneExitCondition/);
 assert.match(chat,/deriveTurnHook/);
+assert.match(chat,/filterTurnHookChoices/);
 assert.match(chat,/exit_condition:exitCondition,turn_hook:turnHook,momentum,scene_delta:sceneDelta/);
 assert.match(chat,/scene_momentum_v1:true/);
 assert.match(chat,/purpose,exit_condition:exitCondition,turn_hook:turnHook,momentum,scene_delta:sceneDelta/);
