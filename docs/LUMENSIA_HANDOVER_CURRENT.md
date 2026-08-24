@@ -403,6 +403,8 @@ A new live P1 was reproduced: the indirect question `지금 오리엔테이션�
 
 That patch was published as `9972c26a4db39b29fd92bd77824e71a2e802126d`; Safety #268 and Vercel passed, and the exact Preview kept 12:40/location unchanged while answering the indirect question. The next CONTINUE check exposed a reload-only UI P1: duplicate stable flow wrappers caused both CONTINUE buttons to be hidden. The current local fix collapses duplicate wrappers and restores stable button visibility; focused CONTINUE/integration/core tests pass. Publish/redeploy this UI fix next, then run live CONTINUE and completed-event forward.
 
+The UI fix was published as `c90616815c9d058c0c185a87402460803df5b0d8`; Safety #269 and Vercel passed, and reload produced exactly one visible/enabled CONTINUE control. The live CONTINUE kept 12:40/location and the correct route but invented a new Artemis quote and NPC actions. The current local follow-up strengthens the narrative freeze to prohibit new NPC speech/actions and allow only an already-started beat's expression or static sensory detail. Publish and rerun CONTINUE next.
+
 ---
 
 # 9. PERMANENT TEST COVERAGE
@@ -527,8 +529,8 @@ Gameplay roadmap discussed but not DONE:
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
 2. Confirm main still contains merge commit `8d378b532910dfecaf5226118bffabdddbe74289`; do **not** redo completed HF1 diagnosis.
 3. Preserve the recorded earlier gates, but do not treat them as authority for the new local question-sovereignty patch.
-4. Publish the tested CONTINUE control-lifecycle fix and wait for exact-head Safety + Vercel.
-5. On that exact Preview require one visible CONTINUE button, execute it, verify hard freeze, then verify completed-event forward progression.
+4. Publish the strengthened CONTINUE narrative-freeze directive and wait for exact-head Safety + Vercel.
+5. On that exact Preview execute CONTINUE and require no new NPC speech/action plus unchanged time/location, then verify completed-event forward progression.
 6. Fix only reproduced P0/P1 failures and repeat the full exact-head gates after any head change.
 7. Obtain a fresh exact-current-HEAD/current-main Codex review and stop at protected-core manual merge readiness; do not auto-merge.
 8. After a human merge, run all 12 cases plus `/api/health` on production, then proceed to **Scene Purpose -> Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence**.
