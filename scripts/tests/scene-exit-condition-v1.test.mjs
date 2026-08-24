@@ -9,17 +9,25 @@ const baseSave={turnNumber:12,world:{location:'A동 개인실'},sceneRuntime:{pu
 const exterior=deriveSceneExitCondition({action:'밖으로 간다.',saveState:baseSave,turnNumber:13});
 assert.equal(exterior.kind,'semantic-destination');
 assert.equal(exterior.source,'current-action');
+assert.equal(exterior.destination,'current-building-exterior');
 assert.match(exterior.target,/건물 외부/);
 
-const exteriorOpen=evaluateSceneExitCondition(exterior,{turn:{scene:[{kind:'narration',text:'복도로 나왔다.'}],choices:[]},sceneDelta:{score:1,structuralScore:1,advanceMinutes:1,flags:{timeAdvanced:true,locationChanged:false}}});
+const exteriorOpen=evaluateSceneExitCondition(exterior,{turn:{scene:[{kind:'narration',text:'복도로 나왔다.'}],choices:[]},sceneDelta:{score:2,structuralScore:2,advanceMinutes:1,afterLocation:'A동 복도',flags:{timeAdvanced:true,locationChanged:true}}});
 assert.equal(exteriorOpen.status,'open','a trivial corridor step must not satisfy the exterior destination');
 const actionPurpose={version:'1.0',kind:'action',focus:'건물 밖으로 이동한다.',source:'player-action',established_turn:13};
 const exteriorWithPurpose=deriveSceneExitCondition({action:'밖으로 간다.',saveState:baseSave,purpose:actionPurpose,turnNumber:13});
-const exteriorOpenWithPurpose=evaluateSceneExitCondition(exteriorWithPurpose,{turn:{scene:[{kind:'narration',text:'복도로 나왔다.'}],choices:[]},sceneDelta:{score:1,structuralScore:1,advanceMinutes:1,flags:{timeAdvanced:true,locationChanged:false}}});
+const exteriorOpenWithPurpose=evaluateSceneExitCondition(exteriorWithPurpose,{turn:{scene:[{kind:'narration',text:'복도로 나왔다.'}],choices:[]},sceneDelta:{score:2,structuralScore:2,advanceMinutes:1,afterLocation:'A동 복도',flags:{timeAdvanced:true,locationChanged:true}}});
 const exteriorAutoRecovery=deriveSceneExitCondition({action:'[AUTO FLOW: PC 새 행동 없음]',saveState:{...baseSave,turnNumber:13,sceneRuntime:{purpose:actionPurpose,exit_condition:exteriorOpenWithPurpose}},purpose:actionPurpose,turnNumber:14});
 assert.deepEqual(exteriorAutoRecovery,exteriorOpenWithPurpose,'AUTO must retain an unsatisfied current-action boundary instead of forgetting a premature stop');
-const exteriorReached=evaluateSceneExitCondition(exterior,{turn:{scene:[{kind:'narration',text:'현관을 지나 바깥에 도착했다.'}],choices:[]},sceneDelta:{score:2,structuralScore:2,advanceMinutes:4,flags:{timeAdvanced:true,locationChanged:true}}});
+const exteriorReached=evaluateSceneExitCondition(exterior,{turn:{scene:[{kind:'narration',text:'현관을 지나 바깥에 도착했다.'}],choices:[]},sceneDelta:{score:2,structuralScore:2,advanceMinutes:4,afterLocation:'A동 기숙사 외부',flags:{timeAdvanced:true,locationChanged:true}}});
 assert.equal(exteriorReached.status,'reached');
+
+const libraryTravel=deriveSceneExitCondition({action:'대도서관으로 간다.',saveState:baseSave,turnNumber:13});
+assert.equal(libraryTravel.destination,'대도서관');
+const libraryCorridor=evaluateSceneExitCondition(libraryTravel,{turn:{scene:[{kind:'narration',text:'복도를 지난다.'}],choices:[]},sceneDelta:{score:1,structuralScore:1,afterLocation:'A동 복도',flags:{locationChanged:true}}});
+assert.equal(libraryCorridor.status,'open','an intermediate location must not satisfy a named travel destination');
+const libraryReached=evaluateSceneExitCondition(libraryTravel,{turn:{scene:[{kind:'narration',text:'도서관에 도착했다.'}],choices:[]},sceneDelta:{score:1,structuralScore:1,afterLocation:'루멘시아 아카데미 대도서관 입구',flags:{locationChanged:true}}});
+assert.equal(libraryReached.status,'reached');
 
 const question=deriveSceneExitCondition({action:'지금 입학식에 돌아갈까?',saveState:baseSave,turnNumber:13});
 assert.equal(question.kind,'question-answered');
