@@ -1,12 +1,13 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Narrative Engine continuation — Deterministic Scene Novelty V1 is merged. NPC↔NPC Relationship V1 is the active separate phase.
+Narrative Engine continuation — NPC↔NPC Relationship V1 is merged. Faction / Social Consequence V1 is the active separate phase.
 
 ## Current GitHub State
 - Repo: `hoho074566-cpu/lumencia-ac`
-- Main: `fe6b4a5dcc0f0a96b71d8fcffcf8666caeefd82b` (`Deterministic Scene Novelty V1`, PR #44 merge)
-- Working branch: `codex/npc-npc-relationship-v1`
+- Main: `71074ccc7a5fd00f193a6aec8b7a1ff82eae1aab` (`NPC↔NPC Relationship V1`, PR #45 merge)
+- Working branch: `codex/faction-social-consequence-v1`
+- PR #45: **merged** from exact reviewed head `583b7622500b9916dd31697d0d6e845f81790ed6` as `71074ccc7a5fd00f193a6aec8b7a1ff82eae1aab`. Merge and reviewed-head trees both equal `690e6a88c015bd28e67bba0bf03bfdba6e73a6c8`; production `/api/health` is healthy on app `1.5.6` / adapter `0.8.3`.
 - PR #44: **merged** from exact reviewed head `e5fae96ac271a617db42627a99d53a720299a213` as `fe6b4a5dcc0f0a96b71d8fcffcf8666caeefd82b`. Merge and reviewed trees both equal `f4aeadd44c116682d60385c265e3f35f3b48ea0e`; production health is green.
 - PR #43: **merged** from exact reviewed/accepted head `6b4f5990278ce8d3446c7b5be94a899a72d9fc80` as `fd2bcff13007fdf66c04477b9f69066f7c9b871e`. Merge and reviewed-head trees both equal `5b6b56b272de438e3db6a53027ce13b75ff7cace`; merged-main Vercel, production `/api/health`, and the clean-LF full PR check pass.
 - PR #42: **merged** from exact reviewed head `6c115e661ed7257b3787b74d5f142a1c0b39e38d`. Safety #32741095125, Vercel, exact-head Codex P0/P1=0, and targeted Exact Preview acceptance passed. Merge `8c5ca35...` and reviewed head share tree `22195b469f2ccb1b3afdc7c197f5259fb110d59a`.
@@ -36,15 +37,18 @@ Narrative Engine continuation — Deterministic Scene Novelty V1 is merged. NPC�
 - Production `/api/health`: `ok=true`, API configured, app `1.5.6`, adapter `/api/chat-router`, canonical core `/api/chat`, prompt cache retention `24h`.
 - Post-merge full `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
-## NPC↔NPC Relationship V1 — Current Candidate
-- Adds a bounded `state_delta.npc_relationship_changes` contract with directional registered source/target NPC keys, affinity/trust deltas, optional status, and a causal reason.
-- Persists inside `npcInnerStates[source].npc_relationships[target]`; there is no new save root/migration, API entrypoint, model call, or `app.js` change.
-- Each direction clamps affinity/trust to ±100, keeps 8 causal rows and 16 targets, and routes only 6 target links with 2 recent causes for currently relevant NPCs.
-- A client fallback persists the structured delta only when no server-backed relationship row exists, covering the quality-pipeline-off path without double application.
-- Reverse directions are independent. Self/unregistered/no-op rows are rejected, and prompt rules prohibit changing a relationship from co-presence alone.
-- Existing `relationship_changes` remains PC↔NPC only. META/CONTINUE clear the new field, while a real mutation contributes once to Scene Momentum's existing relationship axis.
-- `scripts/tests/npc-relationship-v1.test.mjs` covers schema, directionality, accumulation, clamps, bounds, invalid/no-op rejection, causal context, freeze, health, and one-call preservation. Focused NPC Goal/Motivation, Context Router, Scene Momentum, and CONTINUE regressions pass.
-- Exact code checkpoint `ec7228a` passes the authoritative clean-LF full PR check. The normal-checkout run's two automation failures were confirmed as the existing CRLF-only workflow-string false positives; every game/API/runtime suite passed in both runs.
+## Faction / Social Consequence V1 — Current Candidate
+- Adds bounded `state_delta.faction_reputation_changes` rows for the six canon-backed public academy organizations: student council, Blue Knights, White Rose, and the knight/magic/theology departments.
+- Persists inside `sceneRuntime.faction_social`; there is no new save root/migration, API entrypoint, model call, or `app.js` change.
+- Reputation clamps to ±100. One turn accepts at most 4 changes; each public faction retains at most 8 causal rows; routed context keeps at most 6 registered factions with 2 recent causes.
+- Evidence is mandatory: public event, official record, registered NPC witness, or sourced credible rumor. Unwitnessed private conduct, unregistered observers, invented factions, mere co-presence, and zero-delta same-stance rows are rejected.
+- Different organizations may interpret the same public event with different explicit polarity. Group reputation never auto-mutates PC↔NPC or NPC↔NPC relationships.
+- Delayed retaliation, invitation, summons, and administrative consequences reuse `delayed_consequences_add` and the existing Event Consequence lifecycle; V1 adds no second queue.
+- META/CONTINUE clear the new field. A real mutation contributes exactly once to Scene Momentum's existing social axis, while no-ops do not fake progression.
+- `scripts/tests/faction-social-consequence-v1.test.mjs` covers schema, evidence, polarity, clamps/history/context bounds, invalid/no-op rejection, personal-relation isolation, stable runtime persistence, freeze, health, and the one-call invariant. Dedicated and affected Context/Relationship/Event/CONTINUE/Scene/Goal suites pass at code checkpoint `7713d58`.
+
+## NPC↔NPC Relationship V1 — Completed
+- PR #45 merged after exact-head Safety/Vercel/Codex and Exact Preview acceptance. Directional registered NPC affinity/trust/status plus causal history persists in the existing `npcInnerStates` root; reverse and PC relationships remain independent.
 
 ## Deterministic Scene Novelty V1 — Completed
 - Adds a bounded `sceneRuntime.novelty` checkpoint inside the existing flexible runtime root; there is no save root, migration, endpoint, rewrite pass, or additional model call.
@@ -370,11 +374,12 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
 
 ## NEXT ACTION
-1. Push the current exact code/docs head and open the protected-path NPC↔NPC Relationship V1 PR.
-2. Require fresh current-head Safety/Vercel/Codex P0/P1=0.
-3. Revalidate current main, merge-base, no conflict, one-call architecture, bounded storage/context, META/CONTINUE freeze, and unchanged PC↔NPC behavior.
-4. Run Exact Preview acceptance for causal directional persistence, reload retention, explicit-only reverse mutation, and META/CONTINUE zero mutation.
-5. If every gate passes, report the protected-path PR ready for human merge. Do not begin Faction / Social Consequence V1 before this phase is accepted.
+1. Run the authoritative clean-LF full PR check and finish the substantive second review for code checkpoint `7713d58` plus this docs update.
+2. Commit/push the exact code/docs head and open the protected-path Faction / Social Consequence V1 PR.
+3. Require fresh current-head Safety/Vercel/Codex P0/P1=0.
+4. Revalidate current main, merge-base, no conflict, one-call architecture, bounded storage/context, META/CONTINUE freeze, unchanged personal relationships, and reuse of the existing delayed-consequence queue.
+5. Run Exact Preview acceptance for witnessed-public-only mutation, private/unwitnessed rejection, explicit per-faction polarity, reload retention, META/CONTINUE zero mutation, and a delayed faction response that neither fires early nor repeats.
+6. If every gate passes, report the protected-path PR ready for human merge. Do not begin Skill Learning V1 before this phase is accepted.
 
 ## Stop Record
 - Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.
@@ -411,4 +416,5 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Historical PR #43 NEXT ACTION (completed): publish the P2-closure checkpoint, require fresh exact-head hosted authority/review and the three affected Preview cases, then leave the protected-path PR for human merge.
 - Completed: PR #43 exact head `6b4f599...` passed clean-LF/Safety/Vercel/Codex/Preview gates and was merged by the user as `fd2bcff...`; merge-tree equality, merged-main Vercel, production health, and clean-LF full regression pass.
 - Completed: PR #44 exact reviewed head `e5fae96...` merged as `fe6b4a5...`; merge-tree equality and production health pass.
-- Current candidate: NPC↔NPC Relationship V1 on `codex/npc-npc-relationship-v1`; local implementation checkpoint `ec7228a` completed the exact diff and second review, and its focused plus authoritative clean-LF full PR checks PASS. Hosted/review/Preview authority remain.
+- Completed: PR #45 exact reviewed head `583b762...` merged as `71074cc...`; merge-tree equality and production health pass.
+- Current candidate: Faction / Social Consequence V1 on `codex/faction-social-consequence-v1`; code checkpoint `7713d58` adds bounded evidence-gated public-faction reputation in the existing scene runtime and reuses Event Consequence for delayed organization responses. Dedicated and affected gameplay/API/runtime suites pass; clean-LF full authority, final docs checkpoint, hosted review/gates, and Preview acceptance remain.
