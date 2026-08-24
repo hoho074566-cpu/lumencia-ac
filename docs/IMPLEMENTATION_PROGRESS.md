@@ -213,6 +213,11 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Exact code HEAD `e4de523b37f3508d4fc6534ff4aa49df3fd74b05`: Safety #282 PASS, Vercel Ready, and the Preview schedule rerun PASS. World time reached exactly 12:00, location remained the room, `knight_orientation` stayed active/incomplete at `arrival_decision`, and player choices remained open.
 - Fresh review `PRR_kwDOT8LCAs8AAAABKkUk7Q` on `d1ada8288c62bf55a6c41e09485959b568a3a5c8` produced three still-applicable P1 blockers: hard stops currently include unrelated NPC/world schedules; hidden CONTINUE beats are still consumed and lost; and non-downtime action estimates can be stretched to a later boundary instead of merely capped.
 - Repository policy allows at most two Codex-local automatic fix/review iterations. That limit is exhausted, so these P1s were not automatically patched. PR #35 must not merge.
+- The user explicitly authorized a new remediation cycle and instructed Codex to perform every safely automatable step, including an exact-head guarded merge only after every gate is re-fetched and PASS.
+- Local remediation now filters hard stops to PC-owned/personal/promise schedules, general academic schedules, and the PC's own named department. NPC-only legacy rows, world-only rows, and other-department academic rows progress independently.
+- Short travel/exit/explore/observe actions use their minimum completion estimate for mandatory schedule targeting. A later boundary inside the wider guide is emitted only as `SCHEDULE_CAP`, which forbids stretching the action to that time.
+- Frozen CONTINUE still hides `remaining_beats` from model context, but now preserves the original unseen queue in runtime state instead of consuming its head.
+- Permanent regressions reproduce all three prior failures. Focused Scene Momentum/router/Event tests and the full `node scripts/lumensia-pr-check.mjs` pass locally. Hosted checks, exact Preview reruns, and fresh exact-head review remain pending.
 
 ## Permanent HF1 Test Suites
 - `scripts/tests/context-router-authority-tail.test.mjs`
@@ -243,10 +248,10 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
 
 ## NEXT ACTION
-1. Human must review/authorize a new remediation cycle for the three current P1s; do not merge PR #35 in its current state.
-2. Any remediation must jointly cover PC-relevant schedule filtering, non-consuming frozen CONTINUE beats, and cap-vs-target semantics for short actions, with focused/full tests and exact Preview reruns.
-3. Obtain a fresh exact-current-HEAD/current-main Codex review with direct P0/P1=0, then re-fetch every merge gate before any merge.
-4. After a later human merge, rerun production acceptance and implement **Scene Purpose** with bounded purpose state and no automatic player choice, followed by Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence chaining/lifetime.
+1. Publish the human-authorized three-P1 remediation to PR #35 and verify exact Preview behavior for PC-relevant rest, unrelated schedules, short travel cap semantics, and non-consuming frozen CONTINUE.
+2. Require hosted Safety/Vercel PASS plus a fresh exact-current-HEAD/current-main Codex review with direct P0/P1=0.
+3. Re-fetch every merge gate immediately before mutation. Merge only with the unchanged full `expected_head_sha`; stop without merging if any condition changed.
+4. Fetch merged main, run the full post-merge suite and production acceptance, then implement **Scene Purpose** with bounded purpose state and no automatic player choice, followed by Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence chaining/lifetime.
 
 ## Stop Record
 - Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.
@@ -264,6 +269,8 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed local direct-review closure: schedule-title evidence can align the exact boundary without optional `event_progress`; unrelated choices remain unforced; focused/full tests PASS.
 - Completed on exact code head `e4de523...`: Safety #282/Vercel PASS and final schedule Preview rerun PASS.
 - Completed direct audit: fresh review `PRR_kwDOT8LCAs8AAAABKkUk7Q` identified three current P1s after the second automatic remediation round.
-- Unfinished: P1 remediation, new exact-head gates/review, protected manual merge, Scene Purpose and later phases.
-- Blocker: automatic fix/review limit exhausted with three current direct P1 threads (`PRRT_kwDOT8LCAs6bkEy6`, `PRRT_kwDOT8LCAs6bkEy8`, `PRRT_kwDOT8LCAs6bkEy_`).
-- NEXT ACTION: human-authorized remediation cycle; merge remains forbidden.
+- Completed human authorization and local remediation: PC-relevant schedule filtering, short-action cap-vs-target semantics, and frozen CONTINUE queue preservation all have permanent regressions.
+- Tests at this checkpoint: focused regressions and full `node scripts/lumensia-pr-check.mjs` PASS; the diff is limited to the shared momentum helper, stable adapter, tests, and these progress documents.
+- Unfinished: hosted exact-head checks, Preview acceptance, fresh review, guarded merge, post-merge verification, Scene Purpose and later phases.
+- Blocker: none locally. Merge remains forbidden until hosted Safety/Vercel, exact Preview evidence, and fresh direct P0/P1=0 all pass on the final exact head.
+- NEXT ACTION: publish the new exact head and complete hosted/live/review gates.

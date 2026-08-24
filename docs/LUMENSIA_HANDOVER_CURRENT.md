@@ -45,6 +45,9 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Exact code HEAD `e4de523b37f3508d4fc6534ff4aa49df3fd74b05` passed Safety #282, Vercel, and the schedule Preview rerun: exact 12:00, unchanged room, active/incomplete `knight_orientation`, player choices preserved.
 - Fresh review `PRR_kwDOT8LCAs8AAAABKkUk7Q` on `d1ada8288c62bf55a6c41e09485959b568a3a5c8` found three current P1s: unrelated NPC/world schedules can become PC hard stops; a CONTINUE beat hidden from the model is still consumed; and short travel/exit/explore/observe can be stretched to a later schedule boundary instead of only being capped.
 - The repository's two Codex-local automatic fix/review iterations are exhausted. No third automatic fix was attempted; PR #35 is not merge-ready.
+- The user subsequently authorized a new remediation cycle and instructed Codex to automate all safe work through guarded exact-head merge and post-merge continuation.
+- The local remediation jointly closes the three findings: schedule boundaries are filtered to PC-owned/general-academic/own-department relevance; later boundaries for short actions are `SCHEDULE_CAP` rather than mandatory targets; and frozen CONTINUE preserves every model-hidden pending beat.
+- Focused Scene Momentum, schedule-floor, Context Router, Event Progress, CONTINUE, core-invariant tests and the full `node scripts/lumensia-pr-check.mjs` pass. Hosted exact-head checks, exact Preview acceptance, and fresh review remain merge prerequisites.
 
 ## Critical review finding and merged closure
 Final Codex review **did complete** on exact HEAD `8ca24ba...` at 2026-08-23 21:47:49 UTC and found a **new current P1**.
@@ -556,13 +559,13 @@ Gameplay roadmap discussed but not DONE:
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
 2. Confirm main still contains merge commit `88fa53036c58324ffd5012ab7b5ed0cd3099dd6d`; do **not** redo completed HF1 or PR #34 diagnosis.
-3. Do not merge PR #35. Human must authorize a new remediation cycle for the three current P1s.
-4. Remediation must jointly address PC relevance, frozen-beat non-consumption, and short-action cap semantics; rerun focused/full tests plus exact Preview acceptance.
-5. Obtain a fresh exact-current-HEAD/current-main Codex review with direct P0/P1=0 and re-fetch every merge gate.
-6. After a later human merge, rerun production acceptance and proceed to **Scene Purpose -> Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence**.
+3. Publish the human-authorized three-P1 remediation and rerun exact Preview acceptance for relevant/unrelated schedules, short travel, and frozen CONTINUE queue preservation.
+4. Require fresh exact-current-HEAD/current-main direct P0/P1=0 plus Safety/Vercel PASS.
+5. Immediately re-fetch all merge gates and merge only with the unchanged full `expected_head_sha`; any changed condition forbids the merge.
+6. After merge, rerun production acceptance and proceed to **Scene Purpose -> Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence**.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #35 exact code head `e4de523`는 Safety #282/Vercel/Preview schedule rerun이 PASS지만, fresh review `PRR_kwDOT8LCAs8AAAABKkUk7Q`가 unrelated schedule hard-stop, hidden CONTINUE beat loss, short-action boundary stretching의 current P1 세 건을 찾았다. 두 번의 자동 fix/review 한도가 소진됐으므로 merge 금지 상태다. human-authorized remediation -> focused/full/live tests -> fresh direct P0/P1=0 -> exact merge gates 후에만 병합하고, 그 뒤 Scene Purpose -> Scene Exit -> Turn Hook -> Event Consequence로 계속한다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #35 fresh review의 current P1 세 건은 human-authorized local remediation으로 PC-relevant schedule filtering, hidden CONTINUE beat preservation, short-action SCHEDULE_CAP semantics까지 구현했고 focused/full tests가 PASS했다. 새 exact head를 게시한 뒤 exact Preview -> Safety/Vercel -> fresh direct P0/P1=0 -> immediate exact merge gates 순서로 검증한다. 전부 PASS일 때만 unchanged expected_head_sha로 guarded merge하고, post-merge production acceptance 뒤 Scene Purpose -> Scene Exit -> Turn Hook -> Event Consequence로 계속한다.`

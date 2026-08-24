@@ -112,7 +112,19 @@ const continueActionSource=router.slice(router.indexOf('function continueAction'
 assert.doesNotMatch(continueActionSource,/remaining_beats|미처리 같은-장면 beat/,'CONTINUE action must not promote an unstarted pending beat into model instructions');
 assert.match(router,/function continueRouteSave[\s\S]*delete safeRuntime\.remaining_beats/,'CONTINUE routed SAVE_STATE must hide pending beats that would contradict hard freeze');
 assert.match(router,/mode==='continue'[\s\S]*incoming\.saveState=continueRouteSave\(incoming\.saveState\)/,'CONTINUE must route only the freeze-safe runtime view');
-assert.match(router,/consumeContinuationRuntime\(\{\.\.\.incoming,saveState:object\(incoming0\.saveState\)\}/,'CONTINUE must still consume the original pending-beat queue after the frozen response');
+const consumeSource=router.slice(router.indexOf('function consumeContinuationRuntime'),router.indexOf('function localBackgroundDigest'));
+const makeConsume=new Function('clone','object','array','mergeContinuationEventProgressState',`${consumeSource}\nreturn consumeContinuationRuntime;`);
+const consumeContinuationRuntime=makeConsume(
+  (value)=>structuredClone(value),
+  (value)=>value&&typeof value==='object'&&!Array.isArray(value)?value:{},
+  (value)=>Array.isArray(value)?value:[],
+  mergeContinuationEventProgressState,
+);
+const pendingBeat={id:'unseen-beat',text:'아직 모델에 공개되지 않은 같은 장면 beat'};
+const frozenRuntime=consumeContinuationRuntime({saveState:{sceneRuntime:{remaining_beats:[pendingBeat],eventProgress:previous,eventProgressByInstance:{}}}},{event_progress:undefined});
+assert.deepEqual(frozenRuntime.scene_runtime.remaining_beats,[pendingBeat],'a beat hidden from frozen CONTINUE must remain pending instead of being consumed unseen');
+assert.doesNotMatch(consumeSource,/remaining_beats\)\.slice\(1\)/,'frozen CONTINUE must never discard the hidden head beat');
+assert.match(router,/consumeContinuationRuntime\(\{\.\.\.incoming,saveState:object\(incoming0\.saveState\)\}/,'CONTINUE must preserve the original hidden queue while merging frozen runtime state');
 assert.match(router,/consumeContinuationRuntime[\s\S]*mergeContinuationEventProgressState/,'CONTINUE uses conservative occurrence-aware merging');
 assert.match(router,/mode==='game'\?promotePausedEventProgress/, 'paused occurrence promotion must be disabled for CONTINUE/AUTO/META');
 assert.match(router,/scheduled_events_complete[\s\S]*scheduledStillActive/, 'scheduled null is paused only while the occurrence remains authoritative and unfinished');

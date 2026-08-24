@@ -9,7 +9,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import coreHandler, { CHARACTER_REGISTRY } from './chat.js';
 import { routeOpenAIParams, routerVersion, array, object, clampText } from './lib/context-router.js';
 import { actualScheduledEntrants, freshChoices, reconcileParticipants } from '../lib/scene-continuity.js';
-import { SCENE_MOMENTUM_VERSION, classifySceneIntent, deriveSceneDelta, nextScheduleBoundaryMinutes, updateSceneMomentum } from '../lib/scene-momentum.js';
+import { SCENE_MOMENTUM_VERSION, classifySceneIntent, deriveSceneDelta, isPcRelevantScheduleEvent, nextScheduleBoundaryMinutes, scheduleBoundaryLimitMinutes, updateSceneMomentum } from '../lib/scene-momentum.js';
 import { compactEventProgress, mergeContinuationEventProgressState, mergeRoutedEventProgressState, occurrenceIdFromStartEvidence, promotePausedEventProgress, scheduledIdsDueByTurnEnd, unscheduledPausedIdsForResume } from '../lib/event-progress.js';
 
 export const config = { maxDuration: 300 };
@@ -166,7 +166,7 @@ function scheduleTimestamp(date='',time=''){
 function scheduleRowsAtBoundary(saveState={},boundary=null){
   const save=object(saveState),world=object(save.world),start=scheduleTimestamp(world.date,world.time),minutes=Number(boundary);if(start==null||!Number.isFinite(minutes)||minutes<=0)return[];
   const target=start+minutes*60000,seen=new Set(),rows=[];
-  for(const row of [...array(save.scheduledEvents),...array(save?.scheduleContext?.upcoming)]){if(!row||['completed','cancelled'].includes(String(row.status||'').trim().toLowerCase()))continue;const at=scheduleTimestamp(row.date||world.date,row.time);if(at!==target)continue;const key=`${String(row.id||'').trim().toLowerCase()}|${row.date||world.date}|${row.time||''}`;if(seen.has(key))continue;seen.add(key);rows.push(row);}
+  for(const row of [...array(save.scheduledEvents),...array(save?.scheduleContext?.upcoming)]){if(!row||['completed','cancelled'].includes(String(row.status||'').trim().toLowerCase())||!isPcRelevantScheduleEvent(save,row))continue;const at=scheduleTimestamp(row.date||world.date,row.time);if(at!==target)continue;const key=`${String(row.id||'').trim().toLowerCase()}|${row.date||world.date}|${row.time||''}`;if(seen.has(key))continue;seen.add(key);rows.push(row);}
   return rows;
 }
 function scheduleRowMentioned(turn,row={}){
@@ -182,11 +182,11 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game'){
   const requestedFloor=Math.min(1440,Math.max(0,Number(intent.minAdvanceMinutes||0)));
   const boundary=nextScheduleBoundaryMinutes(incoming?.saveState||{},{futureOnly:true});
   const boundedFloor=boundary==null?requestedFloor:Math.min(requestedFloor,Math.max(0,boundary));
-  const allowedMax=Math.min(1440,Math.max(requestedFloor,Number(intent?.suggestedAdvanceMinutes?.[1]||0)));
+  const allowedMax=scheduleBoundaryLimitMinutes(intent);
   const eventId=String(turn?.event_progress?.event_instance_id||turn?.event_progress?.eventInstanceId||'').trim().toLowerCase();
   const dueAtBoundary=new Set(boundary==null?[]:scheduledIdsDueByTurnEnd(incoming?.saveState||{},boundary).map(value=>String(value).trim().toLowerCase()));
   const dueBeforeBoundary=new Set(boundary==null?[]:scheduledIdsDueByTurnEnd(incoming?.saveState||{},Math.max(0,boundary-1)).map(value=>String(value).trim().toLowerCase()));
-  const boundaryRows=scheduleRowsAtBoundary(incoming?.saveState||{},boundary),structuredBoundary=Boolean(eventId&&dueAtBoundary.has(eventId)&&!dueBeforeBoundary.has(eventId)),visibleBoundary=Boolean(!eventId&&boundaryRows.some(row=>scheduleRowMentioned(turn,row)));
+  const boundaryRows=scheduleRowsAtBoundary(incoming?.saveState||{},boundary),boundaryIds=new Set(boundaryRows.map(row=>String(row?.id||'').trim().toLowerCase()).filter(Boolean)),structuredBoundary=Boolean(eventId&&boundaryIds.has(eventId)&&dueAtBoundary.has(eventId)&&!dueBeforeBoundary.has(eventId)),visibleBoundary=Boolean(!eventId&&boundaryRows.some(row=>scheduleRowMentioned(turn,row)));
   const reachedScheduledBoundary=Boolean(boundary!=null&&boundary<=allowedMax&&(structuredBoundary||visibleBoundary));
   if(!hasMeaningfulStop||reachedScheduledBoundary){
     turn.state_delta.advance_minutes=Math.max(current,reachedScheduledBoundary?boundary:boundedFloor);
@@ -408,7 +408,7 @@ function localSceneRuntime(incoming,turn,directorTelemetry=null){
   };
 }
 function clone(value){try{return structuredClone(value);}catch{return JSON.parse(JSON.stringify(value??null));}}
-function consumeContinuationRuntime(incoming,turn){const prev=clone(object(incoming.saveState?.sceneRuntime));prev.remaining_beats=array(prev.remaining_beats).slice(1);Object.assign(prev,mergeContinuationEventProgressState(prev.eventProgress,prev.eventProgressByInstance,turn?.event_progress));return{npc_updates:{},scene_runtime:prev};}
+function consumeContinuationRuntime(incoming,turn){const prev=clone(object(incoming.saveState?.sceneRuntime));prev.remaining_beats=array(prev.remaining_beats).slice();Object.assign(prev,mergeContinuationEventProgressState(prev.eventProgress,prev.eventProgressByInstance,turn?.event_progress));return{npc_updates:{},scene_runtime:prev};}
 
 function localBackgroundDigest(incoming,turn,participants){
   const prior=String(incoming.saveState?.backgroundDigest||'').slice(-1100);if(incoming.backgroundSim===false)return prior;
