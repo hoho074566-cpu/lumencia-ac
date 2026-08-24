@@ -49,6 +49,7 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Goal V2 progress, relationships, memories, faction state, event completion, secrets, and PC choices are out of scope and cannot be synthesized by this phase.
 - A crossed start older than 60 minutes is historical digest evidence only; it cannot claim that the NPC is still at the event location.
 - Permanent tests cover secrecy/knowledge/current-scene/model-update guards, PC priority, cross-midnight clocks, long skips, hard caps, digest bounds, frontend application, and the single-call architecture.
+- Code checkpoint `4d4a66e...` passes focused regressions and the full authoritative clean-LF repository check. A second regression/scope review found no remaining blocker after hardening duplicate rows and unsafe internal keys.
 
 ## Completed active predecessor — NPC Goal Tick V1
 - Final reviewed head `6c115e661ed7257b3787b74d5f142a1c0b39e38d` merged as `8c5ca35a463356f375a4171148268a08abf0c83a`; initial code checkpoint `c9efe50bfc95d5093acbe36aef88f2cc98024a3f` carried the core candidate.
@@ -647,8 +648,8 @@ Gameplay roadmap discussed but not DONE:
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
 2. Confirm main contains PR #42 merge `8c5ca35a463356f375a4171148268a08abf0c83a`; do **not** redo completed HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Stronger Turn Hook, Event Consequence, or NPC Goal Tick diagnosis.
 3. Continue only Bounded Off-screen Progression V1 on `codex/bounded-offscreen-progression-v1`.
-4. Finish clean-LF full checks and the required second regression/scope review, then commit/push/open one focused PR.
-5. Require exact-current-HEAD Safety/Vercel and a fresh Codex P0/P1=0 review; revalidate current main/merge-base/no-conflict and run only the affected Preview cases.
+4. Push the current exact checkpoint and open one focused PR, then require exact-current-HEAD Safety/Vercel and a fresh Codex P0/P1=0 review.
+5. Revalidate current main/merge-base/no-conflict and run only the affected Preview schedule-crossing/background-disabled/PC-schedule cases.
 6. This work changes protected runtime/API paths; keep the PR human-merge only and do not merge it from a Codex task. Do not expand into arbitrary off-screen goal/relationship/faction progression in this PR.
 
 ---

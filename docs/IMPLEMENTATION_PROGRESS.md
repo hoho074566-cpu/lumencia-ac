@@ -41,6 +41,7 @@ Narrative Engine continuation — live acceptance, Scene Purpose, Scene Exit, St
 - Only bounded NPC `location`/`status` may change. Goal V2 progress, relationships, memories, faction state, event completion, secrets, and player decisions are never synthesized.
 - Starts older than 60 minutes are retained only as bounded historical background evidence and do not claim that an NPC is still at the event location.
 - Dedicated regressions cover PC priority, current/model-update protection, known-NPC and secrecy guards, completion guards, cross-midnight clocks, long-skip history, two-NPC/two-event caps, digest bounds, frontend persistence, and one-call architecture.
+- Code checkpoint `4d4a66e...` passes focused regressions and the full authoritative clean-LF `scripts/lumensia-pr-check.mjs origin/main HEAD`. The second regression/scope review found no blocker after duplicate participant/event and unsafe-key hardening.
 
 ## NPC Goal Tick V1 — Completed
 - Final reviewed head `6c115e661ed7257b3787b74d5f142a1c0b39e38d` merged as `8c5ca35a463356f375a4171148268a08abf0c83a`; targeted Preview acceptance and all exact-head gates passed.
@@ -343,11 +344,11 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
 
 ## NEXT ACTION
-1. Finish the Bounded Off-screen Progression V1 diff on `codex/bounded-offscreen-progression-v1` and run the authoritative clean-LF full repository check.
-2. Perform the required second regression/scope review, commit, push, and open one focused protected-path PR.
-3. Require exact-current-HEAD Safety/Vercel and a fresh P0/P1=0 Codex review; revalidate current main, merge-base, and no conflict.
-4. On the exact Preview, exercise one eligible other-department schedule crossing plus disabled-background, PC-schedule, and current-scene/model-update protection as applicable.
-5. Keep the PR human-merge only. Do not expand this phase into goal progress, relationships, factions, rumors, arbitrary event completion, or a second model call.
+1. Push the current exact Bounded Off-screen Progression V1 checkpoint and open one focused protected-path PR.
+2. Require exact-current-HEAD Safety/Vercel and a fresh P0/P1=0 Codex review; revalidate current main, merge-base, and no conflict.
+3. On the exact Preview, exercise one eligible other-department schedule crossing plus disabled-background and PC-schedule protection. Current-scene/model-update guards remain deterministic regressions unless a reliable visible fixture can isolate them.
+4. Keep the exact reviewed/accepted head immutable and the PR human-merge only.
+5. Do not expand this phase into goal progress, relationships, factions, rumors, arbitrary event completion, or a second model call.
 
 ## Stop Record
 - Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.
