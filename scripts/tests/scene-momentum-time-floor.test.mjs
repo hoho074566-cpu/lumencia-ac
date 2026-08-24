@@ -2,6 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { scheduledIdsDueByTurnEnd } from '../../lib/event-progress.js';
 import { buildSceneMomentumDirective, nextScheduleBoundaryMinutes } from '../../lib/scene-momentum.js';
 
 const source=readFileSync('api/chat-router.js','utf8');
@@ -9,11 +10,11 @@ const start=source.indexOf('function bounded(');
 const end=source.indexOf('function uniqText(');
 assert.ok(start>=0&&end>start,'Scene Momentum time-floor source markers missing');
 const timeFloorSource=source.slice(start,end);
-const makeHelpers=new Function('array','object','classifySceneIntent','nextScheduleBoundaryMinutes',`${timeFloorSource}\nreturn {applySceneMomentumTimeFloor};`);
+const makeHelpers=new Function('array','object','classifySceneIntent','nextScheduleBoundaryMinutes','scheduledIdsDueByTurnEnd',`${timeFloorSource}\nreturn {applySceneMomentumTimeFloor};`);
 const array=(value)=>Array.isArray(value)?value:[];
 const object=(value)=>value&&typeof value==='object'&&!Array.isArray(value)?value:{};
 const classifySceneIntent=(action)=>({kind:'downtime',compression:true,minAdvanceMinutes:String(action).includes('48시간')?2880:String(action).includes('6시간')?360:String(action).includes('두 시간')?120:30});
-const {applySceneMomentumTimeFloor}=makeHelpers(array,object,classifySceneIntent,nextScheduleBoundaryMinutes);
+const {applySceneMomentumTimeFloor}=makeHelpers(array,object,classifySceneIntent,nextScheduleBoundaryMinutes,scheduledIdsDueByTurnEnd);
 
 const boundarySave={world:{date:'1285-03-01',time:'09:50'},scheduleContext:{due:[],upcoming:[{id:'class',date:'1285-03-01',time:'10:00'}]}};
 assert.equal(nextScheduleBoundaryMinutes(boundarySave),10,'next schedule boundary should be ten minutes away');
@@ -27,6 +28,14 @@ assert.equal(turn.state_delta.advance_minutes,10,'forced downtime floor must sto
 turn={state_delta:{advance_minutes:0},choices:[]};
 applySceneMomentumTimeFloor({action:'두 시간 쉰다.',saveState:boundarySave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'native-Korean long rest must stop at the next authoritative schedule boundary');
+
+const boundaryChoiceSave={...boundarySave,scheduledEvents:[{id:'class',date:'1285-03-01',time:'10:00',status:'scheduled'}]};
+turn={state_delta:{advance_minutes:0},choices:['수업에 간다','남는다','다른 일을 한다'],event_progress:{event_instance_id:'class'}};
+applySceneMomentumTimeFloor({action:'두 시간 쉰다.',saveState:boundaryChoiceSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,10,'a structured schedule-boundary choice must advance the clock to that boundary');
+turn={state_delta:{advance_minutes:0},choices:['대응한다','피한다','지켜본다'],event_progress:{event_instance_id:'director:interruption'}};
+applySceneMomentumTimeFloor({action:'두 시간 쉰다.',saveState:boundaryChoiceSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,0,'an unrelated meaningful interruption must remain at its model-produced moment');
 
 const fullScheduleSave={world:{date:'1285-03-01',time:'07:00'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[{id:'noon-class',date:'1285-03-01',time:'12:00',status:'scheduled'}]};
 assert.equal(nextScheduleBoundaryMinutes(fullScheduleSave),300,'full authoritative schedule must expose events beyond the four-hour upcoming window');

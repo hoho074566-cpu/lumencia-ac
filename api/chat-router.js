@@ -156,11 +156,14 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game'){
   const intent=classifySceneIntent(incoming?.action||'',{location:incoming?.saveState?.world?.location||''});
   if(mode!=='game'||!turn?.state_delta||!intent.compression||intent.minAdvanceMinutes<=0)return intent;
   const hasMeaningfulStop=array(turn?.choices).length>0;
-  if(!hasMeaningfulStop){
-    const current=Math.max(0,Number(turn.state_delta.advance_minutes||0));
-    const requestedFloor=Math.min(1440,Math.max(0,Number(intent.minAdvanceMinutes||0)));
-    const boundary=nextScheduleBoundaryMinutes(incoming?.saveState||{});
-    const boundedFloor=boundary==null?requestedFloor:Math.min(requestedFloor,Math.max(0,boundary));
+  const current=Math.max(0,Number(turn.state_delta.advance_minutes||0));
+  const requestedFloor=Math.min(1440,Math.max(0,Number(intent.minAdvanceMinutes||0)));
+  const boundary=nextScheduleBoundaryMinutes(incoming?.saveState||{});
+  const boundedFloor=boundary==null?requestedFloor:Math.min(requestedFloor,Math.max(0,boundary));
+  const eventId=String(turn?.event_progress?.event_instance_id||turn?.event_progress?.eventInstanceId||'').trim().toLowerCase();
+  const scheduledBoundaryIds=new Set(boundary==null?[]:scheduledIdsDueByTurnEnd(incoming?.saveState||{},boundedFloor).map(value=>String(value).trim().toLowerCase()));
+  const reachedScheduledBoundary=Boolean(eventId&&boundary!=null&&boundary<=requestedFloor&&scheduledBoundaryIds.has(eventId));
+  if(!hasMeaningfulStop||reachedScheduledBoundary){
     turn.state_delta.advance_minutes=Math.max(current,boundedFloor);
   }
   return intent;

@@ -198,7 +198,10 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Focused branch fix moves the already-proven schedule-boundary calculation into shared Scene Momentum code and reserves `SCHEDULE_BOUNDARY=10min` plus an explicit rule: stop at the schedule start, do not execute the remaining downtime, and do not auto-decide absence/completion.
 - Existing positive model-produced time is still not silently reduced post-response, avoiding prose/state divergence. The fix changes model authority before the single canonical call and adds no call.
 - Permanent tests prove the exact boundary directive, its priority over explicit duration, authoritative schedule-tail retention, full-schedule/next-day/overdue behavior, and all existing time-floor invariants.
-- Focused tests and full local `node scripts/lumensia-pr-check.mjs`: **PASS**.
+- Initial exact Preview head `a7a1a5fba44ed29872cde0dd655e129b81262685`: Safety #277 PASS and Vercel Ready.
+- Its live 11:50 case correctly stopped before executing 120 minutes or deciding nonattendance, surfaced the orientation, and offered attend/stay/other choices. However, the header/runtime clock remained 11:50 while prose said noon: a structured boundary choice caused the existing meaningful-choice guard to skip the local 10-minute floor.
+- Local follow-up applies the bounded floor only when `event_progress.event_instance_id` exactly matches an authoritative schedule occurrence due at that boundary. An unrelated early NPC/Director interruption with choices remains at the model-produced moment.
+- Focused tests cover both branches and pass. Full `node scripts/lumensia-pr-check.mjs` and `git diff --check`: **PASS**.
 
 ## Permanent HF1 Test Suites
 - `scripts/tests/context-router-authority-tail.test.mjs`
@@ -229,8 +232,8 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
 
 ## NEXT ACTION
-1. Commit/publish `codex/live-schedule-boundary-hf2`, open its protected-core PR, and wait for exact-head Safety + Vercel.
-2. Rerun the failing pre-schedule long-rest case and then the full 12-case acceptance against that exact Preview.
+1. Commit/publish the structured-boundary clock follow-up on PR #35 and wait for new exact-head Safety + Vercel.
+2. Rerun the failing pre-schedule long-rest case and then the full 12-case acceptance against the new exact Preview.
 3. Obtain a fresh exact-current-HEAD/current-main Codex review. Direct P0/P1 must be zero; P2/P3 remain non-blocking unless newly reproduced.
 4. Re-fetch main/PR and verify behind=0, base commit=merge-base=current main, open/non-draft/mergeable, clean/synced, Safety/Vercel PASS; then stop at the protected-core manual merge gate.
 5. After human merge, rerun production acceptance and implement **Scene Purpose** with bounded purpose state and no automatic player choice, followed by Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence chaining/lifetime.
@@ -243,7 +246,8 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed in exact Preview sequential live play: all 12 requested behavior classes, including question sovereignty, reload-safe CONTINUE UI, narrative hard freeze, completed-event no-replay, and NPC-first follow-up.
 - Completed: PR #34 exact-head gates and expected-head merge; merge-tree verification; merged-main full regression; production Vercel and `/api/health` smoke.
 - Completed post-merge evidence: 11/12 production live cases green and the remaining schedule-boundary sovereignty failure reproduced exactly.
-- Completed locally on HF2 branch: shared exact schedule boundary in the reserved model directive, focused regressions, full PR check.
-- Unfinished: publish HF2, exact Preview live rerun, hosted gates/fresh review, protected manual merge, Scene Purpose and later phases.
-- Blocker: production currently permits a long rest to auto-cross a near mandatory schedule; the local fix is green but not yet hosted/merged.
-- NEXT ACTION: publish HF2, validate exact Preview, obtain Safety/Vercel + fresh direct P0/P1=0, and stop at its protected manual-merge readiness checkpoint.
+- Completed on initial HF2 exact Preview: Safety #277/Vercel PASS; 120-minute skip/nonattendance choice fixed, but live evidence exposed a 0-minute clock/prose mismatch at the schedule boundary.
+- Completed locally: schedule-identity-gated 10-minute floor for structured boundary choices; unrelated interruptions remain unforced; focused tests PASS.
+- Unfinished: revised exact-head publish/live rerun, hosted gates/fresh review, protected manual merge, Scene Purpose and later phases.
+- Blocker: current PR #35 exact head does not yet include the clock-consistency follow-up.
+- NEXT ACTION: full test -> commit/publish -> exact Preview case/full 12 -> fresh review -> protected manual-merge gate.
