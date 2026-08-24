@@ -161,6 +161,20 @@ const stalledQuestion = route('지금 몇 시야?', {
 });
 assert.notEqual(stalledQuestion.telemetry.event_director_v2.result, 'PRESENT_NPC_GOAL_PRIORITY', 'question sovereignty must suppress present-goal stall recovery');
 assert.match(stalledQuestion.params.input, /INTENT=decision-sensitive/, 'the stalled-question fixture must use the authoritative decision-sensitive classification');
+for (const [action, intent] of [
+  ['도서관에 간다.', 'travel'],
+  ['게시판을 확인한다.', 'observe'],
+  ['계약에 서명한다.', 'committed-consequence'],
+]) {
+  const committedAction = route(action, {
+    sceneRuntime: { participants:['p1'], momentum:{ stall_streak:2, pressure:'required', recent_deltas:[] } },
+    npcInnerStates: {
+      p1: { active_goal:{ desire:'PC의 실력을 직접 확인한다.', priority:5, urgency:4, progress:30, state:'active', target_type:'pc', target_key:'pc' } },
+    },
+  });
+  assert.notEqual(committedAction.telemetry.event_director_v2.result, 'PRESENT_NPC_GOAL_PRIORITY', `${intent} must remain ahead of present-goal stall recovery`);
+  assert.match(committedAction.params.input, new RegExp(`INTENT=${intent}`), `${action} must retain its authoritative ${intent} classification`);
+}
 const scheduledPresentGoal = routeOpenAIParams(
   { instructions, input:directorInput.replace('INTERVENTION: medium', 'INTERVENTION: scheduled') },
   { incoming:{ action:'10분 기다린다.', saveState:{ id:'scheduled-present-goal', turnNumber:8, world:{ date:'1285-03-01', time:'10:00', location:'academy' }, sceneRuntime:{ participants:['p1'], momentum:{ stall_streak:2 } }, npcInnerStates:{ p1:{ active_goal:{ desire:'PC의 실력을 직접 확인한다.', priority:5, urgency:4, progress:30, state:'active', target_type:'pc', target_key:'pc' } } } }, recentTurns:[] }, mode:'game' },

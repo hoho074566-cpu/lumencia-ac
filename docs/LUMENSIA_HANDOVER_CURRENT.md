@@ -39,7 +39,9 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - `npc-initiative` exposed a real orchestration issue: Isabel was already present with a PC-targeted active goal and stall pressure, but a new Chloe Director cameo displaced her initiative.
 - The local fixed-flow closure emits `PRESENT_NPC_GOAL_PRIORITY` when a present NPC has an already-feasible PC/present-NPC goal under momentum pressure. It forbids a new random cameo, lets that NPC act first when physically/canonically possible, and still forbids deciding the PC's action, speech, emotion, or important choice.
 - PR #36 initial exact HEAD `6ee2fb74d207ee20e9880fbdcd0c7fc3af87f981` passed Safety #287 and Vercel Ready. Fresh review found one P1: `decision-sensitive` questions under stall pressure could still be displaced by unrelated present-NPC initiative. Its separate P2 is policy-nonblocking and remains out of scope.
-- The current P1 closure shares Scene Momentum's authoritative `classifySceneIntent` result and suppresses present-goal initiative for `decision-sensitive` input. Ordinary wait initiative and fixed schedule priority remain intact in permanent tests.
+- Published exact HEAD `8e83c4a298d92d9846aceda4132e21d5d6d01896` shares Scene Momentum's authoritative `classifySceneIntent` result and suppresses present-goal initiative for `decision-sensitive` input. Safety #288 and Vercel Ready passed.
+- Fresh exact-head review `5004348673` found one follow-up P1: committed travel, observation, and consequential actions still qualified for present-NPC stall recovery and could be preempted by an unrelated NPC action.
+- The current local closure limits `PRESENT_NPC_GOAL_PRIORITY` to passive `wait` / `downtime` intents. Waiting still triggers NPC initiative, while permanent question/travel/observe/contract-signing regressions preserve the player's committed action. Nine focused suites and the full PR check pass.
 - Exact Preview live rerun remains blocked only by deployment protection plus the unavailable signed-in cloud-browser tab connection. No token extraction/protection bypass is attempted; PR #36 is not merge-ready and Scene Purpose has not started.
 
 ### Historical HF2 diagnosis and closure
@@ -573,14 +575,14 @@ Gameplay roadmap discussed but not DONE:
 # 12. NEXT ACTION — NEW CHAT STARTS HERE
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
-2. Confirm main still contains merge commit `88fa53036c58324ffd5012ab7b5ed0cd3099dd6d`; do **not** redo completed HF1 or PR #34 diagnosis.
-3. Publish the fresh-review CONTINUE UI P1 closure and rerun its focused/full tests plus exact-head hosted checks.
-4. Require fresh exact-current-HEAD/current-main direct P0/P1=0 plus Safety/Vercel PASS.
-5. Immediately re-fetch all merge gates and merge only with the unchanged full `expected_head_sha`; any changed condition forbids the merge.
-6. After merge, rerun production acceptance and proceed to **Scene Purpose -> Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence**.
+2. Confirm main still contains PR #35 merge commit `6a717e5fb612a75d70334eb5b40a461ead36587d`; do **not** redo completed HF1/HF2 diagnosis.
+3. Commit and publish the passive-intent-only fresh-review P1 closure on PR #36; focused and full local tests already pass.
+4. Require new exact-current-HEAD/current-main direct P0/P1=0 plus Safety/Vercel PASS.
+5. When the signed-in cloud-browser connection becomes available, rerun exact Preview door/location and NPC-initiative cases, then all 12 cases. Do not bypass deployment protection.
+6. Do not merge PR #36 without separate exact-merge authorization. After exact Preview acceptance and a later authorized merge, proceed to **Scene Purpose -> Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence**.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #35의 schedule/CONTINUE/short-action P1들은 human-authorized remediation으로 닫았고, exact HEAD fc94fa55 리뷰가 발견한 false CONTINUE beat advertisement P1도 hidden queue 비소비 + generic static-continuation UI로 닫았다. 새 exact head를 게시한 뒤 Safety/Vercel -> fresh direct P0/P1=0 -> immediate exact merge gates 순서로 검증한다. 전부 PASS일 때만 unchanged expected_head_sha로 guarded merge하고, post-merge production acceptance 뒤 Scene Purpose -> Scene Exit -> Turn Hook -> Event Consequence로 계속한다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #35는 exact merge/post-merge 검증까지 끝났고, PR #36의 현재 로컬 작업은 fresh review 5004348673의 committed-action priority P1을 passive wait/downtime-only initiative로 닫은 상태다. 새 exact head를 게시한 뒤 Safety/Vercel -> fresh direct P0/P1=0을 확인하고, signed-in browser가 가능할 때 exact Preview 12-case acceptance를 끝낸다. PR #36은 별도 exact-merge 승인 없이 병합하지 말고, acceptance/authorized merge 뒤 Scene Purpose -> Scene Exit -> Turn Hook -> Event Consequence로 계속한다.`
