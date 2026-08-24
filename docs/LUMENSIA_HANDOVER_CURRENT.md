@@ -14,7 +14,7 @@ Repository: `hoho074566-cpu/lumencia-ac`
 
 ## Live state immediately before this handover update
 - Branch: `codex/scene-purpose-v1`
-- PR #37: **open**. Published HEAD `a433d3ad37a6a830ab199088157aa733c71ade91` has Safety/Vercel and focused signed-in Exact Preview generic-action refresh evidence, but fresh exact-head review found that the AUTO no-PC-action sentinel could be misclassified as `player-action`.
+- PR #37: **open**. Exact head `906bd3de96bf7e49c8af8f31fa19dff4771b3e27` has Safety/Vercel and focused signed-in AUTO Preview acceptance. Fresh review then found that the saved focus could steer the current model call before post-response refresh. Current code candidate `c7e0a8b896790c015891dd44f864e9a47026249b` makes current committed action authoritative; the final docs checkpoint is the branch HEAD containing this record.
 - Base/current main: `1faadd105cf7b7780544abb5ca5276af04198796`
 - PR #36: **merged** after exact Preview acceptance; reviewed code HEAD `c7881f4c31758d0350833f31c37d116f3ff4c18d`, exact docs checkpoint/merge parent `c347744858300359ab8d6da204cb5d9277d366be`.
 - PR #36 exact-head gates: Safety #290 PASS, Vercel Ready, fresh exact-head Codex P0/P1=0. Door/location and NPC-initiative reruns passed first, followed by the full isolated 12-case acceptance at 12/12 PASS.
@@ -43,8 +43,8 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - The persisted object is allowlisted and length-bounded; choices themselves are not persisted as an automatic player action.
 - The reserved model directive treats purpose focus as data and explicitly forbids creating PC action, dialogue, emotion, thought, acceptance, rejection, or choice.
 - CONTINUE preserves the existing purpose object and receives a purpose-specific freeze. META is untouched.
-- The current local closure uses nonempty player action evidence instead of the narrow intent classifier for same-scene refresh and explicitly treats `[AUTO FLOW: PC 새 행동 없음]` as no player action. Empty descriptive churn, AUTO, and decision-sensitive questions retain purpose; active-event authority, explicit decisions, NPC interaction precedence, and CONTINUE freeze are unchanged.
-- The user authorized a new remediation cycle for this follow-up. Local focused validation, full clean-LF repository check, second review, commit/push, fresh exact-head hosted authority, affected AUTO Preview rerun, and guarded merge remain.
+- The current candidate uses nonempty player action evidence for same-scene refresh, treats `[AUTO FLOW: PC 새 행동 없음]` as no player action, and emits `PURPOSE_MODE=current-action-first` before committed actions so prior focus is compatible context only and cannot redirect them.
+- Empty descriptive churn, AUTO, and decision-sensitive questions retain continuity; active-event authority, explicit decisions, NPC interaction precedence, and CONTINUE freeze are unchanged. Focused regressions pass. Full clean-LF check, final docs checkpoint commit/push, fresh exact-head hosted authority, affected current-action Preview rerun, and guarded merge remain.
 
 ### Historical PR #36 diagnosis and closure
 - The PR #35 post-merge production 12-case run is **10 PASS / 2 FAIL**. Schedule boundary, question sovereignty, CONTINUE hard freeze, and completed-event forward progression all pass.
@@ -590,12 +590,12 @@ Gameplay roadmap discussed but not DONE:
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
 2. Confirm main contains PR #36 merge commit `1faadd105cf7b7780544abb5ca5276af04198796`; do **not** redo completed HF1/HF2/HF3 diagnosis or the 12-case acceptance.
-3. Continue only the focused PR #37 AUTO sentinel purpose closure: run the full check and second regression/scope review, and keep Scene Exit/Turn Hook/Event Consequence out of this change.
-4. Commit/push the closure, then require hosted Safety/Vercel plus fresh exact-current-HEAD P0/P1 authority and rerun the affected AUTO Exact Preview case.
+3. Continue only code candidate `c7e0a8b...` plus this focused PR #37 docs checkpoint: run the full check and final regression/scope review, and keep Scene Exit/Turn Hook/Event Consequence out of this change.
+4. Commit/push the docs checkpoint, then require hosted Safety/Vercel plus fresh exact-current-HEAD P0/P1 authority and rerun the affected current-action-priority Exact Preview case.
 5. The user has explicitly authorized merge when no special issue remains. Revalidate the exact head/base/mergeability immediately before merge, then verify the merge tree and production health.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #36은 Exact Preview 12/12 acceptance와 exact-head gates 후 merge commit 1faadd1로 병합되었고 production health도 정상이다. PR #37의 published head a433d3a는 Safety/Vercel과 generic-action focused Exact Preview evidence가 있지만, fresh exact-head review가 AUTO no-PC-action sentinel의 player-action 오인을 지적했다. 사용자가 새 remediation cycle을 승인했고, 현재 브랜치 codex/scene-purpose-v1에는 exact AUTO sentinel을 empty action으로 처리하는 focused local closure와 regression이 있다. full check/2차 회귀 리뷰 -> commit/push -> hosted Safety/Vercel/fresh exact-head P0/P1 -> affected AUTO Preview rerun 순서로 진행하고, 이상이 없으면 사용자의 명시적 권한으로 exact-head merge한다. Scene Exit/Turn Hook/Event Consequence는 이 PR에 섞지 않는다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #36은 Exact Preview 12/12 acceptance와 exact-head gates 후 merge commit 1faadd1로 병합되었고 production health도 정상이다. PR #37 exact head 906bd3d는 Safety/Vercel과 AUTO focused Exact Preview를 통과했지만, fresh review가 saved focus의 pre-response current-action priority P1과 stale docs를 지적했다. 현재 code candidate c7e0a8b는 committed USER ACTION을 saved PURPOSE_FOCUS보다 우선시키고 direct/authority-tail regressions를 추가했다. 이 문서를 포함한 final docs checkpoint를 full check/final review -> commit/push -> hosted Safety/Vercel/fresh exact-head P0/P1 -> affected current-action Preview rerun 순서로 검증하고, 이상이 없으면 사용자의 명시적 권한으로 exact-head merge한다. Scene Exit/Turn Hook/Event Consequence는 이 PR에 섞지 않는다.`
