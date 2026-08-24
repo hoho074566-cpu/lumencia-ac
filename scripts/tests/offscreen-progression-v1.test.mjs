@@ -43,6 +43,16 @@ assert.equal(deriveBoundedOffscreenProgression({ saveState: save(), turn: turn(2
 const longSkip = deriveBoundedOffscreenProgression({ saveState: save(), turn: turn(180) });
 assert.equal(longSkip.telemetry.digest_count, 1, 'a crossed public start remains historical background evidence');
 assert.equal(longSkip.telemetry.applied_count, 0, 'an old start must not pretend the NPC is still at the event');
+const laterStart = save({
+  world: { date: '1285-03-01', time: '08:00', location: '기사과 훈련장' },
+  scheduledEvents: [
+    event({ id: 'old-study', time: '09:00', title: '마법과 오전 연구회' }),
+    event({ id: 'current-study', time: '11:30', title: '마법과 정오 연구회' }),
+  ],
+});
+const latestWins = deriveBoundedOffscreenProgression({ saveState: laterStart, turn: turn(240) });
+assert.equal(latestWins.telemetry.applied_count, 1, 'a recent start must not be masked by an older digest-only start for the same NPC');
+assert.equal(latestWins.npc_state_updates[0].source_event_id, 'current-study');
 const midnight = save({ world: { date: '1285-03-01', time: '23:50', location: '기숙사' }, scheduledEvents: [event({ id: 'night-study', title: '마법과 야간 연구회', date: '1285-03-02', time: '00:10', location: '마법과 연구실' })] });
 const midnightTick = deriveBoundedOffscreenProgression({ saveState: midnight, turn: turn(30) });
 assert.equal(midnightTick.telemetry.end_at, '1285-03-02 00:20');
@@ -57,6 +67,22 @@ const deduped = deriveBoundedOffscreenProgression({ saveState: duplicateRows, tu
 assert.equal(deduped.telemetry.applied_count, 1, 'duplicate participants and duplicate event IDs must not double-apply one transition');
 const unsafeKey = save({ npcStates: { constructor: { location: '기숙사' } }, scheduledEvents: [event({ participants: ['constructor'] })] });
 assert.equal(deriveBoundedOffscreenProgression({ saveState: unsafeKey, turn: turn() }).telemetry.reason, 'no-eligible-transition', 'unsafe object keys must never reach runtime persistence');
+const invalidDate = save({
+  world: { date: '1285-03-03', time: '11:50', location: '기사과 훈련장' },
+  scheduledEvents: [event({ date: '1285-02-31' })],
+});
+assert.equal(deriveBoundedOffscreenProgression({ saveState: invalidDate, turn: turn() }).telemetry.reason, 'no-eligible-transition', 'calendar-invalid dates must not normalize into another day');
+const restricted = save({ scheduledEvents: [event({ visibility: 'restricted' })] });
+assert.equal(deriveBoundedOffscreenProgression({ saveState: restricted, turn: turn() }).telemetry.reason, 'no-eligible-transition', 'explicitly restricted schedules must not fall through the academic public default');
+const mixedVisibility = save({ scheduledEvents: [event({ visibility: 'public', access: 'invite-only' })] });
+assert.equal(deriveBoundedOffscreenProgression({ saveState: mixedVisibility, turn: turn() }).telemetry.reason, 'no-eligible-transition', 'every explicit visibility field must be public');
+const crowdedKeys = Array.from({ length: 9 }, (_, index) => `crowd-${index + 1}`);
+const crowdedSave = save({
+  npcStates: Object.fromEntries(crowdedKeys.map(key => [key, { location: '기사과 훈련장' }])),
+  scheduledEvents: [event({ participants: ['crowd-9'] })],
+});
+const crowdedTurn = { ...turn(), scene: crowdedKeys.map(key => ({ kind: 'dialogue', speaker_key: key, text: '현재 장면 대사' })) };
+assert.equal(deriveBoundedOffscreenProgression({ saveState: crowdedSave, turn: crowdedTurn, participants: crowdedKeys.slice(0, 8) }).telemetry.reason, 'no-eligible-transition', 'every visible turn speaker must be protected beyond the bounded runtime participant list');
 
 assert.match(appendOffscreenDigest('old background', started), /^old background\n\[OFFSCREEN/);
 assert.ok(appendOffscreenDigest('x'.repeat(2200), started).length <= 1800, 'background digest remains bounded');
