@@ -1,0 +1,126 @@
+#!/usr/bin/env node
+
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { routeOpenAIParams } from '../../api/lib/context-router.js';
+import {
+  compactFactionSocialForContext,
+  deriveFactionSocialState,
+  FACTION_KEYS,
+  factionReputationChangeIsReal,
+  normalizeFactionSocial,
+} from '../../lib/faction-social-consequence.js';
+import { deriveSceneDelta } from '../../lib/scene-momentum.js';
+
+const chat=readFileSync('api/chat.js','utf8');
+const router=readFileSync('api/chat-router.js','utf8');
+const runtime=readFileSync('app-runtime.js','utf8');
+const health=readFileSync('api/health.js','utf8');
+
+assert.match(chat,/const FactionReputationChange = z\.object\(/,'canonical schema must define faction reputation changes');
+assert.match(chat,/faction_reputation_changes: z\.array\(FactionReputationChange\)\.max\(4\)/,'canonical state delta must bound faction reputation changes');
+assert.match(chat,/공개 사건·공식 기록·등록 NPC의 실제 목격·출처 있는 소문/,'canonical prompt must require social evidence');
+assert.match(chat,/집단 평판은 개인 NPC 관계나 NPC 간 관계를 자동 변경하지 않는다/,'faction reputation must stay separate from personal relationships');
+assert.match(router,/faction_reputation_changes:\[\]/,'CONTINUE freeze must clear faction reputation changes');
+assert.match(router,/deriveFactionSocialState\(\{/,'stable router must derive bounded faction state from accepted changes');
+assert.match(runtime,/faction_reputation_changes: \[\]/,'client-side frozen delta must clear faction reputation changes');
+assert.match(runtime,/save\.sceneRuntime = \{ \.\.\.\(save\.sceneRuntime \|\| \{\}\), \.\.\.runtime\.scene_runtime \}/,'client runtime must persist server-derived faction state through the existing scene runtime merge');
+assert.match(health,/factionSocialConsequence:/,'health response must advertise Faction Social Consequence V1');
+assert.equal((router.match(/coreHandler\(/g)||[]).length,1,'Faction Social Consequence V1 must preserve one canonical core call site');
+
+const registered=['anastasia','lucia','elise','artemis'];
+const first=deriveFactionSocialState({
+  previous:{},turnNumber:5,sourceEvent:'public_duel',registeredNpcKeys:registered,
+  changes:[
+    {faction_key:'student_council',reputation_delta:4,stance:'관심',evidence_type:'witnessed_action',observer_npc_keys:['anastasia'],reason:'아나스타샤가 공식 대련의 규칙 준수를 직접 목격했다.'},
+    {faction_key:'white_rose',reputation_delta:-3,stance:'경계',evidence_type:'credible_rumor',observer_npc_keys:['lucia'],reason:'루시아에게 출처가 확인된 결투 소문이 전달됐다.'},
+  ],
+});
+assert.equal(first.reputations.student_council.reputation,4,'witnessed public behavior must update the addressed faction only');
+assert.equal(first.reputations.student_council.stance,'관심','explicit faction stance must persist');
+assert.deepEqual(first.reputations.student_council.history[0].observer_npc_keys,['anastasia'],'registered observers must remain bounded causal evidence');
+assert.equal(first.reputations.white_rose.reputation,-3,'different factions may interpret the same public event with different polarity');
+
+const privateRejected=deriveFactionSocialState({
+  previous:first,turnNumber:6,registeredNpcKeys:registered,
+  changes:[{faction_key:'student_council',reputation_delta:8,stance:'호의',evidence_type:'witnessed_action',observer_npc_keys:[],reason:'아무도 보지 않은 사적 행동'}],
+});
+assert.deepEqual(privateRejected,first,'unwitnessed private behavior must not propagate to a faction');
+
+const badRumorRejected=deriveFactionSocialState({
+  previous:first,turnNumber:6,registeredNpcKeys:registered,
+  changes:[{faction_key:'white_rose',reputation_delta:5,stance:null,evidence_type:'credible_rumor',observer_npc_keys:['unknown'],reason:'등록되지 않은 전달자'}],
+});
+assert.deepEqual(badRumorRejected,first,'a rumor without a registered receiving witness must not change faction reputation');
+
+const official=deriveFactionSocialState({
+  previous:first,turnNumber:6,sourceEvent:'discipline_record',registeredNpcKeys:registered,
+  changes:[{faction_key:'blue_knights',reputation_delta:-6,stance:'감시',evidence_type:'official_record',observer_npc_keys:[],reason:'공식 징계 기록이 접수됐다.'}],
+});
+assert.equal(official.reputations.blue_knights.reputation,-6,'an authoritative official record may update a faction without a named witness');
+
+let bounded={version:'1.0',reputations:{student_council:{reputation:99,stance:'호의',updated_turn:1,history:Array.from({length:8},(_,index)=>({turn:index+1,reputation_delta:1,stance:null,evidence_type:'public_event',observer_npc_keys:[],reason:`old-${index+1}`}))}}};
+bounded=deriveFactionSocialState({previous:bounded,turnNumber:10,changes:[{faction_key:'student_council',reputation_delta:10,stance:'우호',evidence_type:'public_event',observer_npc_keys:[],reason:'공개 표창'}]});
+assert.equal(bounded.reputations.student_council.reputation,100,'faction reputation must clamp at 100');
+assert.equal(bounded.reputations.student_council.history.length,8,'faction causal history must stay bounded');
+assert.equal(bounded.reputations.student_council.history.at(-1).reason,'공개 표창','latest bounded history must retain the new cause');
+
+const noOp=deriveFactionSocialState({previous:bounded,turnNumber:11,changes:[{faction_key:'student_council',reputation_delta:0,stance:'우호',evidence_type:'public_event',observer_npc_keys:[],reason:'동일 상태 재출력'}]});
+assert.deepEqual(noOp,bounded,'same-stance zero-delta rows must not append false social history');
+const invalid=deriveFactionSocialState({previous:bounded,turnNumber:11,changes:[{faction_key:'invented_faction',reputation_delta:10,stance:'우호',evidence_type:'public_event',observer_npc_keys:[],reason:'미등록 조직'}]});
+assert.deepEqual(invalid,bounded,'unregistered factions must be rejected');
+assert.ok(Object.keys(normalizeFactionSocial({reputations:Object.fromEntries([...FACTION_KEYS,'invented'].map((key,index)=>[key,{reputation:index,updated_turn:index}]))}).reputations).length<=8,'stored faction rows must remain bounded');
+
+const compact=compactFactionSocialForContext({reputations:{
+  student_council:{reputation:5,stance:'관심',updated_turn:50,history:Array.from({length:5},(_,index)=>({turn:index,reason:`council-${index}`,evidence_type:'public_event'}))},
+  white_rose:{reputation:-2,stance:'경계',updated_turn:2,history:Array.from({length:4},(_,index)=>({turn:index,reason:`rose-${index}`,evidence_type:'public_event'}))},
+  blue_knights:{reputation:1,stance:'중립',updated_turn:40,history:[]},
+  knight_department:{reputation:1,stance:'중립',updated_turn:30,history:[]},
+}},{text:'백장미회가 나를 어떻게 보는지 확인한다.',maxFactions:3,historyLimit:2});
+assert.ok(compact.reputations.white_rose,'an explicitly relevant faction must survive context selection even when older');
+assert.equal(Object.keys(compact.reputations).length,3,'routed faction context must stay bounded');
+assert.equal(compact.reputations.white_rose.history.length,2,'routed faction history must keep only the latest causal rows');
+
+const saveState={sceneRuntime:{faction_social:first},relationships:{anastasia:{affinity:7}},npcInnerStates:{lucia:{npc_relationships:{elise:{affinity:9}}}}};
+const personalBefore=JSON.stringify({relationships:saveState.relationships,npcInnerStates:saveState.npcInnerStates});
+deriveFactionSocialState({previous:saveState.sceneRuntime.faction_social,turnNumber:7,changes:[{faction_key:'student_council',reputation_delta:1,stance:null,evidence_type:'public_event',observer_npc_keys:[],reason:'공개 행사'}]});
+assert.equal(JSON.stringify({relationships:saveState.relationships,npcInnerStates:saveState.npcInnerStates}),personalBefore,'faction updates must not mutate PC/NPC or NPC/NPC relationships');
+
+assert.equal(factionReputationChangeIsReal(saveState,{faction_key:'student_council',reputation_delta:0,stance:'관심',evidence_type:'public_event',observer_npc_keys:[],reason:'같은 태도'}),false,'same faction stance must not fake a Scene Delta');
+const factionDelta=deriveSceneDelta({saveState,turn:{choices:[],scene:[],state_delta:{faction_reputation_changes:[{faction_key:'student_council',reputation_delta:1,stance:null,evidence_type:'public_event',observer_npc_keys:[],reason:'공개 행사'}]}}});
+assert.equal(factionDelta.flags.relationshipChanged,true,'a real faction reputation mutation must count on the social relationship axis');
+assert.equal(factionDelta.structuralScore,1,'one faction reputation mutation must count exactly once');
+
+const divider='='.repeat(20);
+const instructions=`===== CHARACTER REGISTRY =====
+anastasia=아나스타샤, lucia=루시아, elise=엘리제
+===== WORLD CANON =====
+${divider}
+PUBLIC ACADEMY
+${divider}
+Public facts.
+===== NPC CANON =====
+${divider}
+루시아
+${divider}
+루시아 canon.
+===== NPC SPEECH =====
+${divider}
+루시아
+${divider}
+Brief.
+===== OPTIONAL ADULT / INTIMACY SPEECH LAYER =====
+None.
+===== PC SYSTEM =====
+${divider}
+PC ACTION RULES
+${divider}
+Resolve actions.`;
+const routed=routeOpenAIParams(
+  {instructions,input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}'},
+  {incoming:{action:'백장미회가 나를 어떻게 보는지 루시아에게 묻는다.',saveState:{turnNumber:10,world:{location:'academy'},sceneRuntime:{participants:['lucia'],faction_social:{reputations:{student_council:{reputation:9,stance:'관심',updated_turn:99,history:[]},white_rose:{reputation:-2,stance:'경계',updated_turn:2,history:[{turn:2,reputation_delta:-2,evidence_type:'credible_rumor',observer_npc_keys:['lucia'],reason:'전달된 소문'}]},blue_knights:{reputation:3,stance:'중립',updated_turn:80,history:[]},knight_department:{reputation:2,stance:'중립',updated_turn:70,history:[]}}}},npcInnerStates:{}},recentTurns:[]},mode:'game'},
+);
+assert.match(routed.params.input,/"white_rose":\{"reputation":-2,"stance":"경계"/,'relevant faction reputation must reach authoritative routed context');
+assert.match(routed.params.instructions,/사적 행동\/단순 동석으로 바꾸거나 개인 관계와 자동 연동하지 않는다/,'routed prompt must preserve evidence and personal-relation boundaries');
+
+console.log('PASS Faction / Social Consequence V1 schema, evidence, bounds, routing, freeze, and momentum regressions');
