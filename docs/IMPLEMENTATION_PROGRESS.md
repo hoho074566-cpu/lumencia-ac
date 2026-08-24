@@ -207,7 +207,7 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Focused tests, full `node scripts/lumensia-pr-check.mjs`, and `git diff --check`: **PASS**.
 - Exact Preview `d898734cc190c2115078d8191f273215f99ced46` passed the corrected 11:50 case with a coherent 12:00 world clock, unchanged room location, active/non-completed `knight_orientation`, and preserved attend/stay/other choice. The other ten GAME acceptance classes also passed in isolated UI saves.
 - The same full live cycle exposed one separate CONTINUE P1: a raw `remaining_beats` sentence instructed a new book-closing action and the model replayed the preceding NPC question even though State Delta stayed frozen.
-- Local closure removes unstarted pending beats from both the synthetic CONTINUE action and routed SAVE_STATE while retaining the original queue for post-response consumption. It also explicitly forbids replaying prior NPC dialogue. CONTINUE/Event/Context/Schedule focused tests and the full PR check pass.
+- Local closure removes unstarted pending beats from both the synthetic CONTINUE action and routed SAVE_STATE while retaining the original queue in post-response runtime state. It also explicitly forbids replaying prior NPC dialogue. CONTINUE/Event/Context/Schedule focused tests and the full PR check pass.
 - Final runtime exact HEAD `636458e2aef899022d320324aa14b0f654e72ea5` passed both affected Preview reruns. CONTINUE kept 09:15/the library entrance and added only static light/shelf detail with no new dialogue/action; the schedule case again reached exactly 12:00 in the room with the orientation active, incomplete, and player choice preserved.
 - Direct review thread `PRRT_kwDOT8LCAs6bj9L0` found one remaining P1: a valid boundary response may omit optional `event_progress` while still identifying the schedule in prose, which would leave the clock unaligned. The local closure accepts either the exact structured occurrence ID or a bounded two-token match to an authoritative event scheduled at that exact minute; unrelated Director/choice interruptions still do not advance.
 - Exact code HEAD `e4de523b37f3508d4fc6534ff4aa49df3fd74b05`: Safety #282 PASS, Vercel Ready, and the Preview schedule rerun PASS. World time reached exactly 12:00, location remained the room, `knight_orientation` stayed active/incomplete at `arrival_decision`, and player choices remained open.
@@ -217,7 +217,9 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Local remediation now filters hard stops to PC-owned/personal/promise schedules, general academic schedules, and the PC's own named department. NPC-only legacy rows, world-only rows, and other-department academic rows progress independently.
 - Short travel/exit/explore/observe actions use their minimum completion estimate for mandatory schedule targeting. A later boundary inside the wider guide is emitted only as `SCHEDULE_CAP`, which forbids stretching the action to that time.
 - Frozen CONTINUE still hides `remaining_beats` from model context, but now preserves the original unseen queue in runtime state instead of consuming its head.
-- Permanent regressions reproduce all three prior failures. Focused Scene Momentum/router/Event tests and the full `node scripts/lumensia-pr-check.mjs` pass locally. Hosted checks, exact Preview reruns, and fresh exact-head review remain pending.
+- Permanent regressions reproduce all three prior failures. Focused Scene Momentum/router/Event tests and the full `node scripts/lumensia-pr-check.mjs` pass locally.
+- Published exact HEAD `fc94fa55af1adfbcd921c2b919236d017c5503e3` passed Safety Gate #285 and Vercel Ready. Its fresh direct review found no P0, two policy-nonblocking P2s, and one P1: the UI advertised the intentionally model-hidden legacy queue as executable `이어서 생성 · N` content even though frozen CONTINUE cannot safely drain it.
+- The P1 closure keeps the hidden queue non-consuming, removes the false queue count/execution promise, and labels CONTINUE only as static same-moment elaboration. A permanent runtime regression proves that flow controls cannot mention `remaining_beats`, an executable beat count, or a next-beat promise.
 
 ## Permanent HF1 Test Suites
 - `scripts/tests/context-router-authority-tail.test.mjs`
@@ -248,8 +250,8 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
 
 ## NEXT ACTION
-1. Publish the human-authorized three-P1 remediation to PR #35 and verify exact Preview behavior for PC-relevant rest, unrelated schedules, short travel cap semantics, and non-consuming frozen CONTINUE.
-2. Require hosted Safety/Vercel PASS plus a fresh exact-current-HEAD/current-main Codex review with direct P0/P1=0.
+1. Publish the fresh-review CONTINUE UI P1 closure to PR #35; rerun focused/full tests and exact-head hosted checks.
+2. Require a fresh exact-current-HEAD/current-main Codex review with direct P0/P1=0 plus Safety/Vercel PASS.
 3. Re-fetch every merge gate immediately before mutation. Merge only with the unchanged full `expected_head_sha`; stop without merging if any condition changed.
 4. Fetch merged main, run the full post-merge suite and production acceptance, then implement **Scene Purpose** with bounded purpose state and no automatic player choice, followed by Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence chaining/lifetime.
 
