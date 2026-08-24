@@ -75,6 +75,8 @@ assert.match(routed.params.input,/===== SCENE MOMENTUM HF1 =====/,'Scene Momentu
 assert.match(routed.params.input,/INTENT=travel/,'classified travel intent must reach the model under long-action pressure');
 assert.match(routed.params.input,/===== SCENE PURPOSE V1 =====/,'Scene Purpose heading must survive long-action pressure');
 assert.match(routed.params.input,/PURPOSE_RUNTIME_SENTINEL/,'bounded Scene Purpose must reach the model under long-action pressure');
+assert.match(routed.params.input,/PURPOSE_MODE=current-action-first/,'current committed action must outrank the saved purpose under long-action pressure');
+assert.match(routed.params.input,/USER ACTION이 저장된 PURPOSE_FOCUS보다 우선한다/,'saved purpose must be explicitly subordinate to the current action');
 assert.match(routed.params.input,/도서관에 간다\./,'the bounded USER ACTION must retain its committed travel predicate');
 assert.ok(routed.params.input.lastIndexOf('===== USER ACTION =====')>routed.params.input.lastIndexOf('===== SCHEDULE ENGINE (ROUTED) ====='),'USER ACTION marker must remain final');
 

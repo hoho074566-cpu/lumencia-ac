@@ -56,9 +56,19 @@ assert.ok(bounded.event_instance_id.length<=100);
 assert.deepEqual(Object.keys(bounded),['version','kind','focus','source','established_turn','event_instance_id']);
 
 const directive=buildScenePurposeDirective({saveState:{sceneRuntime:{purpose:decision}}});
+assert.match(directive,/PURPOSE_MODE=continuity/);
 assert.match(directive,/NPC·세계·이벤트 반응 방향/);
 assert.match(directive,/PC의 새로운 행동·대사·감정·생각·수락·거절·선택을 대신 만들지 않는다/);
 assert.match(directive,/저장된 선택점을 임의로 해결하거나 특정 선택지를 실행하지 않는다/);
+
+const currentActionDirective=buildScenePurposeDirective({action:'검술 훈련을 시작한다.',saveState:{world:{location:turn.scene_title},sceneRuntime:{purpose:initial}}});
+assert.match(currentActionDirective,/PURPOSE_MODE=current-action-first/);
+assert.match(currentActionDirective,/USER ACTION이 저장된 PURPOSE_FOCUS보다 우선한다/);
+assert.match(currentActionDirective,/현재 행동의 목표를 바꾸지 않는다/);
+
+const autoDirective=buildScenePurposeDirective({action:'[AUTO FLOW: PC 새 행동 없음]',saveState:{sceneRuntime:{purpose:initial}}});
+assert.match(autoDirective,/PURPOSE_MODE=continuity/);
+assert.doesNotMatch(autoDirective,/CURRENT ACTION PRIORITY/);
 
 const continueDirective=buildScenePurposeDirective({action:'[LUMENSIA V1.5.6 CONTINUE] 같은 순간을 이어 쓴다.',saveState:{sceneRuntime:{purpose:initial}}});
 assert.match(continueDirective,/PURPOSE_MODE=preserve-only/);
