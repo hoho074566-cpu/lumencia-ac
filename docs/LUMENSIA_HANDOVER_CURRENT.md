@@ -53,7 +53,9 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Group reputation never auto-mutates PC↔NPC or NPC↔NPC relationships. Delayed retaliation, invitation, summons, or administrative response continues through the existing bounded `delayed_consequences_add` lifecycle rather than a new queue.
 - META and CONTINUE clear the new delta field. A real faction mutation counts once on Scene Momentum's existing social-relationship axis; no-op rows cannot fake momentum.
 - Permanent coverage lives in `scripts/tests/faction-social-consequence-v1.test.mjs` and covers schema, evidence gates, opposite faction polarity, clamping/history/context bounds, invalid/no-op rejection, personal-relation isolation, runtime persistence wiring, freeze paths, health visibility, and the one-call invariant.
-- Exact code checkpoint `193e12a` also rejects invalid or unsupported saved history evidence instead of relabeling it as public evidence. Dedicated/affected suites and the authoritative clean-LF full PR check pass. The substantive second review found no remaining blocker across evidence integrity, bounds, personal-relation isolation, META/CONTINUE freeze, context secrecy, persistence, one-call architecture, or scope. Push/PR, protected-path hosted gates/review, and Exact Preview acceptance remain.
+- Exact code checkpoint `193e12a` also rejects invalid or unsupported saved history evidence instead of relabeling it as public evidence. Dedicated/affected suites and the authoritative clean-LF full PR check pass. The substantive second review found no remaining blocker across evidence integrity, bounds, personal-relation isolation, META/CONTINUE freeze, context secrecy, persistence, one-call architecture, or scope.
+- PR #46 is open on exact accepted head `48d0555c17914c31d07025260fbc42726d82876e`; Vercel is Ready at `https://lumencia-ac-git-codex-faction-social-consequence-v1-ah-203c.vercel.app`.
+- Exact Preview acceptance passes: one public forum produced student council `+2` and White Rose `-1` with separate evidence; an unwitnessed private action produced zero faction mutation; CONTINUE retained the exact prior bounded state with all delta arrays empty; META emitted zero faction mutation; an existing faction consequence did not fire after 5 minutes, surfaced/resolved at its 15-minute boundary, and did not repeat on the following turn.
 
 ## Completed active predecessor — NPC↔NPC Relationship V1
 - PR #45 merged after exact-head hosted gates/review and Preview acceptance. It persists bounded directional affinity/trust/status plus causal history inside `npcInnerStates[source].npc_relationships[target]` without auto-mutating the reverse direction or PC relationships.
@@ -680,9 +682,9 @@ Gameplay roadmap discussed:
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
 2. Confirm main contains PR #45 merge `71074ccc7a5fd00f193a6aec8b7a1ff82eae1aab`; do **not** redo completed HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Turn Hook, Event Consequence, Goal Tick, Off-screen Progression, Scene Novelty, or NPC↔NPC Relationship V1 diagnosis.
 3. Continue only Faction / Social Consequence V1 on `codex/faction-social-consequence-v1`. Keep personal relationships, player sovereignty, META/CONTINUE freeze, relevant-context secrecy, bounded Event Consequence behavior, and the one-call architecture unchanged.
-4. Push the exact code/docs head and open a protected-path human-merge PR; local clean-LF full checks and the substantive second review are complete.
-5. Require current-head Safety/Vercel plus fresh Codex P0/P1=0. Revalidate current main, merge-base, no conflict, bounded storage/context, and no new API entrypoint or save migration.
-6. On the Exact Preview, verify: a witnessed public act changes only the addressed public faction; an unwitnessed/private act does not propagate; opposite organizations may receive different explicit polarity; reload retains bounded reputation/history; META/CONTINUE add no faction mutation; a delayed organization response uses the existing consequence lifecycle without firing early or repeating.
+4. Commit and push this acceptance-only docs checkpoint to PR #46; the code tree remains the already accepted `48d0555` code tree.
+5. Require fresh current-docs-head Safety/Vercel plus Codex P0/P1=0. Revalidate current main, merge-base, no conflict, bounded storage/context, and no new API entrypoint or save migration.
+6. Do not rerun Preview unless code changes; the targeted evidence/polarity/persistence/freeze/delayed-response cases already pass on the exact code tree.
 7. If all gates pass, report the protected-path PR ready for the user's human merge. Do not start Skill Learning V1 before this acceptance is complete.
 
 ---

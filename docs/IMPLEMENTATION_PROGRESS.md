@@ -46,6 +46,7 @@ Narrative Engine continuation — NPC↔NPC Relationship V1 is merged. Faction /
 - Delayed retaliation, invitation, summons, and administrative consequences reuse `delayed_consequences_add` and the existing Event Consequence lifecycle; V1 adds no second queue.
 - META/CONTINUE clear the new field. A real mutation contributes exactly once to Scene Momentum's existing social axis, while no-ops do not fake progression.
 - `scripts/tests/faction-social-consequence-v1.test.mjs` covers schema, evidence, polarity, clamps/history/context bounds, invalid/no-op rejection, personal-relation isolation, stable runtime persistence, freeze, health, and the one-call invariant. Code checkpoint `193e12a` also drops invalid or unsupported saved history evidence instead of relabeling it; dedicated/affected suites and the authoritative clean-LF full PR check pass. The substantive second review found no remaining blocker.
+- PR #46 exact accepted head `48d0555...` is deployed at `https://lumencia-ac-git-codex-faction-social-consequence-v1-ah-203c.vercel.app`. Targeted Preview acceptance passes public student-council `+2` versus White-Rose `-1` polarity, private/unwitnessed zero propagation, exact CONTINUE persistence with zero arrays, META zero mutation, and faction-response consequence no-early-fire / due resolution / no-repeat.
 
 ## NPC↔NPC Relationship V1 — Completed
 - PR #45 merged after exact-head Safety/Vercel/Codex and Exact Preview acceptance. Directional registered NPC affinity/trust/status plus causal history persists in the existing `npcInnerStates` root; reverse and PC relationships remain independent.
@@ -374,11 +375,11 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
 
 ## NEXT ACTION
-1. Commit/push the final docs checkpoint and open the protected-path Faction / Social Consequence V1 PR; code checkpoint `193e12a`, the clean-LF full PR check, and the substantive second review are complete.
-2. Confirm the published exact head contains only the reviewed code plus status docs.
-3. Require fresh current-head Safety/Vercel/Codex P0/P1=0.
+1. Commit/push this acceptance-only docs checkpoint to PR #46; code checkpoint `193e12a`, clean-LF full checks, the substantive second review, and targeted Preview acceptance are complete.
+2. Confirm the published exact head contains only the accepted code tree plus status docs.
+3. Require fresh current-docs-head Safety/Vercel/Codex P0/P1=0.
 4. Revalidate current main, merge-base, no conflict, one-call architecture, bounded storage/context, META/CONTINUE freeze, unchanged personal relationships, and reuse of the existing delayed-consequence queue.
-5. Run Exact Preview acceptance for witnessed-public-only mutation, private/unwitnessed rejection, explicit per-faction polarity, reload retention, META/CONTINUE zero mutation, and a delayed faction response that neither fires early nor repeats.
+5. Do not rerun Preview unless code changes; the required evidence/polarity/persistence/freeze/delayed-response cases already pass.
 6. If every gate passes, report the protected-path PR ready for human merge. Do not begin Skill Learning V1 before this phase is accepted.
 
 ## Stop Record
@@ -417,4 +418,4 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed: PR #43 exact head `6b4f599...` passed clean-LF/Safety/Vercel/Codex/Preview gates and was merged by the user as `fd2bcff...`; merge-tree equality, merged-main Vercel, production health, and clean-LF full regression pass.
 - Completed: PR #44 exact reviewed head `e5fae96...` merged as `fe6b4a5...`; merge-tree equality and production health pass.
 - Completed: PR #45 exact reviewed head `583b762...` merged as `71074cc...`; merge-tree equality and production health pass.
-- Current candidate: Faction / Social Consequence V1 on `codex/faction-social-consequence-v1`; code checkpoint `193e12a` adds bounded evidence-gated public-faction reputation in the existing scene runtime, rejects invalid saved evidence, and reuses Event Consequence for delayed organization responses. Dedicated/affected suites, clean-LF full authority, and the substantive second review pass. Final docs checkpoint, hosted review/gates, and Preview acceptance remain.
+- Current candidate: PR #46 / Faction / Social Consequence V1 on `codex/faction-social-consequence-v1`; code checkpoint `193e12a`, clean-LF full authority, substantive second review, Vercel Ready, and targeted exact-code-tree Preview acceptance pass. Final acceptance-only docs checkpoint and fresh exact-docs-head hosted Safety/Codex authority remain.
