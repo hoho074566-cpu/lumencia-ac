@@ -23,6 +23,12 @@ assert.deepEqual(retainedQuestion,initial,'a decision-sensitive question must no
 const retainedAuto=deriveScenePurpose({previousRuntime:{scene_key:turn.scene_title,purpose:initial},turn:{...turn,scene_summary:'창밖의 구름만 천천히 흘렀다.'},sceneDelta:baseDelta,action:'[AUTO FLOW: PC 새 행동 없음]',sceneKey:turn.scene_title,turnNumber:13});
 assert.deepEqual(retainedAuto,initial,'AUTO without authoritative progression must not become a player-action purpose');
 
+const routedAutoAction=`[LUMENSIA V1.5.6 AUTO FLOW — SCENE MOMENTUM HF1]
+이 요청은 PC의 새 행동/대사/생각/감정/결정이 아니다. PC의 선택을 대신 만들지 않는다.
+PC 판단이 필요 없는 세계의 자연스러운 흐름은 진행한다.`;
+const retainedRoutedAuto=deriveScenePurpose({previousRuntime:{scene_key:turn.scene_title,purpose:initial},turn:{...turn,scene_summary:'창밖의 구름만 천천히 흘렀다.'},sceneDelta:baseDelta,action:routedAutoAction,sceneKey:turn.scene_title,turnNumber:13});
+assert.deepEqual(retainedRoutedAuto,initial,'the routed multiline AUTO directive must not become a player-action purpose');
+
 const refreshedAction=deriveScenePurpose({previousRuntime:{scene_key:turn.scene_title,purpose:initial},turn:{...turn,scene_summary:'같은 열람실에서 검술 훈련을 시작한다.'},sceneDelta:{...baseDelta,intent:'committed-consequence'},action:'검술 훈련을 시작한다.',sceneKey:turn.scene_title,turnNumber:13});
 assert.equal(refreshedAction.kind,'action','a new committed same-scene objective must replace stale purpose');
 assert.equal(refreshedAction.source,'player-action');
@@ -69,6 +75,10 @@ assert.match(currentActionDirective,/현재 행동의 목표를 바꾸지 않는
 const autoDirective=buildScenePurposeDirective({action:'[AUTO FLOW: PC 새 행동 없음]',saveState:{sceneRuntime:{purpose:initial}}});
 assert.match(autoDirective,/PURPOSE_MODE=continuity/);
 assert.doesNotMatch(autoDirective,/CURRENT ACTION PRIORITY/);
+
+const routedAutoDirective=buildScenePurposeDirective({action:routedAutoAction,saveState:{sceneRuntime:{purpose:initial}}});
+assert.match(routedAutoDirective,/PURPOSE_MODE=continuity/);
+assert.doesNotMatch(routedAutoDirective,/CURRENT ACTION PRIORITY/);
 
 const continueDirective=buildScenePurposeDirective({action:'[LUMENSIA V1.5.6 CONTINUE] 같은 순간을 이어 쓴다.',saveState:{sceneRuntime:{purpose:initial}}});
 assert.match(continueDirective,/PURPOSE_MODE=preserve-only/);
