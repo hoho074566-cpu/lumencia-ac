@@ -13,21 +13,20 @@ Repository: `hoho074566-cpu/lumencia-ac`
 # 0. SESSION STOP CHECKPOINT — 가장 먼저 읽을 것
 
 ## Live state immediately before this handover update
-- Branch: `codex/scene-momentum-recovery-hf1`
-- PR: #33 `Restore Scene Momentum and narrative compression in V1.5.6`
-- Current main: `f6122be5f65a7b0b79555b83c9660eb9ed84cb6c`
-- Live PR HEAD refetched before the reservation fix: `0ddd3e300448ac2e241bd57f6371fde83dbf34c1`
-- Historical reviewed PR HEAD: `8ca24ba0d4df31807bf89c1d066317b0329cf18e`
-- Last published code/test commit before the current candidate: `f5a64452d1dcd671cafa30ab033bb05e13308e2b`
-- Historical PR state at `8ca24ba...`: open / not draft / `mergeable=true`
-- Compare `main...8ca24ba...`: ahead 41 / behind 0
-- `base_commit.sha == current main`
-- `merge_base_commit.sha == current main`
-- Hosted Safety: **#261 PASS**
-- Hosted Vercel: **PASS / Ready**
-- PR #33 is protected core/runtime work: **manual merge only**.
+- Branch: `codex/narrative-live-play-acceptance`
+- Current main: `8d378b532910dfecaf5226118bffabdddbe74289`
+- PR #33: **merged** at 2026-08-23 23:07:00 UTC
+- Reviewed/merged PR HEAD: `216bef1d51b72f2edb6da3f06c69e02aa45b5b10`
+- Guarded merge used the same full `expected_head_sha`.
+- Exact-head Safety: **#263 PASS**
+- Exact-head Vercel: **PASS / Ready**
+- Fresh exact-head Codex review: direct P0/P1 = 0.
+- Merge commit tree exactly matches the reviewed PR HEAD.
+- Post-merge main Vercel: **PASS**.
+- Production `/api/health`: healthy; app `1.5.6`, canonical `/api/chat`, adapter `/api/chat-router`, `24h` prompt-cache retention.
+- Full post-merge `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
-## Critical review finding and current candidate closure
+## Critical review finding and merged closure
 Final Codex review **did complete** on exact HEAD `8ca24ba...` at 2026-08-23 21:47:49 UTC and found a **new current P1**.
 
 - Thread: `PRRT_kwDOT8LCAs6biXWm`
@@ -35,16 +34,16 @@ Final Codex review **did complete** on exact HEAD `8ca24ba...` at 2026-08-23 21:
 - Path: `api/lib/context-router.js`, around current line 422
 - Finding: **Reserve the Scene Momentum directive under input pressure**
 
-Current candidate status:
+Merged closure:
 - the P1 is fixed by reserving `SCENE MOMENTUM HF1` separately from prefix-clipped optional context;
 - an exactly-5000-character ROUTINE action ending in `도서관에 간다.` keeps minimum SAVE_STATE, Momentum + `INTENT=travel`, Directors, Schedule, and the final committed predicate within the 9000-character budget;
 - CONTINUE keeps `INTENT=continue-freeze`; AUTO keeps normal world-flow routing;
 - focused tests and full local `node scripts/lumensia-pr-check.mjs` pass.
 
 This means:
-- **DO NOT MERGE PR #33 YET.**
-- the new candidate still needs hosted Safety/Vercel and a fresh exact-current-HEAD/current-main Codex review;
-- Safety/Vercel/clean compare/mergeable status from `8ca24ba...` remain historical evidence only.
+- the input-pressure P1 is closed on main;
+- completed HF1 diagnosis must not be restarted;
+- the active phase is Live-play acceptance, then Scene Purpose / Scene Exit / Turn Hook / Event Consequence.
 
 ---
 
@@ -362,20 +361,57 @@ Additional mode regressions prove CONTINUE retains `INTENT=continue-freeze` and 
 
 # 8. REVIEW STATE AT HANDOVER
 
-The final exact-head Codex review for `8ca24ba...` is **complete**, not merely pending.
+PR #33 final authority and merge:
+- exact reviewed HEAD `216bef1d51b72f2edb6da3f06c69e02aa45b5b10`;
+- fresh review `5003519118`, direct P0/P1=0;
+- Safety #263 PASS and Vercel PASS;
+- ahead 43 / behind 0, base commit and merge-base equal then-current main `f6122be5...`;
+- expected-head guarded merge succeeded as `8d378b532910dfecaf5226118bffabdddbe74289`;
+- PR is merged/closed and main contains no unexpected merge delta.
 
-Review submission:
-- Codex review author: `chatgpt-codex-connector`
-- reviewed commit: `8ca24ba0d4...`
-- submitted: 2026-08-23 21:47:49 UTC
-- result: current P1 described above.
+Five unresolved non-outdated P2 threads remain useful acceptance evidence. They were non-blocking under repository policy and must not be silently promoted or fixed speculatively; address them only when live-play acceptance demonstrates the behavior.
 
-Therefore:
-- **DO NOT MERGE YET.**
-- the code/test P1 closure is locally green, but the resulting exact commit still needs Safety/Vercel + a fresh exact-head Codex review.
-- prior-head review cannot authorize the fix commit.
+## Live-play acceptance Round 1
 
-Some older P2 threads can remain unresolved/non-outdated even though code/tests already cover the cited behavior (for example no-op growth scoring and historical-duration parsing). They are non-blocking by policy but should be rechecked after the P1 fix. Do not silently ignore a newly escalated correctness problem.
+The explicit QA harness is `scripts/qa/live-play-acceptance.mjs`. It calls a selected deployment only when run manually and uses cloned/stateless fixtures, so it neither mutates a user save nor spends API credits during normal CI.
+
+Baseline production run on main `8d378b532910dfecaf5226118bffabdddbe74289`:
+- 12 cases total: 7 PASS / 5 initially flagged;
+- PASS included short travel, exactly-5000-character travel, wait, direct NPC question, door/location compression, CONTINUE freeze, and NPC initiative;
+- mandatory orientation was not skipped by a two-hour rest started ten minutes before it;
+- completed entrance ceremony did not replay;
+- a fresh meaningful interruption during later travel was a valid STOP, so destination-only acceptance was corrected.
+
+Demonstrated defects fixed in the current branch:
+- native-Korean duration phrases `한 시간`, `두 시간`, and compound forms now route as explicit downtime;
+- `게시판을 다시 확인한다.` remains observe intent;
+- `도서관에 갈까?` and `도서관에 갈지 고민한다.` are decision-sensitive, receive no travel floor, and do not execute movement.
+
+Focused regressions and the full local PR check pass. The next authority step is hosted deployment of the exact candidate, then the same 12-case live rerun against that deployment.
+
+PR #34 candidate authority:
+- hosted head `cd5b711f47be99fbe321fb2eddc6c5d8d3eff568` passed Safety #265 and Vercel Ready;
+- compare is ahead 2 / behind 0, and base commit + merge-base are current main `8d378b532910dfecaf5226118bffabdddbe74289`;
+- fresh exact-head Codex review `PRR_kwDOT8LCAs8AAAABKj3Erw` found direct P0/P1=0 and P2 suggestions only;
+- the follow-up makes explicit durations exact, rejects pre-schedule no-op, verifies full CONTINUE state freeze and completed-event arrays, scans all player-visible fields, detects paraphrased known-fact relists without a hook, and covers `갈까 말까` / `가야 할까` / `갈까요`.
+
+Vercel runtime recovery is complete. The user explicitly authorized Preview scope for the existing `OPENAI_API_KEY`; the value was not viewed, copied, replaced, or exposed. Production scope remained selected. Exact head `58f00adf3fccc071afe59bd4134471874fe14b39` was redeployed as Preview deployment `F4Zua1Ud7EQDazJcvwSB2ZjgryeG` and reached Ready. The authenticated branch alias now reports API 0.8.3 configured with Luna/Terra, Q3, Context Router, Motivation V2, and Scene Momentum.
+
+The native chooser was dismissed, but its event could not be driven reliably. Candidate validation therefore continued through the same exact Preview UI with a naturally constructed sequential game state. Short/long travel, wait, rest, repeated observation, NPC question/initiative, door transition, and schedule-boundary rest passed visibly.
+
+A new live P1 was reproduced: the indirect question `지금 오리엔테이션이 끝난 뒤 대장간에 들를 시간이 있을까?` advanced 12:00 -> 12:40 and completed the active orientation. Root cause was a narrow question classifier that only guarded direct travel predicates. The fix classifies terminal question forms as `decision-sensitive`, injects an explicit same-moment/no-location/no-event-completion sovereignty rule, strengthens the live assertion to zero minutes, and passes focused plus full PR checks. The user does not need to operate a file chooser.
+
+That patch was published as `9972c26a4db39b29fd92bd77824e71a2e802126d`; Safety #268 and Vercel passed, and the exact Preview kept 12:40/location unchanged while answering the indirect question. The next CONTINUE check exposed a reload-only UI P1: duplicate stable flow wrappers caused both CONTINUE buttons to be hidden. The current local fix collapses duplicate wrappers and restores stable button visibility; focused CONTINUE/integration/core tests pass. Publish/redeploy this UI fix next, then run live CONTINUE and completed-event forward.
+
+The UI fix was published as `c90616815c9d058c0c185a87402460803df5b0d8`; Safety #269 and Vercel passed, and reload produced exactly one visible/enabled CONTINUE control. The live CONTINUE kept 12:40/location and the correct route but invented a new Artemis quote and NPC actions. The current local follow-up strengthens the narrative freeze to prohibit new NPC speech/actions and allow only an already-started beat's expression or static sensory detail. Publish and rerun CONTINUE next.
+
+The narrative freeze was published as `96230915c651b7c2d1d436f46f04442813014e6e`; Safety #270 and Vercel passed. Exact Preview CONTINUE kept 12:40/location and produced static sensory prose only. The next committed travel reached 기사과 대장간 at 12:48 without replaying the completed orientation, while Isabel/the smith initiated and left a player response hook. All 12 requested live behavior classes now have sufficient candidate evidence. No code/live blocker remains; only the final docs head gates, fresh exact-head review, and protected manual merge checkpoint remain.
+
+The final direct-thread audit found one applicable P1 before requesting review: the CLI harness did not forward the protected deployment token and could receive `401 BAD_ACCESS_TOKEN`. The current local fix accepts a dedicated `LUMENSIA_LIVE_ACCESS_TOKEN`, conditionally sends `x-lumensia-token`, never logs it, and adds a permanent regression. No token value was read or exposed.
+
+Fresh review `PRR_kwDOT8LCAs8AAAABKkJDNQ` on exact head `b30ad59aba9c242bb4beb549a4f444abd645603e` found one new direct P1: high stall pressure contradicted the question sovereignty freeze. The current local fix omits `SCENE_STALL=true` for `decision-sensitive` turns and adds a regression at stall streak 3. Because the same review's P2 evidence directly matched live failures already reproduced here, the harness also seeds/preserves the active orientation in the question case and rejects new NPC dialogue/action in CONTINUE. Non-reproduced P2s remain non-blocking.
+
+Fresh review `PRR_kwDOT8LCAs8AAAABKkKXOQ` on exact head `acab3594c784fdd3b93a32f1163320e5b4fcdbdd` found one follow-up P1: `있을까.` / `있을까요.` without a question mark still became generic. The current local fix recognizes bounded terminal `까/까요` forms with optional punctuation and keeps them decision-sensitive even at stall streak 3. The related active-event acceptance assertion now rejects `event_progress:null` and requires the same occurrence/beat/completed beats.
 
 ---
 
@@ -499,18 +535,15 @@ Gameplay roadmap discussed but not DONE:
 # 12. NEXT ACTION — NEW CHAT STARTS HERE
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
-2. Refetch live branch/PR #33 exact HEAD and current main.
-3. Do **not** redo completed HF1 analysis.
-4. Publish the locally green Scene Momentum reservation candidate if it is not already published.
-5. Require hosted Safety PASS + Vercel PASS on the exact current code/docs HEAD.
-6. Request fresh exact-current-HEAD/current-main Codex review.
-7. Directly inspect unresolved non-outdated P0/P1; sticky READY alone is insufficient. Re-evaluate the inventory-scoring P2 without treating it as blocking unless new evidence escalates it.
-8. If and only if true current P0/P1=0: final main/head compare, base_commit==main, merge_base==main, behind=0, mergeable/no conflict.
-9. Stop at manual-merge readiness; **do not merge PR #33 in this task**.
-10. After a later human merge, verify merged main, production Vercel and `/api/health`, then continue into **Scene Purpose -> Scene Exit Condition -> Turn Hook -> Event Consequence**.
+2. Confirm main still contains merge commit `8d378b532910dfecaf5226118bffabdddbe74289`; do **not** redo completed HF1 diagnosis.
+3. Preserve the recorded earlier gates, but do not treat them as authority for the new local question-sovereignty patch.
+4. Run the full PR check and publish this final acceptance checkpoint.
+5. Wait for exact-head Safety/Vercel, then obtain a fresh exact-current-HEAD/current-main Codex review with direct P0/P1=0.
+6. Re-fetch main/PR and verify every merge gate, then stop at protected-core manual merge readiness; do not auto-merge.
+7. After a human merge, run all 12 cases plus `/api/health` on production, then proceed to **Scene Purpose -> Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence**.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 긴빠이/Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. 완료된 HF1 진단을 다시 분석하지 말고 GitHub live main / PR #33 exact HEAD부터 확인한다. FINAL Codex review가 찾은 P1 `PRRT_kwDOT8LCAs6biXWm`은 현재 candidate에서 `SCENE MOMENTUM HF1`을 별도 reserved context로 옮겨 수정했고, 정확히 5000자인 ROUTINE USER ACTION 끝의 `도서관에 간다.`와 minimum SAVE_STATE + Momentum/INTENT=travel + GM Director + Event Director V2.1 + Schedule이 9000자 예산 안에서 함께 살아남는 회귀 테스트를 추가했다. CONTINUE hard freeze와 AUTO world flow도 예약 상태로 검증했으며 focused/full local PR check는 PASS다. 다음은 candidate publish -> hosted Safety/Vercel -> fresh exact-current-HEAD/current-main Codex review -> direct P0/P1=0 -> final main/merge-base/behind/conflict 검증 순서다. 이 작업에서는 PR #33을 merge하지 말고 manual merge 직전에서 멈춘다. Sticky READY가 direct current threads와 충돌하면 sticky를 신뢰하지 않는다. HF1이 이후 사람에 의해 merge되면 Scene Purpose / Scene Exit Condition / Turn Hook / Event Consequence로 바로 계속한다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. HF1은 main에 반영됐다. PR #34 exact Preview의 12개 live behavior class가 모두 충분히 통과했고, 간접 질문 sovereignty·reload-safe CONTINUE UI·새 NPC 행동 없는 narrative hard freeze·완료 이벤트 no-replay까지 검증됐다. Code head `9623091`은 Safety #270/Vercel/live PASS다. 최종 문서 checkpoint를 publish하고 fresh exact-head Safety/Vercel/Codex direct P0/P1=0 및 behind/base/merge-base/mergeable/clean을 확인한 뒤 protected manual merge gate에서 멈춰라. human merge 뒤 production acceptance -> Scene Purpose -> Scene Exit -> Turn Hook -> Event Consequence로 계속한다.`

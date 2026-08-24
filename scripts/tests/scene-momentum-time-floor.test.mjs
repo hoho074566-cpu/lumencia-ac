@@ -11,7 +11,7 @@ const timeFloorSource=source.slice(start,end);
 const makeHelpers=new Function('array','object','classifySceneIntent',`${timeFloorSource}\nreturn {applySceneMomentumTimeFloor,nextScheduleBoundaryMinutes};`);
 const array=(value)=>Array.isArray(value)?value:[];
 const object=(value)=>value&&typeof value==='object'&&!Array.isArray(value)?value:{};
-const classifySceneIntent=(action)=>({kind:'downtime',compression:true,minAdvanceMinutes:String(action).includes('48시간')?2880:String(action).includes('6시간')?360:30});
+const classifySceneIntent=(action)=>({kind:'downtime',compression:true,minAdvanceMinutes:String(action).includes('48시간')?2880:String(action).includes('6시간')?360:String(action).includes('두 시간')?120:30});
 const {applySceneMomentumTimeFloor,nextScheduleBoundaryMinutes}=makeHelpers(array,object,classifySceneIntent);
 
 const boundarySave={world:{date:'1285-03-01',time:'09:50'},scheduleContext:{due:[],upcoming:[{id:'class',date:'1285-03-01',time:'10:00'}]}};
@@ -19,6 +19,9 @@ assert.equal(nextScheduleBoundaryMinutes(boundarySave),10,'next schedule boundar
 let turn={state_delta:{advance_minutes:0},choices:[]};
 applySceneMomentumTimeFloor({action:'쉰다.',saveState:boundarySave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'forced downtime floor must stop at the next authoritative schedule boundary');
+turn={state_delta:{advance_minutes:0},choices:[]};
+applySceneMomentumTimeFloor({action:'두 시간 쉰다.',saveState:boundarySave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,10,'native-Korean long rest must stop at the next authoritative schedule boundary');
 
 const fullScheduleSave={world:{date:'1285-03-01',time:'07:00'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[{id:'noon-class',date:'1285-03-01',time:'12:00',status:'scheduled'}]};
 assert.equal(nextScheduleBoundaryMinutes(fullScheduleSave),300,'full authoritative schedule must expose events beyond the four-hour upcoming window');

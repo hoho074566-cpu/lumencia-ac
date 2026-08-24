@@ -55,9 +55,8 @@ function canContinueStable() {
 }
 
 function suppressDuplicateFlowControlsStable() {
-  const stable = $('flowControlsStable');
   for (const button of story.querySelectorAll('button')) {
-    if (stable?.contains(button)) continue;
+    if (button.closest('#flowControlsStable')) continue;
     const label = String(button.textContent || '').replace(/\s+/g, ' ').trim();
     if (!/^(?:▶\s*)?자동 진행(?:\s*·.*)?$|^(?:✦\s*)?이어서 생성(?:\s*·.*)?$/.test(label)) continue;
     button.disabled = true;
@@ -68,7 +67,9 @@ function suppressDuplicateFlowControlsStable() {
 
 function renderFlowControlsStable() {
   suppressDuplicateFlowControlsStable();
-  let wrap = $('flowControlsStable');
+  const existing = [...story.querySelectorAll('#flowControlsStable')];
+  let wrap = existing.shift() || null;
+  existing.forEach((duplicate) => duplicate.remove());
   const latest = latestWorldRecordStable();
 
   if (!wrap) {
@@ -99,6 +100,8 @@ function renderFlowControlsStable() {
   const auto = $('autoFlowBtnStable');
   const cont = $('continueBtnStable');
   if (auto) {
+    auto.hidden = false;
+    auto.removeAttribute('aria-hidden');
     auto.disabled = !canAutoFlowStable();
     const latestHasChoices = Boolean((latest?.turn?.choices || []).length);
     const unresolved = String(save?.sceneRuntime?.unresolved_question || '').trim();
@@ -112,6 +115,8 @@ function renderFlowControlsStable() {
   }
   suppressDuplicateFlowControlsStable();
   if (cont) {
+    cont.hidden = false;
+    cont.removeAttribute('aria-hidden');
     cont.disabled = !canContinueStable();
     const beats = Array.isArray(save?.sceneRuntime?.remaining_beats) ? save.sceneRuntime.remaining_beats.length : 0;
     cont.textContent = beats ? `✦ 이어서 생성 · ${beats}` : '✦ 이어서 생성';
