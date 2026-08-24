@@ -14,7 +14,7 @@ Repository: `hoho074566-cpu/lumencia-ac`
 
 ## Live state immediately before this handover update
 - Branch: `codex/scene-purpose-v1`
-- PR #37: **open**. The previous docs checkpoint `b6dfefbb8afb0c8affe1f6065e736ee769e9c11d` passed the focused current-action Preview rerun, but fresh review found that the production multiline `AUTO_DIRECTIVE` was still classified as a player action. Current code candidate `c9d293691ede83d2bb1dd4e249325881f3b987a5` recognizes both the short AUTO sentinel and the routed production header; the final docs checkpoint is the branch HEAD containing this record.
+- PR #37: **open**. Docs checkpoint `df3b9077d093a270ffebf52e04283a1adf1846f0` closed the production multiline AUTO misclassification and passed Safety #298, Vercel, clean-LF checks, and focused signed-in AUTO Preview acceptance. Fresh review then found that direct `decision-sensitive` questions still used continuity mode and could be steered by stale focus. Current code candidate `c9d5a0fc54826ae804a39df4412beaa19ce9b741` gives every real current action/question priority while separately preserving PC choice sovereignty; the final docs checkpoint is the branch HEAD containing this record.
 - Base/current main: `1faadd105cf7b7780544abb5ca5276af04198796`
 - PR #36: **merged** after exact Preview acceptance; reviewed code HEAD `c7881f4c31758d0350833f31c37d116f3ff4c18d`, exact docs checkpoint/merge parent `c347744858300359ab8d6da204cb5d9277d366be`.
 - PR #36 exact-head gates: Safety #290 PASS, Vercel Ready, fresh exact-head Codex P0/P1=0. Door/location and NPC-initiative reruns passed first, followed by the full isolated 12-case acceptance at 12/12 PASS.
@@ -43,8 +43,8 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - The persisted object is allowlisted and length-bounded; choices themselves are not persisted as an automatic player action.
 - The reserved model directive treats purpose focus as data and explicitly forbids creating PC action, dialogue, emotion, thought, acceptance, rejection, or choice.
 - CONTINUE preserves the existing purpose object and receives a purpose-specific freeze. META is untouched.
-- The current candidate uses nonempty player action evidence for same-scene refresh, treats both `[AUTO FLOW: PC 새 행동 없음]` and `[LUMENSIA V1.5.6 AUTO FLOW — SCENE MOMENTUM HF1]` routed input as no player action, and emits `PURPOSE_MODE=current-action-first` only before real committed actions so prior focus is compatible context only and cannot redirect them.
-- Empty descriptive churn, both AUTO forms, and decision-sensitive questions retain continuity; active-event authority, explicit decisions, NPC interaction precedence, and CONTINUE freeze are unchanged. Focused regressions and the full clean-LF PR check pass. Final docs checkpoint push, fresh exact-head hosted authority, affected AUTO Preview rerun, and guarded merge remain.
+- The current candidate uses nonempty player input evidence for same-scene routing, treats both `[AUTO FLOW: PC 새 행동 없음]` and `[LUMENSIA V1.5.6 AUTO FLOW — SCENE MOMENTUM HF1]` routed input as no player action, and emits `PURPOSE_MODE=current-action-first` before real actions and direct questions so prior focus cannot redirect them.
+- Current-action mode separately forbids inventing any additional PC action, dialogue, emotion, thought, acceptance, rejection, or choice. Empty descriptive churn and both AUTO forms retain continuity; active-event authority, explicit decisions, NPC interaction precedence, and CONTINUE freeze are unchanged. Focused regressions and the full clean-LF PR check pass. Final docs checkpoint push, fresh exact-head hosted authority, affected direct-question Preview rerun, and guarded merge remain.
 
 ### Historical PR #36 diagnosis and closure
 - The PR #35 post-merge production 12-case run is **10 PASS / 2 FAIL**. Schedule boundary, question sovereignty, CONTINUE hard freeze, and completed-event forward progression all pass.
