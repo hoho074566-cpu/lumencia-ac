@@ -44,7 +44,7 @@ Narrative Engine continuation — Deterministic Scene Novelty V1 is merged. NPC�
 - Reverse directions are independent. Self/unregistered/no-op rows are rejected, and prompt rules prohibit changing a relationship from co-presence alone.
 - Existing `relationship_changes` remains PC↔NPC only. META/CONTINUE clear the new field, while a real mutation contributes once to Scene Momentum's existing relationship axis.
 - `scripts/tests/npc-relationship-v1.test.mjs` covers schema, directionality, accumulation, clamps, bounds, invalid/no-op rejection, causal context, freeze, health, and one-call preservation. Focused NPC Goal/Motivation, Context Router, Scene Momentum, and CONTINUE regressions pass.
-- The full normal-checkout run reaches all game tests successfully but reproduces the existing CRLF-only workflow-string false positives. The required authoritative clean-LF full run remains pending until the exact code/docs commit.
+- Exact code checkpoint `ec7228a` passes the authoritative clean-LF full PR check. The normal-checkout run's two automation failures were confirmed as the existing CRLF-only workflow-string false positives; every game/API/runtime suite passed in both runs.
 
 ## Deterministic Scene Novelty V1 — Completed
 - Adds a bounded `sceneRuntime.novelty` checkpoint inside the existing flexible runtime root; there is no save root, migration, endpoint, rewrite pass, or additional model call.
@@ -370,8 +370,8 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
 
 ## NEXT ACTION
-1. Complete exact diff and substantive second review for NPC↔NPC Relationship V1, then commit/push the code/docs checkpoint.
-2. Run the authoritative clean-LF full PR check at the exact commit and require fresh current-head Safety/Vercel/Codex P0/P1=0.
+1. Push the current exact code/docs head and open the protected-path NPC↔NPC Relationship V1 PR.
+2. Require fresh current-head Safety/Vercel/Codex P0/P1=0.
 3. Revalidate current main, merge-base, no conflict, one-call architecture, bounded storage/context, META/CONTINUE freeze, and unchanged PC↔NPC behavior.
 4. Run Exact Preview acceptance for causal directional persistence, reload retention, explicit-only reverse mutation, and META/CONTINUE zero mutation.
 5. If every gate passes, report the protected-path PR ready for human merge. Do not begin Faction / Social Consequence V1 before this phase is accepted.
@@ -411,4 +411,4 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Historical PR #43 NEXT ACTION (completed): publish the P2-closure checkpoint, require fresh exact-head hosted authority/review and the three affected Preview cases, then leave the protected-path PR for human merge.
 - Completed: PR #43 exact head `6b4f599...` passed clean-LF/Safety/Vercel/Codex/Preview gates and was merged by the user as `fd2bcff...`; merge-tree equality, merged-main Vercel, production health, and clean-LF full regression pass.
 - Completed: PR #44 exact reviewed head `e5fae96...` merged as `fe6b4a5...`; merge-tree equality and production health pass.
-- Current candidate: NPC↔NPC Relationship V1 on `codex/npc-npc-relationship-v1`; focused implementation tests pass, while exact-commit clean-LF/hosted/review/Preview authority remain.
+- Current candidate: NPC↔NPC Relationship V1 on `codex/npc-npc-relationship-v1`; local implementation checkpoint `ec7228a` completed the exact diff and second review, and its focused plus authoritative clean-LF full PR checks PASS. Hosted/review/Preview authority remain.

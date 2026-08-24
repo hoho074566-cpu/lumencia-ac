@@ -52,7 +52,7 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - A change requires a registered non-self pair plus a real affinity/trust delta or status change. Prompt rules require direct interaction or an authoritative shared event and explicitly reject mere co-presence as evidence.
 - `relationship_changes` remains PC↔NPC only. META and CONTINUE clear the new field; Scene Momentum counts a real NPC relationship mutation once on the existing relationship axis.
 - Permanent coverage lives in `scripts/tests/npc-relationship-v1.test.mjs` and includes directionality, clamping, causal history, bounds, invalid/self/no-op rejection, routed context, freeze paths, Scene Delta, health visibility, and the one-call invariant.
-- Focused NPC Motivation/Goal, Context Router, Scene Momentum, and CONTINUE suites pass. The normal Windows checkout still shows the known CRLF-only workflow test false positives; an authoritative clean-LF full run remains required after the exact code/docs commit.
+- Focused NPC Motivation/Goal, Context Router, Scene Momentum, and CONTINUE suites pass. Exact code checkpoint `ec7228a` passes the authoritative clean-LF full `scripts/lumensia-pr-check.mjs origin/main HEAD`; the normal Windows checkout's two workflow-string failures were confirmed as CRLF-only false positives.
 
 ## Completed active predecessor — Deterministic Scene Novelty V1
 - Uses the existing flexible `sceneRuntime` root and adds no save migration, new endpoint, rewrite pass, or model call.
@@ -674,8 +674,8 @@ Gameplay roadmap discussed:
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
 2. Confirm main contains PR #44 merge `fe6b4a5dcc0f0a96b71d8fcffcf8666caeefd82b`; do **not** redo completed HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Turn Hook, Event Consequence, Goal Tick, Off-screen Progression, or Scene Novelty diagnosis.
 3. Continue only NPC↔NPC Relationship V1 on `codex/npc-npc-relationship-v1`. Keep PC↔NPC relationship behavior, player sovereignty, META/CONTINUE freeze, relevant-context secrecy, and the one-call architecture unchanged.
-4. Finish the exact diff/second regression review, commit and push the code/docs checkpoint, then run the authoritative full clean-LF check at that exact HEAD.
-5. Open a protected-path human-merge PR and require current-head Safety/Vercel plus fresh Codex P0/P1=0. Revalidate current main, merge-base, no conflict, bounded storage/context, and no new API entrypoint or save migration.
+4. Push the current exact code/docs head and open a protected-path human-merge PR.
+5. Require current-head Safety/Vercel plus fresh Codex P0/P1=0. Revalidate current main, merge-base, no conflict, bounded storage/context, and no new API entrypoint or save migration.
 6. On the Exact Preview, verify a causal two-NPC interaction creates only valid directional persisted links, a reload retains them, the reverse direction changes only when explicitly emitted, and META/CONTINUE add no relationship mutation.
 7. If all gates pass, report the PR ready for the user's human merge. Do not start Faction / Social Consequence V1 before this acceptance is complete.
 
