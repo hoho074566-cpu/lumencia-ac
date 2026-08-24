@@ -1,6 +1,6 @@
-// LUMENSIA V1.5.5 Stable Context Router + Event Director V2.1
+// LUMENSIA V1.5.6 Stable Context Router + Event Director V2.1
 // Preserves V1.5.3 HF1 15-20K relevance budgets.
-// V1.5.5: NPC Motivation + Relationship Reason V1 (goal-aware eligible-candidate weighting).
+// NPC Goal Tick V1: guarded present-NPC initiative without an additional model call.
 // Stable path: api/lib/context-router.js
 
 import { buildSceneMomentumDirective, classifySceneIntent, nextScheduleBoundaryMinutes, scheduleBoundaryLimitMinutes } from '../../lib/scene-momentum.js';
@@ -8,15 +8,18 @@ import { buildScenePurposeDirective, normalizeScenePurpose } from '../../lib/sce
 import { buildSceneExitDirective, normalizeSceneExitCondition } from '../../lib/scene-exit.js';
 import { buildTurnHookDirective, normalizeTurnHook } from '../../lib/turn-hook.js';
 import { buildEventConsequenceDirective, minutesUntilEventConsequence, selectDueEventConsequence } from '../../lib/event-consequence.js';
+import { NPC_GOAL_TICK_VERSION, isGoalTickCoolingDown } from '../../lib/npc-goal-tick.js';
 
 const VERSION = '1.5.6-hf1';
 const DIRECTOR_V2_VERSION = '2.1';
 const DIRECTOR_COOLDOWN_TURNS = 3;
+const PROACTIVE_GOAL_TICK_MIN_DRIVE = 8;
 
 const IMPORTANT_RE = /(전투|공격|기습|결투|도망|추적|구출|협상|정치|황위|조사|잠입|권능|부상|치료|판정|대련|시험|고백|배신|의식|각성|성유물|마유물|던전|정령왕)/i;
 const CRITICAL_ACTION_RE = /(L5|마신|델피렘|Delphirem|대죄주교|사도|심검|8서클|9서클|국가\s*전략|암살|살해|죽음|치명|대규모|전면전|성유물|마유물)/i;
 const COMBAT_RE = /(전투|공격|베어|베고|찌르|쏘|회피|막아|막고|패링|결투|대련|검기|오러|마법을?\s*쏘|주먹|발차기|기습|제압|살해|죽이)/i;
 const SECRET_RE = /(L4|L5|비밀|기밀|진실|정체|흑막|마신|델피렘|Delphirem|대죄주교|사도|어비스|심연)/i;
+const DIRECT_NPC_PRONOUN_RE = /(?:(?:그녀|그이|그|그\s*사람|그\s*학생|상대|저\s*사람|너|당신)(?:에게|한테|께|와|과|랑|이랑|을|를)\s*(?:질문|묻|말|대답|대화|부르|다가가|접근|따라가|쫓|붙잡|바라보|살펴보|도와|건네|보여|확인)|(?:ask|question|tell|talk\s+to|speak\s+to|follow|approach|help)\s+(?:her|him|them)\b)/i;
 
 const PROFILES = Object.freeze({
   continue: {
@@ -257,7 +260,7 @@ function goalSignalFor(save,key){
   else if(targetType==='class'&&targetKey&&norm(save?.pc?.department||'').includes(norm(targetKey)))relevance=1.08;
   const drive=1.08+(priority-3)*0.08+(urgency-3)*0.06;
   const multiplier=Math.max(.84,Math.min(1.48,drive*relevance));
-  return{desire,priority,urgency,progress,state:'active',target_type:targetType,target_key:targetKey,multiplier:Number(multiplier.toFixed(3)),source:active.desire?'runtime-active-goal':'npc-state-current_goal'};
+  return{id:clampText(active.id||'',80)||null,desire,priority,urgency,progress,state:'active',target_type:targetType,target_key:targetKey,next_action:clampText(array(active.next_actions)[0]||'',120),obstacle:clampText(active.obstacle||'',120),updated_turn:Number(active.updated_turn||0),multiplier:Number(multiplier.toFixed(3)),source:active.desire?'runtime-active-goal':'npc-state-current_goal'};
 }
 function compactInnerNpc(row={}){
   const src=object(row),goal=object(src.active_goal),reason=object(src.relationship_reason);
@@ -269,16 +272,23 @@ function compactInnerNpc(row={}){
   if(reason.cause||reason.followup)out.relationship_reason={turn:Number(reason.turn||0),dimensions:object(reason.dimensions),status:reason.status||null,cause:clampText(reason.cause||'',150),expression:clampText(reason.expression||'',150),followup:clampText(reason.followup||'',150),source_event:clampText(reason.source_event||'',120)};
   return out;
 }
+function presentGoalTargetIsFeasible(goal,save,present){
+  if(goal.target_type==='pc')return true;
+  if(goal.target_type==='npc')return Boolean(goal.target_key&&present.has(String(goal.target_key)));
+  if(goal.target_type==='place')return Boolean(goal.target_key&&norm(save?.world?.location||'').includes(norm(goal.target_key)));
+  if(goal.target_type==='event')return Boolean(goal.target_key&&array(save?.scheduleContext?.due).some(ev=>norm([ev?.id,ev?.title].filter(Boolean).join(' ')).includes(norm(goal.target_key))));
+  return false;
+}
 function buildEventDirectorV2(incoming,originalInput,registry,mode='game'){
   const save=incoming.saveState||{}, plan=parseDirectorV2Guidance(originalInput), turn=Number(save.turnNumber||0), momentum=object(save?.sceneRuntime?.momentum), stallStreak=Math.max(0,Number(momentum.stall_streak||0)), momentumPressure=stallStreak>=2,sceneIntent=classifySceneIntent(incoming.action||'',{location:save?.world?.location||''});
   const seedRaw=String(save?.director?.rngSeed||save?.directorSeed||save?.id||`${save?.pc?.name||'pc'}|${save?.pc?.origin||''}|legacy`);
   const seedBase=`${seedRaw}|T${turn}|${save?.world?.date||''}|${save?.world?.time||''}|${save?.world?.location||''}`;
   const seedTag=hash32(seedRaw).toString(16).padStart(8,'0').slice(0,8);
-  const base={version:DIRECTOR_V2_VERSION,seed_tag:seedTag,cooldown_turns:DIRECTOR_COOLDOWN_TURNS,intervention:plan.intervention,routine_streak:plan.routineStreak,event_gap:plan.eventGap,momentum_stall_streak:stallStreak,momentum_pressure:momentumPressure?'required':stallStreak===1?'watch':'normal',selected_key:null,selected_name:null,event_style:'none',eligible_keys:[],roll:null,none_weight:null,result:'NO_ROLL',mode:'fixed-flow',goal_signals:{},selected_goal:null};
+  const base={version:DIRECTOR_V2_VERSION,goal_tick_version:NPC_GOAL_TICK_VERSION,seed_tag:seedTag,cooldown_turns:DIRECTOR_COOLDOWN_TURNS,intervention:plan.intervention,routine_streak:plan.routineStreak,event_gap:plan.eventGap,momentum_stall_streak:stallStreak,momentum_pressure:momentumPressure?'required':stallStreak===1?'watch':'normal',selected_key:null,selected_name:null,event_style:'none',eligible_keys:[],roll:null,none_weight:null,result:'NO_ROLL',mode:'fixed-flow',goal_signals:{},selected_goal:null};
   const fixedDirective=(reason)=>({telemetry:{...base,result:reason},selectedKey:null,directive:`[EVENT DIRECTOR V2.1]\nMODE=FIXED_FLOW\n${reason}. 기존 일정·사용자 직접 행동·진행 중인 훅을 우선하고, 이 지시 때문에 새 우연 사건을 추가하지 마라.`});
   if(['meta','continue'].includes(mode))return fixedDirective(`RNG_DISABLED_${mode.toUpperCase()}`);
   const explicit=mentionedNpcKeys(incoming.action||'',registry);
-  if(explicit.length||plan.focused.length)return fixedDirective('DIRECT_USER_FOCUS');
+  if(explicit.length||plan.focused.length||DIRECT_NPC_PRONOUN_RE.test(String(incoming.action||'')))return fixedDirective('DIRECT_USER_FOCUS');
   if(plan.payoffDue||plan.callbacks)return fixedDirective('CALLBACK_PRIORITY');
   if(plan.intervention==='aftermath')return fixedDirective('AFTERMATH_FIXED_FLOW');
   if(plan.intervention==='combat'||plan.intervention==='critical'||hasAffirmedActionKeyword(incoming.action||'',COMBAT_RE))return fixedDirective('ACTIVE_COMBAT_FIXED_FLOW');
@@ -287,6 +297,8 @@ function buildEventDirectorV2(incoming,originalInput,registry,mode='game'){
   const dueConsequence=plan.intervention==='scheduled'||['decision-sensitive','committed-consequence'].includes(sceneIntent.kind)?null:selectDueEventConsequence(save,{lookaheadMinutes:consequenceLookahead});
   const consequenceMinutes=dueConsequence?minutesUntilEventConsequence(save,dueConsequence.id):null;
   const scheduleBoundary=nextScheduleBoundaryMinutes(save,{futureOnly:false});
+  const goalTickScheduleLimit=sceneIntent.compression&&sceneIntent.minAdvanceMinutes>0?scheduleBoundaryLimitMinutes(sceneIntent):0;
+  const goalTickHitsSchedule=scheduleBoundary!=null&&scheduleBoundary>=0&&goalTickScheduleLimit>0&&scheduleBoundary<=goalTickScheduleLimit;
   const scheduleFirst=scheduleBoundary!=null&&consequenceMinutes!=null&&scheduleBoundary<=consequenceMinutes;
   if(dueConsequence&&!scheduleFirst){
     const consequenceNpcText=[dueConsequence.event_name,Number(dueConsequence.secret_level||0)<=2?dueConsequence.reason:''].filter(Boolean).join(' ');
@@ -301,18 +313,33 @@ function buildEventDirectorV2(incoming,originalInput,registry,mode='game'){
   const scheduled=plan.intervention==='scheduled';
   const medium=plan.intervention==='medium'&&(plan.routineStreak>=2||plan.eventGap>=3||plan.crossDue);
   const momentumDue=momentumPressure;
-  if(!scheduled&&!medium&&!momentumDue)return fixedDirective('NO_RANDOM_EVENT_DUE');
-
   const exposure=object(save?.director?.npcExposure),recent=recentSpeakerCountsV2(incoming.recentTurns),present=new Set(array(save?.sceneRuntime?.participants).map(String));
   const dueFixed=new Set(array(save?.scheduleContext?.due).flatMap(ev=>array(ev?.participants)).map(String));
-  const presentGoalRows=[...present].map(key=>({key,goal:goalSignalFor(save,key)})).filter(({goal})=>goal&&(goal.target_type==='pc'||(goal.target_type==='npc'&&goal.target_key&&present.has(String(goal.target_key))))).sort((a,b)=>b.goal.priority-a.goal.priority||b.goal.urgency-a.goal.urgency||b.goal.multiplier-a.goal.multiplier||a.key.localeCompare(b.key));
+  const presentGoalRows=[...present].map(key=>({key,goal:goalSignalFor(save,key)})).filter(({goal})=>goal&&presentGoalTargetIsFeasible(goal,save,present)).sort((a,b)=>b.goal.priority-a.goal.priority||b.goal.urgency-a.goal.urgency||b.goal.multiplier-a.goal.multiplier||a.key.localeCompare(b.key));
+  const availableGoalRows=presentGoalRows.filter(({key,goal})=>!isGoalTickCoolingDown({saveState:save,key,goal,turnNumber:turn+1}));
   const passiveInitiativeIntent=['downtime','wait'].includes(sceneIntent.kind);
-  if(momentumDue&&!scheduled&&passiveInitiativeIntent&&presentGoalRows.length){
-    const {key,goal}=presentGoalRows[0],name=registry[key]||key;
-    const telemetry={...base,result:'PRESENT_NPC_GOAL_PRIORITY',mode:'fixed-flow',selected_key:key,selected_name:name,goal_signals:{[key]:goal},selected_goal:goal};
-    const directive=`[EVENT DIRECTOR V2.1]\nMODE=FIXED_FLOW\nRESULT=PRESENT_NPC_GOAL_PRIORITY\nPRESENT_NPC=${key}(${name})\nACTIVE_GOAL=${clampText(goal.desire,160)}\nGOAL_TARGET=${goal.target_type}:${goal.target_key||'-'} / P${goal.priority} U${goal.urgency}\n- 새 우연 조우나 카메오를 추가하지 마라. 현재 장면의 NPC initiative가 우선이다.\n- 위치·지식·성격·관계상 이미 가능한 경우, 이 NPC가 목표에 맞는 짧고 구체적인 말이나 행동을 먼저 하게 하라.\n- 목표는 이미 가능한 행동의 우선순위만 조정한다. PC의 행동·대사·감정·중요 선택을 대신 결정하지 마라.\n- 지금 실행이 불가능하면 억지로 행동시키지 말고 현재 장면의 자연스러운 변화나 반응 hook만 남겨라.`;
+  const proactiveInitiativeIntent=['generic','observe','explore','downtime','wait'].includes(sceneIntent.kind);
+  const hook=normalizeTurnHook(save?.sceneRuntime?.turn_hook),exit=normalizeSceneExitCondition(save?.sceneRuntime?.exit_condition),progress=object(save?.sceneRuntime?.eventProgress);
+  const playerOwnedStop=hook?.status==='awaiting-player'||exit?.status==='awaiting-player'||Boolean(String(save?.sceneRuntime?.unresolved_question||'').trim());
+  const activeEventFlow=Boolean((progress.activeBeat||progress.active_beat)&&!progress.paused);
+  const goalFlowBlocked=playerOwnedStop||activeEventFlow||goalTickHitsSchedule;
+  const buildPresentGoalResult=(result,key,goal,modeName)=>{
+    const name=registry[key]||key,nextLine=goal.next_action?`\nNEXT_ACTION=${clampText(goal.next_action,120)}`:'';
+    const telemetry={...base,result,mode:modeName,selected_key:key,selected_name:name,goal_signals:{[key]:goal},selected_goal:goal};
+    const actionOrder=result==='PRESENT_NPC_GOAL_TICK'?'USER ACTION을 의미 목표까지 먼저 완료한 뒤, 같은 턴의 세계 반응으로 이 NPC가 행동하게 하라.':'현재 장면의 NPC initiative가 우선이다.';
+    const order=result==='PRESENT_NPC_GOAL_TICK'?'USER_ACTION_FIRST':'NPC_INITIATIVE_FIRST';
+    const directive=`[EVENT DIRECTOR V2.1]\nRESULT=${result}\nORDER=${order}\nGUARDS=NO_PC_CONTROL|FEASIBLE_ONLY|GOAL_PROGRESS_EVIDENCE_ONLY|IMPOSSIBLE_TO_HOOK\nMODE=${modeName}\nGOAL_TICK_VERSION=${NPC_GOAL_TICK_VERSION}\nPRESENT_NPC=${key}(${clampText(name,60)})\nACTIVE_GOAL=${clampText(goal.desire,120)}\nGOAL_TARGET=${goal.target_type}:${clampText(goal.target_key||'-',60)} / P${goal.priority} U${goal.urgency}${nextLine}\n- 새 카메오를 추가하지 마라. ${actionOrder}\n- PC의 행동·대사·감정·중요 선택을 대신 결정하지 마라.\n- 위치·일정·지식·성격·관계상 가능할 때만 목표에 맞는 짧고 구체적인 말/행동을 스스로 하게 하라.\n- 선택만으로 목표 진척을 만들지 말고, 실제 결과가 보일 때만 근거와 함께 Goal V2 필드를 기록하라.\n- 불가능하면 강행하지 말고 자연스러운 반응 hook만 남겨라.`;
     return{telemetry,selectedKey:key,directive};
+  };
+  if(momentumDue&&!scheduled&&!goalFlowBlocked&&passiveInitiativeIntent&&availableGoalRows.length){
+    const {key,goal}=availableGoalRows[0];
+    return buildPresentGoalResult('PRESENT_NPC_GOAL_PRIORITY',key,goal,'fixed-flow');
   }
+  const proactiveGoalRow=availableGoalRows.find(({goal})=>goal.priority+goal.urgency>=PROACTIVE_GOAL_TICK_MIN_DRIVE);
+  if(!scheduled&&!goalFlowBlocked&&proactiveInitiativeIntent&&proactiveGoalRow){
+    return buildPresentGoalResult('PRESENT_NPC_GOAL_TICK',proactiveGoalRow.key,proactiveGoalRow.goal,'goal-tick');
+  }
+  if(!scheduled&&!medium&&!momentumDue)return fixedDirective('NO_RANDOM_EVENT_DUE');
   let pool=plan.candidates.filter(c=>registry[c.key]);
   // Surprise/cameo cooldown and physical eligibility remain authoritative. Goals can weight only an already-eligible candidate.
   pool=pool.filter(c=>{

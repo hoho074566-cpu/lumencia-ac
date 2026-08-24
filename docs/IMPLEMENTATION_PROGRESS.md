@@ -1,13 +1,14 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Narrative Engine continuation — live acceptance, Scene Purpose, Scene Exit, and Stronger Turn Hook are merged. Event Consequence V1 chaining/lifetime is the active separate phase.
+Narrative Engine continuation — live acceptance, Scene Purpose, Scene Exit, Stronger Turn Hook, and Event Consequence V1 are merged. NPC Initiative / Goal Tick V1 is the active separate phase.
 
 ## Current GitHub State
 - Repo: `hoho074566-cpu/lumencia-ac`
-- Main: `5f2073a2874a9b8ee45a6aa34d6e4508997c3cb3` (`Stronger Turn Hook V1 (#40)`)
-- Working branch: `codex/event-consequence-v1`
-- PR #41: **open**, title `Event Consequence V1 bounded chaining and lifetime`; protected runtime/API paths keep it human-merge only. Published acceptance checkpoint `dbdc54b68d33dd095475ff8cecfe09cc6bdea277` passed Safety #316, Vercel Ready, and reports no merge conflict. Exact Preview: `https://lumencia-ac-git-codex-event-consequence-v1-ah-203c.vercel.app`. The current branch adds the hosted-review closure below and needs new exact-head authority.
+- Main: `da248a2df0985d9196232149893a0b196020c0f9` (`Event Consequence V1`, PR #41 merge)
+- Working branch: `codex/npc-goal-tick-v1`
+- PR #42: **open**, title `NPC Goal Tick V1 guarded present-NPC initiative`; protected runtime/API paths keep it human-merge only. Initial published head `1fc90a0627b7b22a077038500e61c34261262b59` is mergeable against current main. Code checkpoint `c9efe50bfc95d5093acbe36aef88f2cc98024a3f` passes the full clean-LF repository check; this status update will become the next exact PR head.
+- PR #41: **merged** from exact reviewed head `06617b3ffe11d83bc512d7e4f520c17946d7bdf0`; Safety/Vercel/fresh P0/P1=0 and targeted Preview lifecycle acceptance passed. Merge `da248a2...` and reviewed head share tree `2bac9dd94468d37ff0cb7787ad6c42cdba478b27`.
 - PR #40: **merged** as squash commit `5f2073a2874a9b8ee45a6aa34d6e4508997c3cb3` from reviewed exact head `85af592b8baae57958eb16d88da83f946d26a2e0`. Safety #313, Vercel, fresh exact-head Codex P0/P1=0, and affected Exact Preview acceptance passed; reviewed and merged trees both equal `2354a0db58c6405beec40fcfaae885fd8850c0db`.
 - PR #39: **merged** as squash commit `4516cc162ef34426ef94d29cf5aa6489013927ec` from reviewed exact head `ba64f9f779cda39f91ef41abfddf3c47f823606c`. Safety #307, Vercel, fresh exact-head Codex P0/P1=0, and affected Chrome Preview acceptance passed. Merge and reviewed-head trees both equal `dfce564cc6b457a5258d5165ea05ce496acf99c6`; production Vercel and `/api/health` are healthy.
 - PR #38: **merged** as `227bcf23ace6ad7dca38b5d02d50a8652dd13a38`; same-occurrence event focus refreshes on authoritative beat/completion progress and remains stable when progress is unchanged.
@@ -33,7 +34,17 @@ Narrative Engine continuation — live acceptance, Scene Purpose, Scene Exit, an
 - Production `/api/health`: `ok=true`, API configured, app `1.5.6`, adapter `/api/chat-router`, canonical core `/api/chat`, prompt cache retention `24h`.
 - Post-merge full `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
-## Event Consequence V1 — Current Candidate
+## NPC Goal Tick V1 — Current Candidate
+- High-drive active goals on currently present NPCs may produce `PRESENT_NPC_GOAL_TICK` on generic/observe/explore/wait/downtime turns without requiring a prior two-turn stall.
+- The model must finish the declared USER ACTION first, then may add one physically feasible present-NPC goal action as the same turn's world response.
+- Valid local targets are the PC, another present NPC, the current place, or a currently due matching event. Remote targets and terminal/blocked goals do not qualify.
+- Direct focus, player-owned choices, active event beats, fixed schedules, callbacks, consequences, AFTERMATH/combat, committed travel, AUTO, and CONTINUE keep priority.
+- Goal selection never advances progress by itself. Existing Goal V2 reasoned evidence remains required for every progress/lifecycle mutation.
+- `sceneRuntime.goal_tick` stores one bounded last-tick checkpoint. Visible ticks use a 2-3 turn cadence; ignored ticks may retry next turn, and cooling one owner does not freeze another eligible NPC.
+- No off-screen simulation, schema/save migration, additional model call, new endpoint, canonical core rewrite, or broader secret access.
+- New permanent suite: `scripts/tests/npc-goal-tick-v1.test.mjs`; affected Goal V2/HF3/Context/Scene/Event/Turn Hook suites and full clean-LF PR check pass at `c9efe50...`.
+
+## Event Consequence V1 — Completed
 - The previously unused `delayed_consequences_add` output is added to the routed structured schema without changing the canonical `api/chat.js` file or save schema.
 - The stable runtime materializes delayed results into the existing `save.hooks` store with a deterministic ID, due clock, bounded 3-day active / 7-day world lifetime, causal source, secret level, and duplicate fingerprint. At most 3 are created in one turn and at most 12 unresolved consequence hooks are retained.
 - Context routing selects at most one due result. Direct player/NPC focus, decision-sensitive or committed high-stakes actions, active callback/aftermath/combat flow, and an earlier fixed schedule keep priority. AUTO may surface an already-due result; META and CONTINUE remain frozen.
@@ -323,10 +334,11 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
 
 ## NEXT ACTION
-1. Run the full clean-LF check and push the focused hosted-review closure on PR #41, then require exact-current-HEAD Safety/Vercel and a fresh P0/P1=0 Codex review.
-2. Revalidate the exact head against current main. Because the closure changes runtime behavior, re-run the targeted due/no-repeat/player-choice Exact Preview smoke.
-3. Do not merge PR #41 from a Codex task. Protected runtime/API paths make merge human-only.
-4. Start NPC Initiative / Goal Tick refinement only after PR #41 closes.
+1. Push this final PR #42 status checkpoint, then require exact-current-HEAD Safety/Vercel and a fresh P0/P1=0 Codex review; revalidate base/main and merge-base.
+2. Keep the exact current head immutable while hosted review and Preview evidence are collected.
+3. Run exact Preview acceptance for proactive observe/explore/wait initiative, manifestation/cooldown/no-repeat, and protected question/travel/schedule boundaries.
+4. Do not merge from a Codex task. Protected runtime/API paths make this PR human-only.
+5. Start bounded off-screen progression only after Goal Tick V1 closes.
 
 ## Stop Record
 - Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.
@@ -357,4 +369,7 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Initial published candidate: `4a24a77...`; Vercel PASS, Safety #308 initially in progress. Its first live travel rerun found the generic-choice issue above, so it is not merge-authoritative.
 - Completed: PR #40 exact-head Safety/Vercel/Codex/Preview gates, squash merge `5f2073a...`, exact tree verification, production Vercel, and health smoke.
 - Acceptance checkpoint `dbdc54b...`: bounded delayed-result materialization into existing hooks, due selection, schedule/player sovereignty guards, visible-result completion, open retry, expiry, duplicate rejection, secret-cause masking, and adaptive authority preservation passed full clean-LF check, Safety #316, Vercel Ready, clean-LF Chrome boot, and Exact Preview lifecycle acceptance. Its hosted review had P0/P1=0; the current closure addresses all six P2 hardening comments.
-- NEXT ACTION: full-check and push the review closure, require exact-head hosted gates/fresh P0/P1=0, rerun targeted Exact Preview, then leave protected-path PR #41 open for human merge.
+- Completed: PR #41 exact reviewed head `06617b3...` merged as `da248a2...`; merge and reviewed trees are identical.
+- Completed locally on NPC Goal Tick V1 code `c9efe50...`: guarded proactive present-NPC tick, bounded cooldown checkpoint, feasibility filters, player/event/schedule/freeze guards, permanent regressions, substantive second review, and full clean-LF PR check PASS.
+- Opened PR #42 from `codex/npc-goal-tick-v1` against current main; the initial published head is mergeable with no behind delta.
+- NEXT ACTION: push this final status checkpoint, require exact-head hosted authority, then run targeted Exact Preview acceptance and leave protected-path PR #42 for human merge.
