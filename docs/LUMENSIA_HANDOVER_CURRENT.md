@@ -43,6 +43,8 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Direct review thread `PRRT_kwDOT8LCAs6bj9L0` then identified one remaining P1: `event_progress` is optional, so a response that clearly presents the exact schedule only in prose could still leave the clock at 11:50. The local closure aligns on either the exact occurrence ID or a bounded authoritative event-title match at that exact minute, without forcing unrelated interruptions.
 - Focused CONTINUE/Event/router/time-floor tests, full `node scripts/lumensia-pr-check.mjs`, and `git diff --check`: **PASS**.
 - Exact code HEAD `e4de523b37f3508d4fc6534ff4aa49df3fd74b05` passed Safety #282, Vercel, and the schedule Preview rerun: exact 12:00, unchanged room, active/incomplete `knight_orientation`, player choices preserved.
+- Fresh review `PRR_kwDOT8LCAs8AAAABKkUk7Q` on `d1ada8288c62bf55a6c41e09485959b568a3a5c8` found three current P1s: unrelated NPC/world schedules can become PC hard stops; a CONTINUE beat hidden from the model is still consumed; and short travel/exit/explore/observe can be stretched to a later schedule boundary instead of only being capped.
+- The repository's two Codex-local automatic fix/review iterations are exhausted. No third automatic fix was attempted; PR #35 is not merge-ready.
 
 ## Critical review finding and merged closure
 Final Codex review **did complete** on exact HEAD `8ca24ba...` at 2026-08-23 21:47:49 UTC and found a **new current P1**.
@@ -554,13 +556,13 @@ Gameplay roadmap discussed but not DONE:
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
 2. Confirm main still contains merge commit `88fa53036c58324ffd5012ab7b5ed0cd3099dd6d`; do **not** redo completed HF1 or PR #34 diagnosis.
-3. Publish this final exact-live-evidence docs checkpoint and obtain exact-head Safety + Vercel.
-4. Obtain a fresh exact-current-HEAD/current-main Codex review with direct P0/P1=0.
-5. Re-fetch main/PR and verify every merge gate, then stop at protected-core manual merge readiness; do not auto-merge this new PR without separate exact authorization.
-6. After human merge, rerun production acceptance and proceed to **Scene Purpose -> Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence**.
+3. Do not merge PR #35. Human must authorize a new remediation cycle for the three current P1s.
+4. Remediation must jointly address PC relevance, frozen-beat non-consumption, and short-action cap semantics; rerun focused/full tests plus exact Preview acceptance.
+5. Obtain a fresh exact-current-HEAD/current-main Codex review with direct P0/P1=0 and re-fetch every merge gate.
+6. After a later human merge, rerun production acceptance and proceed to **Scene Purpose -> Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence**.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #34는 exact head `4479615`로 검증돼 merge commit `88fa5303`으로 main에 반영됐다. PR #35의 schedule closure는 exact Preview에서 11:50 -> 12:00과 선택 보존으로 PASS했고, runtime head `636458e`는 CONTINUE pending beat의 새 NPC 행동/대사 replay도 막았다. direct review의 optional event_progress P1도 exact-minute authoritative event-title evidence fallback으로 닫았고, exact code head `e4de523`는 Safety #282/Vercel/Preview rerun이 PASS다. final docs checkpoint -> hosted gates -> fresh direct P0/P1=0 -> protected manual merge gate까지 진행한 뒤, human merge 후 Scene Purpose -> Scene Exit -> Turn Hook -> Event Consequence로 계속한다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #35 exact code head `e4de523`는 Safety #282/Vercel/Preview schedule rerun이 PASS지만, fresh review `PRR_kwDOT8LCAs8AAAABKkUk7Q`가 unrelated schedule hard-stop, hidden CONTINUE beat loss, short-action boundary stretching의 current P1 세 건을 찾았다. 두 번의 자동 fix/review 한도가 소진됐으므로 merge 금지 상태다. human-authorized remediation -> focused/full/live tests -> fresh direct P0/P1=0 -> exact merge gates 후에만 병합하고, 그 뒤 Scene Purpose -> Scene Exit -> Turn Hook -> Event Consequence로 계속한다.`

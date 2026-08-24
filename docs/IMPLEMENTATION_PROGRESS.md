@@ -211,6 +211,8 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Final runtime exact HEAD `636458e2aef899022d320324aa14b0f654e72ea5` passed both affected Preview reruns. CONTINUE kept 09:15/the library entrance and added only static light/shelf detail with no new dialogue/action; the schedule case again reached exactly 12:00 in the room with the orientation active, incomplete, and player choice preserved.
 - Direct review thread `PRRT_kwDOT8LCAs6bj9L0` found one remaining P1: a valid boundary response may omit optional `event_progress` while still identifying the schedule in prose, which would leave the clock unaligned. The local closure accepts either the exact structured occurrence ID or a bounded two-token match to an authoritative event scheduled at that exact minute; unrelated Director/choice interruptions still do not advance.
 - Exact code HEAD `e4de523b37f3508d4fc6534ff4aa49df3fd74b05`: Safety #282 PASS, Vercel Ready, and the Preview schedule rerun PASS. World time reached exactly 12:00, location remained the room, `knight_orientation` stayed active/incomplete at `arrival_decision`, and player choices remained open.
+- Fresh review `PRR_kwDOT8LCAs8AAAABKkUk7Q` on `d1ada8288c62bf55a6c41e09485959b568a3a5c8` produced three still-applicable P1 blockers: hard stops currently include unrelated NPC/world schedules; hidden CONTINUE beats are still consumed and lost; and non-downtime action estimates can be stretched to a later boundary instead of merely capped.
+- Repository policy allows at most two Codex-local automatic fix/review iterations. That limit is exhausted, so these P1s were not automatically patched. PR #35 must not merge.
 
 ## Permanent HF1 Test Suites
 - `scripts/tests/context-router-authority-tail.test.mjs`
@@ -241,10 +243,10 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
 
 ## NEXT ACTION
-1. Publish this final exact-live-evidence docs checkpoint and wait for exact-head Safety + Vercel.
-2. Obtain a fresh exact-current-HEAD/current-main Codex review. Direct P0/P1 must be zero; P2/P3 remain non-blocking unless newly reproduced.
-3. Re-fetch main/PR and verify behind=0, base commit=merge-base=current main, open/non-draft/mergeable, clean/synced, Safety/Vercel PASS; then stop at the protected-core manual merge gate.
-4. After human merge, rerun production acceptance and implement **Scene Purpose** with bounded purpose state and no automatic player choice, followed by Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence chaining/lifetime.
+1. Human must review/authorize a new remediation cycle for the three current P1s; do not merge PR #35 in its current state.
+2. Any remediation must jointly cover PC-relevant schedule filtering, non-consuming frozen CONTINUE beats, and cap-vs-target semantics for short actions, with focused/full tests and exact Preview reruns.
+3. Obtain a fresh exact-current-HEAD/current-main Codex review with direct P0/P1=0, then re-fetch every merge gate before any merge.
+4. After a later human merge, rerun production acceptance and implement **Scene Purpose** with bounded purpose state and no automatic player choice, followed by Explicit Scene Exit Condition -> Stronger Turn Hook -> Event Consequence chaining/lifetime.
 
 ## Stop Record
 - Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.
@@ -261,6 +263,7 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed on final runtime head `636458e...`: Vercel Ready; exact Preview CONTINUE and schedule reruns PASS.
 - Completed local direct-review closure: schedule-title evidence can align the exact boundary without optional `event_progress`; unrelated choices remain unforced; focused/full tests PASS.
 - Completed on exact code head `e4de523...`: Safety #282/Vercel PASS and final schedule Preview rerun PASS.
-- Unfinished: final docs-only checkpoint hosted gates/fresh review, protected manual merge, Scene Purpose and later phases.
-- Blocker: no demonstrated code/live blocker; final docs-head hosted/review authority remains pending.
-- NEXT ACTION: docs checkpoint -> Safety/Vercel -> fresh review -> protected manual-merge gate.
+- Completed direct audit: fresh review `PRR_kwDOT8LCAs8AAAABKkUk7Q` identified three current P1s after the second automatic remediation round.
+- Unfinished: P1 remediation, new exact-head gates/review, protected manual merge, Scene Purpose and later phases.
+- Blocker: automatic fix/review limit exhausted with three current direct P1 threads (`PRRT_kwDOT8LCAs6bkEy6`, `PRRT_kwDOT8LCAs6bkEy8`, `PRRT_kwDOT8LCAs6bkEy_`).
+- NEXT ACTION: human-authorized remediation cycle; merge remains forbidden.
