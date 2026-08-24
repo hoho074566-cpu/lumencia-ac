@@ -14,6 +14,7 @@ Repository: `hoho074566-cpu/lumencia-ac`
 
 ## Live state immediately before this handover update
 - Branch: `codex/scene-purpose-v1`
+- PR #37: **open**. Published HEAD `a5cff2eddd78926144fc6a27ff19f60797cdc1f1` has Safety/Vercel and focused signed-in Exact Preview evidence, but fresh exact-head review found one stale-purpose path for nonempty player actions classified as `generic`.
 - Base/current main: `1faadd105cf7b7780544abb5ca5276af04198796`
 - PR #36: **merged** after exact Preview acceptance; reviewed code HEAD `c7881f4c31758d0350833f31c37d116f3ff4c18d`, exact docs checkpoint/merge parent `c347744858300359ab8d6da204cb5d9277d366be`.
 - PR #36 exact-head gates: Safety #290 PASS, Vercel Ready, fresh exact-head Codex P0/P1=0. Door/location and NPC-initiative reruns passed first, followed by the full isolated 12-case acceptance at 12/12 PASS.
@@ -42,7 +43,8 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - The persisted object is allowlisted and length-bounded; choices themselves are not persisted as an automatic player action.
 - The reserved model directive treats purpose focus as data and explicitly forbids creating PC action, dialogue, emotion, thought, acceptance, rejection, or choice.
 - CONTINUE preserves the existing purpose object and receives a purpose-specific freeze. META is untouched.
-- Local focused suites and the full repository check in a clean LF checkout pass. Exact diff review, commit/push, hosted gates, and live purpose acceptance remain.
+- The current local closure uses nonempty player action evidence instead of the narrow intent classifier for same-scene refresh. Empty descriptive churn and decision-sensitive questions still retain purpose; active-event authority, explicit decisions, NPC interaction precedence, and CONTINUE freeze are unchanged.
+- Local focused suites pass. The closure still requires its full clean-LF repository check, second review, commit/push, fresh exact-head hosted authority, affected Preview rerun, and guarded merge.
 
 ### Historical PR #36 diagnosis and closure
 - The PR #35 post-merge production 12-case run is **10 PASS / 2 FAIL**. Schedule boundary, question sovereignty, CONTINUE hard freeze, and completed-event forward progression all pass.
@@ -588,12 +590,12 @@ Gameplay roadmap discussed but not DONE:
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
 2. Confirm main contains PR #36 merge commit `1faadd105cf7b7780544abb5ca5276af04198796`; do **not** redo completed HF1/HF2/HF3 diagnosis or the 12-case acceptance.
-3. Continue only the focused `codex/scene-purpose-v1` candidate: inspect the exact diff, perform the second regression/scope review, and keep Scene Exit/Turn Hook/Event Consequence out of this change.
-4. Commit/push, then require hosted Safety/Vercel plus fresh exact-current-HEAD P0/P1 authority and focused Exact Preview purpose acceptance.
+3. Continue only the focused PR #37 generic-action purpose closure: run the full check and second regression/scope review, and keep Scene Exit/Turn Hook/Event Consequence out of this change.
+4. Commit/push the closure, then require hosted Safety/Vercel plus fresh exact-current-HEAD P0/P1 authority and rerun the affected generic-action Exact Preview case.
 5. The user has explicitly authorized merge when no special issue remains. Revalidate the exact head/base/mergeability immediately before merge, then verify the merge tree and production health.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #36은 Exact Preview 12/12 acceptance와 exact-head gates 후 merge commit 1faadd1로 병합되었고 production health도 정상이다. 현재 브랜치는 codex/scene-purpose-v1이며 bounded sceneRuntime.purpose, reserved sovereignty directive, event/decision/transition persistence, CONTINUE freeze와 영구 테스트가 로컬 구현되어 있다. exact diff/2차 회귀 리뷰 -> commit/push -> hosted Safety/Vercel/fresh exact-head P0/P1 -> focused Preview acceptance 순서로 진행하고, 이상이 없으면 사용자의 명시적 권한으로 exact-head merge한다. Scene Exit/Turn Hook/Event Consequence는 이 PR에 섞지 않는다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #36은 Exact Preview 12/12 acceptance와 exact-head gates 후 merge commit 1faadd1로 병합되었고 production health도 정상이다. PR #37의 published head a5cff2e는 Safety/Vercel과 focused Exact Preview evidence가 있지만, fresh exact-head review가 generic으로 분류되는 nonempty same-scene action의 stale purpose를 지적했다. 현재 브랜치 codex/scene-purpose-v1에는 nonempty player action을 직접 사용해 refresh하는 focused local closure와 regression이 있다. full check/2차 회귀 리뷰 -> commit/push -> hosted Safety/Vercel/fresh exact-head P0/P1 -> affected Preview rerun 순서로 진행하고, 이상이 없으면 사용자의 명시적 권한으로 exact-head merge한다. Scene Exit/Turn Hook/Event Consequence는 이 PR에 섞지 않는다.`

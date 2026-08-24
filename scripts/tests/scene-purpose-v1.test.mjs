@@ -12,6 +12,14 @@ assert.deepEqual(initial,{version:SCENE_PURPOSE_VERSION,kind:'scene',focus:turn.
 const retained=deriveScenePurpose({previousRuntime:{scene_key:turn.scene_title,purpose:initial},turn:{...turn,scene_summary:'빛의 각도만 조금 달라졌다.'},sceneDelta:baseDelta,sceneKey:turn.scene_title,turnNumber:13});
 assert.deepEqual(retained,initial,'same-scene descriptive churn must not replace the bounded purpose');
 
+const refreshedGenericAction=deriveScenePurpose({previousRuntime:{scene_key:turn.scene_title,purpose:initial},turn:{...turn,scene_summary:'같은 열람실에서 봉인 기록을 읽기 시작한다.'},sceneDelta:baseDelta,action:'책을 읽는다.',sceneKey:turn.scene_title,turnNumber:13});
+assert.equal(refreshedGenericAction.kind,'action','a nonempty generic player action must replace stale purpose');
+assert.equal(refreshedGenericAction.source,'player-action');
+assert.equal(refreshedGenericAction.focus,'같은 열람실에서 봉인 기록을 읽기 시작한다.');
+
+const retainedQuestion=deriveScenePurpose({previousRuntime:{scene_key:turn.scene_title,purpose:initial},turn:{...turn,scene_summary:'이사벨이 대답을 기다리고 있다.'},sceneDelta:{...baseDelta,intent:'decision-sensitive'},action:'지금 입학식에 돌아갈까?',sceneKey:turn.scene_title,turnNumber:13});
+assert.deepEqual(retainedQuestion,initial,'a decision-sensitive question must not replace or resolve the active purpose');
+
 const refreshedAction=deriveScenePurpose({previousRuntime:{scene_key:turn.scene_title,purpose:initial},turn:{...turn,scene_summary:'같은 열람실에서 검술 훈련을 시작한다.'},sceneDelta:{...baseDelta,intent:'committed-consequence'},action:'검술 훈련을 시작한다.',sceneKey:turn.scene_title,turnNumber:13});
 assert.equal(refreshedAction.kind,'action','a new committed same-scene objective must replace stale purpose');
 assert.equal(refreshedAction.source,'player-action');
