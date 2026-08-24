@@ -7,7 +7,7 @@ Narrative Engine continuation — PR #38 event-focus refresh is merged. PR #39 i
 - Repo: `hoho074566-cpu/lumencia-ac`
 - Main: `227bcf23ace6ad7dca38b5d02d50a8652dd13a38` (`Merge pull request #38`)
 - Working branch: `codex/scene-exit-condition-v1`
-- PR #39: **open**. Code candidate `6a8065019263fc8dece4b952f77acc8fcbd87ced` adds bounded explicit scene exit boundaries. Focused regressions and the full clean-LF PR check pass; hosted exact-head authority and Preview acceptance remain.
+- PR #39: **open**. Current code candidate `be88e14...` adds bounded explicit scene exit boundaries and closes the initial exact-head P1 by matching actual location against the semantic destination. Focused regressions pass; final docs-head checks, hosted authority, and affected Preview rerun remain.
 - PR #38: **merged** as `227bcf23ace6ad7dca38b5d02d50a8652dd13a38`; same-occurrence event focus refreshes on authoritative beat/completion progress and remains stable when progress is unchanged.
 - PR #37: **merged** from exact head `acebe72f6297f44d5f08e820b8c6dc12a4fa00ae` as merge commit `cf05c43604e3ff9c7af03dc4cd09111cae27d729`. The merge tree exactly equals the reviewed head tree; production `/api/health` is 200/configured on app `1.5.6`, adapter `0.8.3`.
 - PR #36: **merged** from exact docs checkpoint HEAD `c347744858300359ab8d6da204cb5d9277d366be`; reviewed code HEAD `c7881f4c31758d0350833f31c37d116f3ff4c18d`.
@@ -35,6 +35,7 @@ Narrative Engine continuation — PR #38 event-focus refresh is merged. PR #39 i
 - New bounded `sceneRuntime.exit_condition` records an allowlisted condition kind/source/status, 180-character single-line target, bounded establishment and purpose turns, and optional event occurrence ID.
 - Current user input outranks saved boundaries. Exterior/travel, explore, observe, downtime, wait, committed action, and direct-question intents each receive a deterministic stop target.
 - Post-response evaluation distinguishes `open`, `reached`, and `awaiting-player`. Prematurely open boundaries survive AUTO only for the same purpose checkpoint; a new user action replaces them.
+- Initial exact-head review `5007442930` found one P1: `locationChanged` alone let a corridor close an exterior boundary. The remediation stores a bounded `destination`, recognizes actual exterior locations, matches named travel targets, and permanently tests that `A동 복도` remains open even with a real location change.
 - Important decisions remain player-owned, direct questions do not execute contemplated actions, and CONTINUE preserves the prior condition without progression.
 - The Context Router reserves both the directive and compact authoritative condition under long-action pressure. Route/pipeline telemetry exposes the evaluated condition.
 - No schema migration, second model call, new API entrypoint, `app.js` rewrite, or canonical `api/chat.js` rewrite.
