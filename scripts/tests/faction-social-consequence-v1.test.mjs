@@ -19,7 +19,9 @@ const health=readFileSync('api/health.js','utf8');
 
 assert.match(chat,/const FactionReputationChange = z\.object\(/,'canonical schema must define faction reputation changes');
 assert.match(chat,/faction_reputation_changes: z\.array\(FactionReputationChange\)\.max\(4\)/,'canonical state delta must bound faction reputation changes');
+assert.match(chat,/source: z\.string\(\)\.max\(120\)\.nullable\(\)/,'faction schema must carry bounded evidence provenance');
 assert.match(chat,/공개 사건·공식 기록·등록 NPC의 실제 목격·출처 있는 소문/,'canonical prompt must require social evidence');
+assert.match(chat,/credible_rumor에는 실제 출처나 전달 경로를 source에 적는다/,'canonical prompt must require explicit rumor provenance');
 assert.match(chat,/집단 평판은 개인 NPC 관계나 NPC 간 관계를 자동 변경하지 않는다/,'faction reputation must stay separate from personal relationships');
 assert.match(router,/faction_reputation_changes:\[\]/,'CONTINUE freeze must clear faction reputation changes');
 assert.match(router,/deriveFactionSocialState\(\{/,'stable router must derive bounded faction state from accepted changes');
@@ -33,13 +35,14 @@ const first=deriveFactionSocialState({
   previous:{},turnNumber:5,sourceEvent:'public_duel',registeredNpcKeys:registered,
   changes:[
     {faction_key:'student_council',reputation_delta:4,stance:'관심',evidence_type:'witnessed_action',observer_npc_keys:['anastasia'],reason:'아나스타샤가 공식 대련의 규칙 준수를 직접 목격했다.'},
-    {faction_key:'white_rose',reputation_delta:-3,stance:'경계',evidence_type:'credible_rumor',observer_npc_keys:['lucia'],reason:'루시아에게 출처가 확인된 결투 소문이 전달됐다.'},
+    {faction_key:'white_rose',reputation_delta:-3,stance:'경계',evidence_type:'credible_rumor',observer_npc_keys:['lucia'],source:'엘리제의 공개 대련 기록 전달',reason:'루시아에게 출처가 확인된 결투 소문이 전달됐다.'},
   ],
 });
 assert.equal(first.reputations.student_council.reputation,4,'witnessed public behavior must update the addressed faction only');
 assert.equal(first.reputations.student_council.stance,'관심','explicit faction stance must persist');
 assert.deepEqual(first.reputations.student_council.history[0].observer_npc_keys,['anastasia'],'registered observers must remain bounded causal evidence');
 assert.equal(first.reputations.white_rose.reputation,-3,'different factions may interpret the same public event with different polarity');
+assert.equal(first.reputations.white_rose.history[0].source,'엘리제의 공개 대련 기록 전달','credible rumor history must retain bounded provenance');
 
 const privateRejected=deriveFactionSocialState({
   previous:first,turnNumber:6,registeredNpcKeys:registered,
@@ -49,9 +52,15 @@ assert.deepEqual(privateRejected,first,'unwitnessed private behavior must not pr
 
 const badRumorRejected=deriveFactionSocialState({
   previous:first,turnNumber:6,registeredNpcKeys:registered,
-  changes:[{faction_key:'white_rose',reputation_delta:5,stance:null,evidence_type:'credible_rumor',observer_npc_keys:['unknown'],reason:'등록되지 않은 전달자'}],
+  changes:[{faction_key:'white_rose',reputation_delta:5,stance:null,evidence_type:'credible_rumor',observer_npc_keys:['unknown'],source:'익명 게시판',reason:'등록되지 않은 전달자'}],
 });
 assert.deepEqual(badRumorRejected,first,'a rumor without a registered receiving witness must not change faction reputation');
+
+const sourcelessRumorRejected=deriveFactionSocialState({
+  previous:first,turnNumber:6,registeredNpcKeys:registered,
+  changes:[{faction_key:'white_rose',reputation_delta:5,stance:null,evidence_type:'credible_rumor',observer_npc_keys:['lucia'],source:null,reason:'사람들이 그랬다는 출처 없는 소문'}],
+});
+assert.deepEqual(sourcelessRumorRejected,first,'a credible rumor must identify its actual source or transmission path');
 
 const official=deriveFactionSocialState({
   previous:first,turnNumber:6,sourceEvent:'discipline_record',registeredNpcKeys:registered,
@@ -68,6 +77,7 @@ assert.equal(bounded.reputations.student_council.history.at(-1).reason,'공개 �
 const taintedHistory=normalizeFactionSocial({reputations:{student_council:{reputation:3,history:[
   {turn:1,reputation_delta:3,evidence_type:'invented_evidence',observer_npc_keys:[],reason:'잘못된 증거 유형'},
   {turn:2,reputation_delta:1,evidence_type:'witnessed_action',observer_npc_keys:[],reason:'목격자 없는 목격 기록'},
+  {turn:2,reputation_delta:1,evidence_type:'credible_rumor',observer_npc_keys:['lucia'],source:null,reason:'출처 없는 소문 기록'},
   {turn:3,reputation_delta:1,evidence_type:'official_record',observer_npc_keys:[],reason:'유효한 공식 기록'},
 ]}}});
 assert.deepEqual(taintedHistory.reputations.student_council.history.map((row)=>row.reason),['유효한 공식 기록'],'invalid or unsupported saved evidence must be dropped rather than relabeled as public evidence');
@@ -125,7 +135,7 @@ ${divider}
 Resolve actions.`;
 const routed=routeOpenAIParams(
   {instructions,input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}'},
-  {incoming:{action:'백장미회가 나를 어떻게 보는지 루시아에게 묻는다.',saveState:{turnNumber:10,world:{location:'academy'},sceneRuntime:{participants:['lucia'],faction_social:{reputations:{student_council:{reputation:9,stance:'관심',updated_turn:99,history:[]},white_rose:{reputation:-2,stance:'경계',updated_turn:2,history:[{turn:2,reputation_delta:-2,evidence_type:'credible_rumor',observer_npc_keys:['lucia'],reason:'전달된 소문'}]},blue_knights:{reputation:3,stance:'중립',updated_turn:80,history:[]},knight_department:{reputation:2,stance:'중립',updated_turn:70,history:[]}}}},npcInnerStates:{}},recentTurns:[]},mode:'game'},
+  {incoming:{action:'백장미회가 나를 어떻게 보는지 루시아에게 묻는다.',saveState:{turnNumber:10,world:{location:'academy'},sceneRuntime:{participants:['lucia'],faction_social:{reputations:{student_council:{reputation:9,stance:'관심',updated_turn:99,history:[]},white_rose:{reputation:-2,stance:'경계',updated_turn:2,history:[{turn:2,reputation_delta:-2,evidence_type:'credible_rumor',observer_npc_keys:['lucia'],source:'엘리제의 전달',reason:'전달된 소문'}]},blue_knights:{reputation:3,stance:'중립',updated_turn:80,history:[]},knight_department:{reputation:2,stance:'중립',updated_turn:70,history:[]}}}},npcInnerStates:{}},recentTurns:[]},mode:'game'},
 );
 assert.match(routed.params.input,/"white_rose":\{"reputation":-2,"stance":"경계"/,'relevant faction reputation must reach authoritative routed context');
 assert.match(routed.params.instructions,/사적 행동\/단순 동석으로 바꾸거나 개인 관계와 자동 연동하지 않는다/,'routed prompt must preserve evidence and personal-relation boundaries');
