@@ -65,6 +65,9 @@ const ownClassSave={pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'
 const ownClassAction='10시에 기초 수업에 참석한다.';
 const ownClassIntent=classifySceneIntent(ownClassAction,{location:'기숙사',currentTime:'09:00'});
 assert.equal(nextScheduleBoundaryMinutes(ownClassSave,{futureOnly:true,action:ownClassAction,intent:ownClassIntent}),null,'an explicitly requested scheduled activity must not interrupt itself at its own start');
+const modifiedOwnClassAction='오전 10시에 기사과의 기초 수업을 듣는다.';
+const modifiedOwnClassIntent=classifySceneIntent(modifiedOwnClassAction,{location:'기숙사',currentTime:'09:00'});
+assert.equal(nextScheduleBoundaryMinutes(ownClassSave,{futureOnly:true,action:modifiedOwnClassAction,intent:modifiedOwnClassIntent}),null,'temporal modifiers and Korean possessive particles must not make the requested class interrupt itself');
 const otherSameTimeClass={id:'advanced-class',title:'기사과 고급 수업',date:'1285-03-01',time:'10:00',kind:'academic',status:'scheduled'};
 assert.equal(nextScheduleBoundaryMinutes({...ownClassSave,scheduleContext:{due:[],upcoming:[ownClass,otherSameTimeClass]},scheduledEvents:[ownClass,otherSameTimeClass]},{futureOnly:true,action:ownClassAction,intent:ownClassIntent}),60,'a different same-time class must remain authoritative even when it shares a department token with the requested class');
 assert.doesNotMatch(buildSceneMomentumDirective({action:ownClassAction,saveState:ownClassSave}),/SCHEDULE_BOUNDARY=60min/,'the requested class start must remain part of class completion rather than become a new choice stop');
