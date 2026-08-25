@@ -68,6 +68,7 @@ export function sanitizeTurn(turn, { allowedCgIds = [], allowedSkills = [], skil
   const traitSet = new Set((existingTraits || []).map((x) => String(x).trim()).filter(Boolean));
   const authoritySet = new Set((existingAuthorities || []).map((x) => String(x).trim()).filter(Boolean));
   const allowedStats = new Set(['신체', '마나', '지능', '신성']);
+  const allowedTalents = new Set(['magic', 'martial', 'soul', 'knowledge']);
   const rawResolution = turn.resolution_log && typeof turn.resolution_log === 'object' ? turn.resolution_log : {};
   const validRoles = new Set(['primary', 'support', 'passive']);
   const seenAbilities = new Set();
@@ -121,6 +122,10 @@ export function sanitizeTurn(turn, { allowedCgIds = [], allowedSkills = [], skil
     kind: raw?.kind === 'authority' ? 'authority' : 'trait', name: cleanText(raw?.name, 64), amount: clamp(raw?.amount, 1, 10), milestone: Boolean(raw?.milestone),
     description: cleanText(raw?.description, 360), limitation: cleanText(raw?.limitation, 360), reason: cleanText(raw?.reason, 300),
   })).filter((row) => row.name.length >= 2 && row.description && row.limitation && row.reason && !(row.kind === 'trait' ? traitSet : authoritySet).has(row.name));
+
+  d.talent_evolution = arrays(d.talent_evolution, 1).map((raw) => ({
+    talent: cleanText(raw?.talent, 24), amount: Number(raw?.amount), cause: cleanText(raw?.cause, 280), reason: cleanText(raw?.reason, 300),
+  })).filter((row) => allowedTalents.has(row.talent) && row.amount === 1 && row.cause && row.reason);
 
   d.items_add = arrays(d.items_add, 12);
   d.items_remove = arrays(d.items_remove, 12);

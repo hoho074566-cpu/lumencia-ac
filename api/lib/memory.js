@@ -315,6 +315,7 @@ export function serializeCompactSaveForPrompt(compactSave = {}, maxChars = 38000
       stats: trimStringsDeep(pc.stats || {}, 100), skills: compactSkills,
       traits: trimStringsDeep(pc.traits || {}, 140), authorities: trimStringsDeep(pc.authorities || {}, 140),
       skillCandidates: trimStringsDeep(pc.skillCandidates || {}, 140), awakeningCandidates: trimStringsDeep(pc.awakeningCandidates || {}, 140),
+      talentEvolutionHistory: trimStringsDeep((pc.talentEvolutionHistory || []).slice(-12), 140),
       inventory: (pc.inventory || []).slice(-30).map((x) => trimText(x, 120)),
     },
     relationships: Object.fromEntries(Object.entries(state.relationships || {}).slice(0, 8).map(([k, v]) => [k, { affinity:Number(v?.affinity||0), trust:Number(v?.trust||0), status:trimText(v?.status||'',60), stage:trimText(v?.stage||'stranger',24), milestones:(v?.milestones||[]).slice(-2), history:[] }])),

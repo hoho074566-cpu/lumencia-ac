@@ -144,7 +144,7 @@ const directive = buildSceneOrchestrationDirective({ plan: presentGoal });
 assert.match(directive, /PRIMARY=user-action/);
 assert.match(directive, /SECONDARY=present-npc-goal/);
 assert.match(directive, /MAX_DRIVERS=2/);
-assert.match(directive, /EFFECT_ONLY=relationship\|faction\|skill-learning\|offscreen\|novelty/);
+assert.match(directive, /EFFECT_ONLY=relationship\|faction\|growth\|offscreen\|novelty/);
 assert.match(directive, /PC의 새 행동·대사·감정·생각·수락·거절·선택/);
 assert.match(sceneOrchestrationActionFrame(presentGoal), /TURN_PLAN=user-action>present-npc-goal/);
 assert.match(sceneOrchestrationActionFrame(activeEvent), /BLOCK=director-event; EFFECT_ONLY/);

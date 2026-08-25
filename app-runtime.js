@@ -286,7 +286,7 @@ function accumulateUsageStable(usage) {
 function zeroStateDeltaStable() {
   return {
     advance_minutes: 0, new_location: null, pc_status: null, fatigue_delta: 0, gold_delta: 0,
-    relationship_changes: [], npc_relationship_changes: [], faction_reputation_changes: [], intimacy_changes: [], stat_progress: [], skill_experience: [], skill_learning: [],
+    relationship_changes: [], npc_relationship_changes: [], faction_reputation_changes: [], intimacy_changes: [], stat_progress: [], skill_experience: [], skill_learning: [], awakening_progress: [], talent_evolution: [],
     items_add: [], items_remove: [], active_events_add: [], active_events_remove: [], completed_events_add: [],
     pc_knowledge_add: [], scheduled_events_add: [], scheduled_events_complete: [], hooks_add: [], hooks_update: [],
     memories_add: [], npc_state_updates: [],
@@ -350,6 +350,103 @@ function applySkillLearningRuntimeStable(runtime = {}) {
   return notices;
 }
 
+function applyAwakeningTalentRuntimeStable(runtime = {}) {
+  const packet = runtime?.awakening_talent;
+  if (!packet || typeof packet !== 'object' || Array.isArray(packet)) return [];
+  const notices = [];
+  const forbidden = new Set(['__proto__', 'prototype', 'constructor']);
+  const clean = (value, max) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+  const identity = (value) => clean(value, 80).normalize('NFKC').toLocaleLowerCase('ko-KR').replace(/\s+/g, '');
+  const validName = (value) => value.length >= 2 && !forbidden.has(value) && !/[{}<>\r\n]/.test(value);
+  const validLimitation = (value) => Boolean(value) && !/^(?:(?:제한|한계|대가|조건)\s*(?:이|가|은|는|:)?\s*(?:없(?:음|다|는)?|무(?:제약|조건)?|존재하지)|무제한|무조건\s*성공|no\s+(?:limit|limitation|cost|condition)|unlimited)(?:$|\s|[.!?])/i.test(value);
+  const abilityMap = (value) => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) return { ...value };
+    if (!Array.isArray(value)) return {};
+    return Object.fromEntries(value.slice(0, 16).map((row) => {
+      const name = clean(typeof row === 'string' ? row : row?.name, 64);
+      return [name, typeof row === 'string' ? { description:row } : { ...row }];
+    }).filter(([name]) => validName(name)));
+  };
+  save.pc.traits = abilityMap(save.pc.traits);
+  save.pc.authorities = abilityMap(save.pc.authorities);
+  const existing = new Set([...Object.keys(save.pc.traits), ...Object.keys(save.pc.authorities)].map(identity).filter(Boolean));
+  const sourceCandidates = packet.candidates && typeof packet.candidates === 'object' && !Array.isArray(packet.candidates) ? packet.candidates : {};
+  const candidates = { trait:{}, authority:{} };
+  for (const kind of ['trait', 'authority']) {
+    for (const [rawName, raw] of Object.entries(sourceCandidates[kind] && typeof sourceCandidates[kind] === 'object' && !Array.isArray(sourceCandidates[kind]) ? sourceCandidates[kind] : {}).slice(0, 4)) {
+      const name = clean(rawName, 64);
+      const key = identity(name);
+      const description = clean(raw?.description, 360);
+      const limitation = clean(raw?.limitation, 360);
+      const reason = clean(raw?.reason, 300);
+      if (!validName(name) || !key || existing.has(key) || !description || !validLimitation(limitation) || !reason) continue;
+      const opposite = kind === 'trait' ? candidates.authority : candidates.trait;
+      if (Object.keys(opposite).some((otherName) => identity(otherName) === key)) continue;
+      const progress = Math.trunc(clamp(raw?.progress, 0, 100));
+      if (progress <= 0) continue;
+      candidates[kind][name] = {
+        progress,
+        milestones: Math.trunc(clamp(raw?.milestones, 0, 20)),
+        description,
+        limitation,
+        reason,
+        updated_turn: Math.max(0, Math.trunc(Number(raw?.updated_turn || 0))),
+        milestone_keys: [...new Set((Array.isArray(raw?.milestone_keys) ? raw.milestone_keys : []).map((value) => clean(value, 180)).filter(Boolean))].slice(-8),
+        history: (Array.isArray(raw?.history) ? raw.history : []).slice(-8).map((row) => ({
+          turn: Math.max(0, Math.trunc(Number(row?.turn || 0))),
+          amount: Math.trunc(clamp(row?.amount, 1, 10)),
+          milestone: row?.milestone === true,
+          reason: clean(row?.reason, 300),
+          evidence_key: clean(row?.evidence_key, 180),
+        })).filter((row) => row.reason && row.evidence_key),
+      };
+    }
+  }
+  save.pc.awakeningCandidates = candidates;
+
+  const installAwakened = (kind, rows) => {
+    const target = kind === 'authority' ? save.pc.authorities : save.pc.traits;
+    for (const raw of (Array.isArray(rows) ? rows : []).slice(0, 1)) {
+      const name = clean(raw?.name, 64);
+      const key = identity(name);
+      const description = clean(raw?.description, 360);
+      const limitation = clean(raw?.limitation, 360);
+      const source = clean(raw?.source, 300);
+      if (!validName(name) || !key || existing.has(key) || !description || !validLimitation(limitation) || !source) continue;
+      target[name] = { description, limitation, awakened_turn:Math.max(0, Math.trunc(Number(raw?.awakened_turn || 0))), source };
+      existing.add(key);
+      for (const candidateName of Object.keys(save.pc.awakeningCandidates[kind])) if (identity(candidateName) === key) delete save.pc.awakeningCandidates[kind][candidateName];
+      notices.push(`${kind === 'authority' ? 'Authority' : 'Trait'} 각성: ${name}`);
+    }
+  };
+  installAwakened('trait', packet.awakened_traits);
+  installAwakened('authority', packet.awakened_authorities);
+
+  save.pc.talents = save.pc.talents && typeof save.pc.talents === 'object' && !Array.isArray(save.pc.talents) ? save.pc.talents : {};
+  const talentLabels = { magic:'마법', martial:'무', soul:'영혼', knowledge:'지식' };
+  for (const raw of (Array.isArray(packet.talent_changes) ? packet.talent_changes : []).slice(0, 1)) {
+    const talent = Object.prototype.hasOwnProperty.call(talentLabels, raw?.talent) ? raw.talent : null;
+    const before = Math.trunc(Number(raw?.before));
+    const after = Math.trunc(Number(raw?.after));
+    const current = talent ? Math.trunc(clamp(save.pc.talents[talent], 1, 10)) : 0;
+    if (!talent || before < 1 || after !== before + 1 || after > 10) continue;
+    if (current === before) {
+      save.pc.talents[talent] = after;
+      notices.push(`재능 진화: ${talentLabels[talent]} ${before} → ${after}`);
+    }
+  }
+  save.pc.talentEvolutionHistory = (Array.isArray(packet.talent_history) ? packet.talent_history : []).slice(-12).map((row) => ({
+    talent: Object.prototype.hasOwnProperty.call(talentLabels, row?.talent) ? row.talent : null,
+    before: Math.trunc(Number(row?.before)),
+    after: Math.trunc(Number(row?.after)),
+    cause: clean(row?.cause, 280),
+    reason: clean(row?.reason, 300),
+    cause_key: clean(row?.cause_key, 180),
+    turn: Math.max(0, Math.trunc(Number(row?.turn || 0))),
+  })).filter((row) => row.talent && row.before >= 1 && row.after === row.before + 1 && row.after <= 10 && row.cause && row.reason && row.cause_key);
+  return notices;
+}
+
 function applyNpcRelationshipDeltaStable(turn, runtime = {}) {
   const serverBacked = new Set(Object.entries(runtime?.npc_updates || {}).filter(([, row]) => row?.npc_relationships && typeof row.npc_relationships === 'object').map(([key]) => key));
   const rows = Array.isArray(turn?.state_delta?.npc_relationship_changes) ? turn.state_delta.npc_relationship_changes.slice(0, 6) : [];
@@ -375,7 +472,7 @@ function applyNpcRelationshipDeltaStable(turn, runtime = {}) {
 
 function applyRuntimeStateStable(data, isContinue = false) {
   const runtime = data?.runtime_state || {};
-  const notices = applySkillLearningRuntimeStable(runtime);
+  const notices = [...applySkillLearningRuntimeStable(runtime), ...applyAwakeningTalentRuntimeStable(runtime)];
   save.npcInnerStates = save.npcInnerStates || {};
   applyNpcRelationshipDeltaStable(data?.turn, runtime);
   for (const [key, row] of Object.entries(runtime.npc_updates || {})) {
@@ -754,14 +851,14 @@ async function boot() {
     source = replaceOnce(
       source,
       "  const skills = Object.entries(save.pc.skills || {}).map(([k,v]) => `${k} ${v.grade}`).join(' | ') || '-';\n  const stats = Object.entries(save.pc.stats || {}).map(([k,v]) => `- ${k}: ${v.grade} [${v.progress}/100]`).join('\\n');",
-      "  const skills = Object.entries(save.pc.skills || {}).map(([k,v]) => `${k} ${v.grade}`).join(' | ') || '-';\n  const learning = Object.entries(save.pc.skillCandidates || {}).map(([k,v]) => `${k} ${Number(v?.progress || 0)}/100`).join(' | ') || '-';\n  const stats = Object.entries(save.pc.stats || {}).map(([k,v]) => `- ${k}: ${v.grade} [${v.progress}/100]`).join('\\n');",
+      "  const skills = Object.entries(save.pc.skills || {}).map(([k,v]) => `${k} ${v.grade}`).join(' | ') || '-';\n  const learning = Object.entries(save.pc.skillCandidates || {}).map(([k,v]) => `${k} ${Number(v?.progress || 0)}/100`).join(' | ') || '-';\n  const traits = Object.keys(save.pc.traits || {}).join(' | ') || '-';\n  const authorities = Object.keys(save.pc.authorities || {}).join(' | ') || '-';\n  const awakening = ['trait','authority'].flatMap((kind) => Object.entries(save.pc.awakeningCandidates?.[kind] || {}).map(([k,v]) => `${kind === 'authority' ? 'Authority' : 'Trait'} ${k} ${Number(v?.progress || 0)}/100 · M${Number(v?.milestones || 0)}/${kind === 'authority' ? 4 : 3}`)).join(' | ') || '-';\n  const stats = Object.entries(save.pc.stats || {}).map(([k,v]) => `- ${k}: ${v.grade} [${v.progress}/100]`).join('\\n');",
       'renderInfo skill candidates'
     );
 
     source = replaceOnce(
       source,
       '\\n스킬: ${skills}\\n---------\\n스탯:',
-      '\\n스킬: ${skills}\\n학습 중: ${learning}\\n---------\\n스탯:',
+      '\\n스킬: ${skills}\\n학습 중: ${learning}\\nTrait: ${traits}\\nAuthority: ${authorities}\\n각성 중: ${awakening}\\n---------\\n스탯:',
       'renderInfo skill candidate line'
     );
 
@@ -781,6 +878,7 @@ async function boot() {
       zeroStateDeltaStable.toString(),
       compactStateStable.toString(),
       applySkillLearningRuntimeStable.toString(),
+      applyAwakeningTalentRuntimeStable.toString(),
       applyNpcRelationshipDeltaStable.toString(),
       applyRuntimeStateStable.toString(),
       materializeEventConsequencesStable.toString(),

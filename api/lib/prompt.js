@@ -128,7 +128,7 @@ export function buildTurnInput({ action, saveState, recentTurns, rollingSummary,
 
 관계 변화가 실제로 생겼다면 이유를 relationship_changes.reason에 구체적으로 적고, 질적으로 중요한 공동 사건은 relationship_milestones_add에만 기록하라. 미래에 이동할 NPC는 npc_schedule_updates, 실제로 퍼질 소문은 rumors_add, 시간이 지난 뒤 되돌아올 결과는 delayed_consequences_add를 사용하라. 이미 큐에 있는 같은 일을 중복 예약하지 마라.
 
-경험치는 단순 사용 보상이 아니라 실제 학습·훈련·실전 자극이 있을 때만 기록하라. 기존 기술 숙련은 skill_experience, 아직 없는 독립 기술을 배우는 과정은 skill_learning으로 구분한다. Trait/Authority 각성 진척은 극히 드문 결정적 사건에서만 awakening_progress를 사용하며 한 턴에 각성을 완성시키지 않는다.
+경험치는 단순 사용 보상이 아니라 실제 학습·훈련·실전 자극이 있을 때만 기록하라. 기존 기술 숙련은 skill_experience, 아직 없는 독립 기술을 배우는 과정은 skill_learning으로 구분한다. Trait/Authority 각성 진척은 극히 드문 결정적 사건에서만 awakening_progress를 사용하며 한 턴에 각성을 완성시키지 않는다. talent_evolution은 성유물·신의 직접 축복·초월적 개입·영혼 재구성처럼 잠재적 성장 한계가 실제로 영구 변화한 신화적 사건에서만 재능 하나를 +1로 기록하고, 일반 훈련·승리·감정 고조에는 절대 사용하지 않는다.
 
 사용자가 선언한 행동과 그 판정·직접 결과, NPC/세계의 자연스러운 연쇄 반응까지 이번 턴에 충분히 진행하라. 이동·수업·훈련 같은 전환 행동은 특별한 방해가 없으면 의미 있는 다음 장면까지 넘겨도 된다. 직전 턴 내용을 불필요하게 반복하지 마라. PC에게 새로운 선택이 필요한 순간에 멈추고 PC의 다음 행동·대사·감정·결정은 대신 정하지 마라. 각 주요 NPC 대사에는 실제 감정 태그/강도/근거를 함께 반환하라.`;
 }
