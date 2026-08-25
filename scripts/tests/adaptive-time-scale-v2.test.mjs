@@ -9,6 +9,7 @@ import {
   classifySceneIntent,
   deriveSceneDelta,
   isRequestedScheduledActivity,
+  nextScheduleBoundaryMinutes,
   scheduleBoundaryLimitMinutes,
 } from '../../lib/scene-momentum.js';
 
@@ -30,6 +31,9 @@ assert.equal(classifySceneIntent('누군가 “죽이겠다”고 외치는 소�
 assert.equal(classifySceneIntent('카인이 잠을 잔다.',{actorName:'카인'}).kind,'downtime','the actual player name must remain a valid explicit subject');
 assert.deepEqual(classifySceneIntent('기숙사에서 카인이 8시간 잠을 잔다.',{actorName:'카인'}).suggestedAdvanceMinutes,[480,480],'a leading location adjunct must not hide the saved PC subject');
 assert.deepEqual(classifySceneIntent('조용히 카인이 8시간 잠을 잔다.',{actorName:'카인'}).suggestedAdvanceMinutes,[480,480],'a leading manner adjunct must not hide the saved PC subject');
+assert.deepEqual(classifySceneIntent('몸이 피곤해서 8시간 잠을 잔다.').suggestedAdvanceMinutes,[480,480],'a causal-clause subject must not become the omitted subject of the terminal PC action');
+assert.deepEqual(classifySceneIntent('날씨가 좋아서 1시간 동안 훈련한다.').suggestedAdvanceMinutes,[60,60],'an environmental causal-clause subject must not block a terminal PC training action');
+assert.equal(classifySceneIntent('몸이 피곤해서 에밀리가 8시간 잠을 잔다.').kind,'generic','an explicit third-party subject in the terminal causal tail must remain third-party');
 const namedActorDelta=deriveSceneDelta({saveState:{pc:{name:'카인'},world:{location:'기숙사',time:'22:00'}},action:'카인이 8시간 잠을 잔다.',turn:{state_delta:{advance_minutes:480},choices:[]}});
 assert.equal(namedActorDelta.intent,'downtime','runtime momentum must classify the saved player name consistently');
 assert.equal(namedActorDelta.target,2,'saved-name downtime must retain the downtime State Delta target');
@@ -187,6 +191,12 @@ assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,clas
 const durationQualifiedClassAction='오전 10시에 기사과 기초 수업을 1시간 동안 듣는다.';
 assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,durationQualifiedClassAction),true,'duration glue must not make the requested schedule look unrelated');
 assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,'오전 10시에 기사과 기초수업을 듣는다.'),true,'Korean spacing alone must not make the requested schedule look unrelated');
+const capitalDeparture={id:'capital-departure',title:'왕도 출발',date:'1285-03-01',time:'10:00',kind:'travel',status:'scheduled'},capitalDepartureSave={pc:{name:'카인'},world:{date:'1285-03-01',time:'08:00',location:'기숙사'},scheduledEvents:[capitalDeparture],scheduleContext:{due:[],upcoming:[capitalDeparture]}},capitalDepartureAction='오전 10시에 왕도로 간다.',capitalDepartureIntent=classifySceneIntent(capitalDepartureAction,{location:'기숙사',currentTime:'08:00',actorName:'카인'});
+assert.equal(capitalDepartureIntent.kind,'travel','a requested saved departure must retain the travel profile');
+assert.equal(capitalDepartureIntent.scheduledStartOffsetMinutes,120,'a requested departure must retain its saved start offset');
+assert.equal(isRequestedScheduledActivity(capitalDepartureSave,capitalDeparture,capitalDepartureAction,capitalDepartureIntent),true,'a destination-matched saved departure must be recognized as the requested travel');
+assert.equal(nextScheduleBoundaryMinutes(capitalDepartureSave,{futureOnly:true,action:capitalDepartureAction,intent:capitalDepartureIntent}),null,'the requested departure must not interrupt itself at its own start');
+assert.doesNotMatch(buildSceneMomentumDirective({action:capitalDepartureAction,saveState:capitalDepartureSave}),/SCHEDULE_BOUNDARY=/,'the requested departure must not emit its own start as a hard boundary');
 const overrunClassAction='3시간 동안 훈련하고 오전 10시에 기사과 기초 수업을 듣는다.',overrunClassIntent=classifySceneIntent(overrunClassAction,{location:'훈련장',currentTime:'08:00',actorName:'카인'});
 assert.equal(overrunClassIntent.scheduledStartOverrun,true,'preceding work longer than the fixed start offset must be marked as an overrun');
 assert.equal(overrunClassIntent.minAdvanceMinutes,120,'an overrun compound must stop at its declared terminal start');
@@ -228,6 +238,24 @@ const overlongDirective=buildSceneMomentumDirective({action:'48시간 쉰다.',s
 assert.match(overlongDirective,/TIME_GUIDE=1440-1440min/,'the model guide must use the canonical one-turn maximum');
 assert.match(overlongDirective,/아직 끝나지 않은 활동으로 남긴다/,'the model must stop with an overlong activity unfinished');
 assert.doesNotMatch(overlongDirective,/사용자가 2880분을 직접 지정했다/,'the directive must not demand impossible one-turn completion');
+const twoDayRest=classifySceneIntent('2일 동안 쉰다.');
+assert.equal(twoDayRest.explicitDurationMinutes,2880,'numeric day durations must normalize to minutes');
+assert.deepEqual(twoDayRest.suggestedAdvanceMinutes,[1440,1440],'a multi-day rest must stop at the canonical one-turn cap');
+assert.equal(twoDayRest.turnLimitTruncated,true,'a multi-day rest must remain unfinished after one turn');
+const oneDaySleep=classifySceneIntent('하루 동안 잠을 잔다.');
+assert.equal(oneDaySleep.explicitDurationMinutes,1440,'하루 must normalize to one day');
+assert.deepEqual(oneDaySleep.suggestedAdvanceMinutes,[1440,1440],'a one-day sleep must fit exactly at the turn cap');
+assert.equal(oneDaySleep.turnLimitTruncated,false,'an exact one-day request may complete at the canonical cap');
+const twoDaySleep=classifySceneIntent('이틀 동안 잠을 잔다.');
+assert.equal(twoDaySleep.explicitDurationMinutes,2880,'이틀 must normalize to two days');
+assert.equal(twoDaySleep.turnLimitTruncated,true,'an 이틀 sleep must remain unfinished after one turn');
+const twoDayTravel=classifySceneIntent('2일 동안 수도로 간다.',{location:'중앙광장'});
+assert.equal(twoDayTravel.kind,'travel','a leading day duration must retain travel intent');
+assert.equal(twoDayTravel.semanticTarget,'수도','a leading day duration must not pollute the destination');
+assert.equal(twoDayTravel.explicitDurationMinutes,2880,'multi-day travel must retain its declared duration');
+assert.deepEqual(twoDayTravel.suggestedAdvanceMinutes,[1440,1440],'multi-day travel must stop at the one-turn cap');
+assert.equal(twoDayTravel.turnLimitTruncated,true,'multi-day travel must remain incomplete at the cap');
+assert.match(buildSceneMomentumDirective({action:'2일 동안 수도로 간다.',saveState:{world:{date:'1285-03-01',time:'09:00',location:'중앙광장'}}}),/아직 끝나지 않은 활동으로 남긴다/,'multi-day travel must fail closed instead of completing early');
 const partlyCappedRange=classifySceneIntent('12~30시간 동안 잠을 잔다.');
 assert.deepEqual(partlyCappedRange.explicitDurationRangeMinutes,[720,1800],'the original explicit range must remain available for intent telemetry');
 assert.equal(partlyCappedRange.minAdvanceMinutes,720,'an in-cap lower endpoint must remain a valid completion floor');
