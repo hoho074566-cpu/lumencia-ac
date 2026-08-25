@@ -438,10 +438,10 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only.
 
 ## NEXT ACTION
-1. Confirm PR #52 exact head contains code checkpoint `4d82b6f...` plus this docs checkpoint and remains based on main `2ce8d0b...` without conflict or behind state.
-2. Require GitHub Safety Gate, Vercel Ready, and fresh exact-head Codex P0/P1=0. The authoritative clean-LF full regression must pass on every new head.
-3. Run targeted Exact Preview lifecycle acceptance: eligible public non-PC start; explicit completion/status/digest; no inferred/generic completion; current/model/PC/secret/future protections; zero-time explicit completion; background-disabled no-op. Do not extract protection tokens/cookies/local storage or bypass Preview protection.
-4. Only if every exact-head gate and Preview case passes, report PR #52 ready for human merge. Codex must not merge this protected-path PR. Event Director V3 remains separate until then.
+1. Commit and push the final acceptance docs checkpoint while preserving code checkpoint `4d82b6f...` and base/main `2ce8d0b...` with no conflict or behind state.
+2. Require the final docs exact head to pass GitHub Safety Gate, Vercel Ready, fresh Codex P0/P1=0, and the authoritative clean-LF full regression.
+3. Targeted Exact Preview lifecycle acceptance is complete: eligible public non-PC start, no time-only inferred completion, explicit completion, known-NPC status, and bounded start/finish digest each passed. Permanent deterministic coverage passes for generic/current/model/PC/secret/future exclusions, zero-time explicit completion, caps, cross-midnight/long skips, and background-disabled no-op. No protection token, cookie, or local storage was read.
+4. When the final exact-head gates are green, report PR #52 ready for human merge. Codex must not merge this protected-path PR. After the user merges it, verify tree equality, merged-main regression/Vercel/health, then begin the separate Event Director V3 result-surfacing analysis.
 
 ## Stop Record
 - Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.
@@ -485,4 +485,4 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed: PR #49 final reviewed head `ff50084...` merged as `93f5644...`; reviewed and merged trees are identical, final hosted readiness had P0/P1=0 with no conflict, and main Vercel/production health/merged-main clean-LF regression pass.
 - Completed: PR #50 final reviewed head `1eb316b...` merged as `88ce7b4...`; reviewed and merged trees are identical, production health advertises Awakening/Talent V1, and merged-main clean-LF full regression passes.
 - Completed: PR #51 final reviewed/accepted head `68c9e84...` merged as `2ce8d0b...`; trees are identical, production health is green, and merged-main clean-LF full regression passes.
-- Current candidate: Living World V1 in open PR #52 on `codex/living-world-v1`; code checkpoint `4d82b6f...` passes focused and authoritative clean-LF full regression with no core/save/schema/model-call expansion. Docs exact-head hosted authority and targeted Preview acceptance are next.
+- Current candidate: Living World V1 in open PR #52 on `codex/living-world-v1`; code checkpoint `4d82b6f...` passes focused and authoritative clean-LF full regression with no core/save/schema/model-call expansion. Pre-acceptance exact head `589510f...` passed Safety #392, Vercel Ready, Merge Readiness, and fresh Codex P0/P1=0. Exact Preview then passed public start, time-only no-inference, explicit completion, Lena `참여 중→일정을 마침`, and bounded start/finish digest validation. The final acceptance docs exact head must repeat hosted authority before human merge.
