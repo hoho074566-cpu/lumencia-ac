@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { appendOffscreenDigest, deriveBoundedOffscreenProgression } from '../../lib/offscreen-progression.js';
+import { appendOffscreenDigest, deriveBoundedOffscreenProgression, OFFSCREEN_PROGRESSION_VERSION } from '../../lib/offscreen-progression.js';
 
 function event(overrides = {}) {
   return {
@@ -22,10 +22,13 @@ function turn(advance = 20, patch = {}) {
 }
 
 const started = deriveBoundedOffscreenProgression({ saveState: save(), turn: turn(), participants: [] });
+assert.equal(OFFSCREEN_PROGRESSION_VERSION, '2');
 assert.equal(started.telemetry.reason, 'schedule-start');
 assert.deepEqual(started.telemetry.event_ids, ['magic-orientation']);
+assert.deepEqual(started.telemetry.started_event_ids, ['magic-orientation']);
+assert.deepEqual(started.telemetry.completed_event_ids, []);
 assert.deepEqual(started.telemetry.npc_keys, ['chloe']);
-assert.deepEqual(started.npc_state_updates, [{ npc_key: 'chloe', location: '마법과 지정 오리엔테이션 장소', status: '마법과 1학년 오리엔테이션 일정에 참여 중', source_event_id: 'magic-orientation', at: '1285-03-01 12:00' }]);
+assert.deepEqual(started.npc_state_updates, [{ npc_key: 'chloe', location: '마법과 지정 오리엔테이션 장소', status: '마법과 1학년 오리엔테이션 일정에 참여 중', source_event_id: 'magic-orientation', phase: 'started', at: '1285-03-01 12:00' }]);
 assert.match(started.digest_rows[0], /OFFSCREEN 1285-03-01 12:00.*chloe.*마법과 1학년 오리엔테이션 시작/);
 
 assert.equal(deriveBoundedOffscreenProgression({ saveState: save(), turn: turn(), enabled: false }).telemetry.reason, 'disabled');
@@ -38,7 +41,9 @@ assert.equal(deriveBoundedOffscreenProgression({ saveState: save(), turn: turn()
 assert.equal(deriveBoundedOffscreenProgression({ saveState: save(), turn: turn(20, { npc_state_updates: [{ npc_key: 'chloe', location: '광장' }] }) }).telemetry.reason, 'no-eligible-transition', 'a model update must not be overwritten');
 assert.equal(deriveBoundedOffscreenProgression({ saveState: save({ scheduledEvents: [event({ secret_level: 3 })] }), turn: turn() }).telemetry.reason, 'no-eligible-transition', 'secret schedules stay hidden');
 assert.equal(deriveBoundedOffscreenProgression({ saveState: save({ completedEvents: ['magic-orientation'] }), turn: turn() }).telemetry.reason, 'no-eligible-transition');
-assert.equal(deriveBoundedOffscreenProgression({ saveState: save(), turn: turn(20, { scheduled_events_complete: ['magic-orientation'] }) }).telemetry.reason, 'no-eligible-transition');
+const sameTurnCompletion = deriveBoundedOffscreenProgression({ saveState: save(), turn: turn(20, { scheduled_events_complete: ['magic-orientation'] }) });
+assert.equal(sameTurnCompletion.telemetry.reason, 'schedule-complete');
+assert.deepEqual(sameTurnCompletion.telemetry.started_event_ids, [], 'an explicitly completed event must not also be recorded as a start');
 
 const longSkip = deriveBoundedOffscreenProgression({ saveState: save(), turn: turn(180) });
 assert.equal(longSkip.telemetry.digest_count, 1, 'a crossed public start remains historical background evidence');
@@ -84,13 +89,47 @@ const crowdedSave = save({
 const crowdedTurn = { ...turn(), scene: crowdedKeys.map(key => ({ kind: 'dialogue', speaker_key: key, text: '현재 장면 대사' })) };
 assert.equal(deriveBoundedOffscreenProgression({ saveState: crowdedSave, turn: crowdedTurn, participants: crowdedKeys.slice(0, 8) }).telemetry.reason, 'no-eligible-transition', 'every visible turn speaker must be protected beyond the bounded runtime participant list');
 
+const completedSave = save({ world: { date: '1285-03-01', time: '12:50', location: '기사과 훈련장' } });
+const completed = deriveBoundedOffscreenProgression({ saveState: completedSave, turn: turn(20, { scheduled_events_complete: ['magic-orientation'] }) });
+assert.equal(completed.telemetry.reason, 'schedule-complete');
+assert.deepEqual(completed.telemetry.started_event_ids, []);
+assert.deepEqual(completed.telemetry.completed_event_ids, ['magic-orientation']);
+assert.deepEqual(completed.npc_state_updates, [{ npc_key: 'chloe', status: '마법과 1학년 오리엔테이션 일정을 마침', source_event_id: 'magic-orientation', phase: 'completed', at: '1285-03-01 13:10' }]);
+assert.match(completed.digest_rows[0], /OFFSCREEN 1285-03-01 13:10.*chloe.*마법과 1학년 오리엔테이션 종료 확정/);
+const completedAtCurrentClock = deriveBoundedOffscreenProgression({ saveState: completedSave, turn: turn(0, { scheduled_events_complete: ['magic-orientation'] }) });
+assert.equal(completedAtCurrentClock.telemetry.reason, 'schedule-complete', 'an authoritative completion at the current clock must propagate even without a time increment');
+assert.equal(completedAtCurrentClock.npc_state_updates[0].at, '1285-03-01 12:50');
+
+const futureCompletion = save({ world: { date: '1285-03-01', time: '11:00', location: '기사과 훈련장' } });
+assert.equal(deriveBoundedOffscreenProgression({ saveState: futureCompletion, turn: turn(10, { scheduled_events_complete: ['magic-orientation'] }) }).telemetry.reason, 'no-eligible-transition', 'an explicit completion cannot propagate before the scheduled start');
+assert.equal(deriveBoundedOffscreenProgression({ saveState: completedSave, turn: turn(20, { completed_events_add: ['magic-orientation'] }) }).telemetry.reason, 'no-eligible-transition', 'generic event completion is not an authoritative scheduled-event completion');
+assert.equal(deriveBoundedOffscreenProgression({ saveState: save({ world: completedSave.world, scheduledEvents: [event({ secret_level: 3 })] }), turn: turn(20, { scheduled_events_complete: ['magic-orientation'] }) }).telemetry.reason, 'no-eligible-transition', 'secret completion remains outside the public background digest');
+assert.equal(deriveBoundedOffscreenProgression({ saveState: completedSave, turn: turn(20, { scheduled_events_complete: ['magic-orientation'] }), participants: ['chloe'] }).telemetry.reason, 'no-eligible-transition', 'a visible NPC completion remains in foreground state');
+assert.equal(deriveBoundedOffscreenProgression({ saveState: completedSave, turn: turn(20, { scheduled_events_complete: ['magic-orientation'], npc_state_updates: [{ npc_key: 'chloe', status: '직접 장면 갱신' }] }) }).telemetry.reason, 'no-eligible-transition', 'explicit model state wins over a completion-derived background status');
+
+const lifecycleSave = save({
+  world: { date: '1285-03-01', time: '11:50', location: '기사과 훈련장' },
+  npcStates: { chloe: { location: '마법과 연구실' }, lena: { location: '기숙사' } },
+  scheduledEvents: [
+    event({ id: 'morning-study', title: '마법과 오전 연구회', time: '11:00', participants: ['chloe'] }),
+    event({ id: 'noon-study', title: '마법과 정오 연구회', time: '12:00', participants: ['lena'] }),
+  ],
+});
+const lifecycle = deriveBoundedOffscreenProgression({ saveState: lifecycleSave, turn: turn(20, { scheduled_events_complete: ['morning-study'] }) });
+assert.equal(lifecycle.telemetry.reason, 'schedule-lifecycle');
+assert.deepEqual(lifecycle.telemetry.completed_event_ids, ['morning-study']);
+assert.deepEqual(lifecycle.telemetry.started_event_ids, ['noon-study']);
+assert.equal(lifecycle.telemetry.applied_count, 2);
+assert.deepEqual(lifecycle.npc_state_updates.map(row => [row.npc_key, row.phase]), [['chloe', 'completed'], ['lena', 'started']]);
+
 assert.match(appendOffscreenDigest('old background', started), /^old background\n\[OFFSCREEN/);
 assert.ok(appendOffscreenDigest('x'.repeat(2200), started).length <= 1800, 'background digest remains bounded');
 const router = readFileSync('api/chat-router.js', 'utf8');
 const runtime = readFileSync('app-runtime.js', 'utf8');
 assert.equal((router.match(/coreHandler\(/g) || []).length, 1, 'off-screen progression preserves one canonical model call');
 assert.match(router, /offscreen_npc_updates:offscreenProgression\.npc_state_updates/);
-assert.match(router, /offscreen_progression_v1:true/);
+assert.match(router, /offscreen_progression_v2:true/);
+assert.match(router, /living_world_v1:true/);
 assert.match(runtime, /runtime\.offscreen_npc_updates/);
 
-console.log('PASS Bounded Off-screen Progression V1 public schedule transitions');
+console.log('PASS Living World V1 bounded public off-screen schedule lifecycle');

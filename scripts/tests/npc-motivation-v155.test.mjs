@@ -198,7 +198,8 @@ assert.equal((chatRouter.match(/coreHandler\(/g)||[]).length, 1, 'V1.5.6 must ke
 assert.match(runtime, /\[NPC GOAL V2\]/, 'DEBUG must expose NPC Goal V2');
 assert.match(runtime, /\[RECENT RELATIONSHIP REASONS\]/, 'DEBUG must expose persistent relationship reasons');
 assert.match(runtime, /const PATCH_VERSION = '1\.5\.6'/, 'runtime version must be V1.5.6');
-assert.match(health, /version: '0\.8\.3'/, 'health API version must be 0.8.3 for Scene Momentum HF1');
+assert.match(health, /version: '0\.8\.4'/, 'health API version must match the Living World V1 adapter');
+assert.match(health, /livingWorld: 'V1 bounded public off-screen schedule lifecycle/, 'health API must advertise Living World V1');
 assert.match(health, /appVersion: '1\.5\.6'/, 'health appVersion must be 1.5.6');
 
 console.log('PASS NPC Motivation + Relationship Reason V1 / Goal V2 regressions');
