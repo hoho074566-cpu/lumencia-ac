@@ -334,9 +334,9 @@ function scheduleRowMentioned(turn,row={}){
 function scheduleTimeMentioned(text,row={}){
   const match=String(row?.time||'').trim().match(/^(\d{1,2}):(\d{2})$/);if(!match)return false;
   const hour=Number(match[1]),minute=Number(match[2]),value=String(text||'');if(!Number.isInteger(hour)||!Number.isInteger(minute))return false;
-  const hourToken=hour<10?`0?${hour}`:`${hour}`,minuteToken=String(minute).padStart(2,'0'),colon=new RegExp(`(?:^|\\D)${hourToken}:${minuteToken}(?!\\d)`),korean=minute===0?new RegExp(`(?:^|\\D)${hour}\\s*시(?!\\s*\\d+\\s*분)`):new RegExp(`(?:^|\\D)${hour}\\s*시\\s*${minute}\\s*분`);
-  const period=hour<12?'오전':'오후',twelveHour=hour%12||12,twelveHourKorean=minute===0?new RegExp(`${period}\\s*${twelveHour}\\s*시(?!\\s*\\d+\\s*분)`):new RegExp(`${period}\\s*${twelveHour}\\s*시\\s*${minute}\\s*분`);
-  if(colon.test(value)||korean.test(value)||twelveHourKorean.test(value))return true;
+  const hourToken=hour<10?`0?${hour}`:`${hour}`,minuteToken=String(minute).padStart(2,'0'),colon=new RegExp(`(?:^|\\D)${hourToken}:${minuteToken}(?!\\d)`),korean=minute===0?new RegExp(`(?:^|\\D)${hour}\\s*시(?!\\s*\\d+\\s*분)`):new RegExp(`(?:^|\\D)${hour}\\s*시\\s*${minute}\\s*분`),unmarkedValue=value.replace(/(?:오전|오후|아침|저녁|밤)\s*\d{1,2}\s*시(?:\s*\d{1,2}\s*분)?/g,' ');
+  const period=hour<12?'(?:오전|아침)':'(?:오후|저녁|밤)',twelveHour=hour%12||12,twelveHourKorean=minute===0?new RegExp(`${period}\\s*${twelveHour}\\s*시(?!\\s*\\d+\\s*분)`):new RegExp(`${period}\\s*${twelveHour}\\s*시\\s*${minute}\\s*분`);
+  if(colon.test(value)||korean.test(unmarkedValue)||twelveHourKorean.test(value))return true;
   return minute===0&&((hour===12&&/정오/.test(value))||(hour===0&&/자정/.test(value)));
 }
 function scheduleBoundaryOccurred(turn,row={}){
@@ -441,7 +441,7 @@ function timedActionCompletionEvidence(turn,intent={}){
     meal:/(?:식사를\s*(?:마쳤|끝냈)|밥을\s*다\s*먹었|식사\s*후)/,
     training:/(?:훈련|연습|수련|단련)(?:을|를)?\s*(?:마쳤|끝냈|완료했|마무리했)/,
     'class-attendance':/(?:수업|강의|세미나|실습)(?:을|를)?\s*(?:마쳤|끝냈|완료했|수료했)|(?:수업|강의|세미나|실습)이\s*(?:끝났|종료되었|종료됐다)/,
-    dialogue:/(?:대화|이야기|상담|논의)(?:를)?\s*(?:마쳤|끝냈|마무리했)|(?:대화|이야기|상담|논의)가\s*(?:끝났|마무리되었)/,
+    dialogue:/(?:대화|이야기|질문|답변|설명|상담|논의|면담|회의|브리핑)(?:을|를)?\s*(?:마쳤|끝냈|마무리했)|(?:대화|이야기|질문|답변|설명|상담|논의|면담|회의|브리핑)(?:이|가)\s*(?:끝났|마무리되었)/,
     travel:/(?:목적지|행선지|[^\s]{2,24})(?:에|로)\s*(?:도착했|도착했다|도착했다가|닿았|다다랐)/,
     explore:/(?:탐색|구경|둘러보기|순회)(?:를)?\s*(?:마쳤|끝냈|마무리했)/,
     'exit-exterior':/(?:건물|기숙사|방)\s*밖(?:에|으로)\s*(?:나왔|도착했)/,
@@ -457,8 +457,9 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   const current=Math.max(0,Number(turn.state_delta.advance_minutes||0));
   const requestedFloor=Math.min(1440,Math.max(0,Number(intent.minAdvanceMinutes||0)));
   if(intent.explicitDurationMinutes===0&&requestedFloor<=0&&boundaryLookahead<=0&&Number(intent.scheduledStartOffsetMinutes||0)<=0){reconcileExplicitZeroTurn(turn);return intent;}
-  if(requestedFloor<=0&&boundaryLookahead<=0)return intent;
-  const profileMax=boundaryLookahead>0?boundaryLookahead:Math.min(1440,Math.max(requestedFloor,Number(array(intent.suggestedAdvanceMinutes)[1]||0)));
+  const requestedMaximum=Math.min(1440,Math.max(requestedFloor,Number(array(intent.suggestedAdvanceMinutes)[1]||0)));
+  if(requestedFloor<=0&&boundaryLookahead<=0&&requestedMaximum<=0)return intent;
+  const profileMax=boundaryLookahead>0?boundaryLookahead:requestedMaximum;
   const scheduleBoundary=nextScheduleBoundaryMinutes(incoming?.saveState||{},{futureOnly:true,action:incoming?.action||'',intent,registry:CHARACTER_REGISTRY});
   const consequenceBoundary=consequenceLifecycle?.selected_id?minutesUntilEventConsequence(incoming?.saveState||{},consequenceLifecycle.selected_id):null;
   const reachedConsequenceBoundary=Boolean(consequenceBoundary!=null&&Number.isFinite(Number(consequenceBoundary))&&consequenceBoundary<=profileMax&&consequenceLifecycle?.status==='resolved'&&consequenceLifecycle?.attribution_safe!==false);

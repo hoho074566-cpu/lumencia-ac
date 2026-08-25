@@ -60,12 +60,18 @@ const compoundExplicitSleep=classifySceneIntent('1시간 동안 훈련을 하고
 assert.equal(compoundExplicitSleep.explicitDurationMinutes,480,'the terminal explicit sleep duration must remain separately identifiable');
 assert.equal(compoundExplicitSleep.precedingActivityMinutes,60,'the committed preceding training duration must be retained');
 assert.deepEqual(compoundExplicitSleep.suggestedAdvanceMinutes,[540,540],'compound explicit activities must use their full declared total duration');
+const rangedCompoundSleep=classifySceneIntent('1시간에서 2시간 동안 훈련을 하고 8시간 동안 잠을 잔다.');
+assert.deepEqual(rangedCompoundSleep.precedingActivityRangeMinutes,[60,120],'a preceding activity range must retain both endpoints');
+assert.deepEqual(rangedCompoundSleep.suggestedAdvanceMinutes,[540,600],'a preceding activity range must offset the terminal activity with separate lower and upper bounds');
 const compoundZeroSleep=classifySceneIntent('1시간 동안 훈련을 하고 0분 동안 잠을 잔다.');
 assert.equal(compoundZeroSleep.explicitDurationMinutes,0,'the terminal zero duration must remain visible');
 assert.equal(compoundZeroSleep.minAdvanceMinutes,60,'the full turn duration must retain the completed preceding hour');
 const compoundExplicitDirective=buildSceneMomentumDirective({action:'1시간 동안 훈련을 하고 8시간 동안 잠을 잔다.',saveState:{world:{date:'1285-03-01',time:'09:00',location:'기숙사'}}});
 assert.match(compoundExplicitDirective,/PRECEDING_ACTIVITY_DURATION=60min/,'the model directive must expose the preceding activity duration');
 assert.match(compoundExplicitDirective,/사용자가 540분을 직접 지정했다\(앞선 행동 60분 포함\)/,'the explicit-duration rule must describe the full compound total without contradicting TIME_GUIDE');
+const rangedCompoundDirective=buildSceneMomentumDirective({action:'1시간에서 2시간 동안 훈련을 하고 8시간 동안 잠을 잔다.',saveState:{world:{date:'1285-03-01',time:'09:00',location:'기숙사'}}});
+assert.match(rangedCompoundDirective,/PRECEDING_ACTIVITY_DURATION_RANGE=60-120min/,'the directive must expose a preceding activity range without collapsing it');
+assert.match(rangedCompoundDirective,/사용자가 540-600분을 직접 지정했다\(앞선 행동 60-120분 포함\)/,'the directive must describe the full compound range');
 assert.equal(classifySceneIntent('한 시간 동안 친구하고 대화한다.').explicitDurationMinutes, 60, 'the comitative 하고 particle must not be mistaken for an activity boundary');
 
 const classAttendance = classifySceneIntent('강의에 참석한다.', { location:'강의실' });
@@ -108,6 +114,9 @@ assert.deepEqual(topicQualifiedClass.suggestedAdvanceMinutes,[0,1440]);
 assert.equal(classifySceneIntent('모레는 오전 8시에 수업을 듣는다.', { location:'기숙사',currentTime:'09:00' }).dateQualifiedStart,true,'모레는 must remain a future date qualifier');
 assert.equal(classifySceneIntent('정오에 수업을 듣는다.', { location:'강의실',currentTime:'09:00' }).scheduledStartOffsetMinutes,180,'noon must normalize to the same-day 12:00 start');
 assert.equal(classifySceneIntent('자정에 훈련한다.', { location:'훈련장',currentTime:'09:00' }).scheduledStartOffsetMinutes,900,'midnight must normalize to the next upcoming 00:00 start');
+assert.equal(classifySceneIntent('오늘 아침 8시에 수업을 듣는다.', { location:'강의실',currentTime:'07:00' }).scheduledStartOffsetMinutes,60,'아침 must normalize to an AM clock marker');
+assert.equal(classifySceneIntent('오늘 저녁 8시에 수업을 듣는다.', { location:'강의실',currentTime:'19:00' }).scheduledStartOffsetMinutes,60,'저녁 must normalize to a PM clock marker');
+assert.equal(classifySceneIntent('오늘 밤 10시에 훈련한다.', { location:'훈련장',currentTime:'21:00' }).scheduledStartOffsetMinutes,60,'밤 must normalize to a PM clock marker');
 
 const sleep = classifySceneIntent('잠을 잔다.', { location:'개인실' });
 assert.equal(sleep.kind, 'downtime');
@@ -118,7 +127,9 @@ assert.equal(classifySceneIntent('아르테미스가 잠을 잔다?', { location
 assert.notEqual(classifySceneIntent('잠을 자지 않는다.', { location:'개인실' }).timeProfile, 'sleep', 'negated sleep must not become committed downtime');
 assert.match(buildSceneMomentumDirective({ action:'잠을 잔다.', saveState:{ world:{ date:'1285-03-02', time:'07:20', location:'개인실' } } }), /완료 시간과 advance_minutes를 TIME_GUIDE 240-480 안에 두며/, 'completed sleep must receive explicit hard profile bounds');
 assert.deepEqual(classifySceneIntent('한 시간 잠을 잔다.').suggestedAdvanceMinutes, [60, 60], 'explicit sleep duration must remain exact');
+assert.deepEqual(classifySceneIntent('1시간 반 동안 잠을 잔다.').suggestedAdvanceMinutes, [90, 90], 'the half-hour suffix must add thirty minutes to an explicit hour duration');
 assert.equal(classifySceneIntent('잠깐 눈을 붙인다.').timeProfile, 'rest', 'a short-rest cue must not become a four-hour sleep floor');
+assert.equal(classifySceneIntent('잠깐 대화를 하고 잠을 잔다.').timeProfile, 'sleep', 'a short cue on a preceding dialogue must not downgrade the terminal sleep action');
 const scheduledSleep=classifySceneIntent('오늘 오후 10시에 잠을 잔다.', { location:'개인실',currentTime:'09:00' });
 assert.equal(scheduledSleep.scheduledStartOffsetMinutes,780,'same-day scheduled sleep must retain its start offset');
 assert.deepEqual(scheduledSleep.suggestedAdvanceMinutes,[1020,1260],'scheduled sleep timing must include waiting until start plus the sleep range');

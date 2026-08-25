@@ -111,6 +111,9 @@ const classroomConsultSave={...personalConsultSave,scheduleContext:{due:[],upcom
 assert.equal(nextScheduleBoundaryMinutes(classroomConsultSave,{futureOnly:true,action:namedConsultAction,intent:classifySceneIntent(namedConsultAction,{location:'기숙사',currentTime:'09:00'}),registry:{emily:'에밀리'}}),null,'an ancillary classroom location must not reclassify a dialogue appointment as an academic event');
 const objectMarkedConsultAction='10시에 에밀리와 상담을 한다.';
 assert.equal(nextScheduleBoundaryMinutes(personalConsultSave,{futureOnly:true,action:objectMarkedConsultAction,intent:classifySceneIntent(objectMarkedConsultAction,{location:'기숙사',currentTime:'09:00'}),registry:{emily:'에밀리'}}),null,'an object-marked dialogue form must still exclude its own matching appointment boundary');
+const notedConsult={...personalConsult,note:'기사과 수업 후 진행'};
+const notedConsultSave={...personalConsultSave,scheduleContext:{due:[],upcoming:[notedConsult]},scheduledEvents:[notedConsult]};
+assert.equal(nextScheduleBoundaryMinutes(notedConsultSave,{futureOnly:true,action:namedConsultAction,intent:classifySceneIntent(namedConsultAction,{location:'기숙사',currentTime:'09:00'}),registry:{emily:'에밀리'}}),null,'an academic note must not reclassify a personal dialogue appointment');
 
 const boundaryChoiceSave={...boundarySave,pc:knightPc,scheduledEvents:[{id:'past-ceremony',date:'1285-03-01',time:'08:00',status:'scheduled'},{id:'class',date:'1285-03-01',time:'10:00',status:'scheduled'}]};
 turn={state_delta:{advance_minutes:0},choices:['수업에 간다','남는다','다른 일을 한다'],event_progress:{event_instance_id:'class'}};
@@ -122,6 +125,15 @@ turn={scene_title:'오후 수업의 종',scene:[{kind:'narration',text:'오후 8
 applySceneMomentumTimeFloor({action:'2시간 동안 검술을 훈련한다.',saveState:eveningClassSave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,30,'an equivalent twelve-hour timestamp must surface the exact saved schedule boundary');
 assert.deepEqual(turn.state_delta.skill_experience,[],'completion effects beyond a twelve-hour-form boundary must fail closed');
+turn={scene_title:'저녁 수업의 종',scene:[{kind:'narration',text:'저녁 8시, 기사과 수업 종이 울렸다.'}],state_delta:{advance_minutes:30,skill_experience:[{skill:'검술',amount:1}]},choices:['수업에 간다','훈련을 멈춘다','다른 곳으로 간다']};
+applySceneMomentumTimeFloor({action:'2시간 동안 검술을 훈련한다.',saveState:eveningClassSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,30,'a 저녁 clock marker must surface the same exact saved schedule boundary');
+assert.deepEqual(turn.state_delta.skill_experience,[],'effects beyond a 저녁-form boundary must fail closed');
+const morningClass={...eveningClass,id:'morning-class',time:'08:00'};
+const morningClassSave={...eveningClassSave,world:{...eveningClassSave.world,time:'07:30'},scheduleContext:{due:[],upcoming:[morningClass]},scheduledEvents:[morningClass]};
+turn={scene_title:'저녁 수업의 예고',scene:[{kind:'narration',text:'저녁 8시, 기사과 수업 종이 울렸다.'}],state_delta:{advance_minutes:10},choices:['훈련을 계속한다','교관에게 묻는다','자리를 뜬다']};
+applySceneMomentumTimeFloor({action:'2시간 동안 검술을 훈련한다.',saveState:morningClassSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,10,'an explicitly evening clock must not be mistaken for the same twelve-hour morning clock');
 turn={scene_title:'정오의 호출',scene:[{kind:'narration',text:'기사과 1학년 필수 오리엔테이션이 시작되어 참석 여부를 정해야 한다.'}],state_delta:{advance_minutes:0},choices:['참석한다','남는다','다른 일을 한다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'두 시간 쉰다.',saveState:{...boundaryChoiceSave,scheduledEvents:[{id:'class',title:'기사과 필수 오리엔테이션',date:'1285-03-01',time:'10:00',status:'scheduled'}]}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'authoritative boundary title evidence must align the clock even when event_progress is omitted');
@@ -354,6 +366,10 @@ turn={scene:[{kind:'narration',text:'한참 뒤 방문객이 도착했다.'}],st
 applySceneMomentumTimeFloor({action:'5분만 기다린다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,5,'meaningful choices must not preserve time beyond an explicit maximum');
 assert.deepEqual(turn.state_delta.items_add,[],'effects from beyond the explicit maximum must be cleared when the turn is shortened');
+turn={scene:[{kind:'narration',text:'기다림을 마쳤다.'}],state_delta:{advance_minutes:100,skill_experience:[{skill:'검술',amount:1}]},choices:[],event_progress:null};
+applySceneMomentumTimeFloor({action:'0분에서 10분 동안 기다린다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,10,'a zero-minimum range must still enforce its positive maximum');
+assert.deepEqual(turn.state_delta.skill_experience,[],'effects beyond a zero-minimum range maximum must be cleared');
 turn={scene:[{kind:'narration',text:'10분 동안 자세를 반복하던 중 훈련장 문밖에서 비명이 들렸다.'}],state_delta:{advance_minutes:10},choices:['밖으로 달려간다','교관을 부른다','훈련을 계속한다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'a positive-time hazard choice during an unfinished activity must stop at its actual moment');
@@ -369,6 +385,9 @@ assert.equal(turn.state_delta.advance_minutes,5,'hypothetical completion in narr
 turn={scene:[{kind:'narration',text:'훈련을 마쳤고 교관이 다음 과정을 고르라고 했다.'}],state_delta:{advance_minutes:10},choices:['대련한다','쉰다','돌아간다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,30,'a clearly completed activity may still raise an underreported clock before post-completion choices');
+turn={scene:[{kind:'narration',text:'회의를 마쳤고 다음 의제를 고르라고 했다.'}],state_delta:{advance_minutes:10},choices:['조사를 계속한다','휴식한다','자리를 뜬다'],event_progress:null};
+applySceneMomentumTimeFloor({action:'1시간 동안 회의를 한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,60,'all dialogue activity vocabulary must share the same completion evidence');
 turn={scene:[{kind:'narration',text:'잠에서 깨어나 몸을 일으켰다.'}],state_delta:{advance_minutes:60},choices:['일어난다','일정을 확인한다','더 쉰다'],event_progress:{event_instance_id:'active:rest'}};
 applySceneMomentumTimeFloor({action:'잠을 잔다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]},sceneRuntime:{eventProgress:{eventInstanceId:'active:rest'}}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,240,'continuing the same structured scene is not a new interruption and must retain the sleep floor');
