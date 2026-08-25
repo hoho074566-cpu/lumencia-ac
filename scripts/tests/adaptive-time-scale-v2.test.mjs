@@ -8,6 +8,7 @@ import {
   buildSceneMomentumDirective,
   classifySceneIntent,
   deriveSceneDelta,
+  isRequestedScheduledActivity,
   scheduleBoundaryLimitMinutes,
 } from '../../lib/scene-momentum.js';
 
@@ -138,6 +139,11 @@ assert.equal(nextDayClass.compression,false,'a date-qualified activity beyond th
 assert.deepEqual(nextDayClass.suggestedAdvanceMinutes,[0,1440],'a date-qualified activity must inspect the bounded next-day window without inheriting the same-day class floor');
 assert.equal(nextDayClass.boundaryLookaheadMinutes,1440,'a date-qualified activity must expose one bounded day for schedule and consequence arbitration');
 assert.match(buildSceneMomentumDirective({action:'내일 10시 30분에 수업을 듣는다.',saveState:{world:{date:'1285-03-01',time:'07:40',location:'여관'}}}),/날짜 지정 시작 규칙/,'the model must be told to preserve the requested day instead of pulling the class into today');
+const reachableNextDayClass=classifySceneIntent('내일 오전 1시에 수업을 듣는다.', { location:'여관',currentTime:'23:30' });
+assert.equal(reachableNextDayClass.scheduledStartOffsetMinutes,90,'a next-day start inside the turn window must retain its real offset');
+assert.deepEqual(reachableNextDayClass.suggestedAdvanceMinutes,[135,210],'a reachable next-day class must include its wait and natural class duration');
+assert.equal(reachableNextDayClass.compression,true,'a future-date activity that fully fits inside one turn must use deterministic completion');
+assert.equal(reachableNextDayClass.boundaryLookaheadMinutes,0,'a reachable future-date activity must not expand consequence arbitration beyond its valid range');
 const todayTerminalClass=classifySceneIntent('내일 계획을 세운 뒤 오늘 오전 10시에 수업을 듣는다.', { location:'여관',currentTime:'09:00' });
 assert.equal(todayTerminalClass.dateQualifiedStart,false,'an earlier next-day planning clause must not date-qualify the terminal today activity');
 assert.equal(todayTerminalClass.scheduledStartOffsetMinutes,60,'the terminal today clock must remain the selected activity start');
@@ -150,6 +156,8 @@ assert.equal(classifySceneIntent('모레는 오전 8시에 수업을 듣는다.'
 assert.equal(classifySceneIntent('정오에 수업을 듣는다.', { location:'강의실',currentTime:'09:00' }).scheduledStartOffsetMinutes,180,'noon must normalize to the same-day 12:00 start');
 assert.equal(classifySceneIntent('자정에 훈련한다.', { location:'훈련장',currentTime:'09:00' }).scheduledStartOffsetMinutes,900,'midnight must normalize to the next upcoming 00:00 start');
 assert.equal(classifySceneIntent('12시에 기사과 오리엔테이션에 참석한다.', { location:'기숙사',currentTime:'09:00' }).kind,'class-attendance','orientation attendance must use the scheduled academic profile');
+const namedPcOrientation={id:'newcomer-orientation',title:'신입생 오리엔테이션',date:'1285-03-01',time:'12:00',kind:'academic',status:'scheduled'},namedPcScheduleSave={pc:{name:'카인',department:'기사과'},world:{date:'1285-03-01',time:'09:00',location:'기숙사'},scheduledEvents:[namedPcOrientation],scheduleContext:{due:[],upcoming:[namedPcOrientation]}},namedPcOrientationAction='카인이 오늘 12시에 신입생 오리엔테이션에 참석한다.';
+assert.equal(isRequestedScheduledActivity(namedPcScheduleSave,namedPcOrientation,namedPcOrientationAction),true,'the saved PC subject must not prevent matching their requested schedule');
 assert.equal(classifySceneIntent('12시에 신입생 교육을 받는다.', { location:'기숙사',currentTime:'09:00' }).kind,'class-attendance','scheduled education must use the academic profile');
 assert.equal(classifySceneIntent('12시에 입학식에 참석한다.', { location:'기숙사',currentTime:'09:00' }).kind,'class-attendance','entrance ceremony attendance must use the academic profile');
 assert.equal(classifySceneIntent('오늘 아침 8시에 수업을 듣는다.', { location:'강의실',currentTime:'07:00' }).scheduledStartOffsetMinutes,60,'아침 must normalize to an AM clock marker');

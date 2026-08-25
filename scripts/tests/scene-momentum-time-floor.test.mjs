@@ -221,6 +221,10 @@ const nextDaySleep={id:'personal-sleep',title:'개인 수면',date:'1285-03-02',
 const nextDaySleepSave={pc:knightPc,world:{date:'1285-03-01',time:'23:00',location:'기숙사'},scheduleContext:{due:[],upcoming:[nextDaySleep]},scheduledEvents:[nextDaySleep]};
 const nextDaySleepAction='내일 밤 1시에 잠을 잔다.';
 assert.equal(nextScheduleBoundaryMinutes(nextDaySleepSave,{futureOnly:true,action:nextDaySleepAction,intent:classifySceneIntent(nextDaySleepAction,{location:'기숙사',currentTime:'23:00'})}),null,'an early-night clock must identify and exclude its own next-day scheduled activity');
+const reachableNextDayClass={id:'reachable-next-day-class',title:'기사과 필수 수업',date:'1285-03-02',time:'01:00',kind:'academic',status:'scheduled'},reachableNextDayClassSave={pc:knightPc,world:{date:'1285-03-01',time:'23:30',location:'기숙사'},scheduleContext:{due:[],upcoming:[reachableNextDayClass]},scheduledEvents:[reachableNextDayClass]};
+turn={scene_title:'기사과 수업 종료',scene:[{kind:'narration',text:'기다린 뒤 기사과 필수 수업을 마쳤다.'}],state_delta:{advance_minutes:10,scheduled_events_complete:['reachable-next-day-class'],completed_events_add:['reachable-next-day-class']},choices:[]};
+applySceneMomentumTimeFloor({action:'내일 오전 1시에 기사과 필수 수업을 듣는다.',saveState:reachableNextDayClassSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,135,'a reachable next-day activity must not complete before its requested start plus minimum duration');
 const earlyNightClass={id:'early-night-class',title:'기사과 필수 수업',date:'1285-03-02',time:'01:00',kind:'academic',status:'scheduled'};
 const earlyNightClassSave={pc:knightPc,world:{date:'1285-03-01',time:'23:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[earlyNightClass]},scheduledEvents:[earlyNightClass]};
 turn={scene_title:'밤의 필수 수업',scene:[{kind:'narration',text:'밤 1시, 기사과 필수 수업 종이 울렸다.'}],state_delta:{advance_minutes:120,skill_experience:[{skill:'검술',amount:1}]},choices:['수업에 간다','훈련을 멈춘다','다른 곳으로 간다']};

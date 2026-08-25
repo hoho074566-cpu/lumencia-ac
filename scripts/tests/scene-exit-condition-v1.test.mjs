@@ -28,6 +28,9 @@ const libraryCorridor=evaluateSceneExitCondition(libraryTravel,{turn:{scene:[{ki
 assert.equal(libraryCorridor.status,'open','an intermediate location must not satisfy a named travel destination');
 const libraryReached=evaluateSceneExitCondition(libraryTravel,{turn:{scene:[{kind:'narration',text:'도서관에 도착했다.'}],choices:[]},sceneDelta:{score:1,structuralScore:1,afterLocation:'루멘시아 아카데미 대도서관 입구',flags:{locationChanged:true}}});
 assert.equal(libraryReached.status,'reached');
+const namedPcTravel=deriveSceneExitCondition({action:'카인이 도서관으로 간다.',saveState:{...baseSave,pc:{name:'카인'}},turnNumber:13});
+assert.equal(namedPcTravel.kind,'semantic-destination','scene exit must recognize the saved PC as the travel actor');
+assert.equal(namedPcTravel.destination,'도서관','saved-name travel must retain the declared destination boundary');
 
 const question=deriveSceneExitCondition({action:'지금 입학식에 돌아갈까?',saveState:baseSave,turnNumber:13});
 assert.equal(question.kind,'question-answered');
