@@ -23,6 +23,7 @@ export default async function handler(req, res) {
     npcRelationship: 'V1 bounded directional NPC-to-NPC affinity/trust/status + causal history',
     factionSocialConsequence: 'V1 evidence-gated public-faction reputation + bounded causal history',
     skillLearning: 'V1 evidence-gated bounded candidates + deterministic unlock at 100 progress',
+    awakeningTalentEvolution: 'V1 rare-evidence Trait/Authority candidates + milestone gates + one-step mythical talent evolution',
     sceneMomentum: 'HF1 semantic action compression + deterministic State Delta/stall + NPC initiative + meaningful-stop policy',
     sceneOrchestration: 'V1 one primary driver + at most one causally connected secondary response + effect-only system guard',
     sceneNovelty: 'V1 bounded visible-term repetition tracking + change-first suppression',

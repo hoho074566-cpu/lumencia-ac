@@ -1,14 +1,18 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Narrative Engine continuation — Multi-System Scene Orchestration V1 implementation and protected-path validation.
+Narrative Engine continuation — Awakening / Talent Evolution V1 implementation and protected-path validation.
 
 ## Current GitHub State
 - Repo: `hoho074566-cpu/lumencia-ac`
-- Main: `8329646cbb92934555afd15f4741b1fc6edb7d1d` (PR #48 merge).
-- Working branch: `codex/multi-system-scene-v1`, based directly on that verified merge.
-- PR #49 is open from `codex/multi-system-scene-v1`. Its initial exact head was `1c3bde86336c7d2d66dd591656064f8b1b66b21b`; Safety #362 passed and Vercel was Ready, while the requested fresh Codex review returned an infrastructure `Unknown error` rather than an authoritative finding.
-- Multi-System Scene V1 corrected code checkpoint: `7624989`. It adds one bounded cross-system arbitration plan, reserves it after routing, repeats its compact result after lower-priority authority blocks, and stores only bounded post-response evidence under the existing `sceneRuntime` root.
+- Main: `93f5644314dada6c9de50f5038bf479f00b7da48` (PR #49 merge).
+- Working branch: `codex/awakening-talent-evolution-v1`, based directly on that verified merge.
+- PR #50 is open from `codex/awakening-talent-evolution-v1`; initial exact code head is `966da63985b78f3d1dfcd9e3bc01aa3e120ee421`.
+- PR #49 is **merged** from exact reviewed head `ff500841487f804fab6031d8bad62c745119cbc2` as `93f5644314dada6c9de50f5038bf479f00b7da48`. Final-head Safety/Vercel, fresh Codex P0/P1=0, and no-conflict Merge Readiness passed.
+- PR #49 merge and reviewed-head trees both equal `48f7a3e28dc7bdc27e31156696a56cd540bcc15f`. Main Vercel, production `/api/health`, and the merged-main clean-LF full regression pass.
+- First docs head `5e74ef8` passed Vercel but failed hosted Repository checks because the new test directly imported `api/chat-router.js` while the dependency-free Safety runner does not install `openai`.
+- Correction 1/5 head `eded605779a563b35fcc50c6547670cfbc7d7cde` makes the deterministic test execute the real extracted schema patch without hosted dependencies. Focused testing and a no-`node_modules` clean-LF full regression pass; product code and workflows are unchanged. The full check must be rerun on the final correction-docs head.
+- Original-head Codex review reported one P1: the eight-entry Trait/Authority compactor ran before action relevance and could remove a directly invoked ninth-or-later ability. Correction 2/5 head `e1e11664b30e0fb145beb68120c3cfb3fb80fb6c` ranks direct names first while preserving the same bound; a ten-entry minimum/detail regression and the dependency-free full check pass.
 - PR #48: **merged** from exact reviewed head `a4772b80cc9e135433fb677460ca3fb5e9cde85e`. Safety #359/#360/#361, Vercel, fresh exact-head Codex P0/P1=0, instructor attribution Preview acceptance, and CONTINUE/META freeze all passed.
 - PR #48 merge `8329646...` and reviewed head share tree `5c8f8fa061742d6c851d09fb03ccf02e4795a559`; no unexpected merge delta exists. Main Vercel and production `/api/health` are green, and the merged tree passes the authoritative clean-LF full check.
 - PR #47: **merged** from exact final head `866c991fb52a77079a191a5d7452e7fecf035ce9` as `54327ea2a5c559a18681f4a4bc8795cc9c1c57a8`. Merge/reviewed trees both equal `143b56d473825969763e9440aca0c4c3100ab3b5`; production health is green on app `1.5.6` / adapter `0.8.3`.
@@ -43,17 +47,21 @@ Narrative Engine continuation — Multi-System Scene Orchestration V1 implementa
 - Production `/api/health`: `ok=true`, API configured, app `1.5.6`, adapter `/api/chat-router`, canonical core `/api/chat`, prompt cache retention `24h`.
 - Post-merge full `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
-## Multi-System Scene Orchestration V1 — Current Candidate
-- Current systems already provide Scene Momentum, Purpose, Exit, Turn Hook, Event Consequence, Goal Tick, Off-screen Progression, Novelty, relationships, faction effects, and skill learning, but they previously lacked one final cross-system driver contract.
-- Each turn now declares exactly one primary driver and at most one physically/causally connected secondary response. Current player action/question remains primary; active events, reachable schedules, due consequences, present-NPC goals, and Director events are ordered without allowing a third independent beat.
-- Direct questions use `answer-only`; AUTO preserves an unanswered player boundary; CONTINUE routes a frozen plan. A reachable hard schedule defers a competing NPC goal, an active event suppresses an unrelated random cameo, and a due consequence may interrupt while the unrelated event remains deferred.
-- Relationship, faction, skill-learning, off-screen, and novelty systems are explicitly effect-only: they may record evidence-backed consequences but cannot initiate separate narrative beats.
-- The compact plan is reserved in routed context and repeated in the final USER ACTION frame. It remains within the `.76` 6,840-character routine ceiling, preserves one canonical `coreHandler` call, and adds no save root, migration, structured schema, endpoint, `api/chat.js`, `app.js`, or second model call.
-- Post-response telemetry records bounded observed/effect axes inside `sceneRuntime.orchestration`; it does not duplicate canon, causal history, or authoritative faction/skill values.
-- Permanent coverage is `scripts/tests/scene-orchestration-v1.test.mjs`, plus the affected Router, Momentum, Purpose, Exit, Hook, Consequence, Goal, Novelty, Off-screen, relationship, faction, skill, and core suites. Correction `6d2d56a` makes `action-until-interruption` stop at the explicit trigger boundary rather than implying full primary completion.
-- Initial Exact Preview acceptance passed the direct-question answer-only case. The active-event case then failed because the orchestration plan suppressed a Director event but the lower-priority selected candidate remained in routed context, allowing the model to reinterpret Mirabelle as an unrelated challenger.
-- Automatic correction cycle **1/5** at `2592d8f` removes suppressed Director selection/consequence keys and legacy detail, substitutes an explicit suppression directive, and carries compact `BLOCK=director-event` authority in the final action frame. A permanent regression uses a real competing `NPC_EVENT` candidate and proves it is absent from selected NPC context and prompt detail. Focused affected suites, `git diff --check`, and the clean-LF full check pass on the corrected code head; the clean-LF check must be rerun once more on the final docs head.
-- Substantive second review found one historical schedule invariant regression before push: due/overdue context could become a 0-minute orchestration interruption and freeze a newly committed action. Closure `7624989` selects strictly future boundaries only, proves overdue-only freedom plus overdue-and-later-future selection, and passes focused Router/Momentum/orchestration checks and the authoritative clean-LF full check.
+## Awakening / Talent Evolution V1 — Current Candidate
+- Reuses the existing declared `state_delta.awakening_progress`, flexible `pc.awakeningCandidates`, Trait/Authority lists, and PC talent values. It adds no save migration, new persistent root, endpoint, serverless function, canonical core edit, or second model call.
+- Trait awakening requires 100 progress plus three distinct decisive milestones; Authority requires 100 plus four. At most four candidates per kind and eight history rows per candidate persist. Candidate description/limitation becomes canonical on creation, and same-name Trait-to-Authority conversion is rejected.
+- New candidates require both bounded rare evidence and an independent anchor from the player action or pre-turn save. Existing candidates can advance from their saved identity. Duplicate normalized causes, negated/model-only evidence, prototype-sensitive keys, and unbounded limitations are rejected.
+- `talent_evolution` accepts at most one exact +1 row, only when an anchored mythic source causes an irreversible potential/ceiling change. Ordinary training/victory/emotion, oversized deltas, duplicate causes, and values above 10 are rejected; audit history is bounded to twelve rows.
+- META and CONTINUE clear both growth fields; AUTO applies neither. The stable runtime persists candidates, promotes learned Traits/Authorities, applies exact before-to-after talent changes, emits notices, and remains replay-idempotent. The PC panel shows learned abilities and candidate progress.
+- Scene Momentum counts accepted awakening/talent as growth delta. Scene Orchestration retains the umbrella `EFFECT_ONLY=relationship|faction|growth|offscreen|novelty`; growth cannot independently create another scene beat.
+- Context routing carries actual talent values, existing ability identities, and active candidate progress only when present. A relevance-based pressure fallback keeps the pathological combined maximum under the existing 6,840-character routine ceiling while preserving directly mentioned growth state.
+- `scripts/tests/awakening-talent-evolution-v1.test.mjs` permanently covers evidence/anchor/threshold/canonical-definition/duplicate/cap/freeze/prototype/context/runtime/UI/health/one-call behavior. Skill, Router, Momentum, Orchestration, CONTINUE, core, debug, and save regressions also pass.
+- Substantive second review closed four pre-push issues: empty growth blocks stealing old routing budget, missing pre-turn source anchoring, unlimited limitation acceptance, and combined-max context overflow. The hosted dependency failure and late-ability routing P1 consumed automatic correction cycles **1/5** and **2/5**. Four original-head P2 hardening notes remain non-blocking by repository policy.
+
+## Multi-System Scene Orchestration V1 — Merged in PR #49
+- Final reviewed head `ff500841487f804fab6031d8bad62c745119cbc2` merged as `93f5644314dada6c9de50f5038bf479f00b7da48` with an identical tree. Final Safety/Vercel and fresh Codex P0/P1=0 passed.
+- Each turn selects one primary driver and at most one causal secondary response. Relationship, faction, growth, off-screen, and novelty stay effect-only; direct questions, player boundaries, META/AUTO/CONTINUE freeze, one canonical call, and stable routing remain preserved.
+- Correction cycle 1/5 removed suppressed Director leakage, and the second review restored strictly-future-only interruption selection so due/overdue context cannot freeze a newly committed action.
 
 ## Skill Learning V1 — Merged in PR #48
 - Completes the already-declared `state_delta.skill_learning` / `pc.skillCandidates` path. No new save root, migration, API entrypoint, canonical `app.js` edit, or second model call is introduced.
@@ -65,7 +73,7 @@ Narrative Engine continuation — Multi-System Scene Orchestration V1 implementa
 - Mandatory `.76` context retains at most 24 compact existing skill identities/grades and eight active candidate identities/progress values. Candidate basis, timestamp, and history remain in routed detail. A true maximum-width 80/48-character fixture remains within the 6,840-character routine input ceiling.
 - `scripts/tests/skill-learning-v1.test.mjs` permanently covers schema/parser wiring, independent/negated evidence, ordinary-combat and ambiguous setting-noun rejection, NPC observation/refusal/sole-performer rejection, instructor self-correction/NPC-receipt rejection, PC-receipt/professor-assessment acceptance, positive combat insight, bounds, alias normalization, legacy-experience isolation, exact 22→37 live regression, persistence, unlock, UI, AUTO/META/CONTINUE freeze, State Delta ordering, maximum-width minimum context, health, and the one-call invariant.
 - Code commits: `76ffa46` initial implementation; `0295ccc` newest-alias preservation; `85fef80` initial mandatory-context bound; `1922f3c` hosted/live blocker correction; `add85ff` ordinary-combat evidence and maximum-width context closure; `108713f` player action/scene attribution closure; `c7f97e8` instructor-target closure.
-- User-authorized correction policy remains in force. PR #48 completed after **1/5** correction cycles; the current Multi-System Scene PR is now at **1/5**. Each cycle follows exact head → cause → minimal repair → focused/full tests → new head → Safety/Vercel → fresh review.
+- User-authorized correction policy remains in force. PR #48 and PR #49 each completed after **1/5** correction cycles; current PR #50 is at **2/5**. Each cycle follows exact head → cause → minimal repair → focused/full tests → new head → Safety/Vercel → fresh review.
 - Final exact head `a4772b8...` passed every hosted gate and affected Preview case; PR #48 merged as `8329646...` with an identical reviewed tree.
 
 ## Faction / Social Consequence V1 — Merged; P2 Hardening Completed
@@ -413,12 +421,12 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only.
 
 ## NEXT ACTION
-1. Commit this correction-1 docs checkpoint and rerun the authoritative clean-LF full check on that new exact head.
-2. Push the existing PR #49 branch; revalidate current main, merge-base, no conflict, one canonical core call, routing budgets, and the absence of endpoint/save migration/canonical-core changes.
-3. Require new-exact-head GitHub Safety, Vercel Ready, and a fresh Codex review. The earlier review infrastructure error is not a PASS. This protected-path PR remains human-merge only.
-4. On the updated Exact Preview, rerun the previously failing active-event/unrelated-cameo case first. If it passes, rerun direct-question answer-only, reachable-schedule versus NPC-goal priority, ordinary exploration plus at most one causally connected NPC response, and CONTINUE/AUTO awaiting-player freeze.
+1. Commit and push this PR #50 docs checkpoint, then rerun the authoritative clean-LF full check on the new exact head.
+2. Revalidate current main, merge-base, no conflict, one canonical core call, the 6,840-character routine ceiling, and the absence of migration/new endpoint/canonical `api/chat.js` or `app.js` changes.
+3. Require new-exact-head GitHub Safety, Vercel Ready, and a fresh Codex review. This protected-path PR remains human-merge only.
+4. On the Exact Preview, verify health/UI boot, ordinary-training negative behavior, META/AUTO/CONTINUE freeze, and replay-safe candidate/ability visibility. Use an anchored rare-growth fixture only without extracting a protection token or bypassing Preview protection.
 5. If fresh review finds a new controllable P0/P1 type, apply the user-authorized correction protocol for up to five cycles. Stop only for same-type recurrence, cross-core expansion, core-invariant impact, five exhausted cycles, or conflicting unsafe guidance.
-6. If every hosted gate, fresh review, and affected Preview case passes, report the Multi-System Scene protected-path PR ready for the user's human merge. Codex must not merge it.
+6. If every hosted gate, fresh review, and affected Preview case passes, report PR #50 ready for the user's human merge. Codex must not merge it.
 
 ## Stop Record
 - Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.
@@ -459,4 +467,5 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed: PR #46 exact reviewed head `2843e5b...` merged as `6204843...`; merge-tree equality and production health pass.
 - Completed: PR #47 final head `866c991...` merged as `54327ea...`; reviewed and merged trees are identical and production health is green.
 - Completed: PR #48 final reviewed head `a4772b8...` merged as `8329646...`; reviewed and merged trees are identical, main Vercel/production health are green, and merged-main clean-LF full regression passes.
-- Current candidate: Multi-System Scene Orchestration V1 in open PR #49 on `codex/multi-system-scene-v1`; corrected code head `7624989` establishes one primary driver plus at most one causal secondary response while keeping relationship/faction/skill/off-screen/novelty systems effect-only. Initial direct-question Preview acceptance passed; the active-event Mirabelle cameo P1 triggered correction cycle 1/5 and now has a permanent real-candidate regression. The second review also restored strictly future-only schedule interruptions so due/overdue context cannot freeze committed actions. Focused suites, `git diff --check`, and the clean-LF full check pass on the code head; final docs-head full check, push, fresh new-exact-head hosted gates/review, and affected Preview reruns remain.
+- Completed: PR #49 final reviewed head `ff50084...` merged as `93f5644...`; reviewed and merged trees are identical, final hosted readiness had P0/P1=0 with no conflict, and main Vercel/production health/merged-main clean-LF regression pass.
+- Current candidate: Awakening / Talent Evolution V1 in open PR #50 on `codex/awakening-talent-evolution-v1`; initial code head `966da63` adds bounded evidence-gated awakening and anchored mythic +1 talent evolution using existing persistence. Correction 1/5 `eded605` closed the dependency-free Safety-runner test import failure. Original-head Codex then reported the late-ability routing P1; correction 2/5 `e1e1166` preserves directly named ninth-or-later Trait/Authority entries before the eight-entry bound and passes focused plus no-`node_modules` full regression. Correction-2 docs full check, push, fresh exact-head hosted gates/review, and affected Preview acceptance remain.

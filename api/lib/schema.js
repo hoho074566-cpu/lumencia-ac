@@ -43,6 +43,10 @@ const AwakeningProgress = z.object({
   kind: z.enum(['trait', 'authority']), name: z.string().min(2).max(64), amount: z.number().int().min(1).max(10), milestone: z.boolean(),
   description: z.string().min(1).max(360), limitation: z.string().min(1).max(360), reason: z.string().min(1).max(300),
 });
+const TalentEvolution = z.object({
+  talent: z.enum(['magic', 'martial', 'soul', 'knowledge']), amount: z.number().int().min(1).max(1),
+  cause: z.string().min(1).max(280), reason: z.string().min(1).max(300),
+});
 
 const AbilityUse = z.object({ kind: z.enum(['skill', 'stat', 'trait', 'authority']), name: z.string().min(1).max(80), role: z.enum(['primary', 'support', 'passive']), reason: z.string().min(1).max(240) });
 const ResolutionLog = z.object({ triggered: z.boolean(), outcome: z.enum(['none', 'success', 'partial', 'failure']), summary: z.string().max(320).nullable(), abilities: z.array(AbilityUse).max(5) });
@@ -69,7 +73,7 @@ export const TurnSchema = z.object({
   state_delta: z.object({
     advance_minutes: z.number().int().min(0).max(1440), new_location: z.string().max(160).nullable(), pc_status: z.string().max(160).nullable(), fatigue_delta: z.number().int().min(-10).max(10), gold_delta: z.number().int().min(-10000).max(10000),
     relationship_changes: z.array(RelationshipChange).max(10), relationship_milestones_add: z.array(RelationshipMilestone).max(6), intimacy_changes: z.array(IntimacyChange).max(6),
-    stat_progress: z.array(StatProgress).max(3), skill_experience: z.array(SkillExperience).max(4), skill_learning: z.array(SkillLearning).max(2), awakening_progress: z.array(AwakeningProgress).max(1),
+    stat_progress: z.array(StatProgress).max(3), skill_experience: z.array(SkillExperience).max(4), skill_learning: z.array(SkillLearning).max(2), awakening_progress: z.array(AwakeningProgress).max(1), talent_evolution: z.array(TalentEvolution).max(1),
     items_add: z.array(z.string().min(1).max(160)).max(12), items_remove: z.array(z.string().min(1).max(160)).max(12),
     active_events_add: z.array(z.string().min(1).max(240)).max(8), active_events_remove: z.array(z.string().min(1).max(240)).max(8), scheduled_events_add: z.array(z.string().min(1).max(240)).max(8), scheduled_events_remove: z.array(z.string().min(1).max(240)).max(8), world_arcs_add: z.array(z.string().min(1).max(240)).max(8), world_arcs_remove: z.array(z.string().min(1).max(240)).max(8), completed_events_add: z.array(z.string().min(1).max(240)).max(8),
     pc_knowledge_add: z.array(z.string().min(1).max(500)).max(10), memories_add: z.array(MemoryAdd).max(12), npc_state_updates: z.array(NpcStateUpdate).max(12), npc_schedule_updates: z.array(NpcScheduleUpdate).max(8), rumors_add: z.array(RumorAdd).max(6), delayed_consequences_add: z.array(DelayedConsequence).max(6),
