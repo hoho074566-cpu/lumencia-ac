@@ -190,6 +190,14 @@ applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:unresolv
 assert.equal(turn.state_delta.advance_minutes,60,'an earlier unresolved consequence must not hide a later crossed required schedule');
 assert.equal(turn.state_delta.new_location,null,'effects after the independently enforced schedule boundary must fail closed');
 
+const earlierSchedule={id:'early-class',title:'기사과 필수 수업',date:'1285-03-01',time:'09:10',kind:'academic',status:'scheduled'},scheduleBeforeResolvedConsequenceSave={...rangedConsequenceSave,pc:knightPc,scheduleContext:{due:[],upcoming:[earlierSchedule]},scheduledEvents:[earlierSchedule]};
+turn={scene:[{kind:'narration',text:'훈련 중 에밀리가 도착했다.'}],state_delta:{advance_minutes:90,hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
+const laterResolvedLifecycle={selected_id:consequenceHook.id,status:'resolved',attribution_safe:true,npc_state_updates:[],npc_schedule_updates:[]};
+applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:scheduleBeforeResolvedConsequenceSave},turn,'game',laterResolvedLifecycle);
+assert.equal(turn.state_delta.advance_minutes,30,'an earlier required schedule must win over a later resolved consequence');
+assert.deepEqual(turn.state_delta.hooks_update,[],'a consequence resolution after the applied schedule boundary must not persist');
+assert.equal(laterResolvedLifecycle.status,'open','consequence telemetry must remain open when its later boundary was not applied');
+
 turn={scene:[{kind:'narration',text:'한 시간째 약속 시각이 되어 에밀리가 중앙광장에 도착했다.'},{kind:'narration',text:'그 뒤 에밀리는 기숙사로 떠났다.'}],state_delta:{advance_minutes:90,npc_state_updates:[{npc_key:'emily',location:'기숙사',status:'떠남'}],npc_schedule_updates:[{npc_key:'emily',delay_minutes:30,location:'기숙사',activity:'휴식',reason:'약속 종료'}],hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
 const ambiguousEffects=consequenceNpcEffectsForShortening(turn,{event_name:'약속 상대의 도착',reason:'약속 장소에 도착한다',secret_level:0},['emily'],{emily:'에밀리'});
 assert.equal(ambiguousEffects.attribution_safe,false,'a later final state for the same NPC must not be attributed to the earlier consequence boundary');
