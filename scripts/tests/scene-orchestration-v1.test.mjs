@@ -81,6 +81,42 @@ assert.match(scheduleDirective, /TRIGGER_MINUTES=30/);
 assert.match(scheduleDirective, /PRIMARY를 TRIGGER_MINUTES의 경계까지만 진행한 뒤 SECONDARY를 처리/,
   'an interrupting boundary must cut off compressed primary action instead of waiting for its full completion');
 
+const dueScheduleDoesNotFreezeAction = deriveSceneOrchestrationPlan({
+  mode: 'game',
+  action: '기숙사로 간다.',
+  saveState: {
+    world: { date: '1285-03-01', time: '13:00', location: '중앙광장' },
+    pc: { department: '기사과' },
+    scheduleContext: { due: [{ id: 'overdue-class', title: '기사과 수업', kind: 'academic' }], upcoming: [] },
+    scheduledEvents: [{ id: 'overdue-class', title: '기사과 수업', kind: 'academic', date: '1285-03-01', time: '12:00' }],
+    sceneRuntime: {},
+  },
+  directorTelemetry: { result: 'NO_RANDOM_EVENT_DUE' },
+});
+assert.equal(dueScheduleDoesNotFreezeAction.secondary, 'world-response',
+  'a due or overdue row is current context and must not become a new schedule interruption');
+assert.equal(dueScheduleDoesNotFreezeAction.trigger_minutes, null,
+  'a newly committed action must never receive a contradictory 0-minute hard stop from overdue context');
+
+const overduePlusFutureSchedule = deriveSceneOrchestrationPlan({
+  mode: 'game',
+  action: '두 시간 쉰다.',
+  saveState: {
+    world: { date: '1285-03-01', time: '13:00', location: '기숙사' },
+    pc: { department: '기사과' },
+    scheduleContext: {
+      due: [{ id: 'overdue-class', title: '기사과 수업', kind: 'academic' }],
+      upcoming: [{ id: 'future-class', title: '기사과 보충 수업', kind: 'academic', date: '1285-03-01', time: '13:10' }],
+    },
+    scheduledEvents: [{ id: 'future-class', title: '기사과 보충 수업', kind: 'academic', date: '1285-03-01', time: '13:10' }],
+    sceneRuntime: {},
+  },
+  directorTelemetry: { result: 'NO_RANDOM_EVENT_DUE' },
+});
+assert.equal(overduePlusFutureSchedule.secondary, 'schedule-boundary',
+  'overdue context must not hide the next strictly future schedule boundary');
+assert.equal(overduePlusFutureSchedule.trigger_minutes, 10);
+
 const dueConsequence = deriveSceneOrchestrationPlan({
   mode: 'game',
   action: '잠시 기다린다.',
