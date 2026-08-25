@@ -7,7 +7,9 @@ Narrative Engine continuation — Skill Learning V1 implementation and protected
 - Repo: `hoho074566-cpu/lumencia-ac`
 - Main: `54327ea2a5c559a18681f4a4bc8795cc9c1c57a8` (PR #47 merge)
 - Working branch: `codex/skill-learning-v1`
-- Skill Learning V1 current code head: `85fef8008eb0c03a30615f99e9a408526a6b9bd7`. Protected adapter/context/runtime paths require human merge after exact-head gates and acceptance.
+- Skill Learning V1 corrected code head: `1922f3c05c7c5ab19a0c13c15f60d367ebefe43d`. Protected adapter/context/runtime paths require human merge after exact-head gates and acceptance.
+- PR #48 remains **open / not merged**. Its prior head `75d7f7c...` passed Repository checks and Vercel but failed Merge Readiness with one exact-head Codex P1: model-authored `basis` / `reason` could satisfy their own learning-evidence gate. Exact Preview independently exposed the legacy `skill_experience` path promoting `반월 보법 22/100` directly to F in one turn instead of the permitted maximum 37/100.
+- User-authorized correction `1922f3c...` now requires positive evidence from the player action or combat plus the visible scene, strips negated learning language, canonicalizes `skill_experience` only to already-existing skills, rejects candidate/new-skill experience, and clears existing-skill experience during AUTO. The exact 22→37 regression and self-authored/negated evidence cases are permanent tests. The authoritative clean-LF full PR check and `git diff --check` pass on this code head.
 - PR #47: **merged** from exact final head `866c991fb52a77079a191a5d7452e7fecf035ce9` as `54327ea2a5c559a18681f4a4bc8795cc9c1c57a8`. Merge/reviewed trees both equal `143b56d473825969763e9440aca0c4c3100ab3b5`; production health is green on app `1.5.6` / adapter `0.8.3`.
 - PR #46: **merged** from exact reviewed head `2843e5bc9ee8169acb7e82b5db9b392beea93539` as `6204843e1cf6f45a9386c13b942c100cd6c7377b`. Merge and reviewed-head trees both equal `4c045c27ccb30f6593370ae2b8e811bebcb39691`; production health is green on app `1.5.6` / adapter `0.8.3` with Faction Social V1 advertised.
 - PR #45: **merged** from exact reviewed head `583b7622500b9916dd31697d0d6e845f81790ed6` as `71074ccc7a5fd00f193a6aec8b7a1ff82eae1aab`. Merge and reviewed-head trees both equal `690e6a88c015bd28e67bba0bf03bfdba6e73a6c8`; production `/api/health` is healthy on app `1.5.6` / adapter `0.8.3`.
@@ -42,14 +44,14 @@ Narrative Engine continuation — Skill Learning V1 implementation and protected
 
 ## Skill Learning V1 — Current Candidate
 - Completes the already-declared `state_delta.skill_learning` / `pc.skillCandidates` path. No new save root, migration, API entrypoint, canonical `app.js` edit, or second model call is introduced.
-- A normal player GAME turn accepts at most two +1..15 rows. Independent skill name, concrete `basis`, causal `reason`, and actual training/instruction/correction/practice/combat-learning evidence are mandatory. Existing skills and spacing aliases, generic names, basis-less claims, ordinary movement, duplicates, and excess rows are rejected.
+- A normal player GAME turn accepts at most two +1..15 rows. Independent skill name, concrete `basis`, causal `reason`, positive player learning intent or combat, and visible scene-side training/instruction/correction/practice/combat-learning evidence are mandatory. Model-authored `basis` / `reason` cannot authenticate themselves, and negated learning language does not count. Existing skills and spacing aliases, generic names, basis-less claims, ordinary movement, duplicates, and excess rows are rejected.
 - Up to eight candidates and six history rows per candidate persist under `pc.skillCandidates`. Alias cleanup preserves the newest authoritative entry. Progress remains 0..99 until a real accepted update reaches 100.
 - At 100 the candidate is removed and added once to `pc.skills` at neutral F grade / 0 hidden XP. The stable runtime emits a visible unlock notice and the PC panel shows active candidate progress.
-- AUTO cannot progress PC learning; META and CONTINUE explicitly clear the delta. Rejected learning rows are removed before deterministic Scene Momentum measures State Delta.
+- AUTO cannot progress candidates or existing-skill experience; META and CONTINUE explicitly clear/freeze growth application. Legacy `skill_experience` rows are canonicalized against existing `pc.skills` only, so an unfinished candidate cannot bypass 100-point accumulation. Rejected learning rows are removed before deterministic Scene Momentum measures State Delta.
 - The existing structured-output interception adds the bounded field and parser merge while retaining one canonical `coreHandler` call. `store:false`, prompt cache, context profiles, player sovereignty, and all prior Event/NPC/relationship systems remain unchanged.
 - Mandatory `.76` context retains at most 24 compact existing skills and eight active candidates without candidate history. A maximal long-name/history fixture remains within the 6,840-character routine input ceiling.
-- `scripts/tests/skill-learning-v1.test.mjs` permanently covers schema/parser wiring, evidence, bounds, alias normalization, persistence, unlock, UI, AUTO/META/CONTINUE freeze, State Delta ordering, dense minimum context, health, and the one-call invariant.
-- Code commits: `76ffa46` initial implementation; `0295ccc` newest-alias preservation; `85fef80` maximal mandatory-context bound. Both permitted local hardening rounds are consumed, and the substantive final review found no P0/P1 blocker.
+- `scripts/tests/skill-learning-v1.test.mjs` permanently covers schema/parser wiring, independent/negated evidence, bounds, alias normalization, legacy-experience isolation, exact 22→37 live regression, persistence, unlock, UI, AUTO/META/CONTINUE freeze, State Delta ordering, dense minimum context, health, and the one-call invariant.
+- Code commits: `76ffa46` initial implementation; `0295ccc` newest-alias preservation; `85fef80` maximal mandatory-context bound; `1922f3c` user-authorized hosted/live blocker correction. Both corrective review rounds in the new cycle are consumed, and the substantive second review plus clean-LF full check found no remaining local P0/P1 blocker.
 
 ## Faction / Social Consequence V1 — Merged; P2 Hardening Completed
 - Adds bounded `state_delta.faction_reputation_changes` rows for the six canon-backed public academy organizations: student council, Blue Knights, White Rose, and the knight/magic/theology departments.
@@ -396,11 +398,11 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
 
 ## NEXT ACTION
-1. Commit the Skill Learning V1 status checkpoint and rerun the authoritative clean-LF full check on the exact docs head.
-2. Confirm the final diff is limited to the stable adapter/runtime/context path, bounded learning module, existing prompt/sanitizer/health metadata, permanent regressions, and status docs.
-3. Push/open the focused protected-path PR and require fresh exact-head Safety/Vercel/Codex P0/P1=0.
-4. Revalidate current main/merge-base/no conflict, one-call architecture, `.76` maximal candidate context, AUTO/META/CONTINUE freeze, deterministic single unlock, and no endpoint/save migration/canonical `app.js` change.
-5. Run affected Exact Preview acceptance for candidate creation, no ordinary-movement learning, frozen modes, existing-skill isolation, and one-time F-grade unlock.
+1. Commit this correction checkpoint, rerun the authoritative clean-LF full check on the exact docs head, and push PR #48.
+2. Require fresh exact-head Safety/Vercel/Codex P0/P1=0; the prior-head P1 and failed readiness are not authoritative for the new head.
+3. Revalidate current main/merge-base/no conflict, one-call architecture, `.76` maximal candidate context, and no endpoint/save migration/canonical `app.js` change.
+4. On the new Exact Preview, rerun ordinary-movement zero learning, real candidate creation, AUTO/META/CONTINUE freeze, and especially multiple same-candidate turns proving the former 22/100 turn advances by at most 15 instead of instant F.
+5. Continue to 100 and confirm exactly one F-grade unlock, candidate removal, and no duplicate/repeated unlock on the following turn.
 6. If every gate passes, report the protected-path Skill Learning V1 PR ready for human merge. Codex must not merge it.
 
 ## Stop Record
@@ -441,4 +443,4 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed: PR #45 exact reviewed head `583b762...` merged as `71074cc...`; merge-tree equality and production health pass.
 - Completed: PR #46 exact reviewed head `2843e5b...` merged as `6204843...`; merge-tree equality and production health pass.
 - Completed: PR #47 final head `866c991...` merged as `54327ea...`; reviewed and merged trees are identical and production health is green.
-- Current candidate: Skill Learning V1 on `codex/skill-learning-v1`; code commits `76ffa46`, `0295ccc`, and `85fef80` complete the bounded candidate/unlock path and both permitted local hardening rounds. Final docs checkpoint, exact-head clean-LF full check, hosted gates/review, and affected Exact Preview acceptance remain.
+- Current candidate: PR #48 Skill Learning V1 on `codex/skill-learning-v1`; corrected code head `1922f3c...` closes the exact-head evidence P1 and the live 22/100→F legacy-experience bypass. Clean-LF full checks pass. Final docs checkpoint/push, fresh exact-head hosted gates/review, and corrected Exact Preview accumulation/unlock acceptance remain.
