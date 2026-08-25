@@ -378,11 +378,6 @@ function consequenceNpcEffectsForShortening(turn,consequence,routedKeys=[],regis
     if(Object.keys(kept).length>1)preservedState.push(kept);
   }
   const preservedSchedule=[];
-  for(const row of array(turn?.state_delta?.npc_schedule_updates)){
-    const key=String(row?.npc_key||row?.key||'').trim(),segments=effectSegments.get(key)||[];if(!limitedKeys.has(key)||!segments.length)continue;
-    const visible=segments.join(' '),location=String(row?.location||'').trim().toLowerCase(),activity=String(row?.activity||'').trim().toLowerCase(),activityTokens=(activity.match(/[가-힣a-z0-9_]{2,}/g)||[]),activityMatched=activity.length>=2&&(visible.includes(activity)||(activityTokens.length>0&&activityTokens.every(token=>visible.includes(token))));
-    if(location.length>=2&&visible.includes(location)&&activityMatched)preservedSchedule.push(row);
-  }
   const relevantCount=[...array(turn?.state_delta?.npc_state_updates),...array(turn?.state_delta?.npc_schedule_updates)].filter(row=>limitedKeys.has(String(row?.npc_key||row?.key||'').trim())).length;
   return{npc_keys:[...limitedKeys],npc_state_updates:preservedState,npc_schedule_updates:preservedSchedule,attribution_safe:relevantCount===0||preservedState.length+preservedSchedule.length>0};
 }

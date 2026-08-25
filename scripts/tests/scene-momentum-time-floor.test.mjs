@@ -65,6 +65,8 @@ const ownClassSave={pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'
 const ownClassAction='10시에 기초 수업에 참석한다.';
 const ownClassIntent=classifySceneIntent(ownClassAction,{location:'기숙사',currentTime:'09:00'});
 assert.equal(nextScheduleBoundaryMinutes(ownClassSave,{futureOnly:true,action:ownClassAction,intent:ownClassIntent}),null,'an explicitly requested scheduled activity must not interrupt itself at its own start');
+const otherSameTimeClass={id:'advanced-class',title:'기사과 고급 수업',date:'1285-03-01',time:'10:00',kind:'academic',status:'scheduled'};
+assert.equal(nextScheduleBoundaryMinutes({...ownClassSave,scheduleContext:{due:[],upcoming:[ownClass,otherSameTimeClass]},scheduledEvents:[ownClass,otherSameTimeClass]},{futureOnly:true,action:ownClassAction,intent:ownClassIntent}),60,'a different same-time class must remain authoritative even when it shares a department token with the requested class');
 assert.doesNotMatch(buildSceneMomentumDirective({action:ownClassAction,saveState:ownClassSave}),/SCHEDULE_BOUNDARY=60min/,'the requested class start must remain part of class completion rather than become a new choice stop');
 turn={scene_title:'기초 수업',scene:[{kind:'narration',text:'10시에 수업이 시작되어 첫 교시를 마쳤다.'}],state_delta:{advance_minutes:60,scheduled_events_complete:['basic-class']},choices:[],event_progress:{event_instance_id:'basic-class'}};
 applySceneMomentumTimeFloor({action:ownClassAction,saveState:ownClassSave},turn,'game');
@@ -160,7 +162,7 @@ const consequenceEffects=consequenceNpcEffectsForShortening(turn,{event_name:'�
 applySceneMomentumTimeFloor({action:'40분 기다린다.',saveState:consequenceSave},turn,'game',{selected_id:consequenceHook.id,status:'resolved',...consequenceEffects});
 assert.equal(turn.state_delta.advance_minutes,20,'a due consequence inside a longer wait must stop at its exact trigger');
 assert.deepEqual(turn.state_delta.npc_state_updates,[{npc_key:'emily',location:'중앙광장',status:'도착'}],'NPC state attributable to the resolved consequence must survive shortening');
-assert.deepEqual(turn.state_delta.npc_schedule_updates,[{npc_key:'emily',delay_minutes:20,location:'중앙광장',activity:'후문 경계',reason:'도착 후 경계'}],'only the consequence-owned NPC schedule state must survive shortening');
+assert.deepEqual(turn.state_delta.npc_schedule_updates,[],'relative NPC schedules must fail closed because their delay cannot be safely rebased to the shortened boundary');
 assert.deepEqual(turn.state_delta.hooks_update,[{id:consequenceHook.id,status:'resolved'}],'the preserved consequence state and its resolved lifecycle must remain aligned');
 
 const rangedConsequenceSave={...consequenceSave,world:{...consequenceSave.world,time:'08:40'}};
@@ -186,6 +188,10 @@ const sameLocationLaterTurn={scene:[{kind:'narration',text:'약속 시각이 되
 const sameLocationLaterEffects=consequenceNpcEffectsForShortening(sameLocationLaterTurn,{event_name:'약속 상대의 도착',reason:'약속 장소에 도착한다',secret_level:0},['emily'],{emily:'에밀리'});
 assert.deepEqual(sameLocationLaterEffects.npc_state_updates,[{npc_key:'emily',location:'중앙광장',status:'도착'}],'matching boundary state may survive even when a later same-location plan is present');
 assert.deepEqual(sameLocationLaterEffects.npc_schedule_updates,[],'a later same-location schedule must not survive from a partial event-token overlap');
+const identicalLaterScheduleTurn={scene:[{kind:'narration',text:'약속 시각이 되어 에밀리가 중앙광장에 도착해 휴식을 시작했다.'}],state_delta:{npc_schedule_updates:[{npc_key:'emily',delay_minutes:30,location:'중앙광장',activity:'휴식',reason:'후속 휴식'}]}};
+const identicalLaterScheduleEffects=consequenceNpcEffectsForShortening(identicalLaterScheduleTurn,{event_name:'에밀리의 도착',reason:'에밀리가 약속 장소에 도착한다',secret_level:0},['emily'],{emily:'에밀리'});
+assert.equal(identicalLaterScheduleEffects.attribution_safe,false,'an identical location/activity schedule without absolute boundary timing must keep attribution unresolved');
+assert.deepEqual(identicalLaterScheduleEffects.npc_schedule_updates,[],'unverified relative delay and reason must never survive consequence-boundary shortening');
 turn={scene:[{kind:'narration',text:'한 시간째 약속 시각이 되어 에밀리가 중앙광장에 도착했다.'},{kind:'narration',text:'그 뒤 에밀리는 기숙사로 떠났다.'}],state_delta:{advance_minutes:180,npc_state_updates:[{npc_key:'emily',location:'기숙사',status:'떠남'}],hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
 const cappedAmbiguousLifecycle={selected_id:consequenceHook.id,status:'resolved',evidence:'visible-result',...ambiguousEffects};
 applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:rangedConsequenceSave},turn,'game',cappedAmbiguousLifecycle);
