@@ -90,6 +90,63 @@ const combatSettingWordsRejected = deriveSkillLearningState({
 });
 assert.deepEqual(combatSettingWordsRejected.accepted_changes, [], 'training-ground and map nouns must not masquerade as active training or instruction');
 
+const npcTrainingObservationRejected = deriveSkillLearningState({
+  changes: [{ skill: '반월 보법', amount: 15, basis: '아르테미스가 보법을 반복했다.', reason: 'NPC의 훈련을 PC 진척으로 주장했다.' }],
+  action: '아르테미스가 반월 보법을 반복 훈련하는 모습을 지켜본다.',
+  scene: [{ text: '아르테미스는 같은 보법을 반복 연습했고, Aaa는 옆에서 관찰만 했다.' }],
+});
+assert.deepEqual(npcTrainingObservationRejected.accepted_changes, [], 'watching an NPC train must not grant that learning to the PC');
+
+const refusedNpcTrainingRejected = deriveSkillLearningState({
+  changes: [{ skill: '반월 보법', amount: 15, basis: '아르테미스의 시범을 보았다.', reason: '거절한 학습을 진척으로 주장했다.' }],
+  action: '반월 보법을 배우라는 권유를 거절하고 아르테미스가 반복 연습하는 모습만 지켜본다.',
+  scene: [{ text: 'Aaa는 훈련을 거절한 채 서 있었고, 아르테미스만 같은 궤적을 연속 재현했다.' }],
+});
+assert.deepEqual(refusedNpcTrainingRejected.accepted_changes, [], 'refusing instruction while another NPC practices must not grant PC progress');
+
+const npcOnlySceneRejected = deriveSkillLearningState({
+  changes: [{ skill: '반월 보법', amount: 15, basis: '아르테미스가 연습했다.', reason: 'PC 행동과 불일치하는 NPC 장면을 진척으로 주장했다.' }],
+  action: '반월 보법을 직접 반복 연습한다.',
+  scene: [{ text: '아르테미스는 같은 보법을 반복 연습했고, Aaa는 옆에서 지켜보기만 했다.' }],
+});
+assert.deepEqual(npcOnlySceneRejected.accepted_changes, [], 'scene evidence performed only by an NPC must not authenticate PC learning');
+
+const npcDirectEmphasisRejected = deriveSkillLearningState({
+  changes: [{ skill: '반월 보법', amount: 15, basis: '아르테미스가 직접 훈련했다.', reason: 'NPC의 직접 행동을 PC 진척으로 주장했다.' }],
+  action: '아르테미스가 직접 반월 보법을 훈련한다.',
+  scene: [{ text: '아르테미스가 직접 같은 동작을 반복 연습했다.' }],
+});
+assert.deepEqual(npcDirectEmphasisRejected.accepted_changes, [], 'direct emphasis on an NPC action must not be confused with a PC self-subject');
+
+const selfObservesNpcRejected = deriveSkillLearningState({
+  changes: [{ skill: '반월 보법', amount: 15, basis: '아르테미스가 훈련했다.', reason: 'PC 관찰 주어를 수행 주어로 주장했다.' }],
+  action: '내가 아르테미스가 반월 보법을 훈련하는 것을 본다.',
+  scene: [{ text: '아르테미스가 같은 보법을 반복 연습하는 것을 Aaa가 보았다.' }],
+});
+assert.deepEqual(selfObservesNpcRejected.accepted_changes, [], 'a PC observer subject must not override the NPC who performed the learning action');
+
+const npcCombatRejected = deriveSkillLearningState({
+  changes: [{ skill: '반월 보법', amount: 15, basis: '아르테미스가 전투에서 교정했다.', reason: 'NPC의 전투 통찰을 PC 진척으로 주장했다.' }],
+  action: '아르테미스가 적을 공격한다.',
+  scene: [{ text: '아르테미스는 실패 원인을 분석하고 자세를 교정한 뒤 같은 공격을 재현했다.' }],
+});
+assert.deepEqual(npcCombatRejected.accepted_changes, [], 'an NPC combat action must not satisfy the PC-owned combat intent gate');
+
+const observedThenPracticedAccepted = deriveSkillLearningState({
+  changes: [{ skill: '반월 보법', amount: 7, basis: '시범 뒤 직접 발 위치를 교정했다.', reason: '직접 같은 궤적을 세 번 연속 재현했다.' }],
+  action: '아르테미스의 시범을 지켜본 뒤 내가 직접 반월 보법을 반복 연습한다.',
+  scene: [{ text: '시범을 따라 직접 발 위치를 교정하고 같은 궤적을 세 번 연속 재현했다.' }],
+  turnNumber: 8,
+});
+assert.equal(observedThenPracticedAccepted.candidates['반월 보법'].progress, 7, 'watching a demonstration may lead to progress only when the PC then practices it directly');
+
+const explicitTrainingParticleAccepted = deriveSkillLearningState({
+  changes: [{ skill: '반월 보법', amount: 5, basis: '직접 급정지를 교정했다.', reason: '같은 궤적을 반복 재현했다.' }],
+  action: '반월 보법 훈련을 한다.',
+  scene: [{ text: '직접 발 위치를 교정하고 같은 궤적을 반복 재현했다.' }],
+});
+assert.equal(explicitTrainingParticleAccepted.candidates['반월 보법'].progress, 5, 'ordinary Korean object-particle phrasing must remain a valid PC training action');
+
 const combatInsightAccepted = deriveSkillLearningState({
   changes: [{ skill: '반월 보법', amount: 9, basis: '빗나간 공격의 실패 원인을 분석하고 발 위치를 교정했다.', reason: '교정한 궤적을 연속 재현했다.' }],
   action: '검으로 적을 공격하며 움직임을 시험한다.',
