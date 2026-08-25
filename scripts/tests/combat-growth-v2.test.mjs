@@ -46,7 +46,7 @@ assert.deepEqual(basicTraining.accepted_skill_experience, [{ skill:'대검술', 
 const pressuredCombat = deriveCombatGrowthState({
   pc,
   action:'강적과 대련하며 대검술로 맞선다.',
-  scene:scene('강적의 실전 압박 속에서 새로운 응용을 시도하고 실패 원인을 파악해 자세를 수정했다.'),
+  scene:scene('강적의 실전 압박 속에서 대검술의 새로운 응용을 시도하고 실패 원인을 파악해 자세를 수정했다.'),
   resolutionLog:resolution('partial', [ability('skill', '대검술'), ability('stat', '신체', 'support')]),
   statChanges:[{ stat:'신체', amount:5, reason:'강적의 압박에 대한 적응' }],
   skillChanges:[{ skill:'대검술', amount:5, reason:'실전에서 새 응용을 습득' }],
@@ -67,7 +67,7 @@ assert.deepEqual(enduranceGrowth.accepted_stat_progress, [{ stat:'신체', amoun
 const failedButLearned = deriveCombatGrowthState({
   pc,
   action:'대검술 대련을 계속한다.',
-  scene:scene('연속 실패의 원인을 파악해 무너진 자세를 수정하고 같은 실수를 피했다.'),
+  scene:scene('대검술 연속 실패의 원인을 파악해 무너진 자세를 수정하고 같은 실수를 피했다.'),
   resolutionLog:resolution('failure', [ability('skill', '대검술')]),
   skillChanges:[{ skill:'대검술', amount:4, reason:'실패 분석과 자세 수정' }],
 });
@@ -76,7 +76,7 @@ assert.deepEqual(failedButLearned.accepted_skill_experience, [{ skill:'대검술
 const extremeBreakthrough = deriveCombatGrowthState({
   pc,
   action:'오러 운용으로 생사의 전투에 맞선다.',
-  scene:scene('죽음의 문턱에서 오러 순환의 근본적인 오류를 깨닫고 극한의 압박 속에 한계를 돌파했다.'),
+  scene:scene('죽음의 문턱에서 오러 운용의 순환 오류를 깨닫고 극한의 압박 속에 한계를 돌파했다.'),
   resolutionLog:resolution('partial', [ability('skill', '오러 운용'), ability('stat', '마나', 'support')]),
   statChanges:[{ stat:'마나', amount:5, reason:'극한에서 순환 한계 돌파' }],
   skillChanges:[{ skill:'오러 운용', amount:5, reason:'생사 경계의 근본 통찰' }],
@@ -162,6 +162,60 @@ const englishNpcOnlyRejected = deriveCombatGrowthState({
 });
 assert.deepEqual(englishNpcOnlyRejected.accepted_skill_experience, [], 'English third-person action and scene evidence must not mutate PC growth');
 
+const englishPlayerEvidenceAccepted = deriveCombatGrowthState({
+  pc:{ ...pc, skills:{ ...pc.skills, Greatsword:{ grade:'C', hiddenXp:0 } } },
+  action:'I practice Greatsword.',
+  scene:scene('Repeated practice corrected my stance and produced new insight in Greatsword.'),
+  resolutionLog:{ triggered:false, outcome:'none', abilities:[] },
+  skillChanges:[{ skill:'Greatsword', amount:3, reason:'repeated stance correction' }],
+});
+assert.deepEqual(englishPlayerEvidenceAccepted.accepted_skill_experience, [{ skill:'Greatsword', amount:1, reason:'repeated stance correction' }], 'a capitalized English sentence opener is not an NPC subject');
+
+const englishNpcEvidenceRejected = deriveCombatGrowthState({
+  pc:{ ...pc, skills:{ ...pc.skills, Greatsword:{ grade:'C', hiddenXp:0 } } },
+  action:'I practice Greatsword.',
+  scene:scene('Lillia practiced Greatsword under pressure and corrected her stance.'),
+  resolutionLog:resolution('success', [ability('skill', 'Greatsword')]),
+  skillChanges:[{ skill:'Greatsword', amount:3, reason:'Lillia corrected her stance' }],
+});
+assert.deepEqual(englishNpcEvidenceRejected.accepted_skill_experience, [], 'an English third-person subject must still block NPC-only scene evidence');
+
+const namedObserverRejected = deriveCombatGrowthState({
+  pc,
+  action:'카일은 릴리아가 대검술을 훈련하는 모습을 지켜본다.',
+  scene:scene('카일은 릴리아가 대검술의 자세를 교정하고 새 통찰을 얻는 모습을 봤다.'),
+  resolutionLog:resolution('success', [ability('skill', '대검술')]),
+  skillChanges:[{ skill:'대검술', amount:3, reason:'릴리아의 훈련 관찰' }],
+});
+assert.deepEqual(namedObserverRejected.accepted_skill_experience, [], 'mentioning the PC as observer must not transfer an NPC training action');
+
+const namedPcWithNpcOnlyEvidenceRejected = deriveCombatGrowthState({
+  pc,
+  action:'대검술을 연습한다.',
+  scene:scene('카일은 잠시 쉬는 동안 릴리아가 대검술의 자세를 교정하고 새 통찰을 얻었다.'),
+  resolutionLog:resolution('success', [ability('skill', '대검술')]),
+  skillChanges:[{ skill:'대검술', amount:3, reason:'릴리아의 교정 장면' }],
+});
+assert.deepEqual(namedPcWithNpcOnlyEvidenceRejected.accepted_skill_experience, [], 'the PC name elsewhere in a scene must not authenticate an NPC learning stimulus');
+
+const playerRecipientCorrectionAccepted = deriveCombatGrowthState({
+  pc,
+  action:'대검술을 연습한다.',
+  scene:scene('릴리아가 카일의 대검술 손목 각도를 직접 교정해 자세가 안정됐다.'),
+  resolutionLog:{ triggered:false, outcome:'none', abilities:[] },
+  skillChanges:[{ skill:'대검술', amount:3, reason:'교관의 직접 교정' }],
+});
+assert.deepEqual(playerRecipientCorrectionAccepted.accepted_skill_experience, [{ skill:'대검술', amount:1, reason:'교관의 직접 교정' }], 'a named instructor may still provide evidence when the PC is the explicit correction recipient');
+
+const koreanAttemptVerbAccepted = deriveCombatGrowthState({
+  pc,
+  action:'대검술을 연습해본다.',
+  scene:scene('대검술의 기본 자세를 반복 연습하고 손목 각도를 교정했다.'),
+  resolutionLog:{ triggered:false, outcome:'none', abilities:[] },
+  skillChanges:[{ skill:'대검술', amount:3, reason:'기본 자세 교정' }],
+});
+assert.deepEqual(koreanAttemptVerbAccepted.accepted_skill_experience, [{ skill:'대검술', amount:1, reason:'기본 자세 교정' }], '연습해본다 is a committed attempt, not an observation verb');
+
 const commandedNpcRejected = deriveCombatGrowthState({
   pc,
   action:'나는 릴리아를 훈련시킨다.',
@@ -198,6 +252,15 @@ const overlappingSkillNames = deriveCombatGrowthState({
 });
 assert.deepEqual(overlappingSkillNames.accepted_skill_experience, [{ skill:'대검술', amount:1, reason:'대검술 자세 교정' }], 'a shorter overlapping skill name must not inherit another skill training mention');
 
+const unownedCompoundNameRejected = deriveCombatGrowthState({
+  pc:{ ...pc, skills:{ '검술':{ grade:'C', hiddenXp:0 } } },
+  action:'대검술 기본 자세를 반복 연습한다.',
+  scene:scene('대검술의 손목 각도를 교정하고 반복 동작을 안정시켰다.'),
+  resolutionLog:{ triggered:false, outcome:'none', abilities:[] },
+  skillChanges:[{ skill:'검술', amount:3, reason:'소유하지 않은 대검술 훈련' }],
+});
+assert.deepEqual(unownedCompoundNameRejected.accepted_skill_experience, [], 'an unowned compound skill must not count as an exact mention of its shorter suffix');
+
 const questionOnlyRejected = deriveCombatGrowthState({
   pc,
   action:'대검술을 훈련하면 얼마나 성장할까?',
@@ -206,6 +269,15 @@ const questionOnlyRejected = deriveCombatGrowthState({
   skillChanges:[{ skill:'대검술', amount:2, reason:'훈련 질문' }],
 });
 assert.deepEqual(questionOnlyRejected.accepted_skill_experience, [], 'a question about training is not a committed growth action');
+
+const conditionalEndingRejected = deriveCombatGrowthState({
+  pc,
+  action:'대검술을 훈련한다면 얼마나 성장할까?',
+  scene:scene('대검술 반복 훈련으로 자세를 교정했다.'),
+  resolutionLog:{ triggered:false, outcome:'none', abilities:[] },
+  skillChanges:[{ skill:'대검술', amount:2, reason:'가정형 훈련 질문' }],
+});
+assert.deepEqual(conditionalEndingRejected.accepted_skill_experience, [], '한다면 must remain hypothetical rather than satisfy the committed-action guard');
 
 const negatedStimulusRejected = deriveCombatGrowthState({
   pc,
@@ -224,6 +296,26 @@ const laterAffirmativeEvidence = deriveCombatGrowthState({
   skillChanges:[{ skill:'대검술', amount:3, reason:'후반의 실패 분석과 수정' }],
 });
 assert.equal(laterAffirmativeEvidence.accepted_skill_experience[0].amount, 2, 'a scoped early failure must not erase later affirmative learning evidence');
+
+const laterNegatedClaimKeepsCorrection = deriveCombatGrowthState({
+  pc,
+  action:'대검술을 연습한다.',
+  scene:scene('대검술의 손목 각도를 교정했지만 새로운 통찰은 얻지 못했다.'),
+  resolutionLog:resolution('partial', [ability('skill', '대검술')]),
+  skillChanges:[{ skill:'대검술', amount:3, reason:'손목 각도 교정' }],
+});
+assert.deepEqual(laterNegatedClaimKeepsCorrection.accepted_skill_experience, [{ skill:'대검술', amount:1, reason:'손목 각도 교정' }], 'negating a later insight must not erase an earlier affirmative correction');
+
+const globalEvidenceNotTransferred = deriveCombatGrowthState({
+  pc,
+  action:'강적의 연속 공격을 견딘다.',
+  scene:scene('죽음의 문턱에서 신체의 호흡과 균형을 교정하며 한계를 넘었다.'),
+  resolutionLog:resolution('partial', [ability('skill', '대검술'), ability('stat', '지능')]),
+  statChanges:[{ stat:'지능', amount:3, reason:'신체 돌파와 무관한 지능' }],
+  skillChanges:[{ skill:'대검술', amount:3, reason:'신체 돌파와 무관한 해결 능력' }],
+});
+assert.deepEqual(globalEvidenceNotTransferred.accepted_stat_progress, [], 'a sole resolved stat still needs ability-specific learning evidence');
+assert.deepEqual(globalEvidenceNotTransferred.accepted_skill_experience, [], 'a sole resolved skill still needs ability-specific learning evidence');
 
 const unrelatedAbilityRejected = deriveCombatGrowthState({
   pc,
