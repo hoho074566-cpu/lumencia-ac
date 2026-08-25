@@ -411,15 +411,28 @@ function consequenceNpcEffectsForShortening(turn,consequence,routedKeys=[],regis
 function consequenceNpcKeysForShortening(turn,consequence,routedKeys=[],registry=CHARACTER_REGISTRY){
   return consequenceNpcEffectsForShortening(turn,consequence,routedKeys,registry).npc_keys;
 }
-function reconcileReachedScheduleStart(turn,boundaryIds=new Set()){
-  const delta=object(turn?.state_delta);if(!turn?.state_delta||!boundaryIds.size)return false;
-  const lifecycleCompleted=['active_events_remove','completed_events_add','scheduled_events_remove','scheduled_events_complete'].some(field=>array(delta[field]).some(value=>boundaryIds.has(String(value||'').trim().toLowerCase())));
+function scheduleBoundaryEffectTokens(value=''){
+  const text=typeof value==='string'?value:Object.values(object(value)).flatMap(item=>Array.isArray(item)?item:[item]).filter(item=>['string','number'].includes(typeof item)).join(' '),generic=new Set(['event','class','academic','personal','scheduled','필수','일정','예정','기사과','마법과','신학부','연금술과','일반과','학부']);
+  return[...new Set((String(text||'').toLowerCase().match(/[가-힣a-z0-9_]{2,}/g)||[]).map(token=>token.replace(/(?:에게서|에게|한테|께서|으로|에서|까지|부터|처럼|보다|에는|은|는|이|가|을|를|와|과|도|의)$/u,'')).filter(token=>token.length>=2&&!generic.has(token)))];
+}
+function reconcileReachedScheduleStart(turn,boundaryRows=[]){
+  const delta=object(turn?.state_delta),rows=array(boundaryRows),boundaryIds=new Set(rows.map(row=>String(row?.id||'').trim().toLowerCase()).filter(Boolean));if(!turn?.state_delta||!boundaryIds.size)return false;
+  const lifecycleCompleted=['active_events_remove','completed_events_add','scheduled_events_complete'].some(field=>array(delta[field]).some(value=>boundaryIds.has(String(value||'').trim().toLowerCase())));
   for(const field of ['active_events_remove','completed_events_add','scheduled_events_remove','scheduled_events_complete'])delta[field]=array(delta[field]).filter(value=>!boundaryIds.has(String(value||'').trim().toLowerCase()));
+  delta.active_events_add=array(delta.active_events_add).filter(value=>!boundaryIds.has(String(value||'').trim().toLowerCase()));
   const progress=object(turn?.event_progress),eventId=String(progress.event_instance_id||progress.eventInstanceId||'').trim().toLowerCase(),terminal=new Set(['complete','completed','done','finished','end']);
   const completionSignals=[progress.active_beat,progress.activeBeat,progress.status,...array(progress.completed_beats||progress.completedBeats)].map(value=>String(value||'').trim().toLowerCase());
   const terminalProgress=boundaryIds.has(eventId)&&completionSignals.some(value=>terminal.has(value));
   if(terminalProgress)turn.event_progress=null;
-  return lifecycleCompleted||terminalProgress;
+  const prematureCompletion=lifecycleCompleted||terminalProgress;if(!prematureCompletion)return false;
+  const rowTokens=new Set(rows.flatMap(row=>scheduleBoundaryEffectTokens([row?.id,row?.title,row?.kind,row?.location].filter(Boolean).join(' ')))),segments=[turn?.scene_title,turn?.scene_summary,...array(turn?.scene).map(item=>item?.text)].filter(Boolean).flatMap(value=>String(value).split(/(?<=[.!?。！？])|\n+/)).map(value=>value.trim().toLowerCase()).filter(Boolean),completionCue=/(?:마쳤|끝냈|완료|종료|수료|보상|상금|지급|complete|finished|reward)/,terminalSegments=segments.filter(segment=>completionCue.test(segment)),matchedSegments=terminalSegments.filter(segment=>rowTokens.size===0||[...rowTokens].some(token=>segment.includes(token))),completionSegments=matchedSegments.length?matchedSegments:terminalProgress?terminalSegments:[],cueTokens=new Set(['보상','상금','수료','지급','완료','종료','내용','지식','호감','신뢰']);
+  const boundaryOwned=(value)=>{const src=object(value),directId=String(src.id||src.event_id||src.event_instance_id||'').trim().toLowerCase(),tokens=scheduleBoundaryEffectTokens(value),text=typeof value==='string'?value:Object.values(src).filter(item=>['string','number'].includes(typeof item)).join(' ');if(directId&&boundaryIds.has(directId))return true;if(tokens.some(token=>rowTokens.has(token)))return true;if(consequenceEffectMatches(value,completionSegments))return true;return tokens.some(token=>cueTokens.has(token)&&completionSegments.some(segment=>segment.includes(token)))||(String(text||'').trim().length>=4&&completionSegments.some(segment=>segment.includes(String(text).trim().toLowerCase())));};
+  const lifecycleFields=new Set(['active_events_remove','completed_events_add','scheduled_events_remove','scheduled_events_complete']);
+  for(const [field,value] of Object.entries(delta)){if(!Array.isArray(value)||lifecycleFields.has(field))continue;delta[field]=value.filter(row=>!boundaryOwned(row));}
+  if(delta.new_location&&boundaryOwned(delta.new_location))delta.new_location=null;
+  if(delta.pc_status&&boundaryOwned(delta.pc_status))delta.pc_status=null;
+  if(Number(delta.gold_delta||0)!==0&&completionSegments.some(segment=>/(?:보상|상금|지급|금화|골드)/.test(segment)))delta.gold_delta=0;
+  return true;
 }
 function reconcileShortenedTimedTurn(turn,{preserveConsequenceId='',preserveNpcStateUpdates=[],preserveNpcScheduleUpdates=[],preserveDelta={}}={}){
   const delta=object(turn?.state_delta);if(!turn?.state_delta)return;
@@ -466,7 +479,8 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   const profileMax=boundaryLookahead>0?boundaryLookahead:requestedMaximum;
   const scheduleBoundary=nextScheduleBoundaryMinutes(incoming?.saveState||{},{futureOnly:true,action:incoming?.action||'',intent,registry:CHARACTER_REGISTRY});
   const consequenceBoundary=consequenceLifecycle?.selected_id?minutesUntilEventConsequence(incoming?.saveState||{},consequenceLifecycle.selected_id):null;
-  const reachedConsequenceBoundary=Boolean(consequenceBoundary!=null&&Number.isFinite(Number(consequenceBoundary))&&consequenceBoundary<=profileMax&&consequenceLifecycle?.status==='resolved'&&consequenceLifecycle?.attribution_safe!==false);
+  const consequenceAttributionSafe=consequenceLifecycle?.attribution_safe!==false;
+  const reachedConsequenceBoundary=Boolean(consequenceBoundary!=null&&Number.isFinite(Number(consequenceBoundary))&&consequenceBoundary<=profileMax&&consequenceLifecycle?.status==='resolved');
   const floorBoundaries=[scheduleBoundary,reachedConsequenceBoundary?consequenceBoundary:null].filter(value=>value!=null&&Number.isFinite(Number(value))).map(Number),floorBoundary=floorBoundaries.length?Math.min(...floorBoundaries):null;
   const boundedFloor=floorBoundary==null?requestedFloor:Math.min(requestedFloor,Math.max(0,floorBoundary));
   const eventId=String(turn?.event_progress?.event_instance_id||turn?.event_progress?.eventInstanceId||'').trim().toLowerCase();
@@ -486,16 +500,18 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   else if(current>profileMax)applied=profileMax;
   else if(!structuredInterruption&&completedBeforeChoice)applied=Math.min(profileMax,Math.max(current,boundedFloor));
   const boundaryTruncatesAction=Boolean(reachedBoundary!=null&&reachedBoundary<requestedFloor),reconcileTruncatedTurn=applied<current||boundaryTruncatesAction;
-  if(reconcileTruncatedTurn&&consequenceLifecycle?.status==='resolved'&&!appliedConsequenceBoundary){
-    if(consequenceLifecycle?.attribution_safe===false){const id=String(consequenceLifecycle.selected_id||'');turn.state_delta.hooks_update=[...array(turn.state_delta.hooks_update).filter(row=>String(row?.id||'')!==id),{id,status:'open',reason:'발현 시각 도달; NPC 경계 효과 귀속 대기'}].slice(0,8);consequenceLifecycle.evidence='ambiguous-npc-effect';}
+  const ambiguousAppliedConsequence=Boolean(appliedConsequenceBoundary&&!consequenceAttributionSafe);
+  if((reconcileTruncatedTurn||ambiguousAppliedConsequence)&&consequenceLifecycle?.status==='resolved'&&(!appliedConsequenceBoundary||ambiguousAppliedConsequence)){
+    if(!consequenceAttributionSafe){const id=String(consequenceLifecycle.selected_id||'');turn.state_delta.hooks_update=[...array(turn.state_delta.hooks_update).filter(row=>String(row?.id||'')!==id),{id,status:'open',reason:'발현 시각 도달; NPC 경계 효과 귀속 대기'}].slice(0,8);consequenceLifecycle.evidence='ambiguous-npc-effect';}
     else consequenceLifecycle.evidence='deferred-by-earlier-boundary';
     consequenceLifecycle.status='open';
   }
+  const preserveAttributedConsequence=Boolean(appliedConsequenceBoundary&&consequenceAttributionSafe),reconcileTimedTurn=reconcileTruncatedTurn||ambiguousAppliedConsequence;
   let rewoundScheduleCompletion=false;
-  if(reconcileTruncatedTurn)reconcileShortenedTimedTurn(turn,{preserveConsequenceId:appliedConsequenceBoundary||consequenceLifecycle?.evidence==='ambiguous-npc-effect'?consequenceLifecycle?.selected_id:'',preserveNpcStateUpdates:appliedConsequenceBoundary?consequenceLifecycle?.npc_state_updates:[],preserveNpcScheduleUpdates:appliedConsequenceBoundary?consequenceLifecycle?.npc_schedule_updates:[],preserveDelta:appliedConsequenceBoundary?consequenceLifecycle?.preserved_delta:{}});
-  else if(appliedScheduleBoundary){rewoundScheduleCompletion=reconcileReachedScheduleStart(turn,boundaryIds);if(rewoundScheduleCompletion)reconcileShortenedTimedTurn(turn);}
+  if(reconcileTimedTurn)reconcileShortenedTimedTurn(turn,{preserveConsequenceId:preserveAttributedConsequence||consequenceLifecycle?.evidence==='ambiguous-npc-effect'?consequenceLifecycle?.selected_id:'',preserveNpcStateUpdates:preserveAttributedConsequence?consequenceLifecycle?.npc_state_updates:[],preserveNpcScheduleUpdates:preserveAttributedConsequence?consequenceLifecycle?.npc_schedule_updates:[],preserveDelta:preserveAttributedConsequence?consequenceLifecycle?.preserved_delta:{}});
+  else if(appliedScheduleBoundary)rewoundScheduleCompletion=reconcileReachedScheduleStart(turn,boundaryRows);
   turn.state_delta.advance_minutes=applied;
-  return{...intent,runtimeSceneTrusted:!reconcileTruncatedTurn&&!rewoundScheduleCompletion};
+  return{...intent,runtimeSceneTrusted:!reconcileTimedTurn&&!rewoundScheduleCompletion};
 }
 function runtimeSynthesisTurn(turn,intent={}){
   if(intent?.runtimeSceneTrusted!==false)return turn;

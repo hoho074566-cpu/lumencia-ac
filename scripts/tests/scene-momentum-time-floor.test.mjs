@@ -130,7 +130,7 @@ assert.equal(turn.state_delta.advance_minutes,10,'an unrelated overdue row must 
 turn={
   scene_title:'수업 종료',scene:[{kind:'narration',text:'기초 수업을 모두 마치고 보상을 받았다.'}],choices:['다음 수업으로 간다','교관에게 묻는다','자리를 뜬다'],
   event_progress:{event_instance_id:'class',active_beat:'complete',completed_beats:['complete']},
-  state_delta:{advance_minutes:10,scheduled_events_complete:['class'],completed_events_add:['class'],pc_knowledge_add:['기초 수업 내용'],items_add:['수료 보상'],gold_delta:5,relationship_changes:[{npc_key:'artemis',affinity_delta:1}],npc_state_updates:[{npc_key:'artemis',status:'수업 종료'}]},
+  state_delta:{advance_minutes:10,scheduled_events_complete:['class'],completed_events_add:['class'],pc_knowledge_add:['기초 수업 내용'],items_add:['수료 보상'],gold_delta:5,relationship_changes:[{npc_key:'artemis',affinity_delta:1,reason:'기초 수업 수료'}],npc_state_updates:[{npc_key:'artemis',status:'수업 종료'}]},
 };
 const rewoundBoundaryIntent=applySceneMomentumTimeFloor({action:'10분 기다린다.',saveState:boundaryChoiceSave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'rewinding premature completion must retain the exact schedule-start clock');
@@ -138,6 +138,32 @@ for(const field of ['scheduled_events_complete','completed_events_add','pc_knowl
 assert.equal(turn.state_delta.gold_delta,0,'currency awarded by a prematurely completed schedule must fail closed');
 assert.equal(turn.event_progress,null,'terminal event progress must not survive rewinding to the schedule start');
 assert.equal(rewoundBoundaryIntent.runtimeSceneTrusted,false,'runtime synthesis must ignore narration that completes a schedule at its start');
+turn={scene_title:'수업 시작',scene:[{kind:'narration',text:'기초 수업이 막 시작되었다.'}],choices:['참석한다','남는다','다른 곳으로 간다'],event_progress:{event_instance_id:'class',active_beat:'start',completed_beats:[]},state_delta:{advance_minutes:10,active_events_add:['class'],scheduled_events_remove:['class'],pc_knowledge_add:['기다리는 동안 확인한 복도 공지']}};
+const ordinaryBoundaryStartIntent=applySceneMomentumTimeFloor({action:'10분 기다린다.',saveState:boundaryChoiceSave},turn,'game');
+assert.deepEqual(turn.state_delta.active_events_add,[],'a schedule must not enter the active bucket before the player handles its start boundary');
+assert.deepEqual(turn.state_delta.scheduled_events_remove,[],'the authoritative schedule row must remain pending at the start boundary');
+assert.deepEqual(turn.state_delta.pc_knowledge_add,['기다리는 동안 확인한 복도 공지'],'ordinary pre-boundary effects must survive a nonterminal schedule start');
+assert.equal(ordinaryBoundaryStartIntent.runtimeSceneTrusted,true,'a nonterminal schedule start must not be treated as premature completion');
+const exactTrainingBoundary={id:'next-class',title:'기사과 기초 수업',date:'1285-03-01',time:'10:00',kind:'academic',status:'scheduled'};
+const exactTrainingBoundarySave={pc:knightPc,world:{date:'1285-03-01',time:'06:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[exactTrainingBoundary]},scheduledEvents:[exactTrainingBoundary]};
+const trainingGrowth={skill:'검술',amount:1,reason:'네 시간 동안 기본 검술을 반복 훈련했다'};
+const prematureClassGrowth={skill:'전술',amount:1,reason:'기사과 기초 수업을 수료했다'};
+turn={
+  scene_title:'훈련 완료와 수업 종료',scene:[{kind:'narration',text:'네 시간의 검술 훈련을 마치고 자세 교정법을 정리했다.'},{kind:'narration',text:'10시가 되자 기사과 기초 수업까지 모두 수료하고 보상을 받았다.'}],choices:[],
+  event_progress:{event_instance_id:'next-class',active_beat:'complete',completed_beats:['complete']},
+  state_delta:{advance_minutes:240,fatigue_delta:2,gold_delta:5,skill_experience:[trainingGrowth,prematureClassGrowth],pc_knowledge_add:['검술 기본 자세 교정법','기사과 기초 수업 내용'],items_add:['훈련 기록표','수료 보상'],relationship_changes:[{npc_key:'artemis',affinity_delta:1,reason:'기초 수업 수료'}],npc_state_updates:[{npc_key:'artemis',status:'기초 수업 종료'}],scheduled_events_complete:['next-class'],completed_events_add:['next-class']},
+};
+const exactTrainingBoundaryIntent=applySceneMomentumTimeFloor({action:'4시간 동안 검술을 훈련한다.',saveState:exactTrainingBoundarySave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,240,'a completed pre-boundary action must retain its full exact duration');
+assert.equal(turn.state_delta.fatigue_delta,2,'fatigue produced by the completed pre-boundary training must survive');
+assert.deepEqual(turn.state_delta.skill_experience,[trainingGrowth],'only growth attributable to the completed training may survive schedule-start reconciliation');
+assert.deepEqual(turn.state_delta.pc_knowledge_add,['검술 기본 자세 교정법'],'pre-boundary action knowledge must survive while premature class knowledge is removed');
+assert.deepEqual(turn.state_delta.items_add,['훈련 기록표'],'pre-boundary items must survive while the premature schedule reward is removed');
+assert.equal(turn.state_delta.gold_delta,0,'currency awarded by the not-yet-run schedule must be removed');
+assert.deepEqual(turn.state_delta.relationship_changes,[],'relationship effects attributable to the premature schedule must be removed');
+assert.deepEqual(turn.state_delta.npc_state_updates,[],'NPC effects attributable to the premature schedule must be removed');
+assert.equal(turn.event_progress,null,'the schedule event must remain incomplete at its start');
+assert.equal(exactTrainingBoundaryIntent.runtimeSceneTrusted,false,'mixed completion narration must not feed runtime synthesis after selective state reconciliation');
 const eveningClass={id:'evening-class',title:'기사과 수업',date:'1285-03-01',time:'20:00',kind:'academic',status:'scheduled'};
 const eveningClassSave={pc:knightPc,world:{date:'1285-03-01',time:'19:30',location:'훈련장'},scheduleContext:{due:[],upcoming:[eveningClass]},scheduledEvents:[eveningClass]};
 turn={scene_title:'오후 수업의 종',scene:[{kind:'narration',text:'오후 8시, 기사과 수업 종이 울렸다.'}],state_delta:{advance_minutes:30,skill_experience:[{skill:'검술',amount:1}]},choices:['수업에 간다','훈련을 멈춘다','다른 곳으로 간다']};
@@ -311,8 +337,10 @@ assert.equal(namedNpcEffects.attribution_safe,false,'the NPC name in the consequ
 assert.deepEqual(namedNpcEffects.npc_state_updates,[],'a named consequence must still reject the NPC final state from a later sentence');
 const ambiguousLifecycle={selected_id:consequenceHook.id,status:'resolved',evidence:'visible-result',...ambiguousEffects};
 applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:rangedConsequenceSave},turn,'game',ambiguousLifecycle);
-assert.equal(turn.state_delta.advance_minutes,90,'an unshortened full response may retain its later same-NPC state at the matching final clock');
-assert.deepEqual(turn.state_delta.npc_state_updates,[{npc_key:'emily',location:'기숙사',status:'떠남'}],'full-clock state remains aligned when unsafe boundary attribution prevents shortening');
+assert.equal(turn.state_delta.advance_minutes,60,'an ambiguously attributed resolved consequence must still stop the action at its exact trigger');
+assert.deepEqual(turn.state_delta.npc_state_updates,[],'unsafe later same-NPC state must fail closed at the consequence trigger');
+assert.deepEqual(turn.state_delta.hooks_update,[{id:consequenceHook.id,status:'open',reason:'발현 시각 도달; NPC 경계 효과 귀속 대기'}],'an ambiguously attributed consequence must be reopened at its exact hard stop');
+assert.equal(ambiguousLifecycle.status,'open','unsafe consequence telemetry must remain open for a later attributable resolution');
 const sameLocationLaterTurn={scene:[{kind:'narration',text:'약속 시각이 되어 에밀리가 중앙광장에 도착했다.'},{kind:'narration',text:'그 뒤 에밀리는 중앙광장에 남아 약속 종료 후 휴식할 계획을 세웠다.'}],state_delta:{npc_state_updates:[{npc_key:'emily',location:'중앙광장',status:'도착'}],npc_schedule_updates:[{npc_key:'emily',delay_minutes:30,location:'중앙광장',activity:'약속 종료 후 휴식',reason:'후속 계획'}]}};
 const sameLocationLaterEffects=consequenceNpcEffectsForShortening(sameLocationLaterTurn,{event_name:'약속 상대의 도착',reason:'약속 장소에 도착한다',secret_level:0},['emily'],{emily:'에밀리'});
 assert.deepEqual(sameLocationLaterEffects.npc_state_updates,[{npc_key:'emily',location:'중앙광장',status:'도착'}],'matching boundary state may survive even when a later same-location plan is present');
@@ -324,7 +352,7 @@ assert.deepEqual(identicalLaterScheduleEffects.npc_schedule_updates,[],'unverifi
 turn={scene:[{kind:'narration',text:'한 시간째 약속 시각이 되어 에밀리가 중앙광장에 도착했다.'},{kind:'narration',text:'그 뒤 에밀리는 기숙사로 떠났다.'}],state_delta:{advance_minutes:180,npc_state_updates:[{npc_key:'emily',location:'기숙사',status:'떠남'}],hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
 const cappedAmbiguousLifecycle={selected_id:consequenceHook.id,status:'resolved',evidence:'visible-result',...ambiguousEffects};
 applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:rangedConsequenceSave},turn,'game',cappedAmbiguousLifecycle);
-assert.equal(turn.state_delta.advance_minutes,120,'an unsafe oversized response still obeys the activity maximum without rewinding to the consequence boundary');
+assert.equal(turn.state_delta.advance_minutes,60,'an unsafe oversized response must stop at the earlier consequence boundary');
 assert.deepEqual(turn.state_delta.npc_state_updates,[],'future same-NPC state must be cleared when the oversized response is shortened');
 assert.deepEqual(turn.state_delta.hooks_update,[{id:consequenceHook.id,status:'open',reason:'발현 시각 도달; NPC 경계 효과 귀속 대기'}],'an ambiguously attributed consequence must remain unresolved after shortening');
 assert.equal(cappedAmbiguousLifecycle.status,'open','telemetry must agree that the shortened ambiguous consequence is unresolved');
