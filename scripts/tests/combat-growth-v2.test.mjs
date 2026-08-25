@@ -293,6 +293,58 @@ const structuralLateNpcSubjectRejected = deriveCombatGrowthState({
 });
 assert.deepEqual(structuralLateNpcSubjectRejected.accepted_stat_progress, [], 'a named NPC after the final-attempt lead must remain third-party evidence');
 
+const splitRowStructuralCorrectionAccepted = deriveCombatGrowthState({
+  pc,
+  action:'나는 이번에는 신체 단련을 위해 별도의 원형 회피 보법을 세 번 연습한다. 첫 두 번은 회전축과 체중 전환이 어긋나 실패한다. 교관에게 새 오류를 봐 달라고 요청하고, 교관의 앞발 각도와 골반 회전 지시를 직접 적용한 마지막 반복을 마친 뒤 실패 원인을 확인한다.',
+  scene:[
+    { kind:'narration', text:'원형으로 몸을 돌리는 첫 두 번의 반복에서는 회전축이 먼저 흔들리고, 체중이 늦게 따라오면서 발이 반 박자씩 밀렸다. 실패가 같은 지점에서 반복되자 교관에게 오류를 확인해 달라는 요청을 보냈다.' },
+    { kind:'narration', text:'마지막 반복에서는 교관에게 받은 앞발 각도와 골반 회전 지시를 그대로 적용했다. 앞발이 회전 방향을 열어 준 뒤 골반이 축을 이끌고, 체중 전환은 회전 중간까지 늦춰졌다. 이번에는 발이 꼬이지 않고 원형 궤도를 끝까지 유지했다.' },
+    { kind:'narration', text:'실패 원인은 회전 자체의 속도가 아니라, 닫힌 앞발 때문에 회전축이 먼저 틀어지고 체중이 그 뒤를 급히 따라가려 했던 데 있었다. 요청에 대한 추가 지시를 기다리는 동안 광장에는 정오 오리엔테이션을 향해 흩어지는 신입생들의 발걸음이 늘어났다.' },
+  ],
+  resolutionLog:{ triggered:false, outcome:'none', abilities:[] },
+  statChanges:[{ stat:'신체', amount:1, reason:'원형 회피 보법의 축과 체중 전환 교정 적용' }],
+});
+assert.equal(splitRowStructuralCorrectionAccepted.evidence_tier, 1, 'final application and immediate cause may form one bounded two-row correction bundle');
+assert.deepEqual(splitRowStructuralCorrectionAccepted.accepted_stat_progress, [{ stat:'신체', amount:1, reason:'원형 회피 보법의 축과 체중 전환 교정 적용' }], 'the exact split-row live correction must retain bounded physical growth');
+
+const nonAdjacentCauseRejected = deriveCombatGrowthState({
+  pc,
+  action:'나는 원형 회피 보법을 연습한다.',
+  scene:[
+    { kind:'narration', text:'교관이 앞발 각도와 골반 회전 순서를 짚었다.' },
+    { kind:'narration', text:'마지막 반복에서는 교관에게 받은 앞발 각도와 골반 회전 지시를 그대로 적용했다.' },
+    { kind:'narration', text:'광장 반대편에서 입학식 안내 종이 울렸다.' },
+    { kind:'narration', text:'실패 원인은 닫힌 앞발과 너무 이른 체중 이동에 있었다.' },
+  ],
+  resolutionLog:{ triggered:false, outcome:'none', abilities:[] },
+  statChanges:[{ stat:'신체', amount:1, reason:'분리된 원형 회피 교정' }],
+});
+assert.deepEqual(nonAdjacentCauseRejected.accepted_stat_progress, [], 'a cause row beyond the immediate next narration must not join the correction bundle');
+
+const splitRowNpcCauseRejected = deriveCombatGrowthState({
+  pc,
+  action:'나는 원형 회피 보법을 연습한다.',
+  scene:[
+    { kind:'narration', text:'마지막 반복에서는 교관에게 받은 앞발 각도와 골반 회전 지시를 그대로 적용했다.' },
+    { kind:'narration', text:'릴리아는 실패 원인이 닫힌 앞발과 너무 이른 체중 이동에 있음을 확인했다.' },
+  ],
+  resolutionLog:{ triggered:false, outcome:'none', abilities:[] },
+  statChanges:[{ stat:'신체', amount:1, reason:'릴리아가 확인한 교정 원인' }],
+});
+assert.deepEqual(splitRowNpcCauseRejected.accepted_stat_progress, [], 'a named NPC cause row must invalidate the combined correction bundle');
+
+const splitRowNpcCauseMentioningPlayerRejected = deriveCombatGrowthState({
+  pc,
+  action:'나는 원형 회피 보법을 연습한다.',
+  scene:[
+    { kind:'narration', text:'마지막 반복에서는 교관에게 받은 앞발 각도와 골반 회전 지시를 그대로 적용했다.' },
+    { kind:'narration', text:'릴리아는 Aaa가 고친 앞발 각도가 실패 원인의 핵심이었음을 확인했다.' },
+  ],
+  resolutionLog:{ triggered:false, outcome:'none', abilities:[] },
+  statChanges:[{ stat:'신체', amount:1, reason:'릴리아가 확인한 교정 원인' }],
+});
+assert.deepEqual(splitRowNpcCauseMentioningPlayerRejected.accepted_stat_progress, [], 'mentioning the player later in an NPC-owned cause row must not change its attribution');
+
 const npcInstructionApplicationRejected = deriveCombatGrowthState({
   pc,
   action:'신체 단련용 보법을 반복 연습한다.',
