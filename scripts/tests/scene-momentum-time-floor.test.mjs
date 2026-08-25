@@ -167,6 +167,19 @@ assert.deepEqual(turn.state_delta.relationship_changes,[],'relationship effects 
 assert.deepEqual(turn.state_delta.npc_state_updates,[],'NPC effects attributable to the premature schedule must be removed');
 assert.equal(turn.event_progress,null,'the schedule event must remain incomplete at its start');
 assert.equal(exactTrainingBoundaryIntent.runtimeSceneTrusted,false,'mixed completion narration must not feed runtime synthesis after selective state reconciliation');
+turn={
+  scene_title:'훈련 완료와 수업 종료',scene:[{kind:'narration',text:'네 시간의 검술 훈련을 마쳤다.'},{kind:'narration',text:'10시가 되자 기사과 기초 수업까지 수료하고 보상을 받았다.'}],choices:[],
+  state_delta:{advance_minutes:240,skill_experience:[trainingGrowth,prematureClassGrowth],items_add:['훈련 기록표','수료 보상']},
+};
+const visibleOnlyCompletionIntent=applySceneMomentumTimeFloor({action:'4시간 동안 검술을 훈련한다.',saveState:exactTrainingBoundarySave},turn,'game');
+assert.deepEqual(turn.state_delta.skill_experience,[trainingGrowth],'visible schedule-completion prose must remove only boundary-owned growth when lifecycle fields are absent');
+assert.deepEqual(turn.state_delta.items_add,['훈련 기록표'],'visible schedule-completion prose must remove a boundary-owned reward without redundant lifecycle markers');
+assert.equal(visibleOnlyCompletionIntent.runtimeSceneTrusted,false,'visible premature completion must invalidate runtime narration even without structured lifecycle markers');
+turn={scene_title:'수업 완료 예정',scene:[{kind:'narration',text:'10시가 되면 기사과 기초 수업을 완료할 예정이다.'}],choices:[],state_delta:{advance_minutes:120,pc_knowledge_add:['복도 공지 확인']}};
+const hypotheticalCompletionIntent=applySceneMomentumTimeFloor({action:'4시간 동안 검술을 훈련한다.',saveState:exactTrainingBoundarySave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,240,'a future completion plan must not masquerade as an occurred schedule boundary');
+assert.deepEqual(turn.state_delta.pc_knowledge_add,['복도 공지 확인'],'a speculative completion mention must not trigger boundary-owned cleanup');
+assert.equal(hypotheticalCompletionIntent.runtimeSceneTrusted,true,'a speculative completion mention must not be treated as an occurred schedule completion');
 const omittedBoundaryClass={id:'omitted-class',title:'기사과 필수 수업',date:'1285-03-01',time:'10:00',kind:'academic',status:'scheduled'};
 const omittedBoundarySave={pc:knightPc,world:{date:'1285-03-01',time:'09:30',location:'훈련장'},scheduleContext:{due:[],upcoming:[omittedBoundaryClass]},scheduledEvents:[omittedBoundaryClass]};
 turn={scene_title:'두 시간 훈련 완료',scene:[{kind:'narration',text:'두 시간의 검술 훈련을 모두 마치고 자세를 바로잡았다.'}],choices:[],state_delta:{advance_minutes:10,fatigue_delta:2,skill_experience:[{skill:'검술',amount:1,reason:'두 시간 훈련 완료'}],pc_knowledge_add:['두 시간 훈련의 교정법']}};

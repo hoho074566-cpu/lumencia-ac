@@ -80,6 +80,7 @@ assert.equal(sharedHourRange.explicitDurationMinutes,null,'a shared-unit hour ra
 assert.deepEqual(sharedHourRange.explicitDurationRangeMinutes,[60,120],'shared-unit hour shorthand must retain both endpoints');
 assert.deepEqual(sharedHourRange.suggestedAdvanceMinutes,[60,120],'shared-unit hour shorthand must bound the time guide');
 assert.deepEqual(classifySceneIntent('30~60분 동안 기다린다.').suggestedAdvanceMinutes,[30,60],'shared-unit minute shorthand must retain both endpoints');
+assert.deepEqual(classifySceneIntent('문 앞에서는 기다리지 않고 로비에서 1시간 동안 기다린다.').suggestedAdvanceMinutes,[60,60],'a negated earlier wait must not cancel a committed terminal wait');
 assert.deepEqual(classifySceneIntent('훈련을 1시간부터 2시간까지 한다.').suggestedAdvanceMinutes,[60,120],'object-marked from/to duration ranges must remain bounded ranges');
 const rangedFutureStart=classifySceneIntent('1시간에서 2시간 후에 훈련한다.',{currentTime:'09:00'});
 assert.equal(rangedFutureStart.explicitDurationRangeMinutes,null,'a future start window must not become an activity duration range');
@@ -105,6 +106,9 @@ assert.deepEqual(classifySceneIntent('훈련을 1시간에서 2시간 동안 하
 const compoundZeroSleep=classifySceneIntent('1시간 동안 훈련을 하고 0분 동안 잠을 잔다.');
 assert.equal(compoundZeroSleep.explicitDurationMinutes,0,'the terminal zero duration must remain visible');
 assert.equal(compoundZeroSleep.minAdvanceMinutes,60,'the full turn duration must retain the completed preceding hour');
+const namedActorZeroTraining=classifySceneIntent('카인이 0분 동안 훈련한다.',{actorName:'카인'});
+assert.equal(namedActorZeroTraining.kind,'training','the saved PC name must remain first-party in a zero-time action');
+assert.equal(namedActorZeroTraining.explicitDurationMinutes,0,'a named-PC zero-time action must reach downstream freeze guards');
 const compoundExplicitDirective=buildSceneMomentumDirective({action:'1시간 동안 훈련을 하고 8시간 동안 잠을 잔다.',saveState:{world:{date:'1285-03-01',time:'09:00',location:'기숙사'}}});
 assert.match(compoundExplicitDirective,/PRECEDING_ACTIVITY_DURATION=60min/,'the model directive must expose the preceding activity duration');
 assert.match(compoundExplicitDirective,/사용자가 540분을 직접 지정했다\(앞선 행동 60분 포함\)/,'the explicit-duration rule must describe the full compound total without contradicting TIME_GUIDE');
@@ -136,6 +140,11 @@ assert.equal(classifySceneIntent('오늘 오후 3시 반에 수업을 듣는다.
 const intervalClockClass=classifySceneIntent('10시 30분부터 11시 30분까지 수업을 듣는다.', { location:'여관',currentTime:'07:40' });
 assert.equal(intervalClockClass.explicitDurationMinutes,60,'an explicit start-to-end clock interval must derive the activity duration');
 assert.deepEqual(intervalClockClass.suggestedAdvanceMinutes,[230,230],'an explicit clock interval must include the wait to start and end at the requested clock');
+assert.deepEqual(classifySceneIntent('오늘 10시부터 11시까지 수업을 듣는다.',{location:'강의실',currentTime:'10:30'}).suggestedAdvanceMinutes,[30,30],'an in-progress clock interval must stop at its declared endpoint');
+assert.deepEqual(classifySceneIntent('자정부터 오전 2시까지 잠을 잔다.',{location:'개인실',currentTime:'01:00'}).suggestedAdvanceMinutes,[60,60],'a named-midnight interval already in progress must use only its remaining time');
+const pastClockInterval=classifySceneIntent('오늘 10시부터 11시까지 수업을 듣는다.',{location:'강의실',currentTime:'11:30'});
+assert.equal(pastClockInterval.explicitDurationMinutes,0,'an entirely past clock interval must be recognized as having no remaining duration');
+assert.deepEqual(pastClockInterval.suggestedAdvanceMinutes,[0,0],'an entirely past interval must not replay from the current moment');
 assert.deepEqual(classifySceneIntent('22시부터 2시까지 잠을 잔다.', { location:'개인실',currentTime:'20:00' }).suggestedAdvanceMinutes,[360,360],'an unmarked 24-hour interval ending before its start must cross midnight');
 assert.deepEqual(classifySceneIntent('오후 11시부터 자정까지 잠을 잔다.', { location:'개인실',currentTime:'22:00' }).suggestedAdvanceMinutes,[120,120],'a named midnight endpoint must produce an exact interval plus its start wait');
 assert.deepEqual(classifySceneIntent('자정부터 오전 2시까지 잠을 잔다.', { location:'개인실',currentTime:'22:00' }).suggestedAdvanceMinutes,[240,240],'a named midnight start must remain available to interval parsing');
