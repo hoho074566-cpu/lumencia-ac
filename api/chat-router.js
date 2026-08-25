@@ -331,6 +331,17 @@ function scheduleRowMentioned(turn,row={}){
   const generic=new Set(['필수','일정','시작','종료','예정','행사','event','required']),raw=String(row.title||'').toLowerCase().match(/[가-힣a-z0-9]+/g)||[],tokens=[...new Set(raw.filter(token=>token.length>=2&&!generic.has(token)))];if(!tokens.length)return false;
   const matched=tokens.filter(token=>visible.includes(token)).length;return matched>=Math.min(2,tokens.length);
 }
+function reconcileShortenedTimedTurn(turn,{preserveConsequenceId=''}={}){
+  const delta=object(turn?.state_delta);if(!turn?.state_delta)return;
+  for(const field of ['active_events_add','active_events_remove','completed_events_add','scheduled_events_add','scheduled_events_complete','npc_state_updates'])delta[field]=[];
+  turn.event_progress=null;
+  const consequenceId=String(preserveConsequenceId||'').trim();
+  if(consequenceId){
+    delta.hooks_update=array(delta.hooks_update).filter(row=>String(row?.id||'').trim()===consequenceId);
+  }else{
+    for(const field of ['pc_knowledge_add','memories_add','hooks_add','hooks_update','delayed_consequences_add'])delta[field]=[];
+  }
+}
 function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecycle=null){
   const intent=classifySceneIntent(incoming?.action||'',{location:incoming?.saveState?.world?.location||''});
   if(mode!=='game'||!turn?.state_delta||!intent.compression||intent.minAdvanceMinutes<=0)return intent;
@@ -348,12 +359,16 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   const dueAtBoundary=new Set(scheduleBoundary==null?[]:scheduledIdsDueByTurnEnd(incoming?.saveState||{},scheduleBoundary).map(value=>String(value).trim().toLowerCase()));
   const dueBeforeBoundary=new Set(scheduleBoundary==null?[]:scheduledIdsDueByTurnEnd(incoming?.saveState||{},Math.max(0,scheduleBoundary-1)).map(value=>String(value).trim().toLowerCase()));
   const boundaryRows=scheduleRowsAtBoundary(incoming?.saveState||{},scheduleBoundary),boundaryIds=new Set(boundaryRows.map(row=>String(row?.id||'').trim().toLowerCase()).filter(Boolean)),structuredBoundary=Boolean(eventId&&boundaryIds.has(eventId)&&dueAtBoundary.has(eventId)&&!dueBeforeBoundary.has(eventId)),visibleBoundary=Boolean(!eventId&&boundaryRows.some(row=>scheduleRowMentioned(turn,row)));
-  const reachedScheduledBoundary=Boolean(scheduleBoundary!=null&&scheduleBoundary===boundary&&boundary<=allowedMax&&(structuredBoundary||visibleBoundary));
+  const crossedScheduledBoundary=Boolean(scheduleBoundary!=null&&scheduleBoundary===boundary&&scheduleBoundary<=profileMax&&current>scheduleBoundary);
+  const reachedScheduledBoundary=Boolean(scheduleBoundary!=null&&scheduleBoundary===boundary&&((boundary<=allowedMax&&(structuredBoundary||visibleBoundary))||crossedScheduledBoundary));
   const reachedConsequenceBoundary=Boolean(consequenceBoundary!=null&&consequenceBoundary===boundary&&boundary<=allowedMax&&consequenceLifecycle?.status==='resolved');
   const previousEventId=String(incoming?.saveState?.sceneRuntime?.eventProgress?.eventInstanceId||incoming?.saveState?.sceneRuntime?.eventProgress?.event_instance_id||'').trim().toLowerCase();
   const structuredInterruption=Boolean(eventId.startsWith('director:')&&eventId!==previousEventId&&!structuredBoundary&&eventId!==String(consequenceLifecycle?.selected_id||'').trim().toLowerCase());
-  if(reachedScheduledBoundary||reachedConsequenceBoundary)turn.state_delta.advance_minutes=boundary;
-  else if(!structuredInterruption&&(!hasMeaningfulStop||current>0))turn.state_delta.advance_minutes=Math.min(profileMax,Math.max(current,boundedFloor));
+  let applied=current;
+  if(reachedScheduledBoundary||reachedConsequenceBoundary)applied=boundary;
+  else if(!structuredInterruption&&(!hasMeaningfulStop||current>0))applied=Math.min(profileMax,Math.max(current,boundedFloor));
+  if(applied<current)reconcileShortenedTimedTurn(turn,{preserveConsequenceId:reachedConsequenceBoundary?consequenceLifecycle?.selected_id:''});
+  turn.state_delta.advance_minutes=applied;
   return intent;
 }
 function uniqText(rows,limit=4){return [...new Set(array(rows).map(x=>clampText(x,140).trim()).filter(Boolean))].slice(-limit);}

@@ -143,6 +143,12 @@ test('an explicit wait routes to its consequence boundary and an earlier fixed s
   assert.equal(waiting.telemetry.event_director_v2.event_consequence_trigger_minutes,20);
   assert.match(waiting.params.input,/TRIGGER_IN=20min/);
 
+  for(const action of ['검술을 훈련한다.','기초 수업에 참석한다.']){
+    const timed=routeOpenAIParams({instructions,input},{mode:'game',incoming:{action,saveState:waitingSave,recentTurns:[]}});
+    assert.equal(timed.telemetry.event_director_v2.result,'EVENT_CONSEQUENCE_DUE',`${action}: a consequence due before the activity minimum must route before the model call`);
+    assert.equal(timed.telemetry.event_director_v2.event_consequence_trigger_minutes,20);
+  }
+
   const scheduled={id:'class#1',title:'필수 수업',date:'1285-03-01',time:'09:30',kind:'academic',status:'scheduled',participants:[]};
   const scheduledSave={...waitingSave,pc:{name:'아리아',department:'기사과'},scheduledEvents:[scheduled],scheduleContext:{due:[],upcoming:[scheduled]}};
   const routed=routeOpenAIParams({instructions,input},{mode:'game',incoming:{action:'40분 기다린다.',saveState:scheduledSave,recentTurns:[]}});

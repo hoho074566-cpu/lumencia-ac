@@ -49,6 +49,8 @@ const explicitClass = classifySceneIntent('두 시간 동안 수업을 듣는다
 assert.equal(explicitClass.explicitDurationMinutes, 120);
 assert.deepEqual(explicitClass.suggestedAdvanceMinutes, [120, 120]);
 assert.deepEqual(classifySceneIntent('수업을 두 시간 동안 듣는다.', { location:'강의실' }).suggestedAdvanceMinutes, [120, 120], 'object-duration-verb class order must honor the explicit duration');
+assert.equal(classifySceneIntent('10시 30분에 수업을 듣는다.', { location:'강의실' }).explicitDurationMinutes, null, 'a clock minute component must not become an activity duration');
+assert.deepEqual(classifySceneIntent('10시 30분에 수업을 한 시간 동안 듣는다.', { location:'강의실' }).suggestedAdvanceMinutes, [60, 60], 'masking a clock must preserve a separate explicit activity duration');
 
 const sleep = classifySceneIntent('잠을 잔다.', { location:'개인실' });
 assert.equal(sleep.kind, 'downtime');
@@ -97,6 +99,7 @@ const health = fs.readFileSync(new URL('../../api/health.js', import.meta.url), 
 assert.match(router, /ADAPTIVE_TIME_SCALE_VERSION/);
 assert.match(router, /adaptive_time_scale_v2:true/);
 assert.match(router, /mode!==['"]game['"]/, 'META/AUTO/CONTINUE must stay outside the deterministic time floor');
+assert.match(fs.readFileSync(new URL('../../api/lib/context-router.js', import.meta.url), 'utf8'), /sceneIntent\.compression&&sceneIntent\.minAdvanceMinutes>0\?scheduleBoundaryLimitMinutes\(sceneIntent\):0/, 'all compressed timed activities must expose their minimum consequence lookahead');
 assert.match(health, /version:\s*'0\.8\.6'/);
 assert.match(health, /adaptiveTimeScale:\s*'V2/);
 assert.equal((router.match(/coreHandler\(/g) || []).length, 1, 'Adaptive Time Scale V2 must preserve one canonical core model call');
