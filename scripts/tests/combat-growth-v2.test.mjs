@@ -247,6 +247,52 @@ const linkedNpcCorrectionRejected = deriveCombatGrowthState({
 });
 assert.deepEqual(linkedNpcCorrectionRejected.accepted_stat_progress, [], 'an explicitly named NPC correction outcome must not transfer through adjacent guidance');
 
+const structuralAppliedCorrectionAccepted = deriveCombatGrowthState({
+  pc,
+  action:'나는 이번에는 신체 단련을 위해 별도의 사선 진입 보법을 세 번 연습한다. 첫 두 번은 앞발과 뒷발의 축이 어긋나 실패한다. 교관에게 새 오류를 봐 달라고 요청하고, 교관의 골반 각도와 체중 이동 지시를 직접 적용한 마지막 반복을 성공시켜 실패 원인을 확인한다.',
+  scene:[
+    { kind:'narration', text:'사선으로 파고드는 첫 두 번의 반복에서는 앞발과 뒷발의 축이 어긋나며 중심이 옆으로 샜다. 요청을 들은 교관은 잠시 발자국을 살핀 뒤, 골반을 진행 방향으로 먼저 열고 체중을 뒷발에서 앞발로 늦게 넘기라고 짚었다.' },
+    { kind:'narration', text:'마지막 반복에서는 지시한 각도와 순서를 적용해 발이 엉키지 않은 채 진입을 끝냈다. 문제는 발의 속도보다, 닫힌 골반과 너무 이른 체중 이동에 있었다.' },
+  ],
+  resolutionLog:{ triggered:false, outcome:'none', abilities:[] },
+  statChanges:[{ stat:'신체', amount:1, reason:'사선 진입 보법의 골반과 체중 이동 교정 적용' }],
+});
+assert.equal(structuralAppliedCorrectionAccepted.evidence_tier, 1, 'a final repetition that applies adjacent guidance and identifies the cause is structural correction evidence');
+assert.deepEqual(structuralAppliedCorrectionAccepted.accepted_stat_progress, [{ stat:'신체', amount:1, reason:'사선 진입 보법의 골반과 체중 이동 교정 적용' }], 'structural correction evidence must not depend on enumerating success synonyms');
+
+const structuralCorrectionWithoutGuidanceRejected = deriveCombatGrowthState({
+  pc,
+  action:'나는 이번에는 신체 단련을 위해 사선 진입 보법을 세 번 연습한다.',
+  scene:[{ kind:'narration', text:'마지막 반복에서는 지시한 각도와 순서를 적용해 발이 엉키지 않은 채 진입을 끝냈다. 문제는 발의 속도보다, 닫힌 골반과 너무 이른 체중 이동에 있었다.' }],
+  resolutionLog:{ triggered:false, outcome:'none', abilities:[] },
+  statChanges:[{ stat:'신체', amount:1, reason:'출처 없는 사선 진입 교정 적용' }],
+});
+assert.deepEqual(structuralCorrectionWithoutGuidanceRejected.accepted_stat_progress, [], 'structural application language still requires visible adjacent instructor guidance');
+
+const structuralNpcCorrectionRejected = deriveCombatGrowthState({
+  pc,
+  action:'나는 사선 진입 보법을 연습한다.',
+  scene:[
+    { kind:'narration', text:'교관이 골반 각도와 체중 이동 순서를 짚었다.' },
+    { kind:'narration', text:'릴리아는 마지막 반복에서 지시한 각도와 순서를 적용해 진입을 끝냈다. 문제는 닫힌 골반과 너무 이른 체중 이동에 있었다.' },
+  ],
+  resolutionLog:{ triggered:false, outcome:'none', abilities:[] },
+  statChanges:[{ stat:'신체', amount:1, reason:'릴리아의 사선 진입 교정 적용' }],
+});
+assert.deepEqual(structuralNpcCorrectionRejected.accepted_stat_progress, [], 'structural correction evidence must still reject an explicitly named NPC performer');
+
+const structuralLateNpcSubjectRejected = deriveCombatGrowthState({
+  pc,
+  action:'나는 사선 진입 보법을 연습한다.',
+  scene:[
+    { kind:'narration', text:'교관이 골반 각도와 체중 이동 순서를 짚었다.' },
+    { kind:'narration', text:'마지막 반복에서는 릴리아가 지시한 각도와 순서를 적용해 진입을 끝냈다. 문제는 닫힌 골반과 너무 이른 체중 이동에 있었다.' },
+  ],
+  resolutionLog:{ triggered:false, outcome:'none', abilities:[] },
+  statChanges:[{ stat:'신체', amount:1, reason:'릴리아의 사선 진입 교정 적용' }],
+});
+assert.deepEqual(structuralLateNpcSubjectRejected.accepted_stat_progress, [], 'a named NPC after the final-attempt lead must remain third-party evidence');
+
 const npcInstructionApplicationRejected = deriveCombatGrowthState({
   pc,
   action:'신체 단련용 보법을 반복 연습한다.',
