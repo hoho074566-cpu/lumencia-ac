@@ -49,6 +49,9 @@ for(const action of ['지금 오리엔테이션이 끝난 뒤 대장간에 들�
 }
 assert.equal(classifySceneIntent('기다린다.',{location:'광장'}).kind,'wait');
 assert.equal(classifySceneIntent('공격한다.',{location:'광장'}).kind,'committed-consequence');
+assert.equal(classifySceneIntent('경비를 죽이고 잠을 잔다.',{location:'광장'}).kind,'committed-consequence','a consequential prefix must outrank a terminal sleep suffix');
+assert.equal(classifySceneIntent('경비를 죽이고 검술을 훈련한다.',{location:'광장'}).kind,'committed-consequence','a consequential prefix must outrank every routine compression suffix');
+assert.equal(classifySceneIntent('경비를 죽이지 않고 잠을 잔다.',{location:'광장'}).kind,'downtime','an explicitly negated consequential prefix may still leave a committed sleep action');
 
 // Explicit durations override generic wait/downtime minimum floors.
 const wait5=classifySceneIntent('5분만 기다린다.',{location:'광장'});

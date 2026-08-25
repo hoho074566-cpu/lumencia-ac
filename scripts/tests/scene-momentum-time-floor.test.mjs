@@ -158,6 +158,9 @@ assert.equal(turn.state_delta.advance_minutes,480,'a completed sleep action must
 turn={scene_title:'기초 수업의 첫 교시',scene:[{kind:'narration',text:'10시 30분에 기초 수업이 시작되었다.'}],state_delta:{advance_minutes:120},choices:[]};
 applySceneMomentumTimeFloor({action:'10시 30분에 기초 수업을 듣는다.',saveState:{world:{date:'1285-03-02',time:'07:40'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,215,'a future class start plus its minimum duration must not be clamped to the unscheduled class maximum');
+turn={scene_title:'다음 날 수업',scene:[{kind:'narration',text:'다음 날 10시에 수업을 마쳤다.'}],state_delta:{advance_minutes:1500},choices:[]};
+applySceneMomentumTimeFloor({action:'내일 오전 10시에 수업을 듣는다.',saveState:{world:{date:'1285-03-01',time:'09:00'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,1500,'a date-qualified activity must not be truncated to the immediate class maximum');
 
 turn={
   event_progress:{event_instance_id:'next-morning',active_beat:'complete',completed_beats:['complete']},choices:[],

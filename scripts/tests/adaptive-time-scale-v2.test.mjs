@@ -68,7 +68,11 @@ const intervalClockClass=classifySceneIntent('10시 30분부터 11시 30분까�
 assert.equal(intervalClockClass.explicitDurationMinutes,60,'an explicit start-to-end clock interval must derive the activity duration');
 assert.deepEqual(intervalClockClass.suggestedAdvanceMinutes,[230,230],'an explicit clock interval must include the wait to start and end at the requested clock');
 assert.equal(classifySceneIntent('10시 30분에 수업을 듣는다.', { location:'강의실',currentTime:'12:00' }).scheduledStartOffsetMinutes,null,'an already-past ambiguous clock must not silently roll into the next day');
-assert.equal(classifySceneIntent('내일 10시 30분에 수업을 듣는다.', { location:'여관',currentTime:'07:40' }).scheduledStartOffsetMinutes,null,'a next-day clock must not be collapsed onto today');
+const nextDayClass=classifySceneIntent('내일 10시 30분에 수업을 듣는다.', { location:'여관',currentTime:'07:40' });
+assert.equal(nextDayClass.scheduledStartOffsetMinutes,null,'a next-day clock must not be collapsed onto today');
+assert.equal(nextDayClass.compression,false,'a date-qualified activity beyond the one-turn clock cap must not receive immediate deterministic enforcement');
+assert.deepEqual(nextDayClass.suggestedAdvanceMinutes,[0,0],'a date-qualified activity must not inherit the same-day class floor');
+assert.match(buildSceneMomentumDirective({action:'내일 10시 30분에 수업을 듣는다.',saveState:{world:{date:'1285-03-01',time:'07:40',location:'여관'}}}),/날짜 지정 시작 규칙/,'the model must be told to preserve the requested day instead of pulling the class into today');
 assert.equal(classifySceneIntent('정오에 수업을 듣는다.', { location:'강의실',currentTime:'09:00' }).scheduledStartOffsetMinutes,180,'noon must normalize to the same-day 12:00 start');
 assert.equal(classifySceneIntent('자정에 훈련한다.', { location:'훈련장',currentTime:'09:00' }).scheduledStartOffsetMinutes,900,'midnight must normalize to the next upcoming 00:00 start');
 
@@ -103,6 +107,9 @@ assert.deepEqual(scheduledTravel.suggestedAdvanceMinutes,[65,80],'scheduled trav
 const destinationFirstScheduledTravel=classifySceneIntent('도서관으로 10시에 간다.', { location:'A동 개인실',currentTime:'09:00' });
 assert.equal(destinationFirstScheduledTravel.semanticTarget,'도서관','a trailing scheduled-start clock must not leave either the clock or destination particle in the target');
 assert.deepEqual(destinationFirstScheduledTravel.suggestedAdvanceMinutes,[65,80],'travel timing must not depend on whether the destination or clock is stated first');
+const nextDayTravel=classifySceneIntent('내일 10시에 도서관으로 간다.', { location:'A동 개인실',currentTime:'09:00' });
+assert.equal(nextDayTravel.semanticTarget,'도서관','a future date qualifier must not pollute the travel destination');
+assert.equal(nextDayTravel.compression,false,'next-day travel must not inherit a same-day deterministic travel floor');
 const intervalTravel=classifySceneIntent('10시부터 11시까지 도서관으로 간다.', { location:'A동 개인실',currentTime:'09:00' });
 assert.equal(intervalTravel.semanticTarget,'도서관','a clock interval must not pollute the travel destination');
 assert.deepEqual(intervalTravel.suggestedAdvanceMinutes,[120,120],'a travel clock interval must end at the explicit requested clock');
