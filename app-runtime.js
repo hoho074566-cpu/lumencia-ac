@@ -286,7 +286,7 @@ function accumulateUsageStable(usage) {
 function zeroStateDeltaStable() {
   return {
     advance_minutes: 0, new_location: null, pc_status: null, fatigue_delta: 0, gold_delta: 0,
-    relationship_changes: [], npc_relationship_changes: [], intimacy_changes: [], stat_progress: [], skill_experience: [],
+    relationship_changes: [], npc_relationship_changes: [], faction_reputation_changes: [], intimacy_changes: [], stat_progress: [], skill_experience: [],
     items_add: [], items_remove: [], active_events_add: [], active_events_remove: [], completed_events_add: [],
     pc_knowledge_add: [], scheduled_events_add: [], scheduled_events_complete: [], hooks_add: [], hooks_update: [],
     memories_add: [], npc_state_updates: [],

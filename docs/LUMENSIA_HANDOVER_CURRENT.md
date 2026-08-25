@@ -13,8 +13,9 @@ Repository: `hoho074566-cpu/lumencia-ac`
 # 0. SESSION STOP CHECKPOINT — 가장 먼저 읽을 것
 
 ## Live state immediately before this handover update
-- Branch: `codex/npc-npc-relationship-v1`
-- Base/current main: `fe6b4a5dcc0f0a96b71d8fcffcf8666caeefd82b` (`Deterministic Scene Novelty V1`, PR #44 merge).
+- Branch: `codex/faction-social-consequence-v1`
+- Base/current main: `71074ccc7a5fd00f193a6aec8b7a1ff82eae1aab` (`NPC↔NPC Relationship V1`, PR #45 merge).
+- PR #45: **merged** from exact reviewed head `583b7622500b9916dd31697d0d6e845f81790ed6` as `71074ccc7a5fd00f193a6aec8b7a1ff82eae1aab`. Merge and reviewed-head trees both equal `690e6a88c015bd28e67bba0bf03bfdba6e73a6c8`; merged production `/api/health` is healthy on app `1.5.6` / adapter `0.8.3`.
 - PR #44: **merged** from exact reviewed head `e5fae96ac271a617db42627a99d53a720299a213` as `fe6b4a5dcc0f0a96b71d8fcffcf8666caeefd82b`. Merge and reviewed-head trees both equal `f4aeadd44c116682d60385c265e3f35f3b48ea0e`; merged production `/api/health` is healthy on app `1.5.6` / adapter `0.8.3`.
 - PR #43: **merged** from exact reviewed/accepted head `6b4f5990278ce8d3446c7b5be94a899a72d9fc80` as `fd2bcff13007fdf66c04477b9f69066f7c9b871e`. Its merge tree exactly equals reviewed head tree `5b6b56b272de438e3db6a53027ce13b75ff7cace`; merged-main Vercel, production `/api/health`, and the clean-LF full PR check pass.
 - PR #42: **merged** from exact reviewed head `6c115e661ed7257b3787b74d5f142a1c0b39e38d`. Safety #32741095125, Vercel, exact-head Codex P0/P1=0, and targeted Exact Preview acceptance passed. Merge `8c5ca35...` and reviewed head share tree `22195b469f2ccb1b3afdc7c197f5259fb110d59a`.
@@ -44,15 +45,23 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Production `/api/health`: healthy; app `1.5.6`, canonical `/api/chat`, adapter `/api/chat-router`, `24h` prompt-cache retention.
 - Full post-merge `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
-## Current active work — NPC↔NPC Relationship V1
-- Adds `state_delta.npc_relationship_changes` with registered, distinct `source_npc_key` / `target_npc_key` endpoints. The relation is directional: one NPC's affinity/trust/status toward another does not automatically mutate the reverse direction.
-- Reuses the flexible `npcInnerStates[source].npc_relationships[target]` root. There is no new save root, migration, endpoint, model call, or canonical `app.js` change.
-- Runtime values are clamped to ±100, retain at most 8 causal history rows and 16 target links per source NPC, and route at most 6 links with 2 recent history rows back to the model for relevant NPCs.
-- The stable client applies a bounded fallback only when the server did not return that source's relationship runtime, so disabling the optional quality pipeline cannot drop the structured change and normal turns cannot double-apply it.
-- A change requires a registered non-self pair plus a real affinity/trust delta or status change. Prompt rules require direct interaction or an authoritative shared event and explicitly reject mere co-presence as evidence.
-- `relationship_changes` remains PC↔NPC only. META and CONTINUE clear the new field; Scene Momentum counts a real NPC relationship mutation once on the existing relationship axis.
-- Permanent coverage lives in `scripts/tests/npc-relationship-v1.test.mjs` and includes directionality, clamping, causal history, bounds, invalid/self/no-op rejection, routed context, freeze paths, Scene Delta, health visibility, and the one-call invariant.
-- Focused NPC Motivation/Goal, Context Router, Scene Momentum, and CONTINUE suites pass. Exact code checkpoint `ec7228a` passes the authoritative clean-LF full `scripts/lumensia-pr-check.mjs origin/main HEAD`; the normal Windows checkout's two workflow-string failures were confirmed as CRLF-only false positives.
+## Current active work — Faction / Social Consequence V1
+- Adds `state_delta.faction_reputation_changes` for six canon-backed public academy organizations: student council, Blue Knights, White Rose, and the knight/magic/theology departments.
+- Reuses the flexible `sceneRuntime.faction_social` root. There is no new save root, migration, endpoint, model call, or canonical `app.js` change.
+- Reputation clamps to ±100; one turn accepts at most 4 changes; each faction keeps at most 8 causal history rows; routed context retains at most 6 registered factions with 2 recent causes.
+- A change requires a public event, official record, registered NPC witness, or a sourced credible rumor. Unwitnessed private conduct, unregistered observers, mere co-presence, invented factions, and same-state no-ops are rejected.
+- Group reputation never auto-mutates PC↔NPC or NPC↔NPC relationships. Delayed retaliation, invitation, summons, or administrative response continues through the existing bounded `delayed_consequences_add` lifecycle rather than a new queue.
+- META and CONTINUE clear the new delta field. A real faction mutation counts once on Scene Momentum's existing social-relationship axis; no-op rows cannot fake momentum.
+- Permanent coverage lives in `scripts/tests/faction-social-consequence-v1.test.mjs` and covers schema, evidence gates, opposite faction polarity, clamping/history/context bounds, invalid/no-op rejection, personal-relation isolation, runtime persistence wiring, freeze paths, health visibility, and the one-call invariant.
+- Code checkpoint `193e12a` rejects invalid or unsupported saved history evidence instead of relabeling it as public evidence. Codex review on `48d0555...` reported P0/P1=0 and one P2 provenance gap: a registered receiver alone could authorize `credible_rumor` without an identifiable source.
+- Review closure `2721ff2` adds a bounded nullable `source` field and requires both a registered receiving NPC and an explicit source/transmission path for `credible_rumor`; source-less saved history is dropped. Dedicated/affected suites and the authoritative clean-LF full PR check pass. The second closure review found no remaining blocker across evidence integrity, bounds, personal-relation isolation, META/CONTINUE freeze, context secrecy, persistence, one-call architecture, or scope.
+- PR #46 is open; Vercel is Ready at `https://lumencia-ac-git-codex-faction-social-consequence-v1-ah-203c.vercel.app`.
+- Exact Preview acceptance passes: one public forum produced student council `+2` and White Rose `-1` with separate evidence; an unwitnessed private action produced zero faction mutation; CONTINUE retained the exact prior bounded state with all delta arrays empty; META emitted zero faction mutation; an existing faction consequence did not fire after 5 minutes, surfaced/resolved at its 15-minute boundary, and did not repeat on the following turn.
+- Closure Preview verification passes on the deployed `2721ff2` code: the app/API still return 200 under the stricter schema; the served faction module rejects a `credible_rumor` with registered Lucia but no source and accepts/persists the same row only when `source='엘리제→루시아 직접 전달'` is present.
+
+## Completed active predecessor — NPC↔NPC Relationship V1
+- PR #45 merged after exact-head hosted gates/review and Preview acceptance. It persists bounded directional affinity/trust/status plus causal history inside `npcInnerStates[source].npc_relationships[target]` without auto-mutating the reverse direction or PC relationships.
+- Registered distinct endpoints and actual interaction/shared-event evidence remain required; mere co-presence, self-links, unregistered links, and no-ops are rejected. META/CONTINUE stay frozen and the one-call architecture is unchanged.
 
 ## Completed active predecessor — Deterministic Scene Novelty V1
 - Uses the existing flexible `sceneRuntime` root and adds no save migration, new endpoint, rewrite pass, or model call.
@@ -642,8 +651,9 @@ Immediately continue:
 6. NPC Initiative / Goal Tick refinement;
 7. bounded off-screen progression — completed in PR #43;
 8. deterministic novelty/repetition suppression — completed in PR #44;
-9. NPC↔NPC Relationship V1 — active on `codex/npc-npc-relationship-v1`;
-10. multi-system scene orchestration.
+9. NPC↔NPC Relationship V1 — completed in PR #45;
+10. Faction / Social Consequence V1 — active on `codex/faction-social-consequence-v1`;
+11. multi-system scene orchestration.
 
 Longer roadmap:
 - Adaptive Time Scale V2
@@ -660,8 +670,8 @@ Longer roadmap:
 - full report-style -> scene-driven novel prose recovery
 
 Gameplay roadmap discussed:
-- NPC↔NPC Relationship V1 — active candidate, not merged
-- Faction / Social Consequence V1
+- NPC↔NPC Relationship V1 — completed in PR #45
+- Faction / Social Consequence V1 — active candidate
 - Skill Learning V1
 - Awakening / Talent Evolution V1
 - Combat Growth V2
@@ -672,15 +682,15 @@ Gameplay roadmap discussed:
 # 12. NEXT ACTION — CURRENT START POINT
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
-2. Confirm main contains PR #44 merge `fe6b4a5dcc0f0a96b71d8fcffcf8666caeefd82b`; do **not** redo completed HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Turn Hook, Event Consequence, Goal Tick, Off-screen Progression, or Scene Novelty diagnosis.
-3. Continue only NPC↔NPC Relationship V1 on `codex/npc-npc-relationship-v1`. Keep PC↔NPC relationship behavior, player sovereignty, META/CONTINUE freeze, relevant-context secrecy, and the one-call architecture unchanged.
-4. Push the current exact code/docs head and open a protected-path human-merge PR.
-5. Require current-head Safety/Vercel plus fresh Codex P0/P1=0. Revalidate current main, merge-base, no conflict, bounded storage/context, and no new API entrypoint or save migration.
-6. On the Exact Preview, verify a causal two-NPC interaction creates only valid directional persisted links, a reload retains them, the reverse direction changes only when explicitly emitted, and META/CONTINUE add no relationship mutation.
-7. If all gates pass, report the PR ready for the user's human merge. Do not start Faction / Social Consequence V1 before this acceptance is complete.
+2. Confirm main contains PR #45 merge `71074ccc7a5fd00f193a6aec8b7a1ff82eae1aab`; do **not** redo completed HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Turn Hook, Event Consequence, Goal Tick, Off-screen Progression, Scene Novelty, or NPC↔NPC Relationship V1 diagnosis.
+3. Continue only Faction / Social Consequence V1 on `codex/faction-social-consequence-v1`. Keep personal relationships, player sovereignty, META/CONTINUE freeze, relevant-context secrecy, bounded Event Consequence behavior, and the one-call architecture unchanged.
+4. Commit and push this review-closure docs checkpoint to PR #46; closure code is `2721ff2`.
+5. Require fresh current-docs-head Safety/Vercel plus Codex P0/P1=0. Revalidate current main, merge-base, no conflict, bounded storage/context, and no new API entrypoint or save migration.
+6. Do not rerun Preview unless code changes; the original targeted cases plus the source-less/source-present rumor gate already pass on the closure deployment.
+7. If all gates pass, report the protected-path PR ready for the user's human merge. Do not start Skill Learning V1 before this acceptance is complete.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #44는 reviewed head `e5fae96...`에서 main `fe6b4a5...`로 merge됐고 merge tree가 reviewed tree와 정확히 같다. 완료된 HF1/HF2/HF3, 12-case acceptance, Scene Purpose/Exit/Turn Hook, Event Consequence, Goal Tick, Off-screen Progression, Scene Novelty를 다시 분석하지 않는다. 현재 branch는 `codex/npc-npc-relationship-v1`이며 활성 범위는 방향성 NPC↔NPC affinity/trust/status와 causal history를 기존 `npcInnerStates`에 bounded 저장하고 관련 NPC 컨텍스트에만 전달하는 Relationship V1이다. 새 save root/migration/endpoint/model call, 자동 역방향 관계, mere-co-presence 변화, faction propagation은 범위 밖이다. exact diff/second review, clean-LF full check, protected-path hosted review/gates, Exact Preview persistence/freeze acceptance 뒤 사용자 human merge로 진행한다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #45는 reviewed head `583b762...`에서 main `71074cc...`로 merge됐고 merge tree가 reviewed tree와 정확히 같다. 완료된 HF1/HF2/HF3, 12-case acceptance, Scene Purpose/Exit/Turn Hook, Event Consequence, Goal Tick, Off-screen Progression, Scene Novelty, NPC↔NPC Relationship V1을 다시 분석하지 않는다. 현재 branch는 `codex/faction-social-consequence-v1`이며 활성 범위는 증거가 있는 공개 조직의 PC 집단 평판을 기존 `sceneRuntime`에 bounded 저장하고 관련 컨텍스트에만 전달하는 Faction / Social Consequence V1이다. 새 save root/migration/endpoint/model call, 사적 행동 전파, 미등록 파벌, 개인 관계 자동 변경, 별도 결과 큐는 범위 밖이다. exact diff/second review, clean-LF full check, protected-path hosted review/gates, Exact Preview evidence/persistence/freeze/delayed-response acceptance 뒤 사용자 human merge로 진행한다. Skill Learning V1은 그 전까지 시작하지 않는다.`
