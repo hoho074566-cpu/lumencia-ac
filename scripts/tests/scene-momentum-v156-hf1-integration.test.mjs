@@ -50,6 +50,7 @@ assert.match(chat,/const hasMeaningfulStop=array\(turn\?\.choices\)\.length>0/,'
 assert.match(chat,/const reachedConsequenceBoundary=/,'manifested delayed results must be recognized as compression boundaries');
 assert.match(chat,/applySceneMomentumTimeFloor\([^;]+consequenceLifecycle\)/,'the selected consequence lifecycle must reach the elapsed-time guard');
 assert.doesNotMatch(chat,/hasMeaningfulStop[^;\n]*importance[^;\n]*critical/i,'critical scene severity must not suppress deterministic elapsed time');
+assert.equal((chat.match(/allowProgress:mode==='game'&&!zeroElapsedIntent/g)||[]).length,3,'explicit zero-minute actions must freeze combat growth, skill learning, and awakening/talent runtime packets');
 
 assert.match(health,/version: '0\.8\.7'/);
 assert.match(health,/appVersion: '1\.5\.6'/);

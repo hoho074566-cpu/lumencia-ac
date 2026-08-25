@@ -175,6 +175,9 @@ const ambiguousEffects=consequenceNpcEffectsForShortening(turn,{event_name:'약�
 assert.equal(ambiguousEffects.attribution_safe,false,'a later final state for the same NPC must not be attributed to the earlier consequence boundary');
 assert.deepEqual(ambiguousEffects.npc_state_updates,[],'future same-NPC state must fail closed when it does not match the boundary effect');
 assert.deepEqual(ambiguousEffects.npc_schedule_updates,[],'future same-NPC schedule must fail closed when it does not match the boundary effect');
+const namedNpcEffects=consequenceNpcEffectsForShortening(turn,{event_name:'에밀리의 도착',reason:'에밀리가 약속 장소에 도착한다',secret_level:0},['emily'],{emily:'에밀리'});
+assert.equal(namedNpcEffects.attribution_safe,false,'the NPC name in the consequence title must not make a later same-NPC sentence boundary-owned');
+assert.deepEqual(namedNpcEffects.npc_state_updates,[],'a named consequence must still reject the NPC final state from a later sentence');
 const ambiguousLifecycle={selected_id:consequenceHook.id,status:'resolved',evidence:'visible-result',...ambiguousEffects};
 applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:rangedConsequenceSave},turn,'game',ambiguousLifecycle);
 assert.equal(turn.state_delta.advance_minutes,90,'an unshortened full response may retain its later same-NPC state at the matching final clock');
@@ -264,6 +267,12 @@ assert.equal(turn.state_delta.advance_minutes,10,'a positive-time hazard choice 
 turn={scene:[{kind:'dialogue',speaker_key:'artemis',text:'5분쯤 훈련했을 때 아르테미스가 물었다. 계속할 텐가?'}],state_delta:{advance_minutes:5},choices:['계속한다','이유를 묻는다','그만둔다'],event_progress:{event_instance_id:'active:training'}};
 applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]},sceneRuntime:{eventProgress:{eventInstanceId:'active:training'}}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,5,'an NPC-owned question inside the same structured activity must preserve the player decision point');
+turn={scene:[{kind:'dialogue',speaker_key:'artemis',text:'훈련을 마쳤다면 다음 과정으로 갈 텐가?'}],state_delta:{advance_minutes:5},choices:['계속한다','다음 과정으로 간다','그만둔다'],event_progress:null};
+applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,5,'hypothetical completion in NPC dialogue must not raise an unfinished decision to the training floor');
+turn={scene:[{kind:'narration',text:'5분쯤 지났을 때, 훈련을 마쳤다면 다음 과정으로 갈 수 있다는 설명이 들렸다.'}],state_delta:{advance_minutes:5},choices:['계속한다','다음 과정으로 간다','그만둔다'],event_progress:null};
+applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,5,'hypothetical completion in narration must not raise an unfinished decision to the training floor');
 turn={scene:[{kind:'narration',text:'훈련을 마쳤고 교관이 다음 과정을 고르라고 했다.'}],state_delta:{advance_minutes:10},choices:['대련한다','쉰다','돌아간다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,30,'a clearly completed activity may still raise an underreported clock before post-completion choices');
@@ -274,9 +283,14 @@ turn={scene:[{kind:'narration',text:'잠에서 깨어나 몸을 일으켰다.'}]
 applySceneMomentumTimeFloor({action:'잠을 잔다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,240,'a normal newly structured scene must not be mistaken for a Director interruption');
 
-turn={state_delta:{advance_minutes:60,new_location:'훈련장',npc_state_updates:[{npc_key:'artemis',location:'훈련장'}],hooks_update:[{id:'future',status:'resolved'}]},choices:[]};
+turn={state_delta:{advance_minutes:60,new_location:'훈련장',pc_status:'훈련 완료',fatigue_delta:3,gold_delta:-10,relationship_changes:[{npc_key:'artemis',affinity_delta:1}],stat_progress:[{stat:'신체',amount:1}],skill_experience:[{skill:'검술',amount:1}],items_add:['훈련 증표'],items_remove:['낡은 목검'],npc_state_updates:[{npc_key:'artemis',location:'훈련장'}],hooks_update:[{id:'future',status:'resolved'}]},choices:[]};
 applySceneMomentumTimeFloor({action:'0분 동안 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,0,'an explicitly zero-minute compressed action must clamp model time to zero');
+assert.equal(turn.state_delta.new_location,null,'explicit zero minutes must reject model-produced travel');
+assert.equal(turn.state_delta.pc_status,null,'explicit zero minutes must reject model-produced completion status');
+assert.equal(turn.state_delta.fatigue_delta,0,'explicit zero minutes must reject resource effects');
+assert.equal(turn.state_delta.gold_delta,0,'explicit zero minutes must reject currency effects');
+for(const field of ['relationship_changes','stat_progress','skill_experience','items_add','items_remove'])assert.deepEqual(turn.state_delta[field],[],`${field} must freeze on an explicit zero-minute action`);
 assert.deepEqual(turn.state_delta.npc_state_updates,[],'future NPC state must not survive an explicit zero-minute clamp');
 assert.deepEqual(turn.state_delta.hooks_update,[],'future hook state must not survive an explicit zero-minute clamp');
 

@@ -409,8 +409,14 @@ function reconcileShortenedTimedTurn(turn,{preserveConsequenceId='',preserveNpcS
     for(const field of ['pc_knowledge_add','memories_add','hooks_add','hooks_update','delayed_consequences_add'])delta[field]=[];
   }
 }
+function reconcileExplicitZeroTurn(turn){
+  const delta=object(turn?.state_delta);if(!turn?.state_delta)return;
+  const frozen={};
+  for(const [field,value] of Object.entries(delta))frozen[field]=Array.isArray(value)?[]:typeof value==='number'?0:null;
+  turn.state_delta={...frozen,advance_minutes:0,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0};
+}
 function timedActionCompletionEvidence(turn,intent={}){
-  const visible=[turn?.scene_title,turn?.scene_summary,...array(turn?.scene).map(item=>item?.text)].filter(Boolean).join(' '),kind=String(intent?.kind||'');if(!visible)return false;
+  const segments=[turn?.scene_title,turn?.scene_summary,...array(turn?.scene).filter(item=>String(item?.kind||'')!=='dialogue').map(item=>item?.text)].filter(Boolean).flatMap(value=>String(value).split(/(?<=[.!?。！？])|\n+/)).map(value=>value.trim()).filter(Boolean),kind=String(intent?.kind||'');if(!segments.length)return false;
   const patterns={
     downtime:/(?:잠에서\s*깨어|눈을\s*떴|잠을\s*(?:푹\s*)?잤|수면을\s*마쳤|휴식을\s*마쳤|충분히\s*쉬었)/,
     wait:/(?:기다림을\s*마쳤|대기를\s*마쳤|요청한\s*시간이\s*(?:흘렀|지났)|시간을\s*보낸\s*뒤)/,
@@ -422,7 +428,8 @@ function timedActionCompletionEvidence(turn,intent={}){
     explore:/(?:탐색|구경|둘러보기|순회)(?:를)?\s*(?:마쳤|끝냈|마무리했)/,
     'exit-exterior':/(?:건물|기숙사|방)\s*밖(?:에|으로)\s*(?:나왔|도착했)/,
   };
-  return Boolean(patterns[kind]?.test(visible));
+  const hypothetical=/(?:다면|라면|했으면|했을\s*경우|했는지|했을지|했을까|했을\s*(?:것인가|텐가)|아직|않았|못했|미완료|가정|예정|계획|[?？])/;
+  return Boolean(patterns[kind]&&segments.some(segment=>patterns[kind].test(segment)&&!hypothetical.test(segment)));
 }
 function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecycle=null){
   const intent=classifySceneIntent(incoming?.action||'',{location:incoming?.saveState?.world?.location||'',currentTime:incoming?.saveState?.world?.time||''});
@@ -430,7 +437,7 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   const hasMeaningfulStop=array(turn?.choices).length>0;
   const current=Math.max(0,Number(turn.state_delta.advance_minutes||0));
   const requestedFloor=Math.min(1440,Math.max(0,Number(intent.minAdvanceMinutes||0)));
-  if(intent.explicitDurationMinutes===0){if(current>0)reconcileShortenedTimedTurn(turn);turn.state_delta.advance_minutes=0;return intent;}
+  if(intent.explicitDurationMinutes===0){reconcileExplicitZeroTurn(turn);return intent;}
   if(requestedFloor<=0)return intent;
   const profileMax=Math.min(1440,Math.max(requestedFloor,Number(array(intent.suggestedAdvanceMinutes)[1]||0)));
   const scheduleBoundary=nextScheduleBoundaryMinutes(incoming?.saveState||{},{futureOnly:true,action:incoming?.action||'',intent});
@@ -732,6 +739,7 @@ export default async function handler(req,res){
     if(mode==='meta'){if(data.turn?.state_delta){data.turn.state_delta.stat_progress=[];data.turn.state_delta.skill_experience=[];data.turn.state_delta.skill_learning=[];data.turn.state_delta.awakening_progress=[];data.turn.state_delta.talent_evolution=[];}const pipeline={pipeline:'meta-full-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,event_director_v3:telemetry?.event_director_v3||null,event_director_v3_enabled:true,world_result_surface:null,world_result_surfacing_v1:true,adaptive_time_scale_version:ADAPTIVE_TIME_SCALE_VERSION,adaptive_time_scale_v2:true,scene_orchestration:telemetry?.scene_orchestration||null,scene_orchestration_v1:true,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true,faction_social_v1:true,combat_growth_v2:true,skill_learning_v1:true,awakening_talent_v1:true};data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);}
     applyExtendedExpressions(data.turn,incoming0.saveState||{});
     data.turn.choices=filterTurnHookChoices(incoming.action,{...data.turn,choices:freshChoices(incoming.action,data.turn)});
+    const zeroElapsedIntent=mode==='game'&&classifySceneIntent(incoming0.action||'',{location:incoming.saveState?.world?.location||'',currentTime:incoming.saveState?.world?.time||''}).explicitDurationMinutes===0;
     if(data.turn?.state_delta)data.turn.state_delta.skill_experience=mode==='auto'?[]:filterExistingSkillExperience(data.turn.state_delta.skill_experience,incoming0.saveState?.pc?.skills);
     const combatGrowthState=deriveCombatGrowthState({
       pc:incoming0.saveState?.pc,
@@ -740,7 +748,7 @@ export default async function handler(req,res){
       action:incoming0.action||'',
       scene:data.turn?.scene,
       resolutionLog:data.turn?.resolution_log,
-      allowProgress:mode==='game',
+      allowProgress:mode==='game'&&!zeroElapsedIntent,
     });
     if(data.turn?.state_delta){data.turn.state_delta.stat_progress=combatGrowthState.accepted_stat_progress;data.turn.state_delta.skill_experience=combatGrowthState.accepted_skill_experience;}
     const skillLearningState=deriveSkillLearningState({
@@ -750,7 +758,7 @@ export default async function handler(req,res){
       action:incoming0.action||'',
       scene:data.turn?.scene,
       turnNumber:Number(incoming0.saveState?.turnNumber||0)+1,
-      allowProgress:mode==='game',
+      allowProgress:mode==='game'&&!zeroElapsedIntent,
     });
     if(data.turn?.state_delta)data.turn.state_delta.skill_learning=skillLearningState.accepted_changes;
     const awakeningTalentState=deriveAwakeningTalentState({
@@ -765,7 +773,7 @@ export default async function handler(req,res){
       saveState:incoming0.saveState||{},
       scene:data.turn?.scene,
       turnNumber:Number(incoming0.saveState?.turnNumber||0)+1,
-      allowProgress:mode==='game',
+      allowProgress:mode==='game'&&!zeroElapsedIntent,
     });
     if(data.turn?.state_delta){
       data.turn.state_delta.awakening_progress=awakeningTalentState.accepted_awakening_changes;
