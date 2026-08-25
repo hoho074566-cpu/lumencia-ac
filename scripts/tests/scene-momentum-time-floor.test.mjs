@@ -312,7 +312,7 @@ const consequenceSave={world:{date:'1285-03-01',time:'09:20'},hooks:[consequence
 const arrivalRelationship={npc_key:'emily',affinity_delta:-1,trust_delta:1,status:'경계 중',reason:'에밀리가 약속 시각에 중앙광장에 도착해 함께 후문을 경계했다'};
 const arrivalKnowledge='에밀리가 약속 시각에 중앙광장에 도착했다.';
 const arrivalMemory={owner:'pc',fact:'에밀리가 약속 시각에 중앙광장에 도착해 후문 경계를 시작했다.',importance:2,secret_level:0};
-turn={scene:[{kind:'narration',text:'약속 시각이 되자 에밀리가 중앙광장에 도착해 함께 후문 경계를 시작했다.'}],state_delta:{advance_minutes:40,relationship_changes:[arrivalRelationship],pc_knowledge_add:[arrivalKnowledge],memories_add:[arrivalMemory],npc_state_updates:[{npc_key:'emily',location:'중앙광장',status:'도착',next_activity:'오후 순찰'},{npc_key:'artemis',location:'기사과 교관실'}],npc_schedule_updates:[{npc_key:'emily',delay_minutes:20,location:'중앙광장',activity:'후문 경계',reason:'도착 후 경계'},{npc_key:'artemis',delay_minutes:20,location:'기사과 교관실',activity:'회의',reason:'정기 일정'}],hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
+turn={scene:[{kind:'narration',text:'약속 시각이 되자 에밀리가 중앙광장에 도착해 함께 후문 경계를 시작했다.'}],state_delta:{advance_minutes:40,relationship_changes:[arrivalRelationship],pc_knowledge_add:[arrivalKnowledge],memories_add:[arrivalMemory],npc_state_updates:[{npc_key:'emily',location:'중앙광장',status:'도착',next_activity:'오후 순찰'},{npc_key:'artemis',location:'기사과 교관실'}],npc_schedule_updates:[{npc_key:'artemis',delay_minutes:20,location:'기사과 교관실',activity:'회의',reason:'정기 일정'}],hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
 const consequenceNpcKeys=consequenceNpcKeysForShortening(turn,{event_name:'약속 상대의 도착',reason:'약속 장소에 도착한다',secret_level:0},[],{emily:'에밀리',artemis:'아르테미스'});
 assert.deepEqual(consequenceNpcKeys,['emily'],'a visible NPC named in the consequence-bearing sentence must be attributed even when the queued title did not name them');
 const consequenceEffects=consequenceNpcEffectsForShortening(turn,{event_name:'약속 상대의 도착',reason:'약속 장소에 도착한다',secret_level:0},[],{emily:'에밀리',artemis:'아르테미스'});
@@ -324,6 +324,15 @@ assert.deepEqual(turn.state_delta.relationship_changes,[arrivalRelationship],'a 
 assert.deepEqual(turn.state_delta.pc_knowledge_add,[arrivalKnowledge],'knowledge visibly learned from the consequence must survive boundary shortening');
 assert.deepEqual(turn.state_delta.memories_add,[arrivalMemory],'a memory visibly formed by the consequence must survive boundary shortening');
 assert.deepEqual(turn.state_delta.hooks_update,[{id:consequenceHook.id,status:'resolved'}],'the preserved consequence state and its resolved lifecycle must remain aligned');
+turn={scene:[{kind:'narration',text:'약속 시각이 되자 에밀리가 중앙광장에 도착해 후문 경계를 시작했다.'}],state_delta:{advance_minutes:40,npc_state_updates:[{npc_key:'emily',location:'중앙광장',status:'도착'}],npc_schedule_updates:[{npc_key:'emily',delay_minutes:20,location:'중앙광장',activity:'후문 경계',reason:'도착 후 경계'}],hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
+const scheduleCoupledEffects=consequenceNpcEffectsForShortening(turn,{event_name:'약속 상대의 도착',reason:'약속 장소에 도착한다',secret_level:0},['emily'],{emily:'에밀리'});
+assert.equal(scheduleCoupledEffects.attribution_safe,false,'an unrebased consequence-owned NPC schedule must keep attribution unresolved');
+const scheduleCoupledLifecycle={selected_id:consequenceHook.id,status:'resolved',...scheduleCoupledEffects};
+applySceneMomentumTimeFloor({action:'40분 기다린다.',saveState:consequenceSave},turn,'game',scheduleCoupledLifecycle);
+assert.deepEqual(turn.state_delta.npc_state_updates,[],'partial NPC state must not be consumed while its causal schedule remains unresolved');
+assert.deepEqual(turn.state_delta.npc_schedule_updates,[],'an unrebased relative NPC schedule must fail closed');
+assert.deepEqual(turn.state_delta.hooks_update,[{id:consequenceHook.id,status:'open',reason:'발현 시각 도달; NPC 경계 효과 귀속 대기'}],'the consequence must reopen when its NPC schedule cannot be retained safely');
+assert.equal(scheduleCoupledLifecycle.status,'open','schedule attribution telemetry must agree with the reopened lifecycle');
 turn={scene:[{kind:'narration',text:'약속 시각이 되자 에밀리가 중앙광장에 도착해 보상으로 금화 12개를 건넸고, 기다림의 피로가 조금 풀렸다.'}],state_delta:{advance_minutes:40,gold_delta:12,fatigue_delta:-1,hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
 const scalarConsequenceEffects=consequenceNpcEffectsForShortening(turn,{event_name:'약속 상대의 도착',reason:'약속 장소에 도착한다',secret_level:0},['emily'],{emily:'에밀리'});
 assert.equal(scalarConsequenceEffects.attribution_safe,true,'visible consequence-owned resource changes must be safely attributable');
@@ -365,6 +374,22 @@ applySceneMomentumTimeFloor({action:'40분 기다린다.',saveState:consequenceS
 assert.equal(turn.state_delta.advance_minutes,20,'an unmanifested selected consequence must stop authoritative time at its trigger');
 assert.deepEqual(turn.state_delta.pc_knowledge_add,[],'effects narrated beyond an unmanifested consequence boundary must fail closed');
 assert.equal(unmanifestedLifecycle.status,'open','an unmanifested consequence must remain open at the hard stop');
+turn={scene:[{kind:'narration',text:'10분 만에 기다림을 마쳤다.'}],state_delta:{advance_minutes:10,pc_knowledge_add:['40분 동안 아무도 오지 않았다.'],items_add:['대기 완료 보상']},choices:[]};
+const underreportedOpenLifecycle={selected_id:consequenceHook.id,status:'open',attribution_safe:true};
+applySceneMomentumTimeFloor({action:'40분 기다린다.',saveState:consequenceSave},turn,'game',underreportedOpenLifecycle);
+assert.equal(turn.state_delta.advance_minutes,20,'an unresolved consequence may cap the floor without being marked reached');
+assert.deepEqual(turn.state_delta.pc_knowledge_add,[],'completion knowledge from beyond an unresolved consequence floor must fail closed');
+assert.deepEqual(turn.state_delta.items_add,[],'completion rewards from beyond an unresolved consequence floor must fail closed');
+assert.equal(underreportedOpenLifecycle.status,'open','the unresolved consequence must remain queued after floor reconciliation');
+
+turn={scene:[{kind:'narration',text:'세 시간 훈련을 마친 뒤 식사까지 끝냈다.'}],state_delta:{advance_minutes:225,new_location:'식당',pc_status:'식사 완료',items_remove:['도시락'],fatigue_delta:-1},choices:[]};
+const noRowOverrunIntent=applySceneMomentumTimeFloor({action:'3시간 동안 훈련하고 오전 10시에 식사를 한다.',saveState:{world:{date:'1285-03-01',time:'08:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,120,'a no-row compound overrun must stop at the declared terminal start');
+assert.equal(turn.state_delta.new_location,null,'an impossible terminal meal location must fail closed at the declared start');
+assert.equal(turn.state_delta.pc_status,null,'an impossible terminal completion status must fail closed at the declared start');
+assert.deepEqual(turn.state_delta.items_remove,[],'terminal activity effects must not survive an overrun start boundary');
+assert.equal(turn.state_delta.fatigue_delta,0,'terminal resource effects must not survive an overrun start boundary');
+assert.equal(noRowOverrunIntent.runtimeSceneTrusted,false,'an overrun start boundary must remain incomplete in runtime continuity');
 
 turn={scene:[{kind:'narration',text:'10분 뒤 창고에서 불길이 치솟았다.'}],event_progress:{event_instance_id:'director:warehouse-fire',active_beat:'ignite',completed_beats:[]},state_delta:{advance_minutes:10,active_events_add:['warehouse-fire']},choices:['불을 끈다','사람을 부른다','대피한다']};
 const interruptedBeforeConsequence={selected_id:consequenceHook.id,status:'open',attribution_safe:true};

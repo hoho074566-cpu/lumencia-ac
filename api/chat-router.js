@@ -407,8 +407,8 @@ function consequenceNpcEffectsForShortening(turn,consequence,routedKeys=[],regis
   let scalarAttributionSafe=true;
   for(const [field,cue] of Object.entries(scalarCues)){const value=Number(delta[field]||0);if(value===0)continue;if(evidence.matched.some(segment=>cue.test(segment)))preservedDelta[field]=value;else scalarAttributionSafe=false;}
   for(const field of ['pc_knowledge_add','memories_add'])if(array(delta[field]).length!==array(preservedDelta[field]).length)return{npc_keys:[...limitedKeys],npc_state_updates:preservedState,npc_schedule_updates:preservedSchedule,preserved_delta:preservedDelta,attribution_safe:false};
-  const relevantNpcCount=[...array(delta.npc_state_updates),...array(delta.npc_schedule_updates)].filter(row=>limitedKeys.has(String(row?.npc_key||row?.key||'').trim())).length;
-  const npcAttributionSafe=relevantNpcCount===0||preservedState.length+preservedSchedule.length>0,relationshipAttributionSafe=linkedRelationshipCount===preservedLinkedRelationshipCount;
+  const relevantNpcStateCount=array(delta.npc_state_updates).filter(row=>limitedKeys.has(String(row?.npc_key||row?.key||'').trim())).length,relevantNpcScheduleCount=array(delta.npc_schedule_updates).filter(row=>limitedKeys.has(String(row?.npc_key||row?.key||'').trim())).length;
+  const npcAttributionSafe=relevantNpcStateCount===preservedState.length&&relevantNpcScheduleCount===preservedSchedule.length,relationshipAttributionSafe=linkedRelationshipCount===preservedLinkedRelationshipCount;
   return{npc_keys:[...limitedKeys],npc_state_updates:preservedState,npc_schedule_updates:preservedSchedule,preserved_delta:preservedDelta,attribution_safe:npcAttributionSafe&&relationshipAttributionSafe&&scalarAttributionSafe};
 }
 function consequenceNpcKeysForShortening(turn,consequence,routedKeys=[],registry=CHARACTER_REGISTRY){
@@ -507,7 +507,7 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   if(reachedBoundary!=null)applied=reachedBoundary;
   else if(current>profileMax)applied=profileMax;
   else if(!structuredInterruption&&completedBeforeChoice)applied=Math.min(profileMax,Math.max(current,boundedFloor));
-  const boundaryTruncatesAction=Boolean(reachedBoundary!=null&&reachedBoundary<requestedFloor),unsurfacedScheduleCapsFloor=Boolean(scheduleBoundary!=null&&scheduleBoundary===floorBoundary&&!reachedScheduledBoundary&&scheduleBoundary<requestedFloor&&applied===scheduleBoundary),reconcileTruncatedTurn=applied<current||boundaryTruncatesAction||unsurfacedScheduleCapsFloor;
+  const boundaryTruncatesAction=Boolean(reachedBoundary!=null&&reachedBoundary<requestedFloor),unsurfacedScheduleCapsFloor=Boolean(scheduleBoundary!=null&&scheduleBoundary===floorBoundary&&!reachedScheduledBoundary&&scheduleBoundary<requestedFloor&&applied===scheduleBoundary),unresolvedConsequenceCapsFloor=Boolean(consequenceBoundary!=null&&consequenceBoundary===floorBoundary&&!reachedConsequenceBoundary&&consequenceBoundary<requestedFloor&&applied===consequenceBoundary),overrunStartBoundary=Boolean(intent.scheduledStartOverrun&&Number(intent.scheduledStartOffsetMinutes||0)>0&&applied===Number(intent.scheduledStartOffsetMinutes)),reconcileTruncatedTurn=applied<current||boundaryTruncatesAction||unsurfacedScheduleCapsFloor||unresolvedConsequenceCapsFloor||overrunStartBoundary;
   const ambiguousAppliedConsequence=Boolean(appliedConsequenceBoundary&&!consequenceAttributionSafe);
   if((reconcileTruncatedTurn||ambiguousAppliedConsequence)&&consequenceLifecycle?.status==='resolved'&&(!appliedConsequenceBoundary||ambiguousAppliedConsequence)){
     if(!consequenceAttributionSafe){const id=String(consequenceLifecycle.selected_id||'');turn.state_delta.hooks_update=[...array(turn.state_delta.hooks_update).filter(row=>String(row?.id||'')!==id),{id,status:'open',reason:'발현 시각 도달; NPC 경계 효과 귀속 대기'}].slice(0,8);consequenceLifecycle.evidence='ambiguous-npc-effect';}

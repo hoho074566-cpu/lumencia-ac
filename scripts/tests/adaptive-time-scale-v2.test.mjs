@@ -167,6 +167,8 @@ assert.equal(topicQualifiedClass.compression,true,'a topic-qualified next-day cl
 assert.deepEqual(topicQualifiedClass.suggestedAdvanceMinutes,[1425,1440]);
 assert.equal(classifySceneIntent('모레는 오전 8시에 수업을 듣는다.', { location:'기숙사',currentTime:'09:00' }).dateQualifiedStart,true,'모레는 must remain a future date qualifier');
 assert.equal(classifySceneIntent('정오에 수업을 듣는다.', { location:'강의실',currentTime:'09:00' }).scheduledStartOffsetMinutes,180,'noon must normalize to the same-day 12:00 start');
+assert.deepEqual(classifySceneIntent('정오부터 1시까지 수업을 듣는다.', { location:'강의실',currentTime:'11:00' }).suggestedAdvanceMinutes,[120,120],'an unmarked 1 o’clock end after noon must mean the same-day afternoon');
+assert.deepEqual(classifySceneIntent('정오부터 오후 1시까지 수업을 듣는다.', { location:'강의실',currentTime:'11:00' }).suggestedAdvanceMinutes,[120,120],'the inferred noon interval must match its explicit PM equivalent');
 assert.equal(classifySceneIntent('자정에 훈련한다.', { location:'훈련장',currentTime:'09:00' }).scheduledStartOffsetMinutes,900,'midnight must normalize to the next upcoming 00:00 start');
 assert.equal(classifySceneIntent('12시에 기사과 오리엔테이션에 참석한다.', { location:'기숙사',currentTime:'09:00' }).kind,'class-attendance','orientation attendance must use the scheduled academic profile');
 const namedPcOrientation={id:'newcomer-orientation',title:'신입생 오리엔테이션',date:'1285-03-01',time:'12:00',kind:'academic',status:'scheduled'},namedPcScheduleSave={pc:{name:'카인',department:'기사과'},world:{date:'1285-03-01',time:'09:00',location:'기숙사'},scheduledEvents:[namedPcOrientation],scheduleContext:{due:[],upcoming:[namedPcOrientation]}},namedPcOrientationAction='카인이 오늘 12시에 신입생 오리엔테이션에 참석한다.';
@@ -175,9 +177,19 @@ const precedingClass={id:'preceding-class',title:'기사과 기초 수업',date:
 assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,classThenSleep),true,'an explicitly requested schedule in a preceding compound clause must not become an unrelated boundary');
 const durationQualifiedClassAction='오전 10시에 기사과 기초 수업을 1시간 동안 듣는다.';
 assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,durationQualifiedClassAction),true,'duration glue must not make the requested schedule look unrelated');
+assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,'오전 10시에 기사과 기초수업을 듣는다.'),true,'Korean spacing alone must not make the requested schedule look unrelated');
 const overrunClassAction='3시간 동안 훈련하고 오전 10시에 기사과 기초 수업을 듣는다.',overrunClassIntent=classifySceneIntent(overrunClassAction,{location:'훈련장',currentTime:'08:00',actorName:'카인'});
 assert.equal(overrunClassIntent.scheduledStartOverrun,true,'preceding work longer than the fixed start offset must be marked as an overrun');
+assert.equal(overrunClassIntent.minAdvanceMinutes,120,'an overrun compound must stop at its declared terminal start');
+assert.deepEqual(overrunClassIntent.suggestedAdvanceMinutes,[120,120],'an overrun compound must not include the impossible terminal activity duration');
 assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,overrunClassAction,overrunClassIntent),false,'an impossible terminal schedule start must remain a hard boundary');
+const noRowOverrunMeal=classifySceneIntent('3시간 동안 훈련하고 오전 10시에 식사를 한다.',{location:'훈련장',currentTime:'08:00'});
+assert.equal(noRowOverrunMeal.scheduledStartOverrun,true,'an overrun must be detected without a saved schedule row');
+assert.deepEqual(noRowOverrunMeal.suggestedAdvanceMinutes,[120,120],'a no-row overrun must still stop at the declared start');
+const noRowOverrunDirective=buildSceneMomentumDirective({action:'3시간 동안 훈련하고 오전 10시에 식사를 한다.',saveState:{world:{date:'1285-03-01',time:'08:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}});
+assert.match(noRowOverrunDirective,/TIME_GUIDE=120-120min/,'an overrun directive must expose only the reachable start boundary');
+assert.match(noRowOverrunDirective,/앞선 행동과 뒤 활동 모두 끝나지 않은 상태로 멈춘다/,'the model must be told that neither overlapping activity completed');
+assert.doesNotMatch(noRowOverrunDirective,/활동 자체의 자연 소요시간을 합친 TIME_GUIDE 안에서 완료한다/,'the ordinary scheduled-completion rule must not contradict an overrun stop');
 assert.equal(classifySceneIntent('12시에 신입생 교육을 받는다.', { location:'기숙사',currentTime:'09:00' }).kind,'class-attendance','scheduled education must use the academic profile');
 assert.equal(classifySceneIntent('12시에 입학식에 참석한다.', { location:'기숙사',currentTime:'09:00' }).kind,'class-attendance','entrance ceremony attendance must use the academic profile');
 assert.equal(classifySceneIntent('오늘 아침 8시에 수업을 듣는다.', { location:'강의실',currentTime:'07:00' }).scheduledStartOffsetMinutes,60,'아침 must normalize to an AM clock marker');
