@@ -144,18 +144,21 @@ assert.deepEqual(turn.state_delta.active_events_add,[],'a schedule must not ente
 assert.deepEqual(turn.state_delta.scheduled_events_remove,[],'the authoritative schedule row must remain pending at the start boundary');
 assert.deepEqual(turn.state_delta.pc_knowledge_add,['기다리는 동안 확인한 복도 공지'],'ordinary pre-boundary effects must survive a nonterminal schedule start');
 assert.equal(ordinaryBoundaryStartIntent.runtimeSceneTrusted,true,'a nonterminal schedule start must not be treated as premature completion');
-const exactTrainingBoundary={id:'next-class',title:'기사과 기초 수업',date:'1285-03-01',time:'10:00',kind:'academic',status:'scheduled'};
+const exactTrainingBoundary={id:'next-class',title:'기사과 기초 수업',date:'1285-03-01',time:'10:00',location:'훈련장',kind:'academic',status:'scheduled'};
 const exactTrainingBoundarySave={pc:knightPc,world:{date:'1285-03-01',time:'06:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[exactTrainingBoundary]},scheduledEvents:[exactTrainingBoundary]};
-const trainingGrowth={skill:'검술',amount:1,reason:'네 시간 동안 기본 검술을 반복 훈련했다'};
+const trainingGrowth={skill:'검술',amount:1,reason:'네 시간 동안 기초 검술 훈련을 완료했다'};
+const trainingGroundProgress={stat:'신체',amount:1,reason:'훈련장에서 네 시간 동안 자세 교정을 완료했다'};
 const prematureClassGrowth={skill:'전술',amount:1,reason:'기사과 기초 수업을 수료했다'};
+const prematureClassProgress={stat:'지능',amount:1,reason:'기사과 기초 수업을 수료했다'};
 turn={
   scene_title:'훈련 완료와 수업 종료',scene:[{kind:'narration',text:'네 시간의 검술 훈련을 마치고 자세 교정법을 정리했다.'},{kind:'narration',text:'10시가 되자 기사과 기초 수업까지 모두 수료하고 보상을 받았다.'}],choices:[],
   event_progress:{event_instance_id:'next-class',active_beat:'complete',completed_beats:['complete']},
-  state_delta:{advance_minutes:240,fatigue_delta:2,gold_delta:5,skill_experience:[trainingGrowth,prematureClassGrowth],pc_knowledge_add:['검술 기본 자세 교정법','기사과 기초 수업 내용'],items_add:['훈련 기록표','수료 보상'],relationship_changes:[{npc_key:'artemis',affinity_delta:1,reason:'기초 수업 수료'}],npc_state_updates:[{npc_key:'artemis',status:'기초 수업 종료'}],scheduled_events_complete:['next-class'],completed_events_add:['next-class']},
+  state_delta:{advance_minutes:240,fatigue_delta:2,gold_delta:5,stat_progress:[trainingGroundProgress,prematureClassProgress],skill_experience:[trainingGrowth,prematureClassGrowth],pc_knowledge_add:['검술 기본 자세 교정법','기사과 기초 수업 내용'],items_add:['훈련 기록표','수료 보상'],relationship_changes:[{npc_key:'artemis',affinity_delta:1,reason:'기초 수업 수료'}],npc_state_updates:[{npc_key:'artemis',status:'기초 수업 종료'}],scheduled_events_complete:['next-class'],completed_events_add:['next-class']},
 };
 const exactTrainingBoundaryIntent=applySceneMomentumTimeFloor({action:'4시간 동안 검술을 훈련한다.',saveState:exactTrainingBoundarySave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,240,'a completed pre-boundary action must retain its full exact duration');
 assert.equal(turn.state_delta.fatigue_delta,2,'fatigue produced by the completed pre-boundary training must survive');
+assert.deepEqual(turn.state_delta.stat_progress,[trainingGroundProgress],'a single location-token overlap must not erase valid pre-boundary progress');
 assert.deepEqual(turn.state_delta.skill_experience,[trainingGrowth],'only growth attributable to the completed training may survive schedule-start reconciliation');
 assert.deepEqual(turn.state_delta.pc_knowledge_add,['검술 기본 자세 교정법'],'pre-boundary action knowledge must survive while premature class knowledge is removed');
 assert.deepEqual(turn.state_delta.items_add,['훈련 기록표'],'pre-boundary items must survive while the premature schedule reward is removed');
@@ -164,6 +167,16 @@ assert.deepEqual(turn.state_delta.relationship_changes,[],'relationship effects 
 assert.deepEqual(turn.state_delta.npc_state_updates,[],'NPC effects attributable to the premature schedule must be removed');
 assert.equal(turn.event_progress,null,'the schedule event must remain incomplete at its start');
 assert.equal(exactTrainingBoundaryIntent.runtimeSceneTrusted,false,'mixed completion narration must not feed runtime synthesis after selective state reconciliation');
+const omittedBoundaryClass={id:'omitted-class',title:'기사과 필수 수업',date:'1285-03-01',time:'10:00',kind:'academic',status:'scheduled'};
+const omittedBoundarySave={pc:knightPc,world:{date:'1285-03-01',time:'09:30',location:'훈련장'},scheduleContext:{due:[],upcoming:[omittedBoundaryClass]},scheduledEvents:[omittedBoundaryClass]};
+turn={scene_title:'두 시간 훈련 완료',scene:[{kind:'narration',text:'두 시간의 검술 훈련을 모두 마치고 자세를 바로잡았다.'}],choices:[],state_delta:{advance_minutes:10,fatigue_delta:2,skill_experience:[{skill:'검술',amount:1,reason:'두 시간 훈련 완료'}],pc_knowledge_add:['두 시간 훈련의 교정법']}};
+const omittedBoundaryIntent=applySceneMomentumTimeFloor({action:'2시간 동안 검술을 훈련한다.',saveState:omittedBoundarySave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,30,'an omitted intervening schedule must cap an underreported completed action at the exact boundary');
+assert.equal(turn.state_delta.fatigue_delta,0,'fatigue from the impossible post-boundary completion must fail closed');
+assert.deepEqual(turn.state_delta.skill_experience,[],'growth from an action truncated by an omitted schedule must fail closed');
+assert.deepEqual(turn.state_delta.pc_knowledge_add,[],'knowledge from an action truncated by an omitted schedule must fail closed');
+assert.equal(omittedBoundaryIntent.runtimeSceneTrusted,false,'omitted-boundary completion prose must not feed runtime synthesis');
+assert.deepEqual(runtimeSynthesisTurn(turn,omittedBoundaryIntent).scene,[],'runtime synthesis must discard the underreported completion scene');
 const eveningClass={id:'evening-class',title:'기사과 수업',date:'1285-03-01',time:'20:00',kind:'academic',status:'scheduled'};
 const eveningClassSave={pc:knightPc,world:{date:'1285-03-01',time:'19:30',location:'훈련장'},scheduleContext:{due:[],upcoming:[eveningClass]},scheduledEvents:[eveningClass]};
 turn={scene_title:'오후 수업의 종',scene:[{kind:'narration',text:'오후 8시, 기사과 수업 종이 울렸다.'}],state_delta:{advance_minutes:30,skill_experience:[{skill:'검술',amount:1}]},choices:['수업에 간다','훈련을 멈춘다','다른 곳으로 간다']};

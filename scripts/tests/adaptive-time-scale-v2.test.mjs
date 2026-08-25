@@ -154,6 +154,8 @@ assert.equal(classifySceneIntent('오늘 밤 10시에 훈련한다.', { location
 assert.equal(classifySceneIntent('밤 1시에 잠을 잔다.', { location:'개인실',currentTime:'23:00' }).scheduledStartOffsetMinutes,120,'early-night clocks must roll forward to the next calendar day');
 assert.equal(classifySceneIntent('내일 밤 1시에 잠을 잔다.', { location:'개인실',currentTime:'23:00' }).dateQualifiedStart,true,'a date-qualified early-night clock must preserve the requested future date');
 assert.deepEqual(classifySceneIntent('밤 11시부터 밤 1시까지 잠을 잔다.', { location:'개인실',currentTime:'22:00' }).suggestedAdvanceMinutes,[180,180],'a night interval ending at 1 AM must cross midnight');
+assert.deepEqual(classifySceneIntent('오후 11시부터 1시까지 잠을 잔다.', { location:'개인실',currentTime:'22:00' }).suggestedAdvanceMinutes,[180,180],'an unmarked end after a marked late-night start must roll into the next day');
+assert.deepEqual(classifySceneIntent('오전 11시부터 1시까지 수업을 듣는다.', { location:'강의실',currentTime:'10:00' }).suggestedAdvanceMinutes,[180,180],'an unmarked lower hour after an AM start must resolve to the same-day afternoon');
 
 const sleep = classifySceneIntent('잠을 잔다.', { location:'개인실' });
 assert.equal(sleep.kind, 'downtime');
@@ -203,6 +205,10 @@ assert.equal(explicitTravel.kind,'travel');
 assert.equal(explicitTravel.semanticTarget,'기숙사','the duration phrase must not pollute the travel destination');
 assert.equal(explicitTravel.explicitDurationMinutes,30);
 assert.deepEqual(explicitTravel.suggestedAdvanceMinutes,[30,30],'an explicit travel duration must override the natural distance range');
+const destinationFirstExplicitTravel=classifySceneIntent('도서관으로 30분 동안 간다.', { location:'기숙사' });
+assert.equal(destinationFirstExplicitTravel.kind,'travel','a duration between the destination and verb must preserve travel intent');
+assert.equal(destinationFirstExplicitTravel.semanticTarget,'도서관','destination-first explicit travel must retain a clean semantic target');
+assert.deepEqual(destinationFirstExplicitTravel.suggestedAdvanceMinutes,[30,30],'destination-first explicit travel must honor its exact duration');
 const scheduledTravel=classifySceneIntent('10시에 도서관으로 간다.', { location:'A동 개인실',currentTime:'09:00' });
 assert.equal(scheduledTravel.semanticTarget,'도서관','a scheduled-start clock must not pollute the travel destination');
 assert.equal(scheduledTravel.scheduledStartOffsetMinutes,60,'scheduled travel must retain the wait until departure');
