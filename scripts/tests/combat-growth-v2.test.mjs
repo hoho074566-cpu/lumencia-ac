@@ -207,6 +207,29 @@ const playerRecipientCorrectionAccepted = deriveCombatGrowthState({
 });
 assert.deepEqual(playerRecipientCorrectionAccepted.accepted_skill_experience, [{ skill:'대검술', amount:1, reason:'교관의 직접 교정' }], 'a named instructor may still provide evidence when the PC is the explicit correction recipient');
 
+const liveImperativeCorrectionAccepted = deriveCombatGrowthState({
+  pc,
+  action:'나는 광장 한쪽에서 신체 단련용 보법을 세 번 시도한다. 첫 두 번은 발이 꼬여 실패하고, 곁의 교관에게 내 자세를 봐 달라고 요청한다. 교관이 오른발을 반 보 뒤로 두고 무게중심을 낮추라고 정확히 교정하면, 나는 그 지시를 직접 적용해 마지막 반복에 성공하고 실패 원인을 파악한다.',
+  scene:[
+    { kind:'narration', text:'광장 한쪽에서 첫 두 번의 보법은 발이 얽히며 흐트러졌다. 곁을 지나던 교관이 요청을 받고 걸음을 멈춘다.' },
+    { kind:'dialogue', speaker_name:'교관', text:'오른발을 반 보 뒤로. 허리를 세우려 하지 말고, 중심부터 낮춰. 발을 옮기는 게 아니라 바닥을 밀어낸다고 생각해.' },
+    { kind:'narration', text:'지시를 적용한 마지막 반복은 발끝이 엉키지 않고 매끄럽게 이어진다. 문제는 속도가 아니라 앞발에 쏠린 무게중심이었다는 점이 분명해진다.' },
+  ],
+  resolutionLog:{ triggered:false, outcome:'none', abilities:[] },
+  statChanges:[{ stat:'신체', amount:1, reason:'실패 뒤 교관의 보법 교정 적용' }],
+});
+assert.equal(liveImperativeCorrectionAccepted.evidence_tier, 1, 'an applied technical instruction in the resolved PC repetition is visible basic correction evidence');
+assert.deepEqual(liveImperativeCorrectionAccepted.accepted_stat_progress, [{ stat:'신체', amount:1, reason:'실패 뒤 교관의 보법 교정 적용' }], 'the exact live failure-and-imperative-correction scene must retain bounded physical growth');
+
+const npcInstructionApplicationRejected = deriveCombatGrowthState({
+  pc,
+  action:'신체 단련용 보법을 반복 연습한다.',
+  scene:scene('릴리아가 교관의 지시를 적용한 마지막 보법 반복에 성공했다.'),
+  resolutionLog:{ triggered:false, outcome:'none', abilities:[] },
+  statChanges:[{ stat:'신체', amount:1, reason:'릴리아의 보법 교정 적용' }],
+});
+assert.deepEqual(npcInstructionApplicationRejected.accepted_stat_progress, [], 'a named NPC applying the instructor directive must not transfer growth to the PC');
+
 const koreanAttemptVerbAccepted = deriveCombatGrowthState({
   pc,
   action:'대검술을 연습해본다.',
