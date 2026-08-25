@@ -28,6 +28,8 @@ assert.equal(classifySceneIntent('에밀리가 한 시간 훈련하고 잠을 �
 assert.equal(classifySceneIntent('에밀리가 한 시간 훈련하고 나는 잠을 잔다.').kind,'downtime','an explicit terminal first-person subject must override an earlier NPC subject');
 assert.equal(classifySceneIntent('누군가 “죽이겠다”고 외치는 소리를 듣고 에밀리가 잠을 잔다.').kind,'generic','an attributed report must not hide an explicit third-party terminal subject');
 assert.equal(classifySceneIntent('카인이 잠을 잔다.',{actorName:'카인'}).kind,'downtime','the actual player name must remain a valid explicit subject');
+assert.deepEqual(classifySceneIntent('기숙사에서 카인이 8시간 잠을 잔다.',{actorName:'카인'}).suggestedAdvanceMinutes,[480,480],'a leading location adjunct must not hide the saved PC subject');
+assert.deepEqual(classifySceneIntent('조용히 카인이 8시간 잠을 잔다.',{actorName:'카인'}).suggestedAdvanceMinutes,[480,480],'a leading manner adjunct must not hide the saved PC subject');
 const namedActorDelta=deriveSceneDelta({saveState:{pc:{name:'카인'},world:{location:'기숙사',time:'22:00'}},action:'카인이 8시간 잠을 잔다.',turn:{state_delta:{advance_minutes:480},choices:[]}});
 assert.equal(namedActorDelta.intent,'downtime','runtime momentum must classify the saved player name consistently');
 assert.equal(namedActorDelta.target,2,'saved-name downtime must retain the downtime State Delta target');
@@ -144,20 +146,31 @@ assert.equal(reachableNextDayClass.scheduledStartOffsetMinutes,90,'a next-day st
 assert.deepEqual(reachableNextDayClass.suggestedAdvanceMinutes,[135,210],'a reachable next-day class must include its wait and natural class duration');
 assert.equal(reachableNextDayClass.compression,true,'a future-date activity that fully fits inside one turn must use deterministic completion');
 assert.equal(reachableNextDayClass.boundaryLookaheadMinutes,0,'a reachable future-date activity must not expand consequence arbitration beyond its valid range');
+const partiallyReachableNextDayClass=classifySceneIntent('내일 오후 10시에 수업을 듣는다.', { location:'여관',currentTime:'23:30' });
+assert.equal(partiallyReachableNextDayClass.scheduledStartOffsetMinutes,1350,'a future start whose minimum session fits must retain its real offset');
+assert.deepEqual(partiallyReachableNextDayClass.suggestedAdvanceMinutes,[1395,1440],'only the unreachable upper end of a natural future activity range may be clamped');
+assert.equal(partiallyReachableNextDayClass.compression,true,'a partially reachable future range must still enforce its earliest valid completion');
+assert.equal(partiallyReachableNextDayClass.turnLimitTruncated,false,'a flexible range with a reachable lower endpoint is not an incomplete fixed request');
 const todayTerminalClass=classifySceneIntent('내일 계획을 세운 뒤 오늘 오전 10시에 수업을 듣는다.', { location:'여관',currentTime:'09:00' });
 assert.equal(todayTerminalClass.dateQualifiedStart,false,'an earlier next-day planning clause must not date-qualify the terminal today activity');
 assert.equal(todayTerminalClass.scheduledStartOffsetMinutes,60,'the terminal today clock must remain the selected activity start');
 assert.deepEqual(todayTerminalClass.suggestedAdvanceMinutes,[105,180],'the terminal today class must retain same-day wait plus activity timing');
 const topicQualifiedClass=classifySceneIntent('내일은 오전 8시에 기사과 기초 수업을 듣는다.', { location:'기숙사',currentTime:'09:00' });
 assert.equal(topicQualifiedClass.dateQualifiedStart,true,'a future-day topic particle must preserve the date-qualified activity');
-assert.equal(topicQualifiedClass.compression,false,'a topic-qualified next-day class must not receive the immediate class floor');
-assert.deepEqual(topicQualifiedClass.suggestedAdvanceMinutes,[0,1440]);
+assert.equal(topicQualifiedClass.scheduledStartOffsetMinutes,1380,'a topic-qualified next-day start with a reachable lower range must retain its real offset');
+assert.equal(topicQualifiedClass.compression,true,'a topic-qualified next-day class with a reachable lower range must enforce its start floor');
+assert.deepEqual(topicQualifiedClass.suggestedAdvanceMinutes,[1425,1440]);
 assert.equal(classifySceneIntent('모레는 오전 8시에 수업을 듣는다.', { location:'기숙사',currentTime:'09:00' }).dateQualifiedStart,true,'모레는 must remain a future date qualifier');
 assert.equal(classifySceneIntent('정오에 수업을 듣는다.', { location:'강의실',currentTime:'09:00' }).scheduledStartOffsetMinutes,180,'noon must normalize to the same-day 12:00 start');
 assert.equal(classifySceneIntent('자정에 훈련한다.', { location:'훈련장',currentTime:'09:00' }).scheduledStartOffsetMinutes,900,'midnight must normalize to the next upcoming 00:00 start');
 assert.equal(classifySceneIntent('12시에 기사과 오리엔테이션에 참석한다.', { location:'기숙사',currentTime:'09:00' }).kind,'class-attendance','orientation attendance must use the scheduled academic profile');
 const namedPcOrientation={id:'newcomer-orientation',title:'신입생 오리엔테이션',date:'1285-03-01',time:'12:00',kind:'academic',status:'scheduled'},namedPcScheduleSave={pc:{name:'카인',department:'기사과'},world:{date:'1285-03-01',time:'09:00',location:'기숙사'},scheduledEvents:[namedPcOrientation],scheduleContext:{due:[],upcoming:[namedPcOrientation]}},namedPcOrientationAction='카인이 오늘 12시에 신입생 오리엔테이션에 참석한다.';
 assert.equal(isRequestedScheduledActivity(namedPcScheduleSave,namedPcOrientation,namedPcOrientationAction),true,'the saved PC subject must not prevent matching their requested schedule');
+const precedingClass={id:'preceding-class',title:'기사과 기초 수업',date:'1285-03-01',time:'10:00',kind:'academic',status:'scheduled'},precedingClassSave={pc:{name:'카인',department:'기사과'},world:{date:'1285-03-01',time:'08:00',location:'기숙사'},scheduledEvents:[precedingClass],scheduleContext:{due:[],upcoming:[precedingClass]}},classThenSleep='오전 10시에 기사과 기초 수업을 듣고 8시간 동안 잠을 잔다.';
+assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,classThenSleep),true,'an explicitly requested schedule in a preceding compound clause must not become an unrelated boundary');
+const overrunClassAction='3시간 동안 훈련하고 오전 10시에 기사과 기초 수업을 듣는다.',overrunClassIntent=classifySceneIntent(overrunClassAction,{location:'훈련장',currentTime:'08:00',actorName:'카인'});
+assert.equal(overrunClassIntent.scheduledStartOverrun,true,'preceding work longer than the fixed start offset must be marked as an overrun');
+assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,overrunClassAction,overrunClassIntent),false,'an impossible terminal schedule start must remain a hard boundary');
 assert.equal(classifySceneIntent('12시에 신입생 교육을 받는다.', { location:'기숙사',currentTime:'09:00' }).kind,'class-attendance','scheduled education must use the academic profile');
 assert.equal(classifySceneIntent('12시에 입학식에 참석한다.', { location:'기숙사',currentTime:'09:00' }).kind,'class-attendance','entrance ceremony attendance must use the academic profile');
 assert.equal(classifySceneIntent('오늘 아침 8시에 수업을 듣는다.', { location:'강의실',currentTime:'07:00' }).scheduledStartOffsetMinutes,60,'아침 must normalize to an AM clock marker');
@@ -243,6 +256,10 @@ assert.equal(classifySceneIntent('계산대로 간다.', { location:'식당' }).
 assert.deepEqual(classifySceneIntent('도서관으로 간다.').suggestedAdvanceMinutes, [3, 30], 'missing location context must preserve the proven fallback');
 assert.equal(classifySceneIntent('도서관으로 내일 10시에 간다.').semanticTarget,'도서관','future-date travel must remove the destination particle after date and clock qualifiers');
 assert.equal(classifySceneIntent('도로로 간다.').semanticTarget,'도로','a destination name ending in 로 must not lose part of its name');
+const deferredFutureTravel=classifySceneIntent('모레 오전 10시에 왕도로 간다.',{location:'기숙사',currentTime:'09:00'});
+assert.equal(deferredFutureTravel.compression,false,'future travel outside the turn window must remain deferred');
+assert.equal(deferredFutureTravel.turnLimitTruncated,true,'deferred future travel must fail closed against premature arrival effects');
+assert.match(buildSceneMomentumDirective({action:'모레 오전 10시에 왕도로 간다.',saveState:{world:{date:'1285-03-01',time:'09:00',location:'기숙사'}}}),/도착·이동 시작을 만들지 말고/,'deferred travel guidance must not contradict the future-date boundary');
 
 assert.deepEqual(classifySceneIntent('1시간 동안 쉬고 8시간 동안 잠을 잔다.').suggestedAdvanceMinutes,[540,540],'동안 connectors must not be mistaken for downtime negation');
 

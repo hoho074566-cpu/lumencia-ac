@@ -225,6 +225,12 @@ const reachableNextDayClass={id:'reachable-next-day-class',title:'기사과 필�
 turn={scene_title:'기사과 수업 종료',scene:[{kind:'narration',text:'기다린 뒤 기사과 필수 수업을 마쳤다.'}],state_delta:{advance_minutes:10,scheduled_events_complete:['reachable-next-day-class'],completed_events_add:['reachable-next-day-class']},choices:[]};
 applySceneMomentumTimeFloor({action:'내일 오전 1시에 기사과 필수 수업을 듣는다.',saveState:reachableNextDayClassSave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,135,'a reachable next-day activity must not complete before its requested start plus minimum duration');
+const overrunClass={id:'overrun-class',title:'기사과 기초 수업',date:'1285-03-01',time:'10:00',kind:'academic',status:'scheduled'},overrunClassSave={pc:knightPc,world:{date:'1285-03-01',time:'08:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[overrunClass]},scheduledEvents:[overrunClass]};
+turn={scene_title:'훈련과 수업 완료',scene:[{kind:'narration',text:'세 시간 훈련한 뒤 기사과 기초 수업까지 마쳤다.'}],state_delta:{advance_minutes:300,skill_experience:[{skill:'검술',amount:1}],scheduled_events_complete:['overrun-class'],completed_events_add:['overrun-class']},choices:[]};
+applySceneMomentumTimeFloor({action:'3시간 동안 훈련하고 오전 10시에 기사과 기초 수업을 듣는다.',saveState:overrunClassSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,120,'preceding work that cannot fit must stop at the requested schedule start');
+assert.deepEqual(turn.state_delta.skill_experience,[],'effects from impossible overlapping work and schedule completion must fail closed');
+assert.deepEqual(turn.state_delta.scheduled_events_complete,[],'the schedule must remain pending at the overrun boundary');
 const earlyNightClass={id:'early-night-class',title:'기사과 필수 수업',date:'1285-03-02',time:'01:00',kind:'academic',status:'scheduled'};
 const earlyNightClassSave={pc:knightPc,world:{date:'1285-03-01',time:'23:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[earlyNightClass]},scheduledEvents:[earlyNightClass]};
 turn={scene_title:'밤의 필수 수업',scene:[{kind:'narration',text:'밤 1시, 기사과 필수 수업 종이 울렸다.'}],state_delta:{advance_minutes:120,skill_experience:[{skill:'검술',amount:1}]},choices:['수업에 간다','훈련을 멈춘다','다른 곳으로 간다']};
@@ -254,6 +260,13 @@ assert.equal(turn.state_delta.advance_minutes,360,'an already-overdue event must
 turn={state_delta:{advance_minutes:0},choices:[]};
 applySceneMomentumTimeFloor({action:'48시간 쉰다.',saveState:{world:{date:'1285-03-01',time:'14:00'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,1440,'locally forced floor must respect canonical one-turn maximum');
+
+turn={scene_title:'왕도 도착',scene:[{kind:'narration',text:'왕도에 도착했다.'}],state_delta:{advance_minutes:1440,new_location:'왕도',pc_knowledge_add:['왕도에 도착했다.']},choices:[]};
+const deferredTravelIntent=applySceneMomentumTimeFloor({action:'모레 오전 10시에 왕도로 간다.',saveState:{world:{date:'1285-03-01',time:'09:00',location:'기숙사'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,1440,'deferred travel may advance only to the one-turn time window');
+assert.equal(turn.state_delta.new_location,null,'deferred future travel must not persist a premature destination');
+assert.deepEqual(turn.state_delta.pc_knowledge_add,[],'premature future-arrival knowledge must fail closed');
+assert.equal(deferredTravelIntent.runtimeSceneTrusted,false,'premature deferred-travel narration must not feed runtime synthesis');
 
 turn={state_delta:{advance_minutes:15},choices:[]};
 applySceneMomentumTimeFloor({action:'쉰다.',saveState:boundarySave},turn,'game');
@@ -331,6 +344,13 @@ applySceneMomentumTimeFloor({action:'40분 기다린다.',saveState:consequenceS
 assert.equal(turn.state_delta.advance_minutes,20,'an unmanifested selected consequence must stop authoritative time at its trigger');
 assert.deepEqual(turn.state_delta.pc_knowledge_add,[],'effects narrated beyond an unmanifested consequence boundary must fail closed');
 assert.equal(unmanifestedLifecycle.status,'open','an unmanifested consequence must remain open at the hard stop');
+
+turn={scene:[{kind:'narration',text:'10분 뒤 창고에서 불길이 치솟았다.'}],event_progress:{event_instance_id:'director:warehouse-fire',active_beat:'ignite',completed_beats:[]},state_delta:{advance_minutes:10,active_events_add:['warehouse-fire']},choices:['불을 끈다','사람을 부른다','대피한다']};
+const interruptedBeforeConsequence={selected_id:consequenceHook.id,status:'open',attribution_safe:true};
+applySceneMomentumTimeFloor({action:'40분 기다린다.',saveState:consequenceSave},turn,'game',interruptedBeforeConsequence);
+assert.equal(turn.state_delta.advance_minutes,10,'a real earlier interruption must not be advanced to a later queued consequence');
+assert.equal(turn.event_progress.event_instance_id,'director:warehouse-fire','the earlier structured interruption must survive consequence arbitration');
+assert.deepEqual(turn.state_delta.active_events_add,['warehouse-fire'],'state attributable to the earlier interruption must not be cleared');
 
 const earlierSchedule={id:'early-class',title:'기사과 필수 수업',date:'1285-03-01',time:'09:10',kind:'academic',status:'scheduled'},scheduleBeforeResolvedConsequenceSave={...rangedConsequenceSave,pc:knightPc,scheduleContext:{due:[],upcoming:[earlierSchedule]},scheduledEvents:[earlierSchedule]};
 turn={scene:[{kind:'narration',text:'훈련 중 에밀리가 도착했다.'}],state_delta:{advance_minutes:90,hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};

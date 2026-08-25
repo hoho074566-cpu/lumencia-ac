@@ -480,9 +480,8 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   const scheduleBoundary=nextScheduleBoundaryMinutes(incoming?.saveState||{},{futureOnly:true,action:incoming?.action||'',intent,registry:CHARACTER_REGISTRY});
   const consequenceBoundary=consequenceLifecycle?.selected_id?minutesUntilEventConsequence(incoming?.saveState||{},consequenceLifecycle.selected_id):null;
   const consequenceAttributionSafe=consequenceLifecycle?.attribution_safe!==false;
-  const reachedConsequenceBoundary=Boolean(consequenceBoundary!=null&&Number.isFinite(Number(consequenceBoundary))&&consequenceBoundary<=profileMax);
-  const manifestedConsequenceBoundary=Boolean(reachedConsequenceBoundary&&consequenceLifecycle?.status==='resolved');
-  const floorBoundaries=[scheduleBoundary,reachedConsequenceBoundary?consequenceBoundary:null].filter(value=>value!=null&&Number.isFinite(Number(value))).map(Number),floorBoundary=floorBoundaries.length?Math.min(...floorBoundaries):null;
+  const consequenceWithinProfile=Boolean(consequenceBoundary!=null&&Number.isFinite(Number(consequenceBoundary))&&consequenceBoundary<=profileMax);
+  const floorBoundaries=[scheduleBoundary,consequenceWithinProfile?consequenceBoundary:null].filter(value=>value!=null&&Number.isFinite(Number(value))).map(Number),floorBoundary=floorBoundaries.length?Math.min(...floorBoundaries):null;
   const boundedFloor=floorBoundary==null?requestedFloor:Math.min(requestedFloor,Math.max(0,floorBoundary));
   const eventId=String(turn?.event_progress?.event_instance_id||turn?.event_progress?.eventInstanceId||'').trim().toLowerCase();
   const dueAtBoundary=new Set(scheduleBoundary==null?[]:scheduledIdsDueByTurnEnd(incoming?.saveState||{},scheduleBoundary).map(value=>String(value).trim().toLowerCase()));
@@ -491,11 +490,12 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   const crossedScheduledBoundary=Boolean(scheduleBoundary!=null&&scheduleBoundary<=profileMax&&current>scheduleBoundary);
   const surfacedScheduledBoundary=Boolean(scheduleBoundary!=null&&scheduleBoundary<=profileMax&&(structuredBoundary||visibleBoundary));
   const reachedScheduledBoundary=surfacedScheduledBoundary||crossedScheduledBoundary;
-  const reachedBoundaries=[reachedScheduledBoundary?scheduleBoundary:null,reachedConsequenceBoundary?consequenceBoundary:null].filter(value=>value!=null&&Number.isFinite(Number(value))).map(Number),reachedBoundary=reachedBoundaries.length?Math.min(...reachedBoundaries):null;
-  const appliedScheduleBoundary=reachedScheduledBoundary&&scheduleBoundary===reachedBoundary,appliedConsequenceBoundary=manifestedConsequenceBoundary&&consequenceBoundary===reachedBoundary;
   const previousEventId=String(incoming?.saveState?.sceneRuntime?.eventProgress?.eventInstanceId||incoming?.saveState?.sceneRuntime?.eventProgress?.event_instance_id||'').trim().toLowerCase();
   const structuredInterruption=Boolean(eventId.startsWith('director:')&&eventId!==previousEventId&&!structuredBoundary&&eventId!==String(consequenceLifecycle?.selected_id||'').trim().toLowerCase());
-  const completedBeforeChoice=!hasMeaningfulStop||timedActionCompletionEvidence(turn,intent);
+  const completionEvidence=timedActionCompletionEvidence(turn,intent),completedBeforeChoice=!hasMeaningfulStop||completionEvidence,earlierInterruptionBeforeConsequence=Boolean(consequenceWithinProfile&&current<consequenceBoundary&&(structuredInterruption||(hasMeaningfulStop&&!completedBeforeChoice)));
+  const reachedConsequenceBoundary=consequenceWithinProfile&&!earlierInterruptionBeforeConsequence,manifestedConsequenceBoundary=Boolean(reachedConsequenceBoundary&&consequenceLifecycle?.status==='resolved');
+  const reachedBoundaries=[reachedScheduledBoundary?scheduleBoundary:null,reachedConsequenceBoundary?consequenceBoundary:null].filter(value=>value!=null&&Number.isFinite(Number(value))).map(Number),reachedBoundary=reachedBoundaries.length?Math.min(...reachedBoundaries):null;
+  const appliedScheduleBoundary=reachedScheduledBoundary&&scheduleBoundary===reachedBoundary,appliedConsequenceBoundary=manifestedConsequenceBoundary&&consequenceBoundary===reachedBoundary;
   let applied=current;
   if(reachedBoundary!=null)applied=reachedBoundary;
   else if(current>profileMax)applied=profileMax;
@@ -507,7 +507,7 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
     else consequenceLifecycle.evidence='deferred-by-earlier-boundary';
     consequenceLifecycle.status='open';
   }
-  const preserveAttributedConsequence=Boolean(appliedConsequenceBoundary&&consequenceAttributionSafe),reconcileTimedTurn=reconcileTruncatedTurn||ambiguousAppliedConsequence;
+  const preserveAttributedConsequence=Boolean(appliedConsequenceBoundary&&consequenceAttributionSafe),turnLimitCompletion=Boolean(intent.turnLimitTruncated&&(applied>=1440||completionEvidence||(intent.kind==='travel'&&Boolean(turn?.state_delta?.new_location)))),reconcileTimedTurn=reconcileTruncatedTurn||ambiguousAppliedConsequence||turnLimitCompletion;
   let rewoundScheduleCompletion=false;
   if(reconcileTimedTurn)reconcileShortenedTimedTurn(turn,{preserveConsequenceId:preserveAttributedConsequence||consequenceLifecycle?.evidence==='ambiguous-npc-effect'?consequenceLifecycle?.selected_id:'',preserveNpcStateUpdates:preserveAttributedConsequence?consequenceLifecycle?.npc_state_updates:[],preserveNpcScheduleUpdates:preserveAttributedConsequence?consequenceLifecycle?.npc_schedule_updates:[],preserveDelta:preserveAttributedConsequence?consequenceLifecycle?.preserved_delta:{}});
   else if(appliedScheduleBoundary)rewoundScheduleCompletion=reconcileReachedScheduleStart(turn,boundaryRows);
