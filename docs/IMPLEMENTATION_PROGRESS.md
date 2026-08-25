@@ -1,18 +1,19 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Narrative Engine continuation — Event Director V3 bounded public world-result surfacing and protected-path validation.
+Narrative Engine continuation — Adaptive Time Scale V2 action-sensitive elapsed time and protected-path validation.
 
 ## Current GitHub State
 - Repo: `hoho074566-cpu/lumencia-ac`
-- Main: `4bbe3fb801152b3cfd66680f8dd0bb3a4a609f2f` (PR #52 merge).
-- Working branch: `codex/event-director-v3-result-surfacing`, based directly on that verified merge.
-- PR #53 is open from this branch; code/test checkpoint `5845cda6b7a5aaa09fc56b2cb8a4f609cf5a2f2d` is unchanged, and accepted code/docs head `58dbc017eac7dabe29bd1b612f1372e1a3e09351` is followed only by this closure checkpoint.
-- PR #52 is **merged** from final reviewed/accepted head `10de71aea55a4056e353689b1f58db68bb43dcb9` as `4bbe3fb801152b3cfd66680f8dd0bb3a4a609f2f`.
-- PR #52 merge and reviewed-head trees both equal `3473b4995ad922b8d432fb8a6d8c70ea921dcb12`. Production `/api/health` is healthy on app `1.5.6` / adapter `0.8.4` with Living World V1 advertised, and merged-main clean-LF full regression passes.
-- Event Director V3 focused/affected suites and the authoritative clean-LF full regression pass at `5845cda...`. A substantive second review tightened future-clock, title/NPC safety, visible-only evidence, negated completion, minimum-budget guards, and stale-backlog behavior without widening scope.
-- The candidate consumes only the latest deterministic public Living World completion fact and delivers it as the existing single Director beat. It never creates an event occurrence or invents an outcome.
-- Consequence, direct-question/focus, combat, player-stop, active-event, reachable-schedule, present-NPC-goal, background-disabled, AUTO/META/CONTINUE guards remain protected. One canonical model call and stable routing budgets are unchanged.
+- Main: `1018d8c27c451dc122982fb14bf7d3e3902c70ca` (PR #53 merge).
+- Working branch: `codex/adaptive-time-scale-v2`, based directly on that verified merge.
+- Adaptive Time Scale V2 code/test checkpoint: `ed5d2b08d46b2ddd9e2ab9289d25f5b65136b455`.
+- PR #53 is **merged** from final reviewed/accepted head `eae16c036c51767f2059b86cd5f0ef077764a3c8`; merge and reviewed-head trees both equal `e2a4b99a89640a553dfbf0fa7f1748a201c039f3`.
+- PR #53 post-merge main Vercel, production `/api/health` on app `1.5.6` / adapter `0.8.5`, and merged-main clean-LF full regression pass.
+- Adaptive Time Scale V2 extends the existing deterministic Scene Momentum intent layer with dialogue `2–10`, meal `20–45`, training `30–120`, class `45–120`, sleep `240–480`, within-building travel `2–8`, campus travel `5–20`, and regional travel `15–60` minute guides.
+- Explicit activity durations remain exact unless an earlier required schedule or due consequence interrupts them. Historical/future references are excluded without hiding a separate real duration in the same action.
+- Direct question/focus and important-player-choice stops remain same-moment. META/AUTO/CONTINUE stay outside the deterministic time floor. One canonical model call and stable routing budgets are unchanged.
+- Focused/affected suites and the authoritative clean-LF full repository regression pass at `ed5d2b0...`; the ordinary Windows worktree reproduces only the known CRLF workflow-fixture artifact.
 - Exact head `7b63bab...` passed Safety #379, Vercel Ready, and fresh P0/P1=0. Its Exact Preview passed basic deliberate physical training (`D 0→1`) and mere-use rejection (`1→1`), but failed failure-plus-visible-correction. Correction 1/5 `57085b0...` recognized the exact applied-instruction wording. Intermediate exact head `3a48337...` passed Repository checks and Vercel, but a new natural variant split the instructor correction and subjectless successful repetition across scene rows; telemetry again reported `evidence_tier:0` / `rejected_stat_count:1`. Correction 2/5 `451679f...` safely links only adjacent instructor technical guidance to a successful PC repetition, handles the leading `이번에는` discourse marker, expands bounded physical relevance, and preserves explicit named-NPC rejection. Focused and authoritative clean-LF full regression pass. The new exact-head hosted cycle and affected Preview rerun remain pending; protection tokens must not be extracted and the same browser-setting work must not be requested again.
 - Exact code/docs head `d980b33...` deployed successfully to Vercel. A fresh `이번에는` deliberate-training Preview turn visibly produced instructor guidance and `마지막 반복에서는 지시한 각도와 순서를 적용해 발이 엉키지 않은 채 진입을 끝냈다`, but `신체` remained `D [1/100]`; exported telemetry again showed `evidence_tier:0` / `rejected_stat_count:1`. The same evidence-classification type has now repeatedly recurred under different natural completion phrases. Automatic correction is stopped under user condition 1; do not add another wording-specific synonym patch without explicit user direction.
 - The user explicitly resumed. Correction 3/5 `717e85c...` replaces completion-word enumeration with a bounded structural predicate: player-owned deliberate action, visible instructor technical guidance, adjacent final repetition, applied guidance or technical adjustment, and identified cause are all required. Final-attempt lead stripping fixes the temporal-phrase/NPC-subject false positive while existing third-party checks remain authoritative. The exact failed live response now passes; missing-guidance and two named-NPC forms remain rejected. Focused and authoritative clean-LF full regression pass; new exact-head hosted and Preview cycles remain.
@@ -58,16 +59,18 @@ Narrative Engine continuation — Event Director V3 bounded public world-result 
 - Production `/api/health`: `ok=true`, API configured, app `1.5.6`, adapter `/api/chat-router`, canonical core `/api/chat`, prompt cache retention `24h`.
 - Post-merge full `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
-## Event Director V3 — Current Candidate in PR #53
-- `lib/world-result-surfacing.js` parses only exact, valid, known-NPC Living World `종료 확정` rows and selects the newest public fact. Future/invalid clocks, unsafe or extra NPC keys, directive-shaped titles, starts, generic background rows, and unknown NPCs are rejected.
-- Selection occurs after due Event Consequence and eligible present-NPC Goal Tick priority, but before a new weighted random event. Direct focus/question, combat, player-owned stop, active event, reachable schedule, scheduled fixed flow, background-disabled, AUTO, META, and CONTINUE paths cannot surface a result.
-- Scene Orchestration treats `WORLD_RESULT_SURFACE` as the existing one `director-event` beat. The player action remains first, only one visible channel is allowed, and no new occurrence/event lifecycle is created.
-- The routed minimum carries the exact `PUBLIC_FACT` and guards against multiple traces, outcome/reward/injury/secret/relationship invention, internal `[OFFSCREEN]` log exposure, teleportation, premature PC knowledge, and PC control even at adaptive scale `.76`.
-- `sceneRuntime.world_result_surface` records a bounded visible-evidence checkpoint. A selected NPC merely appearing, a future choice, internal summary, unrelated return, title-only mention, or negated completion cannot close it. One ignored attempt may retry once; after manifestation or two attempts the newest row stops, and older rows do not become a stale backlog.
-- Adapter/health candidate `0.8.5` adds `event_director_v3` and `world_result_surfacing_v1` telemetry while retaining the compatibility `event_director_v2` object and its V2.1 weighted core version.
-- No new save root/schema/migration, endpoint, serverless function, `app.js`, canonical `api/chat.js`, canon access, prompt-cache behavior, routing profile, or model call was added.
-- `scripts/tests/world-result-surfacing-v1.test.mjs` plus affected Router, authority-tail, Event Consequence, Goal Tick, Scene Orchestration, Scene Momentum, Living World, and core-invariant suites pass. The exact code checkpoint passes the full repository check in a clean-LF worktree.
-- Accepted code/docs head `58dbc017eac7dabe29bd1b612f1372e1a3e09351` passed Safety/Repository checks, Vercel Ready, Merge Readiness, fresh Codex P0/P1=0, and the clean-LF full regression. Exact Preview then proved one-time plausible surfacing, no invented result or new active event, no repeat, direct-question priority, and combat/background-off/AUTO/META/CONTINUE suppression. Deterministic tests retain active-event/reachable-schedule/present-Goal-Tick priority coverage.
+## Adaptive Time Scale V2 — Current Candidate
+- `lib/scene-momentum.js` now returns a named time profile for every intent while preserving `SCENE_MOMENTUM_VERSION='1.0'`; the separate feature marker is `ADAPTIVE_TIME_SCALE_VERSION='2.0'`.
+- Dialogue, meal, training, class attendance, long sleep, and location-aware travel receive bounded natural elapsed-time guides. Short rest, observation, exploration, wait, exterior exit, committed consequence, and generic fallbacks retain their proven semantics.
+- Explicit duration parsing masks qualified historical/future references, then uses any separate unqualified duration. Regional destination matching is token-bounded so names such as `계산대` do not become long-distance travel merely because they contain `산`.
+- Required schedule and due consequence boundaries remain authoritative. Direct questions/deliberation keep zero deterministic time; META/AUTO/CONTINUE remain no-floor/frozen paths.
+- Adapter/health candidate `0.8.6` adds `adaptive_time_scale_v2`, selected profile, and version telemetry without a save/schema/root change.
+- No new endpoint, serverless function, canonical core edit, canon access, prompt-cache behavior, routing profile/budget, or model call was added.
+- Dedicated and affected Scene Momentum, time-floor, Scene Exit/Purpose/Hook, Orchestration, authority-tail, core invariant, NPC Motivation, and Event Director tests pass. Exact code checkpoint `ed5d2b0...` passes the full repository check in a clean-LF worktree.
+
+## Event Director V3 — Merged in PR #53
+- Final reviewed/accepted head `eae16c036c51767f2059b86cd5f0ef077764a3c8` merged as `1018d8c27c451dc122982fb14bf7d3e3902c70ca`; reviewed and merged trees are identical.
+- Exact-head Safety/Vercel/Merge Readiness/fresh P0/P1=0 and targeted one-time public-result Preview acceptance passed. Production health and merged-main clean-LF regression are green.
 
 ## Living World V1 — Merged in PR #52
 - Code checkpoint `4d82b6f08942e9cf6408fc6ff01c675cc3090bb7` extends the existing Bounded Off-screen Progression module from schedule-start evidence to a two-phase public schedule lifecycle.
@@ -452,10 +455,10 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only.
 
 ## NEXT ACTION
-1. Commit and push this docs-only acceptance closure without changing the accepted runtime tree from `58dbc017...` or base/main `4bbe3fb...`.
-2. Run the authoritative clean-LF full regression on the new exact docs head, then require GitHub Safety Gate, Vercel Ready, Merge Readiness/current mergeability, and a fresh exact-head Codex review with P0/P1=0.
-3. When those final docs-head gates are green, report PR #53 ready for human merge. Codex must not merge this protected-path PR.
-4. After the user merges, verify reviewed/merge tree equality, merged-main regression/Vercel/health, then continue to the next separate roadmap phase.
+1. Commit/push the Adaptive Time Scale V2 docs checkpoint and open one focused protected-path PR against current main `1018d8c...`.
+2. Require exact-head GitHub Safety Gate, Vercel Ready, Merge Readiness/current mergeability, and a fresh exact-head Codex review with P0/P1=0; rerun the clean-LF full regression if the head changes.
+3. Run focused Exact Preview acceptance for dialogue/meal/training/class/sleep/travel ranges, explicit duration, earlier required-schedule interruption, direct-question same-moment behavior, and META/AUTO/CONTINUE freeze.
+4. When deterministic, hosted, review, and Preview gates all pass, report the protected-path PR ready for human merge. Codex must not merge it.
 
 ## Stop Record
 - Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.
@@ -500,4 +503,5 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed: PR #50 final reviewed head `1eb316b...` merged as `88ce7b4...`; reviewed and merged trees are identical, production health advertises Awakening/Talent V1, and merged-main clean-LF full regression passes.
 - Completed: PR #51 final reviewed/accepted head `68c9e84...` merged as `2ce8d0b...`; trees are identical, production health is green, and merged-main clean-LF full regression passes.
 - Completed: Living World V1 final reviewed/accepted head `10de71a...` merged in PR #52 as `4bbe3fb...`; reviewed and merged trees are identical, production health is green, and merged-main clean-LF regression passes.
-- Current candidate: Event Director V3 in open PR #53 on `codex/event-director-v3-result-surfacing`; code checkpoint `5845cda...` and accepted code/docs head `58dbc017...` pass focused/full regression, hosted authority, fresh P0/P1=0 review, and targeted Exact Preview acceptance. Only this docs-only closure head's clean-LF regression and hosted/review cycle remain before human merge.
+- Completed: Event Director V3 final reviewed/accepted head `eae16c0...` merged in PR #53 as `1018d8c...`; reviewed and merged trees are identical, production health is green, and merged-main clean-LF regression passes.
+- Current candidate: Adaptive Time Scale V2 on `codex/adaptive-time-scale-v2`; exact code checkpoint `ed5d2b0...` passes focused/affected and authoritative clean-LF full regression. Docs/push/PR, hosted authority, fresh P0/P1 review, and focused Exact Preview acceptance remain.
