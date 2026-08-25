@@ -112,7 +112,34 @@ applySceneMomentumTimeFloor({action:'쉰다.',saveState:boundarySave},turn,'game
 assert.equal(turn.state_delta.advance_minutes,15,'post-processing must not reduce a positive model-produced advance');
 turn={state_delta:{advance_minutes:400},choices:[]};
 applySceneMomentumTimeFloor({action:'6시간 쉰다.',saveState:fullScheduleSave},turn,'game');
-assert.equal(turn.state_delta.advance_minutes,400,'schedule bounding must not reduce a positive model-produced advance');
+assert.equal(turn.state_delta.advance_minutes,360,'an explicit duration remains exact when the model overshoots without surfacing the earlier schedule');
+
+turn={state_delta:{advance_minutes:60},choices:['일어난다','일정을 확인한다','더 쉰다']};
+applySceneMomentumTimeFloor({action:'잠을 잔다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,240,'post-sleep choices must not let a completed sleep action undercut its profile minimum');
+turn={state_delta:{advance_minutes:960},choices:[]};
+applySceneMomentumTimeFloor({action:'잠을 잔다.',saveState:{world:{date:'1285-03-01',time:'15:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,480,'a completed sleep action must not jump to a convenient next morning beyond its profile maximum');
+
+const liveBoundarySave={
+  pc:knightPc,
+  world:{date:'1285-03-01',time:'11:05',location:'기사과 훈련장'},
+  scheduleContext:{due:[],upcoming:[{id:'knight-orientation',title:'기사과 1학년 필수 오리엔테이션',date:'1285-03-01',time:'12:00',kind:'academic'}]},
+  scheduledEvents:[{id:'knight-orientation',title:'기사과 1학년 필수 오리엔테이션',date:'1285-03-01',time:'12:00',kind:'academic',status:'scheduled'}],
+};
+turn={scene_title:'정오를 알리는 종',scene:[{kind:'narration',text:'세 시간을 채우기 전에 기사과 필수 오리엔테이션을 알리는 종이 울렸다.'}],state_delta:{advance_minutes:180},choices:['참석한다','남는다','다른 곳으로 간다'],event_progress:null};
+applySceneMomentumTimeFloor({action:'정확히 세 시간 동안 검술 훈련을 계속한다.',saveState:liveBoundarySave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,55,'a surfaced required schedule boundary must reduce an overshooting positive model advance to the exact boundary');
+
+turn={state_delta:{advance_minutes:10},choices:['대응한다','피한다','지켜본다'],event_progress:{event_instance_id:'director:interruption'}};
+applySceneMomentumTimeFloor({action:'잠을 잔다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,10,'a structured unrelated interruption must preserve its model-produced early stop');
+turn={state_delta:{advance_minutes:60},choices:['일어난다','일정을 확인한다','더 쉰다'],event_progress:{event_instance_id:'active:rest'}};
+applySceneMomentumTimeFloor({action:'잠을 잔다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]},sceneRuntime:{eventProgress:{eventInstanceId:'active:rest'}}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,240,'continuing the same structured scene is not a new interruption and must retain the sleep floor');
+turn={state_delta:{advance_minutes:60},choices:['일어난다','일정을 확인한다','더 쉰다'],event_progress:{event_instance_id:'started:rest'}};
+applySceneMomentumTimeFloor({action:'잠을 잔다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,240,'a normal newly structured scene must not be mistaken for a Director interruption');
 
 turn={state_delta:{advance_minutes:0},choices:[]};
 applySceneMomentumTimeFloor({action:'쉰다.',saveState:{world:{date:'1285-03-01',time:'10:00'},scheduleContext:{due:[{id:'class'}],upcoming:[]}}},turn,'game');

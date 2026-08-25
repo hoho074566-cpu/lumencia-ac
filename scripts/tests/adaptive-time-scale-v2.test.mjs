@@ -52,6 +52,10 @@ const sleep = classifySceneIntent('잠을 잔다.', { location:'개인실' });
 assert.equal(sleep.kind, 'downtime');
 assert.equal(sleep.timeProfile, 'sleep');
 assert.deepEqual(sleep.suggestedAdvanceMinutes, [240, 480]);
+assert.equal(classifySceneIntent('근처 여관에 방을 잡고 충분히 잠을 잔다.', { location:'중앙광장' }).timeProfile, 'sleep', 'a compressed travel-and-sleep action must retain its terminal sleep intent');
+assert.equal(classifySceneIntent('아르테미스가 잠을 잔다?', { location:'개인실' }).kind, 'decision-sensitive', 'a question about sleep must not execute the described action');
+assert.notEqual(classifySceneIntent('잠을 자지 않는다.', { location:'개인실' }).timeProfile, 'sleep', 'negated sleep must not become committed downtime');
+assert.match(buildSceneMomentumDirective({ action:'잠을 잔다.', saveState:{ world:{ date:'1285-03-02', time:'07:20', location:'개인실' } } }), /완료 시간과 advance_minutes를 TIME_GUIDE 240-480 안에 두며/, 'completed sleep must receive explicit hard profile bounds');
 assert.deepEqual(classifySceneIntent('한 시간 잠을 잔다.').suggestedAdvanceMinutes, [60, 60], 'explicit sleep duration must remain exact');
 assert.equal(classifySceneIntent('잠깐 눈을 붙인다.').timeProfile, 'rest', 'a short-rest cue must not become a four-hour sleep floor');
 

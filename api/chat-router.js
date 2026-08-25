@@ -337,6 +337,7 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   const hasMeaningfulStop=array(turn?.choices).length>0;
   const current=Math.max(0,Number(turn.state_delta.advance_minutes||0));
   const requestedFloor=Math.min(1440,Math.max(0,Number(intent.minAdvanceMinutes||0)));
+  const profileMax=Math.min(1440,Math.max(requestedFloor,Number(array(intent.suggestedAdvanceMinutes)[1]||0)));
   const scheduleBoundary=nextScheduleBoundaryMinutes(incoming?.saveState||{},{futureOnly:true});
   const consequenceBoundary=consequenceLifecycle?.selected_id?minutesUntilEventConsequence(incoming?.saveState||{},consequenceLifecycle.selected_id):null;
   const boundaries=[scheduleBoundary,consequenceBoundary].filter(value=>value!=null&&Number.isFinite(Number(value))).map(Number);
@@ -349,9 +350,10 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   const boundaryRows=scheduleRowsAtBoundary(incoming?.saveState||{},scheduleBoundary),boundaryIds=new Set(boundaryRows.map(row=>String(row?.id||'').trim().toLowerCase()).filter(Boolean)),structuredBoundary=Boolean(eventId&&boundaryIds.has(eventId)&&dueAtBoundary.has(eventId)&&!dueBeforeBoundary.has(eventId)),visibleBoundary=Boolean(!eventId&&boundaryRows.some(row=>scheduleRowMentioned(turn,row)));
   const reachedScheduledBoundary=Boolean(scheduleBoundary!=null&&scheduleBoundary===boundary&&boundary<=allowedMax&&(structuredBoundary||visibleBoundary));
   const reachedConsequenceBoundary=Boolean(consequenceBoundary!=null&&consequenceBoundary===boundary&&boundary<=allowedMax&&consequenceLifecycle?.status==='resolved');
-  if(!hasMeaningfulStop||reachedScheduledBoundary||reachedConsequenceBoundary){
-    turn.state_delta.advance_minutes=Math.max(current,reachedScheduledBoundary||reachedConsequenceBoundary?boundary:boundedFloor);
-  }
+  const previousEventId=String(incoming?.saveState?.sceneRuntime?.eventProgress?.eventInstanceId||incoming?.saveState?.sceneRuntime?.eventProgress?.event_instance_id||'').trim().toLowerCase();
+  const structuredInterruption=Boolean(eventId.startsWith('director:')&&eventId!==previousEventId&&!structuredBoundary&&eventId!==String(consequenceLifecycle?.selected_id||'').trim().toLowerCase());
+  if(reachedScheduledBoundary||reachedConsequenceBoundary)turn.state_delta.advance_minutes=boundary;
+  else if(!structuredInterruption&&(!hasMeaningfulStop||current>0))turn.state_delta.advance_minutes=Math.min(profileMax,Math.max(current,boundedFloor));
   return intent;
 }
 function uniqText(rows,limit=4){return [...new Set(array(rows).map(x=>clampText(x,140).trim()).filter(Boolean))].slice(-limit);}
