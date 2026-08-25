@@ -1,18 +1,16 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Narrative Engine continuation — Skill Learning V1 implementation and protected-path validation.
+Narrative Engine continuation — Multi-System Scene Orchestration V1 implementation and protected-path validation.
 
 ## Current GitHub State
 - Repo: `hoho074566-cpu/lumencia-ac`
-- Main: `54327ea2a5c559a18681f4a4bc8795cc9c1c57a8` (PR #47 merge)
-- Working branch: `codex/skill-learning-v1`
-- Skill Learning V1 corrected code head: `c7f97e85c9c8df765728fdbca2f099de844f2c3d`. Protected adapter/context/runtime paths require human merge after exact-head gates and acceptance.
-- PR #48 remains **open / not merged**. Its prior head `75d7f7c...` passed Repository checks and Vercel but failed Merge Readiness with one exact-head Codex P1: model-authored `basis` / `reason` could satisfy their own learning-evidence gate. Exact Preview independently exposed the legacy `skill_experience` path promoting `반월 보법 22/100` directly to F in one turn instead of the permitted maximum 37/100.
-- User-authorized correction `1922f3c...` now requires positive evidence from the player action or combat plus the visible scene, strips negated learning language, canonicalizes `skill_experience` only to already-existing skills, rejects candidate/new-skill experience, and clears existing-skill experience during AUTO. The exact 22→37 regression and self-authored/negated evidence cases are permanent tests. The authoritative clean-LF full PR check and `git diff --check` pass on this code head.
-- Published checkpoint `83377b8...` passed Repository checks, Vercel, and complete Exact Preview accumulation/unlock acceptance. Its fresh exact-head review found P1 ordinary-combat false evidence and P2 maximum-width mandatory-context overflow. Local correction `add85ff...` requires learning-specific visible-scene evidence, rejects training-ground/map noun ambiguity, and retains candidate identity/progress while removing basis/timestamp/history duplication from the fixed minimum. Maximum 80/48-character identity pressure remains within 6,840 characters, and the clean-LF full PR check passes.
-- Published docs checkpoint `a0d76f5...` passed Repository Safety, Vercel Ready, and affected Exact Preview acceptance, but its fresh exact-head Codex review found P1 actor attribution: a PC who only watched or refused an NPC's training could receive progress from that NPC's visible practice. Correction `108713f...` requires a player-owned active learning/combat action and player-attributed scene evidence. NPC-only training/combat, observation/refusal, a PC observer with an NPC performer, and NPC `직접` emphasis are permanent zero-progress regressions; observation followed by the PC's direct practice remains valid. Targeted syntax/tests, the adversarial phrase matrix, `git diff --check`, and the clean-LF full PR check pass.
-- Published exact head `2d9ca9d...` passed Safety #356, Vercel Ready, and affected Preview acceptance (`-` observation/refusal, direct `6/100`, frozen CONTINUE/META). Fresh review found P1 instructor-target attribution plus two nonblocking P2s. Correction `c7f97e8...` rejects instructor self-correction and explicit NPC receipt, retains PC-received correction and professor completion assessment, and passes focused boundaries plus the clean-LF full check. The P2s remain outside this focused P1 repair.
+- Main: `8329646cbb92934555afd15f4741b1fc6edb7d1d` (PR #48 merge).
+- Working branch: `codex/multi-system-scene-v1`, based directly on that verified merge.
+- PR #49 is open from `codex/multi-system-scene-v1`. Its initial exact head was `1c3bde86336c7d2d66dd591656064f8b1b66b21b`; Safety #362 passed and Vercel was Ready, while the requested fresh Codex review returned an infrastructure `Unknown error` rather than an authoritative finding.
+- Multi-System Scene V1 corrected code checkpoint: `7624989`. It adds one bounded cross-system arbitration plan, reserves it after routing, repeats its compact result after lower-priority authority blocks, and stores only bounded post-response evidence under the existing `sceneRuntime` root.
+- PR #48: **merged** from exact reviewed head `a4772b80cc9e135433fb677460ca3fb5e9cde85e`. Safety #359/#360/#361, Vercel, fresh exact-head Codex P0/P1=0, instructor attribution Preview acceptance, and CONTINUE/META freeze all passed.
+- PR #48 merge `8329646...` and reviewed head share tree `5c8f8fa061742d6c851d09fb03ccf02e4795a559`; no unexpected merge delta exists. Main Vercel and production `/api/health` are green, and the merged tree passes the authoritative clean-LF full check.
 - PR #47: **merged** from exact final head `866c991fb52a77079a191a5d7452e7fecf035ce9` as `54327ea2a5c559a18681f4a4bc8795cc9c1c57a8`. Merge/reviewed trees both equal `143b56d473825969763e9440aca0c4c3100ab3b5`; production health is green on app `1.5.6` / adapter `0.8.3`.
 - PR #46: **merged** from exact reviewed head `2843e5bc9ee8169acb7e82b5db9b392beea93539` as `6204843e1cf6f45a9386c13b942c100cd6c7377b`. Merge and reviewed-head trees both equal `4c045c27ccb30f6593370ae2b8e811bebcb39691`; production health is green on app `1.5.6` / adapter `0.8.3` with Faction Social V1 advertised.
 - PR #45: **merged** from exact reviewed head `583b7622500b9916dd31697d0d6e845f81790ed6` as `71074ccc7a5fd00f193a6aec8b7a1ff82eae1aab`. Merge and reviewed-head trees both equal `690e6a88c015bd28e67bba0bf03bfdba6e73a6c8`; production `/api/health` is healthy on app `1.5.6` / adapter `0.8.3`.
@@ -45,7 +43,19 @@ Narrative Engine continuation — Skill Learning V1 implementation and protected
 - Production `/api/health`: `ok=true`, API configured, app `1.5.6`, adapter `/api/chat-router`, canonical core `/api/chat`, prompt cache retention `24h`.
 - Post-merge full `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
-## Skill Learning V1 — Current Candidate
+## Multi-System Scene Orchestration V1 — Current Candidate
+- Current systems already provide Scene Momentum, Purpose, Exit, Turn Hook, Event Consequence, Goal Tick, Off-screen Progression, Novelty, relationships, faction effects, and skill learning, but they previously lacked one final cross-system driver contract.
+- Each turn now declares exactly one primary driver and at most one physically/causally connected secondary response. Current player action/question remains primary; active events, reachable schedules, due consequences, present-NPC goals, and Director events are ordered without allowing a third independent beat.
+- Direct questions use `answer-only`; AUTO preserves an unanswered player boundary; CONTINUE routes a frozen plan. A reachable hard schedule defers a competing NPC goal, an active event suppresses an unrelated random cameo, and a due consequence may interrupt while the unrelated event remains deferred.
+- Relationship, faction, skill-learning, off-screen, and novelty systems are explicitly effect-only: they may record evidence-backed consequences but cannot initiate separate narrative beats.
+- The compact plan is reserved in routed context and repeated in the final USER ACTION frame. It remains within the `.76` 6,840-character routine ceiling, preserves one canonical `coreHandler` call, and adds no save root, migration, structured schema, endpoint, `api/chat.js`, `app.js`, or second model call.
+- Post-response telemetry records bounded observed/effect axes inside `sceneRuntime.orchestration`; it does not duplicate canon, causal history, or authoritative faction/skill values.
+- Permanent coverage is `scripts/tests/scene-orchestration-v1.test.mjs`, plus the affected Router, Momentum, Purpose, Exit, Hook, Consequence, Goal, Novelty, Off-screen, relationship, faction, skill, and core suites. Correction `6d2d56a` makes `action-until-interruption` stop at the explicit trigger boundary rather than implying full primary completion.
+- Initial Exact Preview acceptance passed the direct-question answer-only case. The active-event case then failed because the orchestration plan suppressed a Director event but the lower-priority selected candidate remained in routed context, allowing the model to reinterpret Mirabelle as an unrelated challenger.
+- Automatic correction cycle **1/5** at `2592d8f` removes suppressed Director selection/consequence keys and legacy detail, substitutes an explicit suppression directive, and carries compact `BLOCK=director-event` authority in the final action frame. A permanent regression uses a real competing `NPC_EVENT` candidate and proves it is absent from selected NPC context and prompt detail. Focused affected suites, `git diff --check`, and the clean-LF full check pass on the corrected code head; the clean-LF check must be rerun once more on the final docs head.
+- Substantive second review found one historical schedule invariant regression before push: due/overdue context could become a 0-minute orchestration interruption and freeze a newly committed action. Closure `7624989` selects strictly future boundaries only, proves overdue-only freedom plus overdue-and-later-future selection, and passes focused Router/Momentum/orchestration checks and the authoritative clean-LF full check.
+
+## Skill Learning V1 — Merged in PR #48
 - Completes the already-declared `state_delta.skill_learning` / `pc.skillCandidates` path. No new save root, migration, API entrypoint, canonical `app.js` edit, or second model call is introduced.
 - A normal player GAME turn accepts at most two +1..15 rows. Independent skill name, concrete `basis`, causal `reason`, player-owned active learning/combat intent, and player-attributed visible training/instruction/correction/practice/combat-learning evidence are mandatory. Model-authored `basis` / `reason`, negated/refused learning, observation-only, and NPC-only actions cannot authenticate PC progress. Existing skills and spacing aliases, generic names, basis-less claims, ordinary movement, duplicates, and excess rows are rejected.
 - Up to eight candidates and six history rows per candidate persist under `pc.skillCandidates`. Alias cleanup preserves the newest authoritative entry. Progress remains 0..99 until a real accepted update reaches 100.
@@ -55,7 +65,8 @@ Narrative Engine continuation — Skill Learning V1 implementation and protected
 - Mandatory `.76` context retains at most 24 compact existing skill identities/grades and eight active candidate identities/progress values. Candidate basis, timestamp, and history remain in routed detail. A true maximum-width 80/48-character fixture remains within the 6,840-character routine input ceiling.
 - `scripts/tests/skill-learning-v1.test.mjs` permanently covers schema/parser wiring, independent/negated evidence, ordinary-combat and ambiguous setting-noun rejection, NPC observation/refusal/sole-performer rejection, instructor self-correction/NPC-receipt rejection, PC-receipt/professor-assessment acceptance, positive combat insight, bounds, alias normalization, legacy-experience isolation, exact 22→37 live regression, persistence, unlock, UI, AUTO/META/CONTINUE freeze, State Delta ordering, maximum-width minimum context, health, and the one-call invariant.
 - Code commits: `76ffa46` initial implementation; `0295ccc` newest-alias preservation; `85fef80` initial mandatory-context bound; `1922f3c` hosted/live blocker correction; `add85ff` ordinary-combat evidence and maximum-width context closure; `108713f` player action/scene attribution closure; `c7f97e8` instructor-target closure.
-- User-authorized correction policy: up to five automatic P0/P1 cycles; current count **1/5**. Each cycle follows exact head → cause → minimal repair → focused/full tests → new head → Safety/Vercel → fresh review. Continue automatically only for a new controllable P0/P1 type; stop for same-type recurrence, cross-core expansion, core-invariant impact, five exhausted cycles, or conflicting unsafe guidance.
+- User-authorized correction policy remains in force. PR #48 completed after **1/5** correction cycles; the current Multi-System Scene PR is now at **1/5**. Each cycle follows exact head → cause → minimal repair → focused/full tests → new head → Safety/Vercel → fresh review.
+- Final exact head `a4772b8...` passed every hosted gate and affected Preview case; PR #48 merged as `8329646...` with an identical reviewed tree.
 
 ## Faction / Social Consequence V1 — Merged; P2 Hardening Completed
 - Adds bounded `state_delta.faction_reputation_changes` rows for the six canon-backed public academy organizations: student council, Blue Knights, White Rose, and the knight/magic/theology departments.
@@ -399,15 +410,15 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - canon, NPC personality, established relationships;
 - `app.js` base `APP_VERSION='1.4.8'` is intentional;
 - characters-v2 32-character / 13-state contract;
-- protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
+- protected core/runtime PRs remain exact-head reviewed and human-merge only.
 
 ## NEXT ACTION
-1. Commit this docs checkpoint, rerun the authoritative clean-LF full check on the exact docs head, and push PR #48.
-2. Require fresh exact-head Safety/Vercel/Codex review; the `2d9ca9d...` instructor-target P1 is not authoritative for the new head.
-3. Revalidate current main/merge-base/no conflict, one-call architecture, `.76` maximal candidate context, and no endpoint/save migration/canonical `app.js` change.
-4. On the new Exact Preview, verify instructor self-correction/NPC receipt produces zero PC learning, then verify received PC correction creates bounded progress and CONTINUE/META freeze.
-5. If fresh review finds a new controllable P0/P1 type, continue automatically with cycle 2/5; stop only under the five user-defined conditions.
-6. If every gate passes, report the protected-path Skill Learning V1 PR ready for human merge. Codex must not merge it.
+1. Commit this correction-1 docs checkpoint and rerun the authoritative clean-LF full check on that new exact head.
+2. Push the existing PR #49 branch; revalidate current main, merge-base, no conflict, one canonical core call, routing budgets, and the absence of endpoint/save migration/canonical-core changes.
+3. Require new-exact-head GitHub Safety, Vercel Ready, and a fresh Codex review. The earlier review infrastructure error is not a PASS. This protected-path PR remains human-merge only.
+4. On the updated Exact Preview, rerun the previously failing active-event/unrelated-cameo case first. If it passes, rerun direct-question answer-only, reachable-schedule versus NPC-goal priority, ordinary exploration plus at most one causally connected NPC response, and CONTINUE/AUTO awaiting-player freeze.
+5. If fresh review finds a new controllable P0/P1 type, apply the user-authorized correction protocol for up to five cycles. Stop only for same-type recurrence, cross-core expansion, core-invariant impact, five exhausted cycles, or conflicting unsafe guidance.
+6. If every hosted gate, fresh review, and affected Preview case passes, report the Multi-System Scene protected-path PR ready for the user's human merge. Codex must not merge it.
 
 ## Stop Record
 - Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.
@@ -447,4 +458,5 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed: PR #45 exact reviewed head `583b762...` merged as `71074cc...`; merge-tree equality and production health pass.
 - Completed: PR #46 exact reviewed head `2843e5b...` merged as `6204843...`; merge-tree equality and production health pass.
 - Completed: PR #47 final head `866c991...` merged as `54327ea...`; reviewed and merged trees are identical and production health is green.
-- Current candidate: PR #48 Skill Learning V1 on `codex/skill-learning-v1`; corrected code head `c7f97e8...` closes the `2d9ca9d...` instructor-target P1 after the earlier evidence/legacy-path, ordinary-combat, maximum-width context, and actor-attribution corrections. Clean-LF full checks pass. Final docs checkpoint/push, fresh exact-head hosted gates/review, and affected Exact Preview acceptance remain; current auto-correction count is 1/5.
+- Completed: PR #48 final reviewed head `a4772b8...` merged as `8329646...`; reviewed and merged trees are identical, main Vercel/production health are green, and merged-main clean-LF full regression passes.
+- Current candidate: Multi-System Scene Orchestration V1 in open PR #49 on `codex/multi-system-scene-v1`; corrected code head `7624989` establishes one primary driver plus at most one causal secondary response while keeping relationship/faction/skill/off-screen/novelty systems effect-only. Initial direct-question Preview acceptance passed; the active-event Mirabelle cameo P1 triggered correction cycle 1/5 and now has a permanent real-candidate regression. The second review also restored strictly future-only schedule interruptions so due/overdue context cannot freeze committed actions. Focused suites, `git diff --check`, and the clean-LF full check pass on the code head; final docs-head full check, push, fresh new-exact-head hosted gates/review, and affected Preview reruns remain.
