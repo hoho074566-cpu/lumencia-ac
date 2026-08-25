@@ -8,6 +8,7 @@ import {
   deriveSceneOrchestrationPlan,
   deriveSceneOrchestrationState,
   sceneOrchestrationActionFrame,
+  sceneOrchestrationSuppressesDirectorResult,
 } from '../../lib/scene-orchestration.js';
 
 const adapter = readFileSync('api/chat-router.js', 'utf8');
@@ -37,6 +38,7 @@ const activeEvent = deriveSceneOrchestrationPlan({
 assert.equal(activeEvent.primary, 'user-action', 'the current player action must still resolve first inside an active event');
 assert.equal(activeEvent.secondary, 'active-event', 'the active event must own the single secondary world beat');
 assert.ok(activeEvent.suppressed.includes('director-event'), 'an active event must suppress an unrelated random cameo');
+assert.equal(sceneOrchestrationSuppressesDirectorResult(activeEvent, { result: 'NPC_EVENT' }), true);
 
 const dueActiveEvent = deriveSceneOrchestrationPlan({
   mode: 'game',
@@ -109,6 +111,7 @@ assert.match(directive, /MAX_DRIVERS=2/);
 assert.match(directive, /EFFECT_ONLY=relationship\|faction\|skill-learning\|offscreen\|novelty/);
 assert.match(directive, /PC의 새 행동·대사·감정·생각·수락·거절·선택/);
 assert.match(sceneOrchestrationActionFrame(presentGoal), /TURN_PLAN=user-action>present-npc-goal/);
+assert.match(sceneOrchestrationActionFrame(activeEvent), /BLOCK=director-event; EFFECT_ONLY/);
 
 const observed = deriveSceneOrchestrationState({
   plan: presentGoal,
@@ -136,7 +139,7 @@ assert.equal((adapter.match(/coreHandler\(/g) || []).length, 1, 'Multi-System Sc
 
 const divider = '='.repeat(20);
 const instructions = `===== CHARACTER REGISTRY =====
-artemis=아르테미스
+artemis=아르테미스, mirabelle=미라벨
 ===== WORLD CANON =====
 ${divider}
 PUBLIC
@@ -180,6 +183,46 @@ assert.match(routed.params.input, /===== MULTI-SYSTEM SCENE ORCHESTRATION V1 ===
 assert.match(routed.params.input, /TURN_PLAN=user-action>present-npc-goal/);
 assert.equal(routed.telemetry.scene_orchestration.primary, 'user-action');
 assert.equal(routed.telemetry.scene_orchestration.secondary, 'present-npc-goal');
+
+const suppressedDirector = routeOpenAIParams(
+  { instructions, input: `===== TURN OPTIONS =====
+normal
+===== AUTHORITATIVE SAVE_STATE =====
+{}
+===== GM EVENT DIRECTOR (SERVER GUIDANCE) =====
+INTERVENTION: medium
+ROUTINE_STREAK=3 / EVENT_GAP=10 / CHOICE_GAP=3 / CROSS_DEPT_GAP=3
+- mirabelle(미라벨) score=999999: 연병장에 새 카메오로 등장
+===== SCHEDULE ENGINE (AUTHORITATIVE) =====
+없음` },
+  { incoming: {
+    action: '주변의 변화를 살핀다.',
+    saveState: {
+      id: 'pr49-active-event-live-regression',
+      turnNumber: 24,
+      world: { date: '1285-03-02', time: '10:10', location: '제1연병장' },
+      pc: { name: '카인', department: '기사과', skills: {}, skillCandidates: {} },
+      activeEvents: ['practice_duel'],
+      sceneRuntime: {
+        participants: [],
+        eventProgress: { eventInstanceId: 'practice_duel#1285-03-02t10:10', activeBeat: null, paused: false, resumeKey: 'practice_duel' },
+        momentum: { stall_streak: 2, pressure: 'required' },
+      },
+      director: { rngSeed: 'pr49-active-event-live-regression-0', npcExposure: {}, recentBeats: [], callbacks: [] },
+      scheduleContext: { due: [], upcoming: [] },
+    },
+    recentTurns: [],
+  }, mode: 'game' },
+);
+assert.equal(suppressedDirector.telemetry.event_director_v2.result, 'NPC_EVENT',
+  `the regression must contain a real competing Director cameo: ${JSON.stringify(suppressedDirector.telemetry.event_director_v2)}`);
+assert.equal(suppressedDirector.telemetry.scene_orchestration.secondary, 'active-event');
+assert.ok(suppressedDirector.telemetry.scene_orchestration.suppressed.includes('director-event'));
+assert.ok(!suppressedDirector.telemetry.selected_npcs.includes('mirabelle'), 'a suppressed Director candidate must not displace active-event context selection');
+assert.match(suppressedDirector.params.input, /RESULT=SUPPRESSED_BY_SCENE_ORCHESTRATION/);
+assert.match(suppressedDirector.params.input, /BLOCK=director-event; EFFECT_ONLY/);
+assert.doesNotMatch(suppressedDirector.params.input, /SELECTED=mirabelle/,
+  'the lower-priority selected cameo must not remain as a contradictory routed instruction');
 
 const autoBoundaryRouted = routeOpenAIParams(
   { instructions, input: '===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}' },
