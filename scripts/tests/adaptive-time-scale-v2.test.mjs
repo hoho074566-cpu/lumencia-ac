@@ -28,6 +28,7 @@ assert.deepEqual(meal.suggestedAdvanceMinutes, [20, 45]);
 const explicitMeal = classifySceneIntent('한 시간 동안 점심 식사를 한다.', { location:'식당' });
 assert.equal(explicitMeal.explicitDurationMinutes, 60);
 assert.deepEqual(explicitMeal.suggestedAdvanceMinutes, [60, 60]);
+assert.deepEqual(classifySceneIntent('점심을 한 시간 동안 먹는다.', { location:'식당' }).suggestedAdvanceMinutes, [60, 60], 'object-duration-verb meal order must honor the explicit duration');
 
 const training = classifySceneIntent('검술을 훈련한다.', { location:'훈련장' });
 assert.equal(training.kind, 'training');
@@ -47,6 +48,7 @@ assert.deepEqual(classAttendance.suggestedAdvanceMinutes, [45, 120]);
 const explicitClass = classifySceneIntent('두 시간 동안 수업을 듣는다.', { location:'강의실' });
 assert.equal(explicitClass.explicitDurationMinutes, 120);
 assert.deepEqual(explicitClass.suggestedAdvanceMinutes, [120, 120]);
+assert.deepEqual(classifySceneIntent('수업을 두 시간 동안 듣는다.', { location:'강의실' }).suggestedAdvanceMinutes, [120, 120], 'object-duration-verb class order must honor the explicit duration');
 
 const sleep = classifySceneIntent('잠을 잔다.', { location:'개인실' });
 assert.equal(sleep.kind, 'downtime');
