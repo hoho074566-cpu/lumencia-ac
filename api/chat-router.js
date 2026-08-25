@@ -19,7 +19,7 @@ import { findEventConsequence, minutesUntilEventConsequence, reconcileEventConse
 import { deriveGoalTickState } from '../lib/npc-goal-tick.js';
 import { appendOffscreenDigest, deriveBoundedOffscreenProgression } from '../lib/offscreen-progression.js';
 import { compactFactionSocialTelemetry, deriveFactionSocialState } from '../lib/faction-social-consequence.js';
-import { compactSkillLearningTelemetry, deriveSkillLearningState } from '../lib/skill-learning.js';
+import { compactSkillLearningTelemetry, deriveSkillLearningState, filterExistingSkillExperience } from '../lib/skill-learning.js';
 
 export const config = { maxDuration: 300 };
 
@@ -566,6 +566,7 @@ export default async function handler(req,res){
     if(mode==='meta'){if(data.turn?.state_delta)data.turn.state_delta.skill_learning=[];const pipeline={pipeline:'meta-full-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true,faction_social_v1:true,skill_learning_v1:true};data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);}
     applyExtendedExpressions(data.turn,incoming0.saveState||{});
     data.turn.choices=filterTurnHookChoices(incoming.action,{...data.turn,choices:freshChoices(incoming.action,data.turn)});
+    if(data.turn?.state_delta)data.turn.state_delta.skill_experience=mode==='auto'?[]:filterExistingSkillExperience(data.turn.state_delta.skill_experience,incoming0.saveState?.pc?.skills);
     const skillLearningState=deriveSkillLearningState({
       existingSkills:incoming0.saveState?.pc?.skills,
       previousCandidates:incoming0.saveState?.pc?.skillCandidates,

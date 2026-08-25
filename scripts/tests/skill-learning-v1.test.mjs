@@ -7,6 +7,7 @@ import { deriveSceneDelta } from '../../lib/scene-momentum.js';
 import {
   compactSkillLearningTelemetry,
   deriveSkillLearningState,
+  filterExistingSkillExperience,
   MAX_SKILL_CANDIDATES,
   normalizeSkillCandidates,
 } from '../../lib/skill-learning.js';
@@ -61,6 +62,37 @@ const noEvidence = deriveSkillLearningState({
 });
 assert.deepEqual(noEvidence.accepted_changes, [], 'ordinary movement must not become skill learning');
 
+const selfAuthoredEvidenceRejected = deriveSkillLearningState({
+  changes: [{ skill: '복도 보법', amount: 15, basis: '복도 걷기를 보법 훈련으로 해석했다.', reason: '훈련이라고 판단했다.' }],
+  action: '복도를 평범하게 걷는다.',
+  scene: [{ text: '복도 끝까지 걸어가 문 앞에 멈췄다.' }],
+});
+assert.deepEqual(selfAuthoredEvidenceRejected.accepted_changes, [], 'model-authored basis and reason must not manufacture their own learning evidence');
+
+const negatedLearningRejected = deriveSkillLearningState({
+  changes: [{ skill: '복도 보법', amount: 15, basis: '걷기를 훈련으로 해석했다.', reason: '보법 진척이라고 주장했다.' }],
+  action: '복도를 걷되 별도의 훈련이나 기술 습득은 하지 않는다.',
+  scene: [{ text: '평범하게 복도를 통과했고 훈련은 하지 않았다.' }],
+});
+assert.deepEqual(negatedLearningRejected.accepted_changes, [], 'negated learning language must not satisfy the positive evidence gate');
+
+assert.deepEqual(filterExistingSkillExperience([
+  { skill: ' 대 검 술 ', amount: 3, reason: '교수의 교정' },
+  { skill: '반월 보법', amount: 5, reason: '후보 훈련' },
+], { 대검술: { grade: 'D' } }), [
+  { skill: '대검술', amount: 3, reason: '교수의 교정' },
+], 'skill experience must canonicalize existing aliases and reject not-yet-unlocked candidate skills');
+
+const liveBypassRegression = deriveSkillLearningState({
+  previousCandidates: { '반월 보법': { progress: 22, basis: '이전 교정', reason: '반복 훈련', updated_turn: 6, history: [] } },
+  changes: [{ skill: '반월 보법', amount: 15, basis: '급정지와 재출발을 반복 교정', reason: '마지막 열다섯 회를 연속 재현했다.' }],
+  action: '반월 보법의 급정지와 재출발을 반복 훈련한다.',
+  scene: [{ text: '실패 원인을 교정한 뒤 열다섯 회를 연속 재현했다.' }],
+  turnNumber: 7,
+});
+assert.equal(liveBypassRegression.candidates['반월 보법'].progress, 37, 'a 22-point candidate may advance by at most 15 in one live turn');
+assert.deepEqual(liveBypassRegression.unlocked_skills, [], 'legacy experience output must not make an unfinished candidate unlock early');
+
 const existingRejected = deriveSkillLearningState({
   existingSkills: { '대검술': { grade: 'D' } },
   changes: [{ skill: ' 대 검 술 ', amount: 9, basis: '교수의 검술 교정', reason: '훈련으로 숙련됐다.' }],
@@ -81,6 +113,7 @@ const duplicateBounded = deriveSkillLearningState({
     { skill: '호흡 제어', amount: 99, basis: '호흡 수련', reason: '교수의 지도' },
   ],
   action: '두 기술을 수련하고 교정을 받는다.',
+  scene: [{ text: '반복 수련 뒤 각 기술의 잘못된 동작을 교정받았다.' }],
 });
 assert.equal(duplicateBounded.accepted_changes.length, 2, 'one turn must accept at most two distinct candidate changes');
 assert.equal(duplicateBounded.candidates['호흡 제어'].progress, 15, 'malicious oversized progress must clamp to the per-turn maximum');
@@ -133,6 +166,7 @@ assert.equal(growthDelta.flags.growthChanged, true, 'an accepted learning mutati
 
 assert.match(router, /maxItems:2[\s\S]*skill:\{type:'string',minLength:2,maxLength:48\}[\s\S]*amount:\{type:'integer',minimum:1,maximum:15\}/, 'patched structured schema must bound candidate rows and per-turn progress');
 assert.match(router, /basis 없는 진척은 금지/, 'model instructions must preserve the evidence gate');
+assert.match(router, /state_delta\.skill_experience=mode==='auto'\?\[\]:filterExistingSkillExperience/, 'adapter must freeze AUTO experience and block legacy experience from creating unfinished candidate skills');
 
 const divider = '='.repeat(20);
 const instructions = `===== CHARACTER REGISTRY =====
