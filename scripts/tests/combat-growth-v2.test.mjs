@@ -153,6 +153,15 @@ const npcDirectlyRejected = deriveCombatGrowthState({
 });
 assert.deepEqual(npcDirectlyRejected.accepted_skill_experience, [], 'the word 직접 must not convert a named NPC action into PC-owned growth');
 
+const englishNpcOnlyRejected = deriveCombatGrowthState({
+  pc:{ ...pc, skills:{ ...pc.skills, Greatsword:{ grade:'C', hiddenXp:0 } } },
+  action:'Lillia trains Greatsword.',
+  scene:scene('Lillia practiced under pressure, corrected her stance, and gained a new insight.'),
+  resolutionLog:resolution('success', [ability('skill', 'Greatsword')]),
+  skillChanges:[{ skill:'Greatsword', amount:3, reason:'Lillia trained it' }],
+});
+assert.deepEqual(englishNpcOnlyRejected.accepted_skill_experience, [], 'English third-person action and scene evidence must not mutate PC growth');
+
 const commandedNpcRejected = deriveCombatGrowthState({
   pc,
   action:'나는 릴리아를 훈련시킨다.',
@@ -179,6 +188,15 @@ const namedPcTraining = deriveCombatGrowthState({
   skillChanges:[{ skill:'대검술', amount:3, reason:'카일의 자세 교정' }],
 });
 assert.equal(namedPcTraining.accepted_skill_experience[0].amount, 1, 'the canonical PC name must remain valid attribution evidence');
+
+const overlappingSkillNames = deriveCombatGrowthState({
+  pc:{ ...pc, skills:{ ...pc.skills, 검술:{ grade:'C', hiddenXp:0 } } },
+  action:'대검술 기본 자세를 반복 연습한다.',
+  scene:scene('대검술의 손목 각도를 교정하고 반복 동작을 안정시켰다.'),
+  resolutionLog:{ triggered:false, outcome:'none', abilities:[] },
+  skillChanges:[{ skill:'검술', amount:3, reason:'대검술 훈련의 부분 문자열' }, { skill:'대검술', amount:3, reason:'대검술 자세 교정' }],
+});
+assert.deepEqual(overlappingSkillNames.accepted_skill_experience, [{ skill:'대검술', amount:1, reason:'대검술 자세 교정' }], 'a shorter overlapping skill name must not inherit another skill training mention');
 
 const questionOnlyRejected = deriveCombatGrowthState({
   pc,
@@ -226,6 +244,15 @@ const noResolutionCombatRejected = deriveCombatGrowthState({
   skillChanges:[{ skill:'대검술', amount:3, reason:'새 응용' }],
 });
 assert.deepEqual(noResolutionCombatRejected.accepted_skill_experience, [], 'combat skill XP requires a matching structured resolution ability');
+
+const mixedCombatTrainingMustMatchResolution = deriveCombatGrowthState({
+  pc,
+  action:'강적과 대련하며 대검술의 새로운 응용을 연습한다.',
+  scene:scene('강적의 실전 압박 속에서 대검술의 새로운 응용을 시도하고 자세를 교정했다.'),
+  resolutionLog:resolution('partial', [ability('skill', '전술분석')]),
+  skillChanges:[{ skill:'대검술', amount:3, reason:'혼합 전투 훈련' }],
+});
+assert.deepEqual(mixedCombatTrainingMustMatchResolution.accepted_skill_experience, [], 'training language must not bypass exact resolution membership in a combat action');
 
 const directStudyWithoutResolution = deriveCombatGrowthState({
   pc,
