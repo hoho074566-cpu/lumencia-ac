@@ -69,6 +69,8 @@ assert.equal(intervalClockClass.explicitDurationMinutes,60,'an explicit start-to
 assert.deepEqual(intervalClockClass.suggestedAdvanceMinutes,[230,230],'an explicit clock interval must include the wait to start and end at the requested clock');
 assert.equal(classifySceneIntent('10시 30분에 수업을 듣는다.', { location:'강의실',currentTime:'12:00' }).scheduledStartOffsetMinutes,null,'an already-past ambiguous clock must not silently roll into the next day');
 assert.equal(classifySceneIntent('내일 10시 30분에 수업을 듣는다.', { location:'여관',currentTime:'07:40' }).scheduledStartOffsetMinutes,null,'a next-day clock must not be collapsed onto today');
+assert.equal(classifySceneIntent('정오에 수업을 듣는다.', { location:'강의실',currentTime:'09:00' }).scheduledStartOffsetMinutes,180,'noon must normalize to the same-day 12:00 start');
+assert.equal(classifySceneIntent('자정에 훈련한다.', { location:'훈련장',currentTime:'09:00' }).scheduledStartOffsetMinutes,900,'midnight must normalize to the next upcoming 00:00 start');
 
 const sleep = classifySceneIntent('잠을 잔다.', { location:'개인실' });
 assert.equal(sleep.kind, 'downtime');

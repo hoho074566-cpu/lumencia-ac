@@ -393,16 +393,11 @@ function reconcileReachedScheduleStart(turn,boundaryIds=new Set()){
 }
 function reconcileShortenedTimedTurn(turn,{preserveConsequenceId='',preserveNpcStateUpdates=[],preserveNpcScheduleUpdates=[]}={}){
   const delta=object(turn?.state_delta);if(!turn?.state_delta)return;
-  for(const field of ['active_events_add','active_events_remove','completed_events_add','scheduled_events_add','scheduled_events_remove','scheduled_events_complete'])delta[field]=[];
-  delta.npc_state_updates=array(preserveNpcStateUpdates);
-  delta.npc_schedule_updates=array(preserveNpcScheduleUpdates);
-  turn.event_progress=null;
   const consequenceId=String(preserveConsequenceId||'').trim();
-  if(consequenceId){
-    delta.hooks_update=array(delta.hooks_update).filter(row=>String(row?.id||'').trim()===consequenceId);
-  }else{
-    for(const field of ['pc_knowledge_add','memories_add','hooks_add','hooks_update','delayed_consequences_add'])delta[field]=[];
-  }
+  const hooksUpdate=consequenceId?array(delta.hooks_update).filter(row=>String(row?.id||'').trim()===consequenceId):[],frozen={};
+  for(const [field,value] of Object.entries(delta))frozen[field]=Array.isArray(value)?[]:typeof value==='number'?0:null;
+  turn.state_delta={...frozen,advance_minutes:0,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0,npc_state_updates:array(preserveNpcStateUpdates),npc_schedule_updates:array(preserveNpcScheduleUpdates),hooks_update:hooksUpdate};
+  turn.event_progress=null;
 }
 function reconcileExplicitZeroTurn(turn){
   const delta=object(turn?.state_delta);if(!turn?.state_delta)return;
@@ -437,26 +432,27 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   const profileMax=Math.min(1440,Math.max(requestedFloor,Number(array(intent.suggestedAdvanceMinutes)[1]||0)));
   const scheduleBoundary=nextScheduleBoundaryMinutes(incoming?.saveState||{},{futureOnly:true,action:incoming?.action||'',intent});
   const consequenceBoundary=consequenceLifecycle?.selected_id?minutesUntilEventConsequence(incoming?.saveState||{},consequenceLifecycle.selected_id):null;
-  const boundaries=[scheduleBoundary,consequenceBoundary].filter(value=>value!=null&&Number.isFinite(Number(value))).map(Number);
-  const boundary=boundaries.length?Math.min(...boundaries):null;
-  const boundedFloor=boundary==null?requestedFloor:Math.min(requestedFloor,Math.max(0,boundary));
+  const reachedConsequenceBoundary=Boolean(consequenceBoundary!=null&&Number.isFinite(Number(consequenceBoundary))&&consequenceBoundary<=profileMax&&consequenceLifecycle?.status==='resolved'&&consequenceLifecycle?.attribution_safe!==false);
+  const floorBoundaries=[scheduleBoundary,reachedConsequenceBoundary?consequenceBoundary:null].filter(value=>value!=null&&Number.isFinite(Number(value))).map(Number),floorBoundary=floorBoundaries.length?Math.min(...floorBoundaries):null;
+  const boundedFloor=floorBoundary==null?requestedFloor:Math.min(requestedFloor,Math.max(0,floorBoundary));
   const eventId=String(turn?.event_progress?.event_instance_id||turn?.event_progress?.eventInstanceId||'').trim().toLowerCase();
   const dueAtBoundary=new Set(scheduleBoundary==null?[]:scheduledIdsDueByTurnEnd(incoming?.saveState||{},scheduleBoundary).map(value=>String(value).trim().toLowerCase()));
   const dueBeforeBoundary=new Set(scheduleBoundary==null?[]:scheduledIdsDueByTurnEnd(incoming?.saveState||{},Math.max(0,scheduleBoundary-1)).map(value=>String(value).trim().toLowerCase()));
   const boundaryRows=scheduleRowsAtBoundary(incoming?.saveState||{},scheduleBoundary),boundaryIds=new Set(boundaryRows.map(row=>String(row?.id||'').trim().toLowerCase()).filter(Boolean)),structuredBoundary=Boolean(eventId&&boundaryIds.has(eventId)&&dueAtBoundary.has(eventId)&&!dueBeforeBoundary.has(eventId)),visibleBoundary=Boolean(boundaryRows.some(row=>scheduleBoundaryOccurred(turn,row)));
-  const crossedScheduledBoundary=Boolean(scheduleBoundary!=null&&scheduleBoundary===boundary&&scheduleBoundary<=profileMax&&current>scheduleBoundary);
-  const surfacedScheduledBoundary=Boolean(scheduleBoundary!=null&&scheduleBoundary===boundary&&scheduleBoundary<=profileMax&&(structuredBoundary||visibleBoundary));
+  const crossedScheduledBoundary=Boolean(scheduleBoundary!=null&&scheduleBoundary<=profileMax&&current>scheduleBoundary);
+  const surfacedScheduledBoundary=Boolean(scheduleBoundary!=null&&scheduleBoundary<=profileMax&&(structuredBoundary||visibleBoundary));
   const reachedScheduledBoundary=surfacedScheduledBoundary||crossedScheduledBoundary;
-  const reachedConsequenceBoundary=Boolean(consequenceBoundary!=null&&consequenceBoundary===boundary&&boundary<=profileMax&&consequenceLifecycle?.status==='resolved'&&consequenceLifecycle?.attribution_safe!==false);
+  const reachedBoundaries=[reachedScheduledBoundary?scheduleBoundary:null,reachedConsequenceBoundary?consequenceBoundary:null].filter(value=>value!=null&&Number.isFinite(Number(value))).map(Number),reachedBoundary=reachedBoundaries.length?Math.min(...reachedBoundaries):null;
+  const appliedScheduleBoundary=reachedScheduledBoundary&&scheduleBoundary===reachedBoundary,appliedConsequenceBoundary=reachedConsequenceBoundary&&consequenceBoundary===reachedBoundary;
   const previousEventId=String(incoming?.saveState?.sceneRuntime?.eventProgress?.eventInstanceId||incoming?.saveState?.sceneRuntime?.eventProgress?.event_instance_id||'').trim().toLowerCase();
   const structuredInterruption=Boolean(eventId.startsWith('director:')&&eventId!==previousEventId&&!structuredBoundary&&eventId!==String(consequenceLifecycle?.selected_id||'').trim().toLowerCase());
   const completedBeforeChoice=!hasMeaningfulStop||timedActionCompletionEvidence(turn,intent);
   let applied=current;
-  if(reachedScheduledBoundary||reachedConsequenceBoundary)applied=boundary;
+  if(reachedBoundary!=null)applied=reachedBoundary;
   else if(!structuredInterruption&&completedBeforeChoice)applied=Math.min(profileMax,Math.max(current,boundedFloor));
   if(applied<current&&consequenceLifecycle?.status==='resolved'&&consequenceLifecycle?.attribution_safe===false){const id=String(consequenceLifecycle.selected_id||'');turn.state_delta.hooks_update=[...array(turn.state_delta.hooks_update).filter(row=>String(row?.id||'')!==id),{id,status:'open',reason:'발현 시각 도달; NPC 경계 효과 귀속 대기'}].slice(0,8);consequenceLifecycle.status='open';consequenceLifecycle.evidence='ambiguous-npc-effect';}
-  if(applied<current)reconcileShortenedTimedTurn(turn,{preserveConsequenceId:reachedConsequenceBoundary||consequenceLifecycle?.evidence==='ambiguous-npc-effect'?consequenceLifecycle?.selected_id:'',preserveNpcStateUpdates:reachedConsequenceBoundary?consequenceLifecycle?.npc_state_updates:[],preserveNpcScheduleUpdates:reachedConsequenceBoundary?consequenceLifecycle?.npc_schedule_updates:[]});
-  else if(reachedScheduledBoundary)reconcileReachedScheduleStart(turn,boundaryIds);
+  if(applied<current)reconcileShortenedTimedTurn(turn,{preserveConsequenceId:appliedConsequenceBoundary||consequenceLifecycle?.evidence==='ambiguous-npc-effect'?consequenceLifecycle?.selected_id:'',preserveNpcStateUpdates:appliedConsequenceBoundary?consequenceLifecycle?.npc_state_updates:[],preserveNpcScheduleUpdates:appliedConsequenceBoundary?consequenceLifecycle?.npc_schedule_updates:[]});
+  else if(appliedScheduleBoundary)reconcileReachedScheduleStart(turn,boundaryIds);
   turn.state_delta.advance_minutes=applied;
   return intent;
 }
