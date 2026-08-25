@@ -98,6 +98,9 @@ const scheduledTravel=classifySceneIntent('10시에 도서관으로 간다.', { 
 assert.equal(scheduledTravel.semanticTarget,'도서관','a scheduled-start clock must not pollute the travel destination');
 assert.equal(scheduledTravel.scheduledStartOffsetMinutes,60,'scheduled travel must retain the wait until departure');
 assert.deepEqual(scheduledTravel.suggestedAdvanceMinutes,[65,80],'scheduled travel must add the departure offset to the natural travel range');
+const destinationFirstScheduledTravel=classifySceneIntent('도서관으로 10시에 간다.', { location:'A동 개인실',currentTime:'09:00' });
+assert.equal(destinationFirstScheduledTravel.semanticTarget,'도서관','a trailing scheduled-start clock must not leave either the clock or destination particle in the target');
+assert.deepEqual(destinationFirstScheduledTravel.suggestedAdvanceMinutes,[65,80],'travel timing must not depend on whether the destination or clock is stated first');
 const intervalTravel=classifySceneIntent('10시부터 11시까지 도서관으로 간다.', { location:'A동 개인실',currentTime:'09:00' });
 assert.equal(intervalTravel.semanticTarget,'도서관','a clock interval must not pollute the travel destination');
 assert.deepEqual(intervalTravel.suggestedAdvanceMinutes,[120,120],'a travel clock interval must end at the explicit requested clock');
