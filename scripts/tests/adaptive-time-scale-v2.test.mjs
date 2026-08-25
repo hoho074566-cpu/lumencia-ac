@@ -207,6 +207,15 @@ const overlongDirective=buildSceneMomentumDirective({action:'48시간 쉰다.',s
 assert.match(overlongDirective,/TIME_GUIDE=1440-1440min/,'the model guide must use the canonical one-turn maximum');
 assert.match(overlongDirective,/아직 끝나지 않은 활동으로 남긴다/,'the model must stop with an overlong activity unfinished');
 assert.doesNotMatch(overlongDirective,/사용자가 2880분을 직접 지정했다/,'the directive must not demand impossible one-turn completion');
+const partlyCappedRange=classifySceneIntent('12~30시간 동안 잠을 잔다.');
+assert.deepEqual(partlyCappedRange.explicitDurationRangeMinutes,[720,1800],'the original explicit range must remain available for intent telemetry');
+assert.equal(partlyCappedRange.minAdvanceMinutes,720,'an in-cap lower endpoint must remain a valid completion floor');
+assert.deepEqual(partlyCappedRange.suggestedAdvanceMinutes,[720,1440],'only the out-of-cap upper endpoint should be clamped');
+assert.equal(partlyCappedRange.turnLimitTruncated,false,'an explicit range with an in-cap endpoint is not necessarily incomplete');
+const partlyCappedRangeDirective=buildSceneMomentumDirective({action:'12~30시간 동안 잠을 잔다.',saveState:{world:{date:'1285-03-01',time:'09:00',location:'개인실'}}});
+assert.match(partlyCappedRangeDirective,/TIME_GUIDE=720-1440min/,'the directive must expose the valid one-turn completion range');
+assert.match(partlyCappedRangeDirective,/활동 지속시간을 720-1800분으로 지정했다[\s\S]*TIME_GUIDE 720-1440분 안에서 완료한다/,'the range explanation must distinguish the original request from its in-cap guide');
+assert.doesNotMatch(partlyCappedRangeDirective,/아직 끝나지 않은 활동으로 남긴다/,'the directive must not forbid completion at a valid lower endpoint');
 const cappedScheduledSleep=classifySceneIntent('오늘 오후 11시에 잠을 잔다.',{location:'개인실',currentTime:'00:00'});
 assert.deepEqual(cappedScheduledSleep.suggestedAdvanceMinutes,[1440,1440],'a late scheduled sleep must cap its start offset plus activity guide at one turn');
 assert.equal(cappedScheduledSleep.turnLimitTruncated,true,'a scheduled activity extending beyond one turn must remain unfinished');

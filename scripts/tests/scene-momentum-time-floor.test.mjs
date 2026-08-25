@@ -341,6 +341,12 @@ assert.deepEqual(turn.state_delta.hooks_update,[{id:consequenceHook.id,status:'o
 assert.equal(ambiguousScalarLifecycle.status,'open','scalar attribution telemetry must agree with the reopened lifecycle');
 
 const rangedConsequenceSave={...consequenceSave,world:{...consequenceSave.world,time:'08:40'}};
+turn={scene:[{kind:'narration',text:'30분 동안 기본 자세를 반복해 훈련을 마쳤다.'}],state_delta:{advance_minutes:30,skill_experience:[{skill:'검술',amount:1}]},choices:[]};
+const laterOpenConsequence={selected_id:consequenceHook.id,status:'open',attribution_safe:true};
+applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:rangedConsequenceSave},turn,'game',laterOpenConsequence);
+assert.equal(turn.state_delta.advance_minutes,30,'a valid flexible completion must not stretch forward to a later unmanifested consequence');
+assert.deepEqual(turn.state_delta.skill_experience,[{skill:'검술',amount:1}],'valid completion effects must survive when a later consequence is only a cap');
+assert.equal(laterOpenConsequence.status,'open','the later unmanifested consequence must remain queued');
 turn={scene:[{kind:'narration',text:'한 시간째 약속 시각이 되어 에밀리가 중앙광장에 도착했다.'}],state_delta:{advance_minutes:90,npc_state_updates:[{npc_key:'emily',location:'중앙광장',status:'도착'}],hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
 const rangedEffects=consequenceNpcEffectsForShortening(turn,{event_name:'약속 상대의 도착',reason:'약속 장소에 도착한다',secret_level:0},['emily'],{emily:'에밀리'});
 applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:rangedConsequenceSave},turn,'game',{selected_id:consequenceHook.id,status:'resolved',...rangedEffects});
@@ -498,6 +504,16 @@ assert.deepEqual(safeRuntimeTurn.choices,[],'post-boundary choices must not infl
 assert.equal(safeRuntimeTurn.state_delta.advance_minutes,5,'the reconciled bounded state delta must remain available to runtime synthesis');
 assert.equal(safeRuntimeTurn.runtime_incomplete_boundary,true,'runtime synthesis must mark the sanitized turn as an incomplete scene boundary');
 assert.strictEqual(turn.scene,futureScene,'runtime fail-closed filtering must not erase the user-visible response');
+turn={scene:[{kind:'narration',text:'하루 동안 수도를 향해 이동한 끝에 중간 마을에서 밤을 맞았다.'}],state_delta:{advance_minutes:1440,new_location:'중간 마을',pc_status:'이동 중',items_add:['도착 보상']},choices:[],event_progress:null};
+const cappedTravelIntent=applySceneMomentumTimeFloor({action:'48시간 동안 수도로 간다.',saveState:{world:{date:'1285-03-02',time:'07:20',location:'변경 도시'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,1440,'an overlong trip must stop at the one-turn cap');
+assert.equal(turn.state_delta.new_location,'중간 마을','a real in-transit location must survive capped-travel reconciliation');
+assert.equal(turn.state_delta.pc_status,null,'unverified travel status must still fail closed at the cap');
+assert.deepEqual(turn.state_delta.items_add,[],'destination-owned effects must not survive a capped intermediate stop');
+assert.equal(cappedTravelIntent.runtimeSceneTrusted,false,'a capped intermediate travel scene must keep its exit boundary incomplete');
+turn={scene:[{kind:'narration',text:'하루 만에 수도에 도착했다.'}],state_delta:{advance_minutes:1440,new_location:'수도',pc_status:'도착',items_add:['도착 보상']},choices:[],event_progress:null};
+applySceneMomentumTimeFloor({action:'48시간 동안 수도로 간다.',saveState:{world:{date:'1285-03-02',time:'07:20',location:'변경 도시'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.new_location,null,'a premature destination claim must not survive the one-turn travel cap');
 turn={scene:[{kind:'narration',text:'기다림을 마쳤다.'}],state_delta:{advance_minutes:100,skill_experience:[{skill:'검술',amount:1}]},choices:[],event_progress:null};
 applySceneMomentumTimeFloor({action:'0분에서 10분 동안 기다린다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'a zero-minimum range must still enforce its positive maximum');
