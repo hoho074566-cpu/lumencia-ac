@@ -404,6 +404,7 @@ function reconcileExplicitZeroTurn(turn){
   const frozen={};
   for(const [field,value] of Object.entries(delta))frozen[field]=Array.isArray(value)?[]:typeof value==='number'?0:null;
   turn.state_delta={...frozen,advance_minutes:0,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0};
+  delete turn.event_progress;
 }
 function timedActionCompletionEvidence(turn,intent={}){
   const segments=[turn?.scene_title,turn?.scene_summary,...array(turn?.scene).filter(item=>String(item?.kind||'')!=='dialogue').map(item=>item?.text)].filter(Boolean).flatMap(value=>String(value).split(/(?<=[.!?。！？])|\n+/)).map(value=>value.trim()).filter(Boolean),kind=String(intent?.kind||'');if(!segments.length)return false;

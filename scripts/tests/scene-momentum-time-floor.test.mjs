@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { scheduledIdsDueByTurnEnd } from '../../lib/event-progress.js';
+import { mergeRoutedEventProgressState, scheduledIdsDueByTurnEnd } from '../../lib/event-progress.js';
 import { minutesUntilEventConsequence } from '../../lib/event-consequence.js';
 import { buildSceneMomentumDirective, classifySceneIntent, isPcRelevantScheduleEvent, nextScheduleBoundaryMinutes, scheduleBoundaryLimitMinutes } from '../../lib/scene-momentum.js';
 
@@ -334,7 +334,7 @@ turn={scene:[{kind:'narration',text:'잠에서 깨어나 몸을 일으켰다.'}]
 applySceneMomentumTimeFloor({action:'잠을 잔다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,240,'a normal newly structured scene must not be mistaken for a Director interruption');
 
-turn={state_delta:{advance_minutes:60,new_location:'훈련장',pc_status:'훈련 완료',fatigue_delta:3,gold_delta:-10,relationship_changes:[{npc_key:'artemis',affinity_delta:1}],stat_progress:[{stat:'신체',amount:1}],skill_experience:[{skill:'검술',amount:1}],items_add:['훈련 증표'],items_remove:['낡은 목검'],npc_state_updates:[{npc_key:'artemis',location:'훈련장'}],hooks_update:[{id:'future',status:'resolved'}]},choices:[]};
+turn={event_progress:{event_instance_id:'active:training',active_beat:'complete',completed_beats:['drill','complete']},state_delta:{advance_minutes:60,new_location:'훈련장',pc_status:'훈련 완료',fatigue_delta:3,gold_delta:-10,relationship_changes:[{npc_key:'artemis',affinity_delta:1}],stat_progress:[{stat:'신체',amount:1}],skill_experience:[{skill:'검술',amount:1}],items_add:['훈련 증표'],items_remove:['낡은 목검'],npc_state_updates:[{npc_key:'artemis',location:'훈련장'}],hooks_update:[{id:'future',status:'resolved'}]},choices:[]};
 applySceneMomentumTimeFloor({action:'0분 동안 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,0,'an explicitly zero-minute compressed action must clamp model time to zero');
 assert.equal(turn.state_delta.new_location,null,'explicit zero minutes must reject model-produced travel');
@@ -344,6 +344,13 @@ assert.equal(turn.state_delta.gold_delta,0,'explicit zero minutes must reject cu
 for(const field of ['relationship_changes','stat_progress','skill_experience','items_add','items_remove'])assert.deepEqual(turn.state_delta[field],[],`${field} must freeze on an explicit zero-minute action`);
 assert.deepEqual(turn.state_delta.npc_state_updates,[],'future NPC state must not survive an explicit zero-minute clamp');
 assert.deepEqual(turn.state_delta.hooks_update,[],'future hook state must not survive an explicit zero-minute clamp');
+assert.equal(turn.event_progress,undefined,'explicit zero minutes must reject model-produced event progress');
+const priorZeroProgress={eventInstanceId:'active:training',activeBeat:'drill',completedBeats:['setup'],paused:false};
+const zeroProgressState=mergeRoutedEventProgressState(priorZeroProgress,{},turn.event_progress);
+assert.equal(zeroProgressState.eventProgress?.eventInstanceId,priorZeroProgress.eventInstanceId,'rejected zero-minute progress must preserve the authoritative prior event identity');
+assert.equal(zeroProgressState.eventProgress?.activeBeat,priorZeroProgress.activeBeat,'rejected zero-minute progress must preserve the authoritative prior active beat');
+assert.deepEqual(zeroProgressState.eventProgress?.completedBeats,priorZeroProgress.completedBeats,'rejected zero-minute progress must preserve authoritative completed beats');
+assert.equal(mergeRoutedEventProgressState(null,{},turn.event_progress).eventProgress,null,'rejected zero-minute progress must not start a new event');
 
 turn={state_delta:{advance_minutes:0},choices:[]};
 applySceneMomentumTimeFloor({action:'쉰다.',saveState:{world:{date:'1285-03-01',time:'10:00'},scheduleContext:{due:[{id:'class'}],upcoming:[]}}},turn,'game');
