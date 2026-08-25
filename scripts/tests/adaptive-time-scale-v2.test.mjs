@@ -40,6 +40,9 @@ assert.deepEqual(explicitTraining.suggestedAdvanceMinutes, [45, 45]);
 assert.equal(classifySceneIntent('10분 전에 배운 동작을 훈련한다.').explicitDurationMinutes, null, 'historical time must not become a training duration');
 assert.equal(classifySceneIntent('한 시간 후에 검술을 훈련한다.').explicitDurationMinutes, null, 'future start time must not become a training duration');
 assert.equal(classifySceneIntent('10분 전에 배운 동작을 한 시간 동안 훈련한다.').explicitDurationMinutes, 60, 'a historical reference must not hide a separate explicit activity duration');
+assert.equal(classifySceneIntent('한 시간 훈련하고 20분 쉰다.').explicitDurationMinutes, 20, 'a terminal rest must use only the duration attached to that rest clause');
+assert.deepEqual(classifySceneIntent('30분 동안 훈련한 뒤 잠을 잔다.').suggestedAdvanceMinutes, [240, 480], 'an earlier training duration must not become the terminal sleep duration');
+assert.equal(classifySceneIntent('한 시간 동안 친구하고 대화한다.').explicitDurationMinutes, 60, 'the comitative 하고 particle must not be mistaken for an activity boundary');
 
 const classAttendance = classifySceneIntent('강의에 참석한다.', { location:'강의실' });
 assert.equal(classAttendance.kind, 'class-attendance');
@@ -104,11 +107,13 @@ assert.doesNotMatch(continueDirective, /TIME_PROFILE=/, 'CONTINUE must not recei
 
 const router = fs.readFileSync(new URL('../../api/chat-router.js', import.meta.url), 'utf8');
 const health = fs.readFileSync(new URL('../../api/health.js', import.meta.url), 'utf8');
+const repositoryRules = fs.readFileSync(new URL('../../AGENTS.md', import.meta.url), 'utf8');
 assert.match(router, /ADAPTIVE_TIME_SCALE_VERSION/);
 assert.match(router, /adaptive_time_scale_v2:true/);
 assert.match(router, /mode!==['"]game['"]/, 'META/AUTO/CONTINUE must stay outside the deterministic time floor');
 assert.match(fs.readFileSync(new URL('../../api/lib/context-router.js', import.meta.url), 'utf8'), /sceneIntent\.compression&&sceneIntent\.minAdvanceMinutes>0\?scheduleBoundaryLimitMinutes\(sceneIntent\):0/, 'all compressed timed activities must expose their minimum consequence lookahead');
 assert.match(health, /version:\s*'0\.8\.6'/);
+assert.match(repositoryRules, /External API adapter:\s*`0\.8\.6`/, 'the authoritative release manifest must match the adapter and health surface');
 assert.match(health, /adaptiveTimeScale:\s*'V2/);
 assert.equal((router.match(/coreHandler\(/g) || []).length, 1, 'Adaptive Time Scale V2 must preserve one canonical core model call');
 

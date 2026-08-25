@@ -347,13 +347,33 @@ function scheduleBoundaryOccurred(turn,row={}){
   if(bellSegments.some(text=>scheduleTimeMentioned(text,row)))return true;
   const title=String(turn?.scene_title||'');return bellSegments.length>0&&/종/.test(title)&&scheduleTimeMentioned(title,row);
 }
+function consequenceNpcKeysForShortening(turn,consequence,routedKeys=[],registry=CHARACTER_REGISTRY){
+  const keys=new Set(array(routedKeys).map(value=>String(value||'').trim()).filter(value=>Object.prototype.hasOwnProperty.call(registry,value)));
+  const source=[consequence?.event_name,Number(consequence?.secret_level||0)<=2?consequence?.reason:''].filter(Boolean).join(' ').toLowerCase();
+  const generic=new Set(['결과','후속','사건','상황','변화','발생','진행','관련','event','result','consequence']);
+  const tokens=[...new Set((source.match(/[가-힣a-z0-9_]{2,}/g)||[]).map(token=>token.replace(/(?:에게서|에게|한테|께서|으로|에서|까지|부터|처럼|보다|에는|은|는|이|가|을|를|와|과|도|의)$/u,'')).filter(token=>token.length>=2&&!generic.has(token)))];
+  if(!tokens.length)return[...keys].slice(0,4);
+  const segments=[turn?.scene_title,turn?.scene_summary,...array(turn?.scene).map(item=>item?.text)].filter(Boolean).flatMap(value=>String(value).toLowerCase().split(/(?<=[.!?。！？])|\n+/)).map(value=>value.trim()).filter(Boolean);
+  const updated=new Set([...array(turn?.state_delta?.npc_state_updates),...array(turn?.state_delta?.npc_schedule_updates)].map(row=>String(row?.npc_key||row?.key||'').trim()).filter(Boolean));
+  for(const key of updated){
+    if(!Object.prototype.hasOwnProperty.call(registry,key))continue;
+    const labels=[key,String(registry[key]||'').trim().toLowerCase()].filter(value=>value.length>=2);
+    if(segments.some(segment=>labels.some(label=>segment.includes(label))&&tokens.some(token=>segment.includes(token))))keys.add(key);
+  }
+  return[...keys].slice(0,4);
+}
 function reconcileReachedScheduleStart(turn,boundaryIds=new Set()){
   const delta=object(turn?.state_delta);if(!turn?.state_delta||!boundaryIds.size)return;
   for(const field of ['active_events_remove','completed_events_add','scheduled_events_remove','scheduled_events_complete'])delta[field]=array(delta[field]).filter(value=>!boundaryIds.has(String(value||'').trim().toLowerCase()));
 }
-function reconcileShortenedTimedTurn(turn,{preserveConsequenceId=''}={}){
+function reconcileShortenedTimedTurn(turn,{preserveConsequenceId='',preserveNpcKeys=[]}={}){
   const delta=object(turn?.state_delta);if(!turn?.state_delta)return;
-  for(const field of ['active_events_add','active_events_remove','completed_events_add','scheduled_events_add','scheduled_events_remove','scheduled_events_complete','npc_state_updates','npc_schedule_updates'])delta[field]=[];
+  const npcKeys=new Set(array(preserveNpcKeys).map(value=>String(value||'').trim().toLowerCase()).filter(Boolean));
+  const preservedNpcState=array(delta.npc_state_updates).filter(row=>npcKeys.has(String(row?.npc_key||row?.key||'').trim().toLowerCase()));
+  const preservedNpcSchedule=array(delta.npc_schedule_updates).filter(row=>npcKeys.has(String(row?.npc_key||row?.key||'').trim().toLowerCase()));
+  for(const field of ['active_events_add','active_events_remove','completed_events_add','scheduled_events_add','scheduled_events_remove','scheduled_events_complete'])delta[field]=[];
+  delta.npc_state_updates=preservedNpcState;
+  delta.npc_schedule_updates=preservedNpcSchedule;
   turn.event_progress=null;
   const consequenceId=String(preserveConsequenceId||'').trim();
   if(consequenceId){
@@ -369,7 +389,7 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   const current=Math.max(0,Number(turn.state_delta.advance_minutes||0));
   const requestedFloor=Math.min(1440,Math.max(0,Number(intent.minAdvanceMinutes||0)));
   const profileMax=Math.min(1440,Math.max(requestedFloor,Number(array(intent.suggestedAdvanceMinutes)[1]||0)));
-  const scheduleBoundary=nextScheduleBoundaryMinutes(incoming?.saveState||{},{futureOnly:true});
+  const scheduleBoundary=nextScheduleBoundaryMinutes(incoming?.saveState||{},{futureOnly:true,action:incoming?.action||'',intent});
   const consequenceBoundary=consequenceLifecycle?.selected_id?minutesUntilEventConsequence(incoming?.saveState||{},consequenceLifecycle.selected_id):null;
   const boundaries=[scheduleBoundary,consequenceBoundary].filter(value=>value!=null&&Number.isFinite(Number(value))).map(Number);
   const boundary=boundaries.length?Math.min(...boundaries):null;
@@ -388,7 +408,7 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   let applied=current;
   if(reachedScheduledBoundary||reachedConsequenceBoundary)applied=boundary;
   else if(!structuredInterruption&&(!hasMeaningfulStop||current>0))applied=Math.min(profileMax,Math.max(current,boundedFloor));
-  if(applied<current)reconcileShortenedTimedTurn(turn,{preserveConsequenceId:reachedConsequenceBoundary?consequenceLifecycle?.selected_id:''});
+  if(applied<current)reconcileShortenedTimedTurn(turn,{preserveConsequenceId:reachedConsequenceBoundary?consequenceLifecycle?.selected_id:'',preserveNpcKeys:reachedConsequenceBoundary?consequenceLifecycle?.npc_keys:[]});
   else if(reachedScheduledBoundary)reconcileReachedScheduleStart(turn,boundaryIds);
   turn.state_delta.advance_minutes=applied;
   return intent;
@@ -708,7 +728,7 @@ export default async function handler(req,res){
     }
     const consequenceId=String(telemetry?.event_director_v2?.event_consequence_id||'');
     const selectedConsequence=findEventConsequence(incoming.saveState,consequenceId);
-    const consequenceLifecycle=reconcileEventConsequenceLifecycle({saveState:incoming.saveState,turn:data.turn,selectedConsequence});
+    const consequenceLifecycle={...reconcileEventConsequenceLifecycle({saveState:incoming.saveState,turn:data.turn,selectedConsequence}),npc_keys:consequenceNpcKeysForShortening(data.turn,selectedConsequence,telemetry?.event_director_v2?.event_consequence_npc_keys)};
     const sceneIntent=applySceneMomentumTimeFloor({...incoming0,saveState:incoming.saveState,action:incoming0.action||''},data.turn,mode,consequenceLifecycle);
     const sceneRuntime=localSceneRuntime({...incoming0,saveState:incoming.saveState,action:incoming0.action||''},data.turn,telemetry?.event_director_v2,mode,telemetry?.scene_orchestration);
     const npcUpdates=incoming0.qualityPipeline===false?{}:localNpcUpdates(incoming0,data.turn);
