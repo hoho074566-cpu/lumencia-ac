@@ -74,6 +74,10 @@ const scheduleBoundary = deriveSceneOrchestrationPlan({
 assert.equal(scheduleBoundary.secondary, 'schedule-boundary', 'compressed downtime must stop at a reachable authoritative schedule');
 assert.equal(scheduleBoundary.trigger_minutes, 30);
 assert.ok(scheduleBoundary.suppressed.includes('present-npc-goal'), 'a reachable hard schedule must defer a competing NPC goal beat');
+const scheduleDirective = buildSceneOrchestrationDirective({ plan: scheduleBoundary });
+assert.match(scheduleDirective, /TRIGGER_MINUTES=30/);
+assert.match(scheduleDirective, /PRIMARY를 TRIGGER_MINUTES의 경계까지만 진행한 뒤 SECONDARY를 처리/,
+  'an interrupting boundary must cut off compressed primary action instead of waiting for its full completion');
 
 const dueConsequence = deriveSceneOrchestrationPlan({
   mode: 'game',
