@@ -115,7 +115,7 @@ export function sanitizeTurn(turn, { allowedCgIds = [], allowedSkills = [], skil
 
   d.skill_learning = arrays(d.skill_learning, 2).map((raw) => ({
     skill: cleanText(raw?.skill, 48), amount: clamp(raw?.amount, 1, 15), basis: cleanText(raw?.basis, 120) || null, reason: cleanText(raw?.reason, 280),
-  })).filter((row) => validCandidateName(row.skill) && row.reason && !allowedSkillSet.has(row.skill));
+  })).filter((row) => validCandidateName(row.skill) && row.basis && row.reason && !allowedSkillSet.has(row.skill));
 
   d.awakening_progress = arrays(d.awakening_progress, 1).map((raw) => ({
     kind: raw?.kind === 'authority' ? 'authority' : 'trait', name: cleanText(raw?.name, 64), amount: clamp(raw?.amount, 1, 10), milestone: Boolean(raw?.milestone),

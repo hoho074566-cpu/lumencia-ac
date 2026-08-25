@@ -19,6 +19,7 @@ import { findEventConsequence, minutesUntilEventConsequence, reconcileEventConse
 import { deriveGoalTickState } from '../lib/npc-goal-tick.js';
 import { appendOffscreenDigest, deriveBoundedOffscreenProgression } from '../lib/offscreen-progression.js';
 import { compactFactionSocialTelemetry, deriveFactionSocialState } from '../lib/faction-social-consequence.js';
+import { compactSkillLearningTelemetry, deriveSkillLearningState } from '../lib/skill-learning.js';
 
 export const config = { maxDuration: 300 };
 
@@ -42,6 +43,9 @@ PC의 행동·대사·감정·생각·수락·거절을 새로 만들지 않는�
 
 const GOAL_V2_RULES = String.raw`[NPC GOAL V2]
 npc_state_updates의 Goal V2 필드는 실제 턴 근거가 있을 때만 쓴다. goal_progress_delta는 -100..100 정수이며 0이 아닌 변화에는 goal_reason이 필수다. goal_state 전환에도 goal_reason이 필수다. 같은 목표의 표현만 다듬는 것은 goal_replace=false/null이고 기존 목표 ID·진행도·우선도·긴급도·시작 턴을 유지한다. 실제로 다른 목표로 교체할 때만 goal_replace=true로 보고한다. goal_next_action은 실제 다음 행동 근거가 있을 때만 쓴다. completed 목표를 active로 재개하려면 명시적 reason과 음수 delta로 100 미만이 되어야 한다. abandoned 목표는 명시적 active 재개 전까지 진행도를 바꾸지 않는다. 대화/등장만으로 목표 진행도를 올리지 않는다.`;
+
+const SKILL_LEARNING_RULES = String.raw`[SKILL LEARNING V1]
+skill_learning은 PC에게 아직 없는 독립적이고 반복 사용 가능한 기술을 실제 훈련·수업·교정·실전 통찰로 배우는 경우에만 쓴다. 기존 기술의 동의어·세부 동작·일회성 연출·단순 사용을 새 기술로 만들지 않는다. skill에는 짧고 일관된 기술명, amount에는 한 턴 1~15의 보수적 진척, basis에는 이번 턴에 실제로 관찰 가능한 훈련법·교정·실전 근거, reason에는 진척 원인을 쓴다. basis 없는 진척은 금지한다. 이미 pc.skills에 있는 기술은 skill_experience만 사용하고, 기존 pc.skillCandidates의 같은 기술은 저장된 정확한 이름을 유지한다. 한 턴에 최대 2개만 보고하며 META·AUTO·CONTINUE에서는 성장시키지 않는다.`;
 
 function goalV2FieldSchema(){
   return {
@@ -68,6 +72,21 @@ function delayedConsequenceFieldSchema(){
     },
   };
 }
+function skillLearningFieldSchema(){
+  return {
+    type:'array',maxItems:2,
+    items:{
+      type:'object',additionalProperties:false,
+      properties:{
+        skill:{type:'string',minLength:2,maxLength:48},
+        amount:{type:'integer',minimum:1,maximum:15},
+        basis:{anyOf:[{type:'string',minLength:1,maxLength:120},{type:'null'}]},
+        reason:{type:'string',minLength:1,maxLength:280},
+      },
+      required:['skill','amount','basis','reason'],
+    },
+  };
+}
 function extendGoalV2JsonSchema(schema){
   if(!schema||typeof schema!=='object')return false;
   let changed=false;
@@ -84,6 +103,11 @@ function extendGoalV2JsonSchema(schema){
     if(stateDelta?.properties?.hooks_add&&!stateDelta.properties.delayed_consequences_add){
       stateDelta.properties.delayed_consequences_add=delayedConsequenceFieldSchema();
       stateDelta.required=[...new Set([...(Array.isArray(stateDelta.required)?stateDelta.required:[]),'delayed_consequences_add'])];
+      changed=true;
+    }
+    if(stateDelta?.properties?.skill_experience&&!stateDelta.properties.skill_learning){
+      stateDelta.properties.skill_learning=skillLearningFieldSchema();
+      stateDelta.required=[...new Set([...(Array.isArray(stateDelta.required)?stateDelta.required:[]),'skill_learning'])];
       changed=true;
     }
     for(const value of Object.values(node)){
@@ -111,6 +135,8 @@ function mergeRawGoalV2Fields(parsed,raw){
   }
   const rawConsequences=raw?.state_delta?.delayed_consequences_add;
   if(parsed?.state_delta&&Array.isArray(rawConsequences))parsed.state_delta.delayed_consequences_add=rawConsequences.slice(0,6);
+  const rawSkillLearning=raw?.state_delta?.skill_learning;
+  if(parsed?.state_delta&&Array.isArray(rawSkillLearning))parsed.state_delta.skill_learning=rawSkillLearning.slice(0,2);
   return parsed;
 }
 function patchGoalV2StructuredFormat(params){
@@ -127,7 +153,8 @@ function patchGoalV2StructuredFormat(params){
       try{return mergeRawGoalV2Fields(parsed,JSON.parse(content));}catch{return parsed;}
     };
   }
-  return {...params,instructions:`${String(params.instructions||'')}\n\n${GOAL_V2_RULES}`,text:{...(params.text||{}),format:patchedFormat}};
+  const skillLearningRules=typeof SKILL_LEARNING_RULES==='string'?`\n\n${SKILL_LEARNING_RULES}`:'';
+  return {...params,instructions:`${String(params.instructions||'')}\n\n${GOAL_V2_RULES}${skillLearningRules}`,text:{...(params.text||{}),format:patchedFormat}};
 }
 
 function installResponsesRouter() {
@@ -151,7 +178,7 @@ installResponsesRouter();
 function emptyStateDelta() {
   return {
     advance_minutes:0,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0,
-    relationship_changes:[],npc_relationship_changes:[],faction_reputation_changes:[],intimacy_changes:[],stat_progress:[],skill_experience:[],
+    relationship_changes:[],npc_relationship_changes:[],faction_reputation_changes:[],intimacy_changes:[],stat_progress:[],skill_experience:[],skill_learning:[],
     items_add:[],items_remove:[],active_events_add:[],active_events_remove:[],completed_events_add:[],
     pc_knowledge_add:[],scheduled_events_add:[],scheduled_events_complete:[],hooks_add:[],hooks_update:[],
     memories_add:[],npc_state_updates:[],delayed_consequences_add:[],
@@ -521,7 +548,7 @@ function classifyExtendedExpression(item,saveState){
 function applyExtendedExpressions(turn,saveState){if(!turn||!Array.isArray(turn.scene))return turn;turn.scene=turn.scene.map(item=>item?.kind==='dialogue'?{...item,display_expression:classifyExtendedExpression(item,saveState),stable_extended_expression:true}:item);return turn;}
 function isCombatLike(action=''){return /(전투|공격|베어|베고|찌르|쏘|회피|막아|막고|패링|결투|대련|검기|오러|마법을?\s*쏘|주먹|발차기|기습|제압|죽이|살해)/i.test(String(action));}
 function makeCaptureResponse(){return{statusCode:200,payload:null,headers:{},status(code){this.statusCode=Number(code)||200;return this;},json(payload){this.payload=payload;return this;},setHeader(name,value){this.headers[String(name).toLowerCase()]=value;return this;},getHeader(name){return this.headers[String(name).toLowerCase()];}};}
-function setAdapterRoute(data,mode,pipeline,telemetry){data.route={...(data.route||{}),input_mode:mode,adapter_version:ADAPTER_VERSION,app_version:APP_VERSION,core_server_version:data.server_version||data.route?.server_version||'0.5.6',quality_pipeline:pipeline?.pipeline||'legacy',qa_result:pipeline?.qa_result||'SKIP',rewrite_applied:false,context_router:telemetry||null,scene_momentum:pipeline?.scene_momentum||null,scene_novelty:pipeline?.scene_novelty||null,scene_purpose:pipeline?.scene_purpose||null,scene_exit_condition:pipeline?.scene_exit_condition||null,turn_hook:pipeline?.turn_hook||null,event_consequence:pipeline?.event_consequence||null,faction_social:pipeline?.faction_social||null};data.server_version=ADAPTER_VERSION;return data;}
+function setAdapterRoute(data,mode,pipeline,telemetry){data.route={...(data.route||{}),input_mode:mode,adapter_version:ADAPTER_VERSION,app_version:APP_VERSION,core_server_version:data.server_version||data.route?.server_version||'0.5.6',quality_pipeline:pipeline?.pipeline||'legacy',qa_result:pipeline?.qa_result||'SKIP',rewrite_applied:false,context_router:telemetry||null,scene_momentum:pipeline?.scene_momentum||null,scene_novelty:pipeline?.scene_novelty||null,scene_purpose:pipeline?.scene_purpose||null,scene_exit_condition:pipeline?.scene_exit_condition||null,turn_hook:pipeline?.turn_hook||null,event_consequence:pipeline?.event_consequence||null,faction_social:pipeline?.faction_social||null,skill_learning:pipeline?.skill_learning||null};data.server_version=ADAPTER_VERSION;return data;}
 async function runCore(req,incoming,mode){const capture=makeCaptureResponse();const routedReq={method:req.method,headers:req.headers||{},body:incoming};const ctx={enabled:true,incoming,mode,telemetry:null};await ROUTER_CONTEXT.run(ctx,()=>coreHandler(routedReq,capture));return{status:capture.statusCode,data:capture.payload||{},telemetry:ctx.telemetry};}
 
 export default async function handler(req,res){
@@ -535,13 +562,34 @@ export default async function handler(req,res){
     const result=await runCore(req,incoming,mode);if(result.status<200||result.status>=300)return res.status(result.status).json({...result.data,server_version:ADAPTER_VERSION,adapter_version:ADAPTER_VERSION});
     const data=result.data;if(!data?.turn)throw new Error('코어 API 응답에 turn이 없습니다.');
     let telemetry=result.telemetry||{routerVersion:routerVersion(),enabled:false,profile:'unknown'};telemetry={...telemetry,actual_input_tokens:Number(data?.usage?.input_tokens||0),actual_output_tokens:Number(data?.usage?.output_tokens||0)};if(Number(telemetry.soft_max_tokens||0)>0)telemetry.budget_status=telemetry.actual_input_tokens<=telemetry.soft_max_tokens?'OK':'OVER';
-    if(mode==='continue'){lockContinueTurn(data.turn);applyExtendedExpressions(data.turn,incoming0.saveState||{});data.runtime_state=consumeContinuationRuntime({...incoming,saveState:object(incoming0.saveState)},data.turn);data.background_digest=String(incoming.saveState?.backgroundDigest||'').slice(-1800);const pipeline={pipeline:'continue-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,scene_novelty:data.runtime_state.scene_runtime?.novelty||null,scene_novelty_v1:true,scene_purpose:data.runtime_state.scene_runtime?.purpose||null,scene_purpose_v1:true,scene_exit_condition:data.runtime_state.scene_runtime?.exit_condition||null,scene_exit_condition_v1:true,turn_hook:data.runtime_state.scene_runtime?.turn_hook||null,turn_hook_v1:true,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true,faction_social_v1:true};data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);}
-    if(mode==='meta'){const pipeline={pipeline:'meta-full-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true,faction_social_v1:true};data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);}
-    applyExtendedExpressions(data.turn,incoming0.saveState||{});data.turn.choices=filterTurnHookChoices(incoming.action,{...data.turn,choices:freshChoices(incoming.action,data.turn)});const consequenceId=String(telemetry?.event_director_v2?.event_consequence_id||'');const selectedConsequence=findEventConsequence(incoming.saveState,consequenceId);const consequenceLifecycle=reconcileEventConsequenceLifecycle({saveState:incoming.saveState,turn:data.turn,selectedConsequence});const sceneIntent=applySceneMomentumTimeFloor({...incoming0,saveState:incoming.saveState,action:incoming0.action||''},data.turn,mode,consequenceLifecycle);const sceneRuntime=localSceneRuntime({...incoming0,saveState:incoming.saveState,action:incoming0.action||''},data.turn,telemetry?.event_director_v2,mode);const npcUpdates=incoming0.qualityPipeline===false?{}:localNpcUpdates(incoming0,data.turn);const offscreenProgression=deriveBoundedOffscreenProgression({saveState:incoming.saveState,turn:data.turn,participants:sceneRuntime.participants,enabled:incoming0.backgroundSim!==false});data.runtime_state={npc_updates:npcUpdates,scene_runtime:sceneRuntime,offscreen_npc_updates:offscreenProgression.npc_state_updates};data.background_digest=appendOffscreenDigest(localBackgroundDigest(incoming0,data.turn,sceneRuntime.participants),offscreenProgression);
+    if(mode==='continue'){lockContinueTurn(data.turn);applyExtendedExpressions(data.turn,incoming0.saveState||{});data.runtime_state=consumeContinuationRuntime({...incoming,saveState:object(incoming0.saveState)},data.turn);data.background_digest=String(incoming.saveState?.backgroundDigest||'').slice(-1800);const pipeline={pipeline:'continue-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,scene_novelty:data.runtime_state.scene_runtime?.novelty||null,scene_novelty_v1:true,scene_purpose:data.runtime_state.scene_runtime?.purpose||null,scene_purpose_v1:true,scene_exit_condition:data.runtime_state.scene_runtime?.exit_condition||null,scene_exit_condition_v1:true,turn_hook:data.runtime_state.scene_runtime?.turn_hook||null,turn_hook_v1:true,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true,faction_social_v1:true,skill_learning_v1:true};data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);}
+    if(mode==='meta'){if(data.turn?.state_delta)data.turn.state_delta.skill_learning=[];const pipeline={pipeline:'meta-full-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true,faction_social_v1:true,skill_learning_v1:true};data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);}
+    applyExtendedExpressions(data.turn,incoming0.saveState||{});
+    data.turn.choices=filterTurnHookChoices(incoming.action,{...data.turn,choices:freshChoices(incoming.action,data.turn)});
+    const skillLearningState=deriveSkillLearningState({
+      existingSkills:incoming0.saveState?.pc?.skills,
+      previousCandidates:incoming0.saveState?.pc?.skillCandidates,
+      changes:data.turn?.state_delta?.skill_learning,
+      action:incoming0.action||'',
+      scene:data.turn?.scene,
+      turnNumber:Number(incoming0.saveState?.turnNumber||0)+1,
+      allowProgress:mode==='game',
+    });
+    if(data.turn?.state_delta)data.turn.state_delta.skill_learning=skillLearningState.accepted_changes;
+    const consequenceId=String(telemetry?.event_director_v2?.event_consequence_id||'');
+    const selectedConsequence=findEventConsequence(incoming.saveState,consequenceId);
+    const consequenceLifecycle=reconcileEventConsequenceLifecycle({saveState:incoming.saveState,turn:data.turn,selectedConsequence});
+    const sceneIntent=applySceneMomentumTimeFloor({...incoming0,saveState:incoming.saveState,action:incoming0.action||''},data.turn,mode,consequenceLifecycle);
+    const sceneRuntime=localSceneRuntime({...incoming0,saveState:incoming.saveState,action:incoming0.action||''},data.turn,telemetry?.event_director_v2,mode);
+    const npcUpdates=incoming0.qualityPipeline===false?{}:localNpcUpdates(incoming0,data.turn);
+    const offscreenProgression=deriveBoundedOffscreenProgression({saveState:incoming.saveState,turn:data.turn,participants:sceneRuntime.participants,enabled:incoming0.backgroundSim!==false});
+    data.runtime_state={npc_updates:npcUpdates,scene_runtime:sceneRuntime,offscreen_npc_updates:offscreenProgression.npc_state_updates,skill_learning:skillLearningState};
+    data.background_digest=appendOffscreenDigest(localBackgroundDigest(incoming0,data.turn,sceneRuntime.participants),offscreenProgression);
     const sceneMomentum={version:SCENE_MOMENTUM_VERSION,intent:sceneIntent?.kind||sceneRuntime?.momentum?.last_intent||'generic',score:Number(sceneRuntime?.momentum?.last_score||0),structural_score:Number(sceneRuntime?.momentum?.last_structural_score||0),target:Number(sceneRuntime?.momentum?.last_target||0),stall_streak:Number(sceneRuntime?.momentum?.stall_streak||0),pressure:sceneRuntime?.momentum?.pressure||'normal'};
     const sceneNovelty={version:SCENE_NOVELTY_VERSION,repetition_streak:Number(sceneRuntime?.novelty?.repetition_streak||0),last_similarity:Number(sceneRuntime?.novelty?.last_similarity||0),repeated_terms:array(sceneRuntime?.novelty?.repeated_terms).slice(0,8)};
     const factionSocialTelemetry=compactFactionSocialTelemetry(sceneRuntime.faction_social,incoming.saveState?.sceneRuntime?.faction_social);
-    const pipeline={pipeline:incoming0.qualityPipeline===false?'single-writer-stable-v156-hf1':'single-pass-q3-stable-v156-hf1',stages:1,qa_result:incoming0.qualityPipeline===false?'SKIP':'LOCAL_GUARD',rewrite_applied:false,background_sim:false,background_local:incoming0.backgroundSim!==false,offscreen_progression:offscreenProgression.telemetry,offscreen_progression_v1:true,combat_engine:isCombatLike(incoming.action),runtime_synthesized:true,continuation_beats:array(sceneRuntime.remaining_beats).length,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,scene_momentum:sceneMomentum,scene_momentum_v1:true,scene_novelty:sceneNovelty,scene_novelty_v1:true,scene_purpose:sceneRuntime.purpose||null,scene_purpose_v1:true,scene_exit_condition:sceneRuntime.exit_condition||null,scene_exit_condition_v1:true,turn_hook:sceneRuntime.turn_hook||null,turn_hook_v1:true,event_consequence:consequenceLifecycle,event_consequence_v1:true,npc_motivation_v1:true,npc_goal_v2:true,npc_goal_tick:sceneRuntime.goal_tick||null,npc_goal_tick_v1:true,relationship_reason_v1:true,faction_social:factionSocialTelemetry,faction_social_v1:true,note:'V1.5.6 Scene Momentum Recovery HF1 keeps one core model call while restoring semantic action compression, deterministic State Delta/stall tracking, NPC initiative, downtime skip, and meaningful stop points. Deterministic Scene Novelty V1 suppresses unchanged visible-term relisting with bounded runtime evidence. Scene Purpose V1 adds bounded scene-focus continuity; Explicit Scene Exit Condition V1 adds deterministic stop boundaries; Stronger Turn Hook V1 keeps a concrete next direction; Event Consequence V1 gives delayed causal results a bounded persisted lifecycle; NPC Goal Tick V1 lets an eligible present NPC pursue a high-drive goal after player-owned action resolution without bypassing fixed-flow guards; Bounded Off-screen Progression V1 advances only public non-PC schedule starts for known absent NPCs; Faction / Social Consequence V1 persists evidence-gated public-organization reputation without mutating personal relationships.'};
+    const skillLearningTelemetry=compactSkillLearningTelemetry(skillLearningState);
+    const pipeline={pipeline:incoming0.qualityPipeline===false?'single-writer-stable-v156-hf1':'single-pass-q3-stable-v156-hf1',stages:1,qa_result:incoming0.qualityPipeline===false?'SKIP':'LOCAL_GUARD',rewrite_applied:false,background_sim:false,background_local:incoming0.backgroundSim!==false,offscreen_progression:offscreenProgression.telemetry,offscreen_progression_v1:true,combat_engine:isCombatLike(incoming.action),runtime_synthesized:true,continuation_beats:array(sceneRuntime.remaining_beats).length,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,scene_momentum:sceneMomentum,scene_momentum_v1:true,scene_novelty:sceneNovelty,scene_novelty_v1:true,scene_purpose:sceneRuntime.purpose||null,scene_purpose_v1:true,scene_exit_condition:sceneRuntime.exit_condition||null,scene_exit_condition_v1:true,turn_hook:sceneRuntime.turn_hook||null,turn_hook_v1:true,event_consequence:consequenceLifecycle,event_consequence_v1:true,npc_motivation_v1:true,npc_goal_v2:true,npc_goal_tick:sceneRuntime.goal_tick||null,npc_goal_tick_v1:true,relationship_reason_v1:true,faction_social:factionSocialTelemetry,faction_social_v1:true,skill_learning:skillLearningTelemetry,skill_learning_v1:true,note:'V1.5.6 Scene Momentum Recovery HF1 keeps one core model call while restoring semantic action compression, deterministic State Delta/stall tracking, NPC initiative, downtime skip, and meaningful stop points. Deterministic Scene Novelty V1 suppresses unchanged visible-term relisting with bounded runtime evidence. Scene Purpose V1 adds bounded scene-focus continuity; Explicit Scene Exit Condition V1 adds deterministic stop boundaries; Stronger Turn Hook V1 keeps a concrete next direction; Event Consequence V1 gives delayed causal results a bounded persisted lifecycle; NPC Goal Tick V1 lets an eligible present NPC pursue a high-drive goal after player-owned action resolution without bypassing fixed-flow guards; Bounded Off-screen Progression V1 advances only public non-PC schedule starts for known absent NPCs; Faction / Social Consequence V1 persists evidence-gated public-organization reputation without mutating personal relationships; Skill Learning V1 persists evidence-gated bounded learning candidates and promotes them only at 100 progress.'};
     data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);
   }catch(error){console.error('[V1.5.6]',error);return res.status(Number.isInteger(error?.status)?error.status:500).json({error:error?.message||String(error),code:error?.code||'STABLE_ROUTER_V156_ERROR',server_version:ADAPTER_VERSION});}
 }

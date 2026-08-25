@@ -286,7 +286,7 @@ function accumulateUsageStable(usage) {
 function zeroStateDeltaStable() {
   return {
     advance_minutes: 0, new_location: null, pc_status: null, fatigue_delta: 0, gold_delta: 0,
-    relationship_changes: [], npc_relationship_changes: [], faction_reputation_changes: [], intimacy_changes: [], stat_progress: [], skill_experience: [],
+    relationship_changes: [], npc_relationship_changes: [], faction_reputation_changes: [], intimacy_changes: [], stat_progress: [], skill_experience: [], skill_learning: [],
     items_add: [], items_remove: [], active_events_add: [], active_events_remove: [], completed_events_add: [],
     pc_knowledge_add: [], scheduled_events_add: [], scheduled_events_complete: [], hooks_add: [], hooks_update: [],
     memories_add: [], npc_state_updates: [],
@@ -314,6 +314,42 @@ function compactStateStable() {
   };
 }
 
+function applySkillLearningRuntimeStable(runtime = {}) {
+  const packet = runtime?.skill_learning;
+  if (!packet || typeof packet !== 'object' || Array.isArray(packet)) return [];
+  const notices = [];
+  const forbidden = new Set(['__proto__', 'prototype', 'constructor']);
+  const clean = (value, max) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+  const candidates = {};
+  for (const [rawName, raw] of Object.entries(packet.candidates && typeof packet.candidates === 'object' && !Array.isArray(packet.candidates) ? packet.candidates : {}).slice(0, 8)) {
+    const name = clean(rawName, 48);
+    if (name.length < 2 || forbidden.has(name) || /[{}<>\r\n]/.test(name) || save.pc.skills?.[name]) continue;
+    const progress = Math.trunc(clamp(raw?.progress, 0, 99));
+    if (progress <= 0) continue;
+    candidates[name] = {
+      progress,
+      basis: clean(raw?.basis, 120) || null,
+      reason: clean(raw?.reason, 280) || null,
+      updated_turn: Math.max(0, Math.trunc(Number(raw?.updated_turn || 0))),
+      history: (Array.isArray(raw?.history) ? raw.history : []).slice(-6).map((row) => ({
+        turn: Math.max(0, Math.trunc(Number(row?.turn || 0))),
+        amount: Math.trunc(clamp(row?.amount, 1, 15)),
+        basis: clean(row?.basis, 120),
+        reason: clean(row?.reason, 280),
+      })).filter((row) => row.basis && row.reason),
+    };
+  }
+  save.pc.skillCandidates = candidates;
+  for (const raw of (Array.isArray(packet.unlocked_skills) ? packet.unlocked_skills : []).slice(0, 2)) {
+    const name = clean(raw?.skill, 48);
+    if (name.length < 2 || forbidden.has(name) || /[{}<>\r\n]/.test(name) || save.pc.skills?.[name]) continue;
+    save.pc.skills[name] = { grade: 'F', hiddenXp: 0 };
+    delete save.pc.skillCandidates[name];
+    notices.push(`새 스킬 습득: ${name} F`);
+  }
+  return notices;
+}
+
 function applyNpcRelationshipDeltaStable(turn, runtime = {}) {
   const serverBacked = new Set(Object.entries(runtime?.npc_updates || {}).filter(([, row]) => row?.npc_relationships && typeof row.npc_relationships === 'object').map(([key]) => key));
   const rows = Array.isArray(turn?.state_delta?.npc_relationship_changes) ? turn.state_delta.npc_relationship_changes.slice(0, 6) : [];
@@ -339,6 +375,7 @@ function applyNpcRelationshipDeltaStable(turn, runtime = {}) {
 
 function applyRuntimeStateStable(data, isContinue = false) {
   const runtime = data?.runtime_state || {};
+  const notices = applySkillLearningRuntimeStable(runtime);
   save.npcInnerStates = save.npcInnerStates || {};
   applyNpcRelationshipDeltaStable(data?.turn, runtime);
   for (const [key, row] of Object.entries(runtime.npc_updates || {})) {
@@ -372,6 +409,7 @@ function applyRuntimeStateStable(data, isContinue = false) {
     save.debug = save.debug || {};
     save.debug.lastPipeline = save.qualityTelemetry;
   }
+  return notices;
 }
 
 function materializeEventConsequencesStable(turn, pipeline = null, action = '') {
@@ -542,7 +580,7 @@ async function sendActionStable(action, requestedMode = null) {
       mergeContinuationIntoRecentStable(data.turn);
     }
 
-    if (!isMeta) applyRuntimeStateStable(data, isContinue);
+    if (!isMeta) record.notices.push(...applyRuntimeStateStable(data, isContinue));
 
     save.renderedTurns.push(record);
     save.renderedTurns = save.renderedTurns.slice(-80);
@@ -713,6 +751,20 @@ async function boot() {
       'updateStatus'
     );
 
+    source = replaceOnce(
+      source,
+      "  const skills = Object.entries(save.pc.skills || {}).map(([k,v]) => `${k} ${v.grade}`).join(' | ') || '-';\n  const stats = Object.entries(save.pc.stats || {}).map(([k,v]) => `- ${k}: ${v.grade} [${v.progress}/100]`).join('\\n');",
+      "  const skills = Object.entries(save.pc.skills || {}).map(([k,v]) => `${k} ${v.grade}`).join(' | ') || '-';\n  const learning = Object.entries(save.pc.skillCandidates || {}).map(([k,v]) => `${k} ${Number(v?.progress || 0)}/100`).join(' | ') || '-';\n  const stats = Object.entries(save.pc.stats || {}).map(([k,v]) => `- ${k}: ${v.grade} [${v.progress}/100]`).join('\\n');",
+      'renderInfo skill candidates'
+    );
+
+    source = replaceOnce(
+      source,
+      '\\n스킬: ${skills}\\n---------\\n스탯:',
+      '\\n스킬: ${skills}\\n학습 중: ${learning}\\n---------\\n스탯:',
+      'renderInfo skill candidate line'
+    );
+
     const helperSource = [
       `const AUTO_GESTURE_PX = ${AUTO_GESTURE_PX};`,
       `const FLOW_AUTO_ACTION_Stable = ${JSON.stringify(FLOW_AUTO_ACTION)};`,
@@ -728,6 +780,7 @@ async function boot() {
       accumulateUsageStable.toString(),
       zeroStateDeltaStable.toString(),
       compactStateStable.toString(),
+      applySkillLearningRuntimeStable.toString(),
       applyNpcRelationshipDeltaStable.toString(),
       applyRuntimeStateStable.toString(),
       materializeEventConsequencesStable.toString(),
