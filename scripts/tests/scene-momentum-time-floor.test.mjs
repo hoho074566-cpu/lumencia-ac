@@ -324,6 +324,21 @@ assert.deepEqual(turn.state_delta.relationship_changes,[arrivalRelationship],'a 
 assert.deepEqual(turn.state_delta.pc_knowledge_add,[arrivalKnowledge],'knowledge visibly learned from the consequence must survive boundary shortening');
 assert.deepEqual(turn.state_delta.memories_add,[arrivalMemory],'a memory visibly formed by the consequence must survive boundary shortening');
 assert.deepEqual(turn.state_delta.hooks_update,[{id:consequenceHook.id,status:'resolved'}],'the preserved consequence state and its resolved lifecycle must remain aligned');
+turn={scene:[{kind:'narration',text:'약속 시각이 되자 에밀리가 중앙광장에 도착해 보상으로 금화 12개를 건넸고, 기다림의 피로가 조금 풀렸다.'}],state_delta:{advance_minutes:40,gold_delta:12,fatigue_delta:-1,hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
+const scalarConsequenceEffects=consequenceNpcEffectsForShortening(turn,{event_name:'약속 상대의 도착',reason:'약속 장소에 도착한다',secret_level:0},['emily'],{emily:'에밀리'});
+assert.equal(scalarConsequenceEffects.attribution_safe,true,'visible consequence-owned resource changes must be safely attributable');
+applySceneMomentumTimeFloor({action:'40분 기다린다.',saveState:consequenceSave},turn,'game',{selected_id:consequenceHook.id,status:'resolved',...scalarConsequenceEffects});
+assert.equal(turn.state_delta.gold_delta,12,'visible consequence-owned gold must survive boundary shortening');
+assert.equal(turn.state_delta.fatigue_delta,-1,'visible consequence-owned fatigue recovery must survive boundary shortening');
+assert.deepEqual(turn.state_delta.hooks_update,[{id:consequenceHook.id,status:'resolved'}],'preserved scalar effects and the resolved lifecycle must remain aligned');
+turn={scene:[{kind:'narration',text:'약속 시각이 되자 에밀리가 중앙광장에 도착했다.'}],state_delta:{advance_minutes:40,gold_delta:12,hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
+const ambiguousScalarEffects=consequenceNpcEffectsForShortening(turn,{event_name:'약속 상대의 도착',reason:'약속 장소에 도착한다',secret_level:0},['emily'],{emily:'에밀리'});
+assert.equal(ambiguousScalarEffects.attribution_safe,false,'an invisible scalar change must keep consequence attribution unresolved');
+const ambiguousScalarLifecycle={selected_id:consequenceHook.id,status:'resolved',...ambiguousScalarEffects};
+applySceneMomentumTimeFloor({action:'40분 기다린다.',saveState:consequenceSave},turn,'game',ambiguousScalarLifecycle);
+assert.equal(turn.state_delta.gold_delta,0,'an unattributed scalar effect must fail closed at the consequence boundary');
+assert.deepEqual(turn.state_delta.hooks_update,[{id:consequenceHook.id,status:'open',reason:'발현 시각 도달; NPC 경계 효과 귀속 대기'}],'an unattributed scalar effect must reopen the consequence lifecycle');
+assert.equal(ambiguousScalarLifecycle.status,'open','scalar attribution telemetry must agree with the reopened lifecycle');
 
 const rangedConsequenceSave={...consequenceSave,world:{...consequenceSave.world,time:'08:40'}};
 turn={scene:[{kind:'narration',text:'한 시간째 약속 시각이 되어 에밀리가 중앙광장에 도착했다.'}],state_delta:{advance_minutes:90,npc_state_updates:[{npc_key:'emily',location:'중앙광장',status:'도착'}],hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
@@ -481,6 +496,7 @@ assert.deepEqual(safeRuntimeTurn.scene,[],'post-boundary speakers must not reach
 assert.deepEqual(safeRuntimeTurn.emotion_updates,[],'post-boundary speaker moods must not reach runtime synthesis');
 assert.deepEqual(safeRuntimeTurn.choices,[],'post-boundary choices must not influence runtime continuity');
 assert.equal(safeRuntimeTurn.state_delta.advance_minutes,5,'the reconciled bounded state delta must remain available to runtime synthesis');
+assert.equal(safeRuntimeTurn.runtime_incomplete_boundary,true,'runtime synthesis must mark the sanitized turn as an incomplete scene boundary');
 assert.strictEqual(turn.scene,futureScene,'runtime fail-closed filtering must not erase the user-visible response');
 turn={scene:[{kind:'narration',text:'기다림을 마쳤다.'}],state_delta:{advance_minutes:100,skill_experience:[{skill:'검술',amount:1}]},choices:[],event_progress:null};
 applySceneMomentumTimeFloor({action:'0분에서 10분 동안 기다린다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');

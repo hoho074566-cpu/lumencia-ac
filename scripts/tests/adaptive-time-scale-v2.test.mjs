@@ -75,6 +75,11 @@ assert.equal(rangedTraining.minAdvanceMinutes,60,'the lower range endpoint must 
 assert.deepEqual(rangedTraining.suggestedAdvanceMinutes,[60,120],'the time guide must retain both range endpoints without summing them');
 assert.match(buildSceneMomentumDirective({action:'1시간에서 2시간 동안 훈련한다.',saveState:{world:{date:'1285-03-01',time:'09:00',location:'훈련장'}}}),/EXPLICIT_DURATION_RANGE=60-120min/,'the model must receive the declared range as a range');
 assert.deepEqual(classifySceneIntent('30분~1시간 동안 기다린다.').suggestedAdvanceMinutes,[30,60],'tilde-separated duration ranges must also retain their endpoints');
+const sharedHourRange=classifySceneIntent('1~2시간 동안 훈련한다.', { location:'훈련장' });
+assert.equal(sharedHourRange.explicitDurationMinutes,null,'a shared-unit hour range must not collapse to its upper endpoint');
+assert.deepEqual(sharedHourRange.explicitDurationRangeMinutes,[60,120],'shared-unit hour shorthand must retain both endpoints');
+assert.deepEqual(sharedHourRange.suggestedAdvanceMinutes,[60,120],'shared-unit hour shorthand must bound the time guide');
+assert.deepEqual(classifySceneIntent('30~60분 동안 기다린다.').suggestedAdvanceMinutes,[30,60],'shared-unit minute shorthand must retain both endpoints');
 assert.deepEqual(classifySceneIntent('훈련을 1시간부터 2시간까지 한다.').suggestedAdvanceMinutes,[60,120],'object-marked from/to duration ranges must remain bounded ranges');
 const rangedFutureStart=classifySceneIntent('1시간에서 2시간 후에 훈련한다.',{currentTime:'09:00'});
 assert.equal(rangedFutureStart.explicitDurationRangeMinutes,null,'a future start window must not become an activity duration range');
@@ -168,6 +173,8 @@ const namedPcOrientation={id:'newcomer-orientation',title:'신입생 오리엔�
 assert.equal(isRequestedScheduledActivity(namedPcScheduleSave,namedPcOrientation,namedPcOrientationAction),true,'the saved PC subject must not prevent matching their requested schedule');
 const precedingClass={id:'preceding-class',title:'기사과 기초 수업',date:'1285-03-01',time:'10:00',kind:'academic',status:'scheduled'},precedingClassSave={pc:{name:'카인',department:'기사과'},world:{date:'1285-03-01',time:'08:00',location:'기숙사'},scheduledEvents:[precedingClass],scheduleContext:{due:[],upcoming:[precedingClass]}},classThenSleep='오전 10시에 기사과 기초 수업을 듣고 8시간 동안 잠을 잔다.';
 assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,classThenSleep),true,'an explicitly requested schedule in a preceding compound clause must not become an unrelated boundary');
+const durationQualifiedClassAction='오전 10시에 기사과 기초 수업을 1시간 동안 듣는다.';
+assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,durationQualifiedClassAction),true,'duration glue must not make the requested schedule look unrelated');
 const overrunClassAction='3시간 동안 훈련하고 오전 10시에 기사과 기초 수업을 듣는다.',overrunClassIntent=classifySceneIntent(overrunClassAction,{location:'훈련장',currentTime:'08:00',actorName:'카인'});
 assert.equal(overrunClassIntent.scheduledStartOverrun,true,'preceding work longer than the fixed start offset must be marked as an overrun');
 assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,overrunClassAction,overrunClassIntent),false,'an impossible terminal schedule start must remain a hard boundary');

@@ -368,7 +368,7 @@ function consequenceEffectMatches(value,segments=[]){
 }
 function consequenceNpcEffectsForShortening(turn,consequence,routedKeys=[],registry=CHARACTER_REGISTRY){
   const routed=new Set(array(routedKeys).map(value=>String(value||'').trim()).filter(value=>Object.prototype.hasOwnProperty.call(registry,value))),keys=new Set(routed),evidence=consequenceEvidenceSegments(turn,consequence);
-  if(!evidence.tokens.length&&!evidence.matched.length)return{npc_keys:[...keys].slice(0,4),npc_state_updates:[],npc_schedule_updates:[],preserved_delta:{},attribution_safe:true};
+  if(!evidence.tokens.length&&!evidence.matched.length){const delta=object(turn?.state_delta),hasUnattributedScalar=['gold_delta','fatigue_delta'].some(field=>Number(delta[field]||0)!==0);return{npc_keys:[...keys].slice(0,4),npc_state_updates:[],npc_schedule_updates:[],preserved_delta:{},attribution_safe:!hasUnattributedScalar};}
   const updated=new Set([...array(turn?.state_delta?.npc_state_updates),...array(turn?.state_delta?.npc_schedule_updates)].map(row=>String(row?.npc_key||row?.key||'').trim()).filter(Boolean));
   for(const key of updated){
     if(!Object.prototype.hasOwnProperty.call(registry,key))continue;
@@ -403,10 +403,13 @@ function consequenceNpcEffectsForShortening(turn,consequence,routedKeys=[],regis
   preservedLinkedRelationshipCount+=keptNpcRelationships.length;if(keptNpcRelationships.length)preservedDelta.npc_relationship_changes=keptNpcRelationships;
   const reservedFields=new Set([...linkedRelationshipFields,'npc_relationship_changes','npc_state_updates','npc_schedule_updates','hooks_update']),evidenceFields=Object.entries(delta).filter(([field,value])=>Array.isArray(value)&&!reservedFields.has(field)).map(([field])=>field);
   for(const field of evidenceFields){const kept=array(delta[field]).filter(row=>consequenceEffectMatches(row,evidence.matched));if(kept.length)preservedDelta[field]=kept;}
+  const scalarCues={gold_delta:/(?:금화|골드|돈|상금|보상|지급|지불|상환|빚|채무|대금|비용|소지금)/,fatigue_delta:/(?:피로|지침|지쳤|회복|휴식|탈진|기력)/};
+  let scalarAttributionSafe=true;
+  for(const [field,cue] of Object.entries(scalarCues)){const value=Number(delta[field]||0);if(value===0)continue;if(evidence.matched.some(segment=>cue.test(segment)))preservedDelta[field]=value;else scalarAttributionSafe=false;}
   for(const field of ['pc_knowledge_add','memories_add'])if(array(delta[field]).length!==array(preservedDelta[field]).length)return{npc_keys:[...limitedKeys],npc_state_updates:preservedState,npc_schedule_updates:preservedSchedule,preserved_delta:preservedDelta,attribution_safe:false};
   const relevantNpcCount=[...array(delta.npc_state_updates),...array(delta.npc_schedule_updates)].filter(row=>limitedKeys.has(String(row?.npc_key||row?.key||'').trim())).length;
   const npcAttributionSafe=relevantNpcCount===0||preservedState.length+preservedSchedule.length>0,relationshipAttributionSafe=linkedRelationshipCount===preservedLinkedRelationshipCount;
-  return{npc_keys:[...limitedKeys],npc_state_updates:preservedState,npc_schedule_updates:preservedSchedule,preserved_delta:preservedDelta,attribution_safe:npcAttributionSafe&&relationshipAttributionSafe};
+  return{npc_keys:[...limitedKeys],npc_state_updates:preservedState,npc_schedule_updates:preservedSchedule,preserved_delta:preservedDelta,attribution_safe:npcAttributionSafe&&relationshipAttributionSafe&&scalarAttributionSafe};
 }
 function consequenceNpcKeysForShortening(turn,consequence,routedKeys=[],registry=CHARACTER_REGISTRY){
   return consequenceNpcEffectsForShortening(turn,consequence,routedKeys,registry).npc_keys;
@@ -439,8 +442,8 @@ function reconcileShortenedTimedTurn(turn,{preserveConsequenceId='',preserveNpcS
   const consequenceId=String(preserveConsequenceId||'').trim();
   const hooksUpdate=consequenceId?array(delta.hooks_update).filter(row=>String(row?.id||'').trim()===consequenceId):[],frozen={},attributed={};
   for(const [field,value] of Object.entries(delta))frozen[field]=Array.isArray(value)?[]:typeof value==='number'?0:null;
-  for(const [field,value] of Object.entries(object(preserveDelta)))if(Array.isArray(delta[field])&&Array.isArray(value)&&!['npc_state_updates','npc_schedule_updates','hooks_update'].includes(field))attributed[field]=value;
-  turn.state_delta={...frozen,...attributed,advance_minutes:0,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0,npc_state_updates:array(preserveNpcStateUpdates),npc_schedule_updates:array(preserveNpcScheduleUpdates),hooks_update:hooksUpdate};
+  for(const [field,value] of Object.entries(object(preserveDelta))){if(Array.isArray(delta[field])&&Array.isArray(value)&&!['npc_state_updates','npc_schedule_updates','hooks_update'].includes(field))attributed[field]=value;else if(['fatigue_delta','gold_delta'].includes(field)&&Number.isFinite(Number(value)))attributed[field]=Number(value);}
+  turn.state_delta={...frozen,...attributed,advance_minutes:0,new_location:null,pc_status:null,fatigue_delta:Number(attributed.fatigue_delta||0),gold_delta:Number(attributed.gold_delta||0),npc_state_updates:array(preserveNpcStateUpdates),npc_schedule_updates:array(preserveNpcScheduleUpdates),hooks_update:hooksUpdate};
   turn.event_progress=null;
 }
 function reconcileExplicitZeroTurn(turn){
@@ -516,7 +519,7 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
 }
 function runtimeSynthesisTurn(turn,intent={}){
   if(intent?.runtimeSceneTrusted!==false)return turn;
-  return{...object(turn),scene:[],scene_title:'',scene_summary:'',choices:[],emotion_updates:[],director:null};
+  return{...object(turn),scene:[],scene_title:'',scene_summary:'',choices:[],emotion_updates:[],director:null,runtime_incomplete_boundary:true};
 }
 function uniqText(rows,limit=4){return [...new Set(array(rows).map(x=>clampText(x,140).trim()).filter(Boolean))].slice(-limit);}
 function tinyHash(text=''){let h=0x811c9dc5;for(const ch of String(text)){h^=ch.charCodeAt(0);h=Math.imul(h,0x01000193);}return(h>>>0).toString(16).padStart(8,'0');}
@@ -731,7 +734,7 @@ function localSceneRuntime(incoming,turn,directorTelemetry=null,mode='game',orch
   const novelty=deriveSceneNovelty({previousRuntime:previous,turn,sceneDelta,action:incoming.action||'',turnNumber,mode});
   const purpose=deriveScenePurpose({previousRuntime:previous,turn,sceneDelta,eventProgress:progressState.eventProgress,action:incoming.action||'',sceneKey,turnNumber});
   const proposedExit=deriveSceneExitCondition({action:incoming.action||'',saveState:incoming.saveState||{},purpose,turnNumber});
-  const exitCondition=evaluateSceneExitCondition(proposedExit,{turn,sceneDelta,previousRuntime:previous,eventProgress:progressState.eventProgress});
+  const exitCondition=evaluateSceneExitCondition(proposedExit,{turn,sceneDelta,previousRuntime:previous,eventProgress:progressState.eventProgress,incompleteBoundary:turn?.runtime_incomplete_boundary===true});
   const turnHook=deriveTurnHook({turn,sceneDelta,purpose,exitCondition,eventProgress:progressState.eventProgress,previousRuntime:previous,action:incoming.action||'',mode,turnNumber});
   const goalTick=deriveGoalTickState({previousRuntime:previous,directorTelemetry,turn,turnNumber,saveState:incoming.saveState||{}});
   const worldResultSurface=deriveWorldResultSurfaceState({previousRuntime:previous,directorTelemetry,turn,turnNumber});

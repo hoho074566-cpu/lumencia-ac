@@ -37,6 +37,12 @@ assert.equal(question.kind,'question-answered');
 const answered=evaluateSceneExitCondition(question,{turn:{scene:[{kind:'dialogue',speaker_key:'guide',text:'아직 늦지는 않았어.'}],choices:[]},sceneDelta:{score:1,structuralScore:0,advanceMinutes:0,flags:{npcAction:true}}});
 assert.equal(answered.status,'reached');
 assert.match(buildSceneExitDirective({action:'지금 입학식에 돌아갈까?',saveState:baseSave}),/질문 속 가능 행동을 실행하거나 시간·위치·진행 상태를 바꾸지 않는다/);
+const downtime=deriveSceneExitCondition({action:'좀 쉰다.',saveState:baseSave,turnNumber:13});
+const truncatedDowntime=evaluateSceneExitCondition(downtime,{turn:{scene:[],choices:[]},sceneDelta:{score:1,structuralScore:0,advanceMinutes:20,flags:{timeAdvanced:true}},incompleteBoundary:true});
+assert.equal(truncatedDowntime.status,'open','a sanitized partial timed turn must not close its scene boundary from time alone');
+const genericAction=deriveSceneExitCondition({action:'문서를 정리한다.',saveState:baseSave,turnNumber:13});
+const truncatedAction=evaluateSceneExitCondition(genericAction,{turn:{scene:[],choices:[]},sceneDelta:{score:2,structuralScore:1,advanceMinutes:5,flags:{objectiveChanged:true}},incompleteBoundary:true});
+assert.equal(truncatedAction.status,'open','a sanitized partial action must not close its scene boundary from structural delta alone');
 
 const openEvent=deriveSceneExitCondition({action:'[AUTO FLOW: PC 새 행동 없음]',saveState:baseSave,purpose,turnNumber:13});
 assert.equal(openEvent.kind,'event-step');
