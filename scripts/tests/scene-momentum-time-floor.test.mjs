@@ -348,6 +348,8 @@ const scheduleCoupledEffects=consequenceNpcEffectsForShortening(turn,{event_name
 assert.equal(scheduleCoupledEffects.attribution_safe,false,'an unrebased consequence-owned NPC schedule must keep attribution unresolved');
 const partialNpcEffects=consequenceNpcEffectsForShortening({scene:[{kind:'narration',text:'약속 시각이 되자 에밀리가 중앙광장에 도착했다.'}],state_delta:{advance_minutes:40,npc_state_updates:[{npc_key:'emily',location:'중앙광장',goal_progress_delta:20}],hooks_update:[{id:consequenceHook.id,status:'resolved'}]}},{event_name:'약속 상대의 도착',reason:'약속 장소에 도착한다',secret_level:0},['emily'],{emily:'에밀리'});
 assert.equal(partialNpcEffects.attribution_safe,false,'a partially preserved NPC row must not resolve while any material field remains unattributed');
+const mismatchedArrayEffects=consequenceNpcEffectsForShortening({scene:[{kind:'narration',text:'약속 시각이 되자 에밀리가 중앙광장에 도착해 치유 물약을 건넸다.'}],state_delta:{advance_minutes:40,items_add:['healing_potion'],hooks_update:[{id:consequenceHook.id,status:'resolved'}]}},{event_name:'약속 상대의 도착',reason:'약속 장소에 도착한다',secret_level:0},['emily'],{emily:'에밀리'});
+assert.equal(mismatchedArrayEffects.attribution_safe,false,'a material array effect that cannot be matched literally must keep the consequence open');
 const tokenlessSecretConsequence={id:'secret-result',event_name:'후속 결과',secret_level:5,reason:'숨겨진 원인'};
 const tokenlessEffects=consequenceNpcEffectsForShortening({scene:[{kind:'narration',text:'복도 저편에서 낯선 움직임이 번졌다.'}],state_delta:{advance_minutes:60,npc_state_updates:[{npc_key:'emily',status:'추적 중'}],npc_schedule_updates:[{npc_key:'emily',activity:'비밀 조사'}],relationship_changes:[{npc_key:'emily',affinity_delta:1,reason:'숨겨진 반응'}]}},tokenlessSecretConsequence,['emily']);
 assert.equal(tokenlessEffects.attribution_safe,false,'a tokenless consequence with any unpreserved NPC, schedule, or relationship effect must remain unresolved');
@@ -373,6 +375,13 @@ const ambiguousScalarLifecycle={selected_id:consequenceHook.id,status:'resolved'
 applySceneMomentumTimeFloor({action:'40분 기다린다.',saveState:consequenceSave},turn,'game',ambiguousScalarLifecycle);
 assert.equal(turn.state_delta.gold_delta,0,'an unattributed scalar effect must fail closed at the consequence boundary');
 assert.deepEqual(turn.state_delta.hooks_update,[{id:consequenceHook.id,status:'open',reason:'발현 시각 도달; NPC 경계 효과 귀속 대기'}],'an unattributed scalar effect must reopen the consequence lifecycle');
+
+const startOnlyClass={id:'next-day-start-only',title:'기사과 기초 수업',date:'1285-03-02',time:'10:00',kind:'academic',status:'scheduled'},startOnlySave={pc:{department:'기사과'},world:{date:'1285-03-01',time:'10:30',location:'여관'},scheduledEvents:[startOnlyClass],scheduleContext:{due:[],upcoming:[startOnlyClass]}};
+turn={scene_title:'수업 완료',scene:[{kind:'narration',text:'다음 날 기초 수업을 마쳤다.'}],state_delta:{advance_minutes:1440,pc_knowledge_add:['기초 수업 내용'],items_add:['수료 보상'],scheduled_events_complete:['next-day-start-only'],completed_events_add:['next-day-start-only']},choices:[]};
+const startOnlyIntent=applySceneMomentumTimeFloor({action:'내일 오전 10시에 수업을 듣는다.',saveState:startOnlySave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,1410,'a reachable future start must stop before the one-turn cap passes it');
+for(const field of ['pc_knowledge_add','items_add','scheduled_events_complete','completed_events_add'])assert.deepEqual(turn.state_delta[field],[],`${field} must not preserve completion effects at a start-only boundary`);
+assert.equal(startOnlyIntent.reconciliationReason,'turn-limit','start-only future reconciliation must report an incomplete turn-limit boundary');
 assert.equal(ambiguousScalarLifecycle.status,'open','scalar attribution telemetry must agree with the reopened lifecycle');
 
 const rangedConsequenceSave={...consequenceSave,world:{...consequenceSave.world,time:'08:40'}};
