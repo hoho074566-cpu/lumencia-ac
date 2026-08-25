@@ -214,6 +214,10 @@ assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,clas
 const durationQualifiedClassAction='오전 10시에 기사과 기초 수업을 1시간 동안 듣는다.';
 assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,durationQualifiedClassAction),true,'duration glue must not make the requested schedule look unrelated');
 assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,'오전 10시에 기사과 기초수업을 듣는다.'),true,'Korean spacing alone must not make the requested schedule look unrelated');
+const roomClass={id:'room-class',title:'101호 수업',date:'1285-03-01',time:'10:00',kind:'academic',status:'scheduled'},roomClassSave={pc:{name:'카인'},world:{date:'1285-03-01',time:'08:00',location:'기숙사'},scheduledEvents:[roomClass],scheduleContext:{due:[],upcoming:[roomClass]}},rightRoomAction='오전 10시에 101호 수업을 듣는다.',wrongRoomAction='오전 10시에 102호 수업을 듣는다.';
+assert.equal(isRequestedScheduledActivity(roomClassSave,roomClass,rightRoomAction),true,'matching non-time room identifiers must preserve requested-schedule identity');
+assert.equal(isRequestedScheduledActivity(roomClassSave,roomClass,wrongRoomAction),false,'a different room number must not collapse into the unique generic class fallback');
+assert.equal(nextScheduleBoundaryMinutes(roomClassSave,{futureOnly:true,action:wrongRoomAction,intent:classifySceneIntent(wrongRoomAction,{currentTime:'08:00'})}),120,'the conflicting saved room schedule must remain a hard boundary');
 const capitalDeparture={id:'capital-departure',title:'왕도 출발',date:'1285-03-01',time:'10:00',kind:'travel',status:'scheduled'},capitalDepartureSave={pc:{name:'카인'},world:{date:'1285-03-01',time:'08:00',location:'기숙사'},scheduledEvents:[capitalDeparture],scheduleContext:{due:[],upcoming:[capitalDeparture]}},capitalDepartureAction='오전 10시에 왕도로 간다.',capitalDepartureIntent=classifySceneIntent(capitalDepartureAction,{location:'기숙사',currentTime:'08:00',actorName:'카인'});
 assert.equal(capitalDepartureIntent.kind,'travel','a requested saved departure must retain the travel profile');
 assert.equal(capitalDepartureIntent.scheduledStartOffsetMinutes,120,'a requested departure must retain its saved start offset');
@@ -364,6 +368,10 @@ assert.equal(deferredFutureTravel.turnLimitTruncated,true,'deferred future trave
 assert.match(buildSceneMomentumDirective({action:'모레 오전 10시에 왕도로 간다.',saveState:{world:{date:'1285-03-01',time:'09:00',location:'기숙사'}}}),/도착·이동 시작을 만들지 말고/,'deferred travel guidance must not contradict the future-date boundary');
 
 assert.deepEqual(classifySceneIntent('1시간 동안 쉬고 8시간 동안 잠을 잔다.').suggestedAdvanceMinutes,[540,540],'동안 connectors must not be mistaken for downtime negation');
+assert.deepEqual(classifySceneIntent('에밀리가 “1시간 동안 훈련하고 와”라고 말했다. 나는 8시간 동안 잠을 잔다.',{actorName:'카인'}).suggestedAdvanceMinutes,[480,480],'quoted reported work must not be totaled as a preceding player activity');
+assert.deepEqual(classifySceneIntent('에밀리가 1시간 동안 훈련하고 돌아왔다. 나는 8시간 동안 잠을 잔다.',{actorName:'카인'}).suggestedAdvanceMinutes,[480,480],'an already-completed prior sentence must not be totaled into the current action');
+assert.deepEqual(classifySceneIntent('에밀리가 1시간 동안 훈련하고 나는 8시간 동안 잠을 잔다.',{actorName:'카인'}).suggestedAdvanceMinutes,[480,480],'a same-sentence third-party activity must not be attributed to the player');
+assert.deepEqual(classifySceneIntent('나는 1시간 동안 훈련하고 8시간 동안 잠을 잔다.',{actorName:'카인'}).suggestedAdvanceMinutes,[540,540],'a genuine first-person compound must retain its preceding activity');
 
 const boundarySave = {
   pc:{ department:'기사과' },

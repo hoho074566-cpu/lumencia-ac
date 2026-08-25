@@ -569,6 +569,13 @@ turn={scene:[{kind:'narration',text:'기다림을 마쳤다.'}],state_delta:{adv
 applySceneMomentumTimeFloor({action:'0분에서 10분 동안 기다린다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'a zero-minimum range must still enforce its positive maximum');
 assert.deepEqual(turn.state_delta.skill_experience,[],'effects beyond a zero-minimum range maximum must be cleared');
+turn={scene:[{kind:'narration',text:'훈련을 마치고 보상을 챙겼다.'}],state_delta:{advance_minutes:25,fatigue_delta:2,items_add:['훈련 보상'],stat_progress:[{stat:'신체',amount:1}]},choices:[],event_progress:{event_instance_id:'active:training',active_beat:'complete',completed_beats:['complete']}};
+applySceneMomentumTimeFloor({action:'0~0분 동안 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,0,'a zero-length explicit range must freeze the authoritative clock');
+assert.equal(turn.state_delta.fatigue_delta,0,'a zero-length explicit range must reject resource effects');
+assert.deepEqual(turn.state_delta.items_add,[],'a zero-length explicit range must reject item effects');
+assert.deepEqual(turn.state_delta.stat_progress,[],'a zero-length explicit range must reject growth effects');
+assert.equal(turn.event_progress,undefined,'a zero-length explicit range must reject event progress just like scalar zero');
 turn={scene:[{kind:'narration',text:'10분 동안 자세를 반복하던 중 훈련장 문밖에서 비명이 들렸다.'}],state_delta:{advance_minutes:10},choices:['밖으로 달려간다','교관을 부른다','훈련을 계속한다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'a positive-time hazard choice during an unfinished activity must stop at its actual moment');

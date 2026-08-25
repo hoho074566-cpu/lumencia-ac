@@ -485,7 +485,8 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   const hasMeaningfulStop=array(turn?.choices).length>0;
   const current=Math.max(0,Number(turn.state_delta.advance_minutes||0));
   const requestedFloor=Math.min(1440,Math.max(0,Number(intent.minAdvanceMinutes||0)));
-  if(intent.explicitDurationMinutes===0&&requestedFloor<=0&&boundaryLookahead<=0&&Number(intent.scheduledStartOffsetMinutes||0)<=0){reconcileExplicitZeroTurn(turn);return{...intent,runtimeSceneTrusted:false};}
+  const explicitZeroRange=array(intent.explicitDurationRangeMinutes).length===2&&intent.explicitDurationRangeMinutes.every(value=>Number(value)===0);
+  if((intent.explicitDurationMinutes===0||explicitZeroRange)&&requestedFloor<=0&&boundaryLookahead<=0&&Number(intent.scheduledStartOffsetMinutes||0)<=0){reconcileExplicitZeroTurn(turn);return{...intent,runtimeSceneTrusted:false};}
   const requestedMaximum=Math.min(1440,Math.max(requestedFloor,Number(array(intent.suggestedAdvanceMinutes)[1]||0)));
   if(requestedFloor<=0&&boundaryLookahead<=0&&requestedMaximum<=0)return intent;
   const profileMax=boundaryLookahead>0?boundaryLookahead:requestedMaximum;
