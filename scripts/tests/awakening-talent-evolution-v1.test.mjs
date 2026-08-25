@@ -8,7 +8,6 @@ import {
 } from '../../lib/awakening-talent-evolution.js';
 import { deriveSceneDelta } from '../../lib/scene-momentum.js';
 import { routeOpenAIParams } from '../../api/lib/context-router.js';
-import { patchGoalV2StructuredFormat } from '../../api/chat-router.js';
 
 const traitChange = (overrides = {}) => ({
   kind: 'trait',
@@ -206,6 +205,12 @@ const telemetry = compactAwakeningTalentTelemetry(evolvedTalent);
 assert.deepEqual(telemetry.evolved_talent_keys, ['martial']);
 assert.doesNotMatch(JSON.stringify(telemetry), /cause|reason|history|before|after|description|limitation/, 'telemetry must not duplicate authoritative causal or ability state');
 
+const routerSource = readFileSync(new URL('../../api/chat-router.js', import.meta.url), 'utf8');
+const structuredPatchMatch = routerSource.match(/const GOAL_V2_RULES = String\.raw`[\s\S]*?\n}\n\nfunction installResponsesRouter\(\)/);
+assert.ok(structuredPatchMatch, 'structured schema patch must remain extractable without loading hosted dependencies');
+const structuredPatchSource = structuredPatchMatch[0].replace(/\n\nfunction installResponsesRouter\(\)[\s\S]*$/, '');
+const patchGoalV2StructuredFormat = Function(`${structuredPatchSource}; return patchGoalV2StructuredFormat;`)();
+
 const baseSchema = {
   type:'object', additionalProperties:false,
   properties:{
@@ -305,7 +310,6 @@ assert.equal(maximalMinimum.pc.growth_context_truncated, true, 'pathological com
 assert.ok(Object.prototype.hasOwnProperty.call(maximalMinimum.pc.traits, directlyMentionedTrait), 'directly mentioned Trait must outrank unmentioned entries under pressure');
 assert.ok(Object.prototype.hasOwnProperty.call(maximalMinimum.pc.awakeningCandidates.authority, directlyMentionedAwakening), 'directly mentioned awakening candidate must survive pressure compaction');
 
-const routerSource = readFileSync(new URL('../../api/chat-router.js', import.meta.url), 'utf8');
 const runtimeSource = readFileSync(new URL('../../app-runtime.js', import.meta.url), 'utf8');
 const healthSource = readFileSync(new URL('../../api/health.js', import.meta.url), 'utf8');
 const coreSource = readFileSync(new URL('../../api/chat.js', import.meta.url), 'utf8');
