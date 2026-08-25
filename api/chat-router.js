@@ -424,13 +424,14 @@ function timedActionCompletionEvidence(turn,intent={}){
 }
 function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecycle=null){
   const intent=classifySceneIntent(incoming?.action||'',{location:incoming?.saveState?.world?.location||'',currentTime:incoming?.saveState?.world?.time||''});
-  if(mode!=='game'||!turn?.state_delta||!intent.compression)return intent;
+  const boundaryLookahead=Math.min(1440,Math.max(0,Number(intent.boundaryLookaheadMinutes||0)));
+  if(mode!=='game'||!turn?.state_delta||(!intent.compression&&boundaryLookahead<=0))return intent;
   const hasMeaningfulStop=array(turn?.choices).length>0;
   const current=Math.max(0,Number(turn.state_delta.advance_minutes||0));
   const requestedFloor=Math.min(1440,Math.max(0,Number(intent.minAdvanceMinutes||0)));
   if(intent.explicitDurationMinutes===0){reconcileExplicitZeroTurn(turn);return intent;}
-  if(requestedFloor<=0)return intent;
-  const profileMax=Math.min(1440,Math.max(requestedFloor,Number(array(intent.suggestedAdvanceMinutes)[1]||0)));
+  if(requestedFloor<=0&&boundaryLookahead<=0)return intent;
+  const profileMax=boundaryLookahead>0?boundaryLookahead:Math.min(1440,Math.max(requestedFloor,Number(array(intent.suggestedAdvanceMinutes)[1]||0)));
   const scheduleBoundary=nextScheduleBoundaryMinutes(incoming?.saveState||{},{futureOnly:true,action:incoming?.action||'',intent,registry:CHARACTER_REGISTRY});
   const consequenceBoundary=consequenceLifecycle?.selected_id?minutesUntilEventConsequence(incoming?.saveState||{},consequenceLifecycle.selected_id):null;
   const reachedConsequenceBoundary=Boolean(consequenceBoundary!=null&&Number.isFinite(Number(consequenceBoundary))&&consequenceBoundary<=profileMax&&consequenceLifecycle?.status==='resolved'&&consequenceLifecycle?.attribution_safe!==false);

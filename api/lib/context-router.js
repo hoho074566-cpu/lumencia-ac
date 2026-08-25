@@ -307,13 +307,15 @@ function buildEventDirectorV2(incoming,originalInput,registry,mode='game'){
   if(!directUserFocus&&plan.intervention==='aftermath')return fixedDirective('AFTERMATH_FIXED_FLOW');
   if(!directUserFocus&&(plan.intervention==='combat'||plan.intervention==='critical'||hasAffirmedActionKeyword(incoming.action||'',COMBAT_RE)))return fixedDirective('ACTIVE_COMBAT_FIXED_FLOW');
 
-  const consequenceLookahead=sceneIntent.compression&&sceneIntent.minAdvanceMinutes>0?activityRangeLimitMinutes(sceneIntent):0;
+  const boundaryLookahead=Math.max(0,Number(sceneIntent.boundaryLookaheadMinutes||0));
+  const consequenceLookahead=(sceneIntent.compression&&sceneIntent.minAdvanceMinutes>0)||boundaryLookahead>0?activityRangeLimitMinutes(sceneIntent):0;
   const dueConsequence=plan.intervention==='scheduled'||['decision-sensitive','committed-consequence'].includes(sceneIntent.kind)?null:selectDueEventConsequence(save,{lookaheadMinutes:consequenceLookahead});
   const consequenceMinutes=dueConsequence?minutesUntilEventConsequence(save,dueConsequence.id):null;
-  const scheduleBoundary=nextScheduleBoundaryMinutes(save,{futureOnly:true,action:incoming?.action||'',intent:sceneIntent,registry});
-  const goalTickScheduleLimit=sceneIntent.compression&&sceneIntent.minAdvanceMinutes>0?scheduleBoundaryLimitMinutes(sceneIntent):0;
+  const scheduleBoundary=nextScheduleBoundaryMinutes(save,{futureOnly:false,action:incoming?.action||'',intent:sceneIntent,registry});
+  const futureScheduleBoundary=nextScheduleBoundaryMinutes(save,{futureOnly:true,action:incoming?.action||'',intent:sceneIntent,registry});
+  const goalTickScheduleLimit=(sceneIntent.compression&&sceneIntent.minAdvanceMinutes>0)||boundaryLookahead>0?scheduleBoundaryLimitMinutes(sceneIntent):0;
   const goalTickHitsSchedule=scheduleBoundary!=null&&scheduleBoundary>=0&&goalTickScheduleLimit>0&&scheduleBoundary<=goalTickScheduleLimit;
-  const scheduleFirst=scheduleBoundary!=null&&consequenceMinutes!=null&&scheduleBoundary<=consequenceMinutes;
+  const scheduleFirst=futureScheduleBoundary!=null&&consequenceMinutes!=null&&futureScheduleBoundary<=consequenceMinutes;
   if(dueConsequence&&!scheduleFirst){
     const consequenceNpcText=[dueConsequence.event_name,Number(dueConsequence.secret_level||0)<=2?dueConsequence.reason:''].filter(Boolean).join(' ');
     const consequenceKeys=mentionedNpcKeys(consequenceNpcText,registry).slice(0,2);

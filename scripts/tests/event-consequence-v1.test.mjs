@@ -151,6 +151,9 @@ test('an explicit wait routes to its consequence boundary and an earlier fixed s
   const namedTimed=routeOpenAIParams({instructions,input},{mode:'game',incoming:{action:'가이드와 검술을 훈련한다.',saveState:waitingSave,recentTurns:[]}});
   assert.equal(namedTimed.telemetry.event_director_v2.result,'EVENT_CONSEQUENCE_DUE','an NPC-focused compressed action must still route an earlier queued consequence');
   assert.equal(namedTimed.telemetry.event_director_v2.event_consequence_trigger_minutes,20);
+  const futureDated=routeOpenAIParams({instructions,input},{mode:'game',incoming:{action:'내일 오전 10시에 수업을 듣는다.',saveState:waitingSave,recentTurns:[]}});
+  assert.equal(futureDated.telemetry.event_director_v2.result,'EVENT_CONSEQUENCE_DUE','a date-qualified request must still route a queued consequence inside its bounded next-day window');
+  assert.equal(futureDated.telemetry.event_director_v2.event_consequence_trigger_minutes,20);
   const overdue={id:'overdue-class',title:'필수 수업',date:'1285-03-01',time:'09:00',kind:'academic',status:'scheduled'};
   const overdueSave={...waitingSave,scheduledEvents:[overdue],scheduleContext:{due:[overdue],upcoming:[]}};
   const afterOverdue=routeOpenAIParams({instructions,input},{mode:'game',incoming:{action:'검술을 훈련한다.',saveState:overdueSave,recentTurns:[]}});

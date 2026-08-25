@@ -160,7 +160,11 @@ applySceneMomentumTimeFloor({action:'10시 30분에 기초 수업을 듣는다.'
 assert.equal(turn.state_delta.advance_minutes,215,'a future class start plus its minimum duration must not be clamped to the unscheduled class maximum');
 turn={scene_title:'다음 날 수업',scene:[{kind:'narration',text:'다음 날 10시에 수업을 마쳤다.'}],state_delta:{advance_minutes:1500},choices:[]};
 applySceneMomentumTimeFloor({action:'내일 오전 10시에 수업을 듣는다.',saveState:{world:{date:'1285-03-01',time:'09:00'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
-assert.equal(turn.state_delta.advance_minutes,1500,'a date-qualified activity must not be truncated to the immediate class maximum');
+assert.equal(turn.state_delta.advance_minutes,1440,'a date-qualified activity must use the canonical one-turn cap without inheriting the immediate class maximum');
+const futureDateScheduleSave={world:{date:'1285-03-01',time:'09:00'},scheduleContext:{due:[],upcoming:[{id:'class',title:'필수 수업',date:'1285-03-01',time:'09:30',status:'scheduled'}]},scheduledEvents:[{id:'class',title:'필수 수업',date:'1285-03-01',time:'09:30',status:'scheduled'}]};
+turn={scene_title:'필수 수업 시작',scene:[{kind:'narration',text:'필수 수업이 시작되었다.'}],state_delta:{advance_minutes:1440},choices:['수업에 참석한다','일정을 미룬다','다른 행동을 한다'],event_progress:{event_instance_id:'class',active_beat:'start'}};
+applySceneMomentumTimeFloor({action:'내일 오전 10시에 수업을 듣는다.',saveState:futureDateScheduleSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,30,'a date-qualified activity must stop at an earlier authoritative schedule in its bounded lookahead');
 
 turn={
   event_progress:{event_instance_id:'next-morning',active_beat:'complete',completed_beats:['complete']},choices:[],

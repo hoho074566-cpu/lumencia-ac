@@ -71,8 +71,13 @@ assert.equal(classifySceneIntent('10시 30분에 수업을 듣는다.', { locati
 const nextDayClass=classifySceneIntent('내일 10시 30분에 수업을 듣는다.', { location:'여관',currentTime:'07:40' });
 assert.equal(nextDayClass.scheduledStartOffsetMinutes,null,'a next-day clock must not be collapsed onto today');
 assert.equal(nextDayClass.compression,false,'a date-qualified activity beyond the one-turn clock cap must not receive immediate deterministic enforcement');
-assert.deepEqual(nextDayClass.suggestedAdvanceMinutes,[0,0],'a date-qualified activity must not inherit the same-day class floor');
+assert.deepEqual(nextDayClass.suggestedAdvanceMinutes,[0,1440],'a date-qualified activity must inspect the bounded next-day window without inheriting the same-day class floor');
+assert.equal(nextDayClass.boundaryLookaheadMinutes,1440,'a date-qualified activity must expose one bounded day for schedule and consequence arbitration');
 assert.match(buildSceneMomentumDirective({action:'내일 10시 30분에 수업을 듣는다.',saveState:{world:{date:'1285-03-01',time:'07:40',location:'여관'}}}),/날짜 지정 시작 규칙/,'the model must be told to preserve the requested day instead of pulling the class into today');
+const todayTerminalClass=classifySceneIntent('내일 계획을 세운 뒤 오늘 오전 10시에 수업을 듣는다.', { location:'여관',currentTime:'09:00' });
+assert.equal(todayTerminalClass.dateQualifiedStart,false,'an earlier next-day planning clause must not date-qualify the terminal today activity');
+assert.equal(todayTerminalClass.scheduledStartOffsetMinutes,60,'the terminal today clock must remain the selected activity start');
+assert.deepEqual(todayTerminalClass.suggestedAdvanceMinutes,[105,180],'the terminal today class must retain same-day wait plus activity timing');
 assert.equal(classifySceneIntent('정오에 수업을 듣는다.', { location:'강의실',currentTime:'09:00' }).scheduledStartOffsetMinutes,180,'noon must normalize to the same-day 12:00 start');
 assert.equal(classifySceneIntent('자정에 훈련한다.', { location:'훈련장',currentTime:'09:00' }).scheduledStartOffsetMinutes,900,'midnight must normalize to the next upcoming 00:00 start');
 
@@ -143,7 +148,7 @@ const repositoryRules = fs.readFileSync(new URL('../../AGENTS.md', import.meta.u
 assert.match(router, /ADAPTIVE_TIME_SCALE_VERSION/);
 assert.match(router, /adaptive_time_scale_v2:true/);
 assert.match(router, /mode!==['"]game['"]/, 'META/AUTO/CONTINUE must stay outside the deterministic time floor');
-assert.match(fs.readFileSync(new URL('../../api/lib/context-router.js', import.meta.url), 'utf8'), /sceneIntent\.compression&&sceneIntent\.minAdvanceMinutes>0\?activityRangeLimitMinutes\(sceneIntent\):0/, 'all compressed timed activities must expose their full valid consequence lookahead');
+assert.match(fs.readFileSync(new URL('../../api/lib/context-router.js', import.meta.url), 'utf8'), /boundaryLookahead>0\?activityRangeLimitMinutes\(sceneIntent\):0/, 'compressed timed and bounded future-date activities must expose their full valid consequence lookahead');
 assert.match(health, /version:\s*'0\.8\.7'/);
 assert.match(repositoryRules, /External API adapter:\s*`0\.8\.7`/, 'the authoritative release manifest must match the adapter and health surface');
 assert.match(health, /adaptiveTimeScale:\s*'V2/);

@@ -110,6 +110,8 @@ assert.notEqual(route('주변을 살펴본다.',upcomingAt('10:01')).telemetry.e
 assert.notEqual(route('돌아다닌다.',upcomingAt('10:08')).telemetry.event_director_v2.result,'PRESENT_NPC_GOAL_TICK','exploration must not cross a reachable fixed schedule boundary for Goal Tick');
 assert.notEqual(route('좀 쉰다.',upcomingAt('10:10')).telemetry.event_director_v2.result,'PRESENT_NPC_GOAL_TICK','open-ended downtime must yield to a reachable fixed schedule boundary');
 assert.equal(route('주변을 살펴본다.',upcomingAt('10:02')).telemetry.event_director_v2.result,'PRESENT_NPC_GOAL_TICK','a schedule beyond the observation window must not suppress eligible initiative');
+const overdueSchedule={id:'academy:overdue',title:'이미 시작한 필수 수업',date:'1285-03-01',time:'09:59',kind:'academic',status:'scheduled',participants:['pc']};
+assert.notEqual(route('주변을 살펴본다.',{scheduledEvents:[overdueSchedule],scheduleContext:{due:[overdueSchedule],upcoming:[]}}).telemetry.event_director_v2.result,'PRESENT_NPC_GOAL_TICK','an overdue unfinished schedule must block unrelated proactive Goal Tick initiative');
 assert.notEqual(route('주변을 살펴본다.',{},baseDirector,'auto').telemetry.event_director_v2.result,'PRESENT_NPC_GOAL_TICK','AUTO keeps its existing fixed-flow authority');
 assert.notEqual(route('주변을 살펴본다.',{},baseDirector,'continue').telemetry.event_director_v2.result,'PRESENT_NPC_GOAL_TICK','CONTINUE remains frozen');
 
