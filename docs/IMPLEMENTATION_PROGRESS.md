@@ -1,12 +1,14 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Narrative Engine continuation — NPC↔NPC Relationship V1 is merged. Faction / Social Consequence V1 is the active separate phase.
+Narrative Engine continuation — Faction / Social Consequence V1 is merged. Its focused P2 hardening is active before Skill Learning V1.
 
 ## Current GitHub State
 - Repo: `hoho074566-cpu/lumencia-ac`
-- Main: `71074ccc7a5fd00f193a6aec8b7a1ff82eae1aab` (`NPC↔NPC Relationship V1`, PR #45 merge)
-- Working branch: `codex/faction-social-consequence-v1`
+- Main: `6204843e1cf6f45a9386c13b942c100cd6c7377b` (`Faction / Social Consequence V1`, PR #46 merge)
+- Working branch: `codex/faction-social-hardening-v1`
+- PR #47: **open** from code checkpoint `0cd75a7683f67196701b7f8376298ead1620f868`. It contains only the three final-review P2 hardenings plus permanent regressions; protected adapter/context paths require human merge.
+- PR #46: **merged** from exact reviewed head `2843e5bc9ee8169acb7e82b5db9b392beea93539` as `6204843e1cf6f45a9386c13b942c100cd6c7377b`. Merge and reviewed-head trees both equal `4c045c27ccb30f6593370ae2b8e811bebcb39691`; production health is green on app `1.5.6` / adapter `0.8.3` with Faction Social V1 advertised.
 - PR #45: **merged** from exact reviewed head `583b7622500b9916dd31697d0d6e845f81790ed6` as `71074ccc7a5fd00f193a6aec8b7a1ff82eae1aab`. Merge and reviewed-head trees both equal `690e6a88c015bd28e67bba0bf03bfdba6e73a6c8`; production `/api/health` is healthy on app `1.5.6` / adapter `0.8.3`.
 - PR #44: **merged** from exact reviewed head `e5fae96ac271a617db42627a99d53a720299a213` as `fe6b4a5dcc0f0a96b71d8fcffcf8666caeefd82b`. Merge and reviewed trees both equal `f4aeadd44c116682d60385c265e3f35f3b48ea0e`; production health is green.
 - PR #43: **merged** from exact reviewed/accepted head `6b4f5990278ce8d3446c7b5be94a899a72d9fc80` as `fd2bcff13007fdf66c04477b9f69066f7c9b871e`. Merge and reviewed-head trees both equal `5b6b56b272de438e3db6a53027ce13b75ff7cace`; merged-main Vercel, production `/api/health`, and the clean-LF full PR check pass.
@@ -37,17 +39,21 @@ Narrative Engine continuation — NPC↔NPC Relationship V1 is merged. Faction /
 - Production `/api/health`: `ok=true`, API configured, app `1.5.6`, adapter `/api/chat-router`, canonical core `/api/chat`, prompt cache retention `24h`.
 - Post-merge full `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
-## Faction / Social Consequence V1 — Current Candidate
+## Faction / Social Consequence V1 — Merged; P2 Hardening Current Candidate
 - Adds bounded `state_delta.faction_reputation_changes` rows for the six canon-backed public academy organizations: student council, Blue Knights, White Rose, and the knight/magic/theology departments.
 - Persists inside `sceneRuntime.faction_social`; there is no new save root/migration, API entrypoint, model call, or `app.js` change.
-- Reputation clamps to ±100. One turn accepts at most 4 changes; each public faction retains at most 8 causal rows; routed context keeps at most 6 registered factions with 2 recent causes.
+- Reputation clamps to ±100. One turn accepts at most 4 changes; each public faction retains at most 8 causal rows. PR #47 routes at most 3 relevant factions / 2 causes in detail and 2 factions / 1 cause in the mandatory minimum.
 - Evidence is mandatory: public event, official record, registered NPC witness, or sourced credible rumor. Unwitnessed private conduct, unregistered observers, invented factions, mere co-presence, and zero-delta same-stance rows are rejected.
 - Different organizations may interpret the same public event with different explicit polarity. Group reputation never auto-mutates PC↔NPC or NPC↔NPC relationships.
 - Delayed retaliation, invitation, summons, and administrative consequences reuse `delayed_consequences_add` and the existing Event Consequence lifecycle; V1 adds no second queue.
 - META/CONTINUE clear the new field. A real mutation contributes exactly once to Scene Momentum's existing social axis, while no-ops do not fake progression.
 - `scripts/tests/faction-social-consequence-v1.test.mjs` covers schema, evidence, polarity, clamps/history/context bounds, invalid/no-op rejection, personal-relation isolation, stable runtime persistence, freeze, health, and the one-call invariant. Code checkpoint `193e12a` drops invalid/unsupported saved history instead of relabeling it. Codex review then reported P0/P1=0 and one P2 rumor-provenance gap; closure `2721ff2` requires a bounded explicit `source` plus a registered receiving NPC for `credible_rumor`. Dedicated/affected suites and the authoritative clean-LF full PR check pass; the substantive closure review found no remaining blocker.
-- PR #46 exact accepted head `48d0555...` is deployed at `https://lumencia-ac-git-codex-faction-social-consequence-v1-ah-203c.vercel.app`. Targeted Preview acceptance passes public student-council `+2` versus White-Rose `-1` polarity, private/unwitnessed zero propagation, exact CONTINUE persistence with zero arrays, META zero mutation, and faction-response consequence no-early-fire / due resolution / no-repeat.
+- PR #46 final reviewed head `2843e5b...` was merged with an identical tree. Its targeted Preview acceptance passed public student-council `+2` versus White-Rose `-1` polarity, private/unwitnessed zero propagation, exact CONTINUE persistence with zero arrays, META zero mutation, and faction-response consequence no-early-fire / due resolution / no-repeat.
 - The `2721ff2` closure deployment returns 200 with the stricter schema. Its served deterministic module rejects a source-less `credible_rumor` even with registered Lucia and accepts the same row only with the explicit `엘리제→루시아 직접 전달` path.
+- PR #47 code checkpoint `0cd75a7` removes stale/unregistered observer keys during saved-history normalization; evidence types that require a witness are dropped if no registered witness remains.
+- Direct USER ACTION faction mentions outrank broad context keywords. Dense `.76` adaptive routing retains the explicitly queried faction while the fixed minimum remains inside 6,840 characters.
+- Pipeline and route diagnostics now expose only version, bounded faction keys, and current changed keys instead of duplicating reputation values and causal history into `qualityTelemetry`/rendered records.
+- Dedicated/affected suites and the full clean-LF `scripts/lumensia-pr-check.mjs origin/main HEAD` pass at the code checkpoint. There is no new endpoint, save root, migration, model call, or gameplay semantic change.
 
 ## NPC↔NPC Relationship V1 — Completed
 - PR #45 merged after exact-head Safety/Vercel/Codex and Exact Preview acceptance. Directional registered NPC affinity/trust/status plus causal history persists in the existing `npcInnerStates` root; reverse and PC relationships remain independent.
@@ -376,12 +382,12 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
 
 ## NEXT ACTION
-1. Commit/push this review-closure docs checkpoint to PR #46; closure code `2721ff2`, clean-LF full checks, the substantive second review, and targeted Preview acceptance are complete.
-2. Confirm the published exact head contains only the reviewed closure plus status docs.
-3. Require fresh current-docs-head Safety/Vercel/Codex P0/P1=0.
-4. Revalidate current main, merge-base, no conflict, one-call architecture, bounded storage/context, META/CONTINUE freeze, unchanged personal relationships, and reuse of the existing delayed-consequence queue.
-5. Do not rerun Preview unless code changes; the required evidence/polarity/persistence/freeze/delayed-response cases and the rumor-provenance closure already pass.
-6. If every gate passes, report the protected-path PR ready for human merge. Do not begin Skill Learning V1 before this phase is accepted.
+1. Commit/push this status checkpoint to PR #47 and confirm the exact diff contains only the three P2 hardenings, their permanent regressions, and status docs.
+2. Require fresh exact-head Safety/Vercel/Codex P0/P1=0.
+3. Revalidate current main/merge-base/no conflict, one-call architecture, `.76` context bound, registered-observer normalization, compact telemetry, and no endpoint/save migration.
+4. Perform the final second regression review and fix only blockers within this focused scope.
+5. If every gate passes, report protected-path PR #47 ready for human merge.
+6. Start Skill Learning V1 only after PR #47 is accepted and merged.
 
 ## Stop Record
 - Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.
@@ -419,4 +425,5 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed: PR #43 exact head `6b4f599...` passed clean-LF/Safety/Vercel/Codex/Preview gates and was merged by the user as `fd2bcff...`; merge-tree equality, merged-main Vercel, production health, and clean-LF full regression pass.
 - Completed: PR #44 exact reviewed head `e5fae96...` merged as `fe6b4a5...`; merge-tree equality and production health pass.
 - Completed: PR #45 exact reviewed head `583b762...` merged as `71074cc...`; merge-tree equality and production health pass.
-- Current candidate: PR #46 / Faction / Social Consequence V1 on `codex/faction-social-consequence-v1`; review closure `2721ff2`, clean-LF full authority, substantive closure review, Vercel Ready, and targeted Preview acceptance including explicit rumor provenance pass. Final review-closure docs checkpoint and fresh exact-docs-head hosted Safety/Codex authority remain.
+- Completed: PR #46 exact reviewed head `2843e5b...` merged as `6204843...`; merge-tree equality and production health pass.
+- Current candidate: PR #47 / Faction Social P2 hardening on `codex/faction-social-hardening-v1`; code checkpoint `0cd75a7`, dedicated/affected tests, and authoritative clean-LF full checks pass. Status-doc checkpoint and fresh exact-head hosted Safety/Vercel/Codex authority remain.
