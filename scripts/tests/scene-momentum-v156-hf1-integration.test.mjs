@@ -51,10 +51,10 @@ assert.match(chat,/const ADAPTER_VERSION = '0\.8\.7'/);
 assert.equal((chat.match(/coreHandler\(/g)||[]).length,1,'stable adapter must keep exactly one canonical coreHandler call site');
 assert.match(chat,/const hasMeaningfulStop=array\(turn\?\.choices\)\.length>0/,'time-floor stop evidence must come from an explicit player decision');
 assert.match(chat,/const reachedConsequenceBoundary=/,'manifested delayed results must be recognized as compression boundaries');
-assert.match(chat,/applySceneMomentumTimeFloor\([^;]+consequenceLifecycle\)/,'the selected consequence lifecycle must reach the elapsed-time guard');
+assert.match(chat,/applySceneMomentumTimeFloor\([^;]+consequenceLifecycle,consequenceVisibleScene\)/,'the selected consequence lifecycle and attributable narration must reach the elapsed-time guard');
 assert.doesNotMatch(chat,/hasMeaningfulStop[^;\n]*importance[^;\n]*critical/i,'critical scene severity must not suppress deterministic elapsed time');
 assert.equal((chat.match(/allowProgress:mode==='game'&&!zeroElapsedIntent/g)||[]).length,3,'explicit zero-minute actions must freeze combat growth, skill learning, and awakening/talent runtime packets');
-assert.match(chat,/zeroElapsedIntent=mode==='game'&&growthIntent\.explicitDurationMinutes===0&&Number\(growthIntent\.minAdvanceMinutes\|\|0\)<=0/,'zero-growth freeze must use the total requested turn duration rather than only the terminal duration');
+assert.match(chat,/zeroElapsedRange=array\(growthIntent\.explicitDurationRangeMinutes\)[^;]+zeroElapsedIntent=mode==='game'&&\(growthIntent\.explicitDurationMinutes===0\|\|zeroElapsedRange\)&&Number\(growthIntent\.minAdvanceMinutes\|\|0\)<=0/,'zero-growth freeze must cover both scalar-zero and zero-length range requests');
 assert.match(chat,/growthIntent=classifySceneIntent\(incoming0\.action\|\|'',\{[^}]*actorName:incoming\.saveState\?\.pc\?\.name\|\|''\}\)/,'zero-growth classification must preserve the saved player as the first-party actor');
 const timeReconciliationIndex=chat.indexOf('const sceneIntent=applySceneMomentumTimeFloor');
 for(const marker of ['persistedCombatGrowthState=deriveCombatGrowthState','persistedSkillLearningState=deriveSkillLearningState','persistedAwakeningTalentState=deriveAwakeningTalentState']){

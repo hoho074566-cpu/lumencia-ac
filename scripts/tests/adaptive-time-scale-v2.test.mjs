@@ -236,6 +236,12 @@ const noRowOverrunDirective=buildSceneMomentumDirective({action:'3시간 동안 
 assert.match(noRowOverrunDirective,/TIME_GUIDE=120-120min/,'an overrun directive must expose only the reachable start boundary');
 assert.match(noRowOverrunDirective,/앞선 행동과 뒤 활동 모두 끝나지 않은 상태로 멈춘다/,'the model must be told that neither overlapping activity completed');
 assert.doesNotMatch(noRowOverrunDirective,/활동 자체의 자연 소요시간을 합친 TIME_GUIDE 안에서 완료한다/,'the ordinary scheduled-completion rule must not contradict an overrun stop');
+const trainingThenAttack=classifySceneIntent('1시간 동안 훈련하고 공격한다.',{location:'훈련장',currentTime:'09:00'});
+assert.equal(trainingThenAttack.kind,'committed-consequence','a terminal consequential action must remain committed after a timed prefix');
+assert.equal(trainingThenAttack.compression,true,'a timed prefix before a committed consequence must remain boundary-aware');
+assert.deepEqual(trainingThenAttack.suggestedAdvanceMinutes,[60,70],'the committed consequence guide must retain the exact preceding hour before its immediate resolution');
+const prefixBoundary={id:'prefix-class',title:'기사과 필수 수업',date:'1285-03-01',time:'09:30',kind:'academic',status:'scheduled'},prefixBoundarySave={pc:{department:'기사과'},world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduledEvents:[prefixBoundary],scheduleContext:{due:[],upcoming:[prefixBoundary]}};
+assert.match(buildSceneMomentumDirective({action:'1시간 동안 훈련하고 공격한다.',saveState:prefixBoundarySave}),/SCHEDULE_BOUNDARY=30min/,'an intervening required schedule must stop the timed prefix before the attack');
 assert.equal(classifySceneIntent('12시에 신입생 교육을 받는다.', { location:'기숙사',currentTime:'09:00' }).kind,'class-attendance','scheduled education must use the academic profile');
 assert.equal(classifySceneIntent('12시에 입학식에 참석한다.', { location:'기숙사',currentTime:'09:00' }).kind,'class-attendance','entrance ceremony attendance must use the academic profile');
 assert.equal(classifySceneIntent('오늘 아침 8시에 수업을 듣는다.', { location:'강의실',currentTime:'07:00' }).scheduledStartOffsetMinutes,60,'아침 must normalize to an AM clock marker');
