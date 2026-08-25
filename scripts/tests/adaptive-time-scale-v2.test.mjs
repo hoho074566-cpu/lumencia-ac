@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {
   ADAPTIVE_TIME_SCALE_VERSION,
+  activityRangeLimitMinutes,
   buildSceneMomentumDirective,
   classifySceneIntent,
   scheduleBoundaryLimitMinutes,
@@ -82,6 +83,11 @@ const campusTravel = classifySceneIntent('도서관으로 간다.', { location:'
 assert.equal(campusTravel.timeProfile, 'travel-campus');
 assert.deepEqual(campusTravel.suggestedAdvanceMinutes, [5, 20]);
 assert.equal(classifySceneIntent('B동으로 간다.', { location:'A동 개인실' }).timeProfile, 'travel-campus');
+const explicitTravel=classifySceneIntent('30분 동안 기숙사로 간다.', { location:'도서관' });
+assert.equal(explicitTravel.kind,'travel');
+assert.equal(explicitTravel.semanticTarget,'기숙사','the duration phrase must not pollute the travel destination');
+assert.equal(explicitTravel.explicitDurationMinutes,30);
+assert.deepEqual(explicitTravel.suggestedAdvanceMinutes,[30,30],'an explicit travel duration must override the natural distance range');
 
 const regionalTravel = classifySceneIntent('왕도로 간다.', { location:'중앙광장' });
 assert.equal(regionalTravel.timeProfile, 'travel-regional');
@@ -100,6 +106,7 @@ assert.match(trainingDirective, /TIME_PROFILE=training@2\.0/);
 assert.match(trainingDirective, /TIME_GUIDE=30-120min/);
 assert.match(trainingDirective, /SCHEDULE_BOUNDARY=20min/, 'an earlier mandatory schedule must interrupt a compressed training session');
 assert.equal(scheduleBoundaryLimitMinutes(training), 30);
+assert.equal(activityRangeLimitMinutes(training),120,'consequence lookahead must cover the complete valid training range');
 
 const continueDirective = buildSceneMomentumDirective({ action:'[LUMENSIA V1.5.6 CONTINUE]', saveState:boundarySave });
 assert.match(continueDirective, /CONTINUE HARD FREEZE/);
@@ -111,7 +118,7 @@ const repositoryRules = fs.readFileSync(new URL('../../AGENTS.md', import.meta.u
 assert.match(router, /ADAPTIVE_TIME_SCALE_VERSION/);
 assert.match(router, /adaptive_time_scale_v2:true/);
 assert.match(router, /mode!==['"]game['"]/, 'META/AUTO/CONTINUE must stay outside the deterministic time floor');
-assert.match(fs.readFileSync(new URL('../../api/lib/context-router.js', import.meta.url), 'utf8'), /sceneIntent\.compression&&sceneIntent\.minAdvanceMinutes>0\?scheduleBoundaryLimitMinutes\(sceneIntent\):0/, 'all compressed timed activities must expose their minimum consequence lookahead');
+assert.match(fs.readFileSync(new URL('../../api/lib/context-router.js', import.meta.url), 'utf8'), /sceneIntent\.compression&&sceneIntent\.minAdvanceMinutes>0\?activityRangeLimitMinutes\(sceneIntent\):0/, 'all compressed timed activities must expose their full valid consequence lookahead');
 assert.match(health, /version:\s*'0\.8\.6'/);
 assert.match(repositoryRules, /External API adapter:\s*`0\.8\.6`/, 'the authoritative release manifest must match the adapter and health surface');
 assert.match(health, /adaptiveTimeScale:\s*'V2/);

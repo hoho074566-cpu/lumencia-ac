@@ -162,6 +162,12 @@ assert.deepEqual(turn.state_delta.npc_state_updates,[{npc_key:'emily',location:'
 assert.deepEqual(turn.state_delta.npc_schedule_updates,[{npc_key:'emily',time:'09:40'}],'the same consequence-owned NPC schedule state must survive shortening');
 assert.deepEqual(turn.state_delta.hooks_update,[{id:consequenceHook.id,status:'resolved'}],'the preserved consequence state and its resolved lifecycle must remain aligned');
 
+const rangedConsequenceSave={...consequenceSave,world:{...consequenceSave.world,time:'08:40'}};
+turn={scene:[{kind:'narration',text:'한 시간째 에밀리가 중앙광장에 도착했다.'}],state_delta:{advance_minutes:90,npc_state_updates:[{npc_key:'emily',location:'중앙광장',status:'도착'}],hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
+applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:rangedConsequenceSave},turn,'game',{selected_id:consequenceHook.id,status:'resolved',npc_keys:['emily']});
+assert.equal(turn.state_delta.advance_minutes,60,'a resolved consequence inside the full valid training range must align to its routed trigger');
+assert.deepEqual(turn.state_delta.npc_state_updates,[{npc_key:'emily',location:'중앙광장',status:'도착'}],'full-range consequence alignment must retain its attributable NPC state');
+
 const liveBoundarySave={
   pc:knightPc,
   world:{date:'1285-03-01',time:'11:05',location:'기사과 훈련장'},
@@ -205,6 +211,17 @@ turn={scene_title:'오리엔테이션 호출',scene:[{kind:'narration',text:'호
 applySceneMomentumTimeFloor({action:'기본 검술 자세와 발놀림을 충분히 훈련한다.',saveState:underreportedScheduleSave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,60,'an exact structured occurrence ID must align an underreported clock without textual title matching');
 assert.deepEqual(turn.state_delta.scheduled_events_complete,[],'structured start evidence must not complete its own schedule at the boundary');
+
+turn={scene_title:'오리엔테이션 종료',scene:[{kind:'narration',text:'기사과 필수 오리엔테이션을 모두 마쳤다.'}],state_delta:{advance_minutes:40,scheduled_events_complete:['knight-orientation'],completed_events_add:['knight-orientation']},choices:[],event_progress:{event_instance_id:'knight-orientation',active_beat:'complete',completed_beats:['arrival','complete']}};
+applySceneMomentumTimeFloor({action:'기본 검술 자세와 발놀림을 충분히 훈련한다.',saveState:underreportedScheduleSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,60,'structured completion evidence may align only to the authoritative start when the reported clock is short');
+assert.equal(turn.event_progress,null,'event completion progress must not survive reconciliation to the occurrence start');
+assert.deepEqual(turn.state_delta.scheduled_events_complete,[],'the rewound occurrence must remain incomplete at its start');
+
+turn={scene_title:'진행 중인 의뢰와 정오',scene:[{kind:'narration',text:'기사과 필수 오리엔테이션이 정오에 시작되었다.'}],state_delta:{advance_minutes:40},choices:['참석한다','의뢰를 계속한다','다른 곳으로 간다'],event_progress:{event_instance_id:'active:quest',active_beat:'investigate'}};
+applySceneMomentumTimeFloor({action:'기본 검술 자세와 발놀림을 충분히 훈련한다.',saveState:underreportedScheduleSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,60,'a visibly started schedule must align even while an unrelated event remains active');
+assert.equal(turn.event_progress.event_instance_id,'active:quest','the unrelated active event must remain intact at the schedule boundary');
 
 turn={scene_title:'훈련장의 기본기',scene:[{kind:'narration',text:'기사과 필수 오리엔테이션은 10시에 예정되어 있다.'},{kind:'narration',text:'10시 30분을 알리는 종이 울렸다.'}],state_delta:{advance_minutes:40},choices:[],event_progress:null};
 applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:rangedScheduleSave},turn,'game');

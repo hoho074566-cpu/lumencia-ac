@@ -3,7 +3,7 @@
 // NPC Goal Tick V1: guarded present-NPC initiative without an additional model call.
 // Stable path: api/lib/context-router.js
 
-import { buildSceneMomentumDirective, classifySceneIntent, nextScheduleBoundaryMinutes, scheduleBoundaryLimitMinutes } from '../../lib/scene-momentum.js';
+import { activityRangeLimitMinutes, buildSceneMomentumDirective, classifySceneIntent, nextScheduleBoundaryMinutes, scheduleBoundaryLimitMinutes } from '../../lib/scene-momentum.js';
 import { buildSceneNoveltyDirective } from '../../lib/scene-novelty.js';
 import { buildScenePurposeDirective, normalizeScenePurpose } from '../../lib/scene-purpose.js';
 import { buildSceneExitDirective, normalizeSceneExitCondition } from '../../lib/scene-exit.js';
@@ -307,7 +307,7 @@ function buildEventDirectorV2(incoming,originalInput,registry,mode='game'){
   if(plan.intervention==='aftermath')return fixedDirective('AFTERMATH_FIXED_FLOW');
   if(plan.intervention==='combat'||plan.intervention==='critical'||hasAffirmedActionKeyword(incoming.action||'',COMBAT_RE))return fixedDirective('ACTIVE_COMBAT_FIXED_FLOW');
 
-  const consequenceLookahead=sceneIntent.compression&&sceneIntent.minAdvanceMinutes>0?scheduleBoundaryLimitMinutes(sceneIntent):0;
+  const consequenceLookahead=sceneIntent.compression&&sceneIntent.minAdvanceMinutes>0?activityRangeLimitMinutes(sceneIntent):0;
   const dueConsequence=plan.intervention==='scheduled'||['decision-sensitive','committed-consequence'].includes(sceneIntent.kind)?null:selectDueEventConsequence(save,{lookaheadMinutes:consequenceLookahead});
   const consequenceMinutes=dueConsequence?minutesUntilEventConsequence(save,dueConsequence.id):null;
   const scheduleBoundary=nextScheduleBoundaryMinutes(save,{futureOnly:false,action:incoming?.action||'',intent:sceneIntent});

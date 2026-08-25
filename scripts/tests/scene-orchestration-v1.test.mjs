@@ -81,6 +81,16 @@ assert.match(scheduleDirective, /TRIGGER_MINUTES=30/);
 assert.match(scheduleDirective, /PRIMARY를 TRIGGER_MINUTES의 경계까지만 진행한 뒤 SECONDARY를 처리/,
   'an interrupting boundary must cut off compressed primary action instead of waiting for its full completion');
 
+const requestedClass={id:'basic-class',title:'기사과 기초 수업',kind:'academic',date:'1285-03-01',time:'10:00',status:'scheduled'};
+const ownScheduledActivity=deriveSceneOrchestrationPlan({
+  mode:'game',
+  action:'10시에 기초 수업에 참석한다.',
+  saveState:{world:{date:'1285-03-01',time:'09:00',location:'기숙사'},pc:{department:'기사과'},scheduleContext:{due:[],upcoming:[requestedClass]},scheduledEvents:[requestedClass],sceneRuntime:{}},
+  directorTelemetry:{result:'NO_RANDOM_EVENT_DUE'},
+});
+assert.equal(ownScheduledActivity.secondary,'world-response','the orchestration layer must not reintroduce the requested class as its own interruption');
+assert.equal(ownScheduledActivity.trigger_minutes,null);
+
 const dueScheduleDoesNotFreezeAction = deriveSceneOrchestrationPlan({
   mode: 'game',
   action: '기숙사로 간다.',

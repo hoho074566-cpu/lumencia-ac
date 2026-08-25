@@ -9,7 +9,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import coreHandler, { CHARACTER_REGISTRY } from './chat.js';
 import { routeOpenAIParams, routerVersion, array, object, clampText } from './lib/context-router.js';
 import { actualScheduledEntrants, freshChoices, reconcileParticipants } from '../lib/scene-continuity.js';
-import { ADAPTIVE_TIME_SCALE_VERSION, SCENE_MOMENTUM_VERSION, classifySceneIntent, deriveSceneDelta, isPcRelevantScheduleEvent, nextScheduleBoundaryMinutes, scheduleBoundaryLimitMinutes, updateSceneMomentum } from '../lib/scene-momentum.js';
+import { ADAPTIVE_TIME_SCALE_VERSION, SCENE_MOMENTUM_VERSION, classifySceneIntent, deriveSceneDelta, isPcRelevantScheduleEvent, nextScheduleBoundaryMinutes, updateSceneMomentum } from '../lib/scene-momentum.js';
 import { SCENE_NOVELTY_VERSION, deriveSceneNovelty } from '../lib/scene-novelty.js';
 import { deriveScenePurpose } from '../lib/scene-purpose.js';
 import { deriveSceneExitCondition, evaluateSceneExitCondition } from '../lib/scene-exit.js';
@@ -365,6 +365,9 @@ function consequenceNpcKeysForShortening(turn,consequence,routedKeys=[],registry
 function reconcileReachedScheduleStart(turn,boundaryIds=new Set()){
   const delta=object(turn?.state_delta);if(!turn?.state_delta||!boundaryIds.size)return;
   for(const field of ['active_events_remove','completed_events_add','scheduled_events_remove','scheduled_events_complete'])delta[field]=array(delta[field]).filter(value=>!boundaryIds.has(String(value||'').trim().toLowerCase()));
+  const progress=object(turn?.event_progress),eventId=String(progress.event_instance_id||progress.eventInstanceId||'').trim().toLowerCase(),terminal=new Set(['complete','completed','done','finished','end']);
+  const completionSignals=[progress.active_beat,progress.activeBeat,progress.status,...array(progress.completed_beats||progress.completedBeats)].map(value=>String(value||'').trim().toLowerCase());
+  if(boundaryIds.has(eventId)&&completionSignals.some(value=>terminal.has(value)))turn.event_progress=null;
 }
 function reconcileShortenedTimedTurn(turn,{preserveConsequenceId='',preserveNpcKeys=[]}={}){
   const delta=object(turn?.state_delta);if(!turn?.state_delta)return;
@@ -394,15 +397,14 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   const boundaries=[scheduleBoundary,consequenceBoundary].filter(value=>value!=null&&Number.isFinite(Number(value))).map(Number);
   const boundary=boundaries.length?Math.min(...boundaries):null;
   const boundedFloor=boundary==null?requestedFloor:Math.min(requestedFloor,Math.max(0,boundary));
-  const hardStopLimit=scheduleBoundaryLimitMinutes(intent);
   const eventId=String(turn?.event_progress?.event_instance_id||turn?.event_progress?.eventInstanceId||'').trim().toLowerCase();
   const dueAtBoundary=new Set(scheduleBoundary==null?[]:scheduledIdsDueByTurnEnd(incoming?.saveState||{},scheduleBoundary).map(value=>String(value).trim().toLowerCase()));
   const dueBeforeBoundary=new Set(scheduleBoundary==null?[]:scheduledIdsDueByTurnEnd(incoming?.saveState||{},Math.max(0,scheduleBoundary-1)).map(value=>String(value).trim().toLowerCase()));
-  const boundaryRows=scheduleRowsAtBoundary(incoming?.saveState||{},scheduleBoundary),boundaryIds=new Set(boundaryRows.map(row=>String(row?.id||'').trim().toLowerCase()).filter(Boolean)),structuredBoundary=Boolean(eventId&&boundaryIds.has(eventId)&&dueAtBoundary.has(eventId)&&!dueBeforeBoundary.has(eventId)),visibleBoundary=Boolean(!eventId&&boundaryRows.some(row=>scheduleBoundaryOccurred(turn,row)));
+  const boundaryRows=scheduleRowsAtBoundary(incoming?.saveState||{},scheduleBoundary),boundaryIds=new Set(boundaryRows.map(row=>String(row?.id||'').trim().toLowerCase()).filter(Boolean)),structuredBoundary=Boolean(eventId&&boundaryIds.has(eventId)&&dueAtBoundary.has(eventId)&&!dueBeforeBoundary.has(eventId)),visibleBoundary=Boolean(boundaryRows.some(row=>scheduleBoundaryOccurred(turn,row)));
   const crossedScheduledBoundary=Boolean(scheduleBoundary!=null&&scheduleBoundary===boundary&&scheduleBoundary<=profileMax&&current>scheduleBoundary);
   const surfacedScheduledBoundary=Boolean(scheduleBoundary!=null&&scheduleBoundary===boundary&&scheduleBoundary<=profileMax&&(structuredBoundary||visibleBoundary));
   const reachedScheduledBoundary=surfacedScheduledBoundary||crossedScheduledBoundary;
-  const reachedConsequenceBoundary=Boolean(consequenceBoundary!=null&&consequenceBoundary===boundary&&boundary<=hardStopLimit&&consequenceLifecycle?.status==='resolved');
+  const reachedConsequenceBoundary=Boolean(consequenceBoundary!=null&&consequenceBoundary===boundary&&boundary<=profileMax&&consequenceLifecycle?.status==='resolved');
   const previousEventId=String(incoming?.saveState?.sceneRuntime?.eventProgress?.eventInstanceId||incoming?.saveState?.sceneRuntime?.eventProgress?.event_instance_id||'').trim().toLowerCase();
   const structuredInterruption=Boolean(eventId.startsWith('director:')&&eventId!==previousEventId&&!structuredBoundary&&eventId!==String(consequenceLifecycle?.selected_id||'').trim().toLowerCase());
   let applied=current;
