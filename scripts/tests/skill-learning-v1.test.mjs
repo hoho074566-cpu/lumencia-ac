@@ -117,6 +117,12 @@ const normalized = normalizeSkillCandidates({ ...denseCandidates, constructor: {
 assert.equal(Object.keys(normalized).length, MAX_SKILL_CANDIDATES, 'saved candidate count must remain bounded');
 assert.ok(Object.values(normalized).every((row) => row.history.length <= 6), 'saved candidate history must remain bounded');
 assert.equal(normalized.constructor, Object.prototype.constructor, 'prototype-sensitive candidate keys must not become own save fields');
+const aliasNormalized = normalizeSkillCandidates({
+  '반월 보법': { progress: 10, basis: '초기 연습', reason: '첫 시도', updated_turn: 2 },
+  '반월보법': { progress: 70, basis: '최근 실전 훈련', reason: '안정적 재현', updated_turn: 9 },
+});
+assert.deepEqual(Object.keys(aliasNormalized), ['반월보법'], 'spacing aliases must keep the most recently updated authoritative candidate');
+assert.equal(aliasNormalized['반월보법'].progress, 70, 'legacy alias cleanup must not discard newer progress');
 
 const telemetry = compactSkillLearningTelemetry(newCandidate);
 assert.deepEqual(telemetry.candidate_keys, ['반월 보법'], 'telemetry may identify bounded candidate keys');
