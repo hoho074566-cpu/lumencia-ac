@@ -106,6 +106,9 @@ const keyedConsultAction='10시에 emily와 상담한다.';
 assert.equal(nextScheduleBoundaryMinutes(personalConsultSave,{futureOnly:true,action:keyedConsultAction,intent:classifySceneIntent(keyedConsultAction,{location:'기숙사',currentTime:'09:00'})}),null,'a participant key must identify its otherwise generic scheduled consultation');
 const namedConsultAction='10시에 에밀리와 상담한다.';
 assert.equal(nextScheduleBoundaryMinutes(personalConsultSave,{futureOnly:true,action:namedConsultAction,intent:classifySceneIntent(namedConsultAction,{location:'기숙사',currentTime:'09:00'}),registry:{emily:'에밀리'}}),null,'a canonical participant label must identify its otherwise generic scheduled consultation');
+const classroomConsult={...personalConsult,location:'기사과 강의실'};
+const classroomConsultSave={...personalConsultSave,scheduleContext:{due:[],upcoming:[classroomConsult]},scheduledEvents:[classroomConsult]};
+assert.equal(nextScheduleBoundaryMinutes(classroomConsultSave,{futureOnly:true,action:namedConsultAction,intent:classifySceneIntent(namedConsultAction,{location:'기숙사',currentTime:'09:00'}),registry:{emily:'에밀리'}}),null,'an ancillary classroom location must not reclassify a dialogue appointment as an academic event');
 
 const boundaryChoiceSave={...boundarySave,pc:knightPc,scheduledEvents:[{id:'past-ceremony',date:'1285-03-01',time:'08:00',status:'scheduled'},{id:'class',date:'1285-03-01',time:'10:00',status:'scheduled'}]};
 turn={state_delta:{advance_minutes:0},choices:['수업에 간다','남는다','다른 일을 한다'],event_progress:{event_instance_id:'class'}};
@@ -196,7 +199,10 @@ for(const field of ['relationship_changes','stat_progress','skill_experience','s
 
 const consequenceHook={id:'consequence:emily-arrival',title:'에밀리의 도착',status:'deferred',importance:3,event_consequence:{version:'1.0',event_name:'에밀리의 도착',target_bucket:'active',reason:'에밀리가 약속 장소에 도착한다',secret_level:0,due_at:'1285-03-01T09:40',expires_at:'1285-03-04T09:40'}};
 const consequenceSave={world:{date:'1285-03-01',time:'09:20'},hooks:[consequenceHook],scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]};
-turn={scene:[{kind:'narration',text:'약속 시각이 되자 에밀리가 중앙광장에 도착해 후문 경계를 시작했다.'}],state_delta:{advance_minutes:40,npc_state_updates:[{npc_key:'emily',location:'중앙광장',status:'도착',next_activity:'오후 순찰'},{npc_key:'artemis',location:'기사과 교관실'}],npc_schedule_updates:[{npc_key:'emily',delay_minutes:20,location:'중앙광장',activity:'후문 경계',reason:'도착 후 경계'},{npc_key:'artemis',delay_minutes:20,location:'기사과 교관실',activity:'회의',reason:'정기 일정'}],hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
+const arrivalRelationship={npc_key:'emily',affinity_delta:-1,trust_delta:1,status:'경계 중',reason:'에밀리가 약속 시각에 중앙광장에 도착해 함께 후문을 경계했다'};
+const arrivalKnowledge='에밀리가 약속 시각에 중앙광장에 도착했다.';
+const arrivalMemory={owner:'pc',fact:'에밀리가 약속 시각에 중앙광장에 도착해 후문 경계를 시작했다.',importance:2,secret_level:0};
+turn={scene:[{kind:'narration',text:'약속 시각이 되자 에밀리가 중앙광장에 도착해 함께 후문 경계를 시작했다.'}],state_delta:{advance_minutes:40,relationship_changes:[arrivalRelationship],pc_knowledge_add:[arrivalKnowledge],memories_add:[arrivalMemory],npc_state_updates:[{npc_key:'emily',location:'중앙광장',status:'도착',next_activity:'오후 순찰'},{npc_key:'artemis',location:'기사과 교관실'}],npc_schedule_updates:[{npc_key:'emily',delay_minutes:20,location:'중앙광장',activity:'후문 경계',reason:'도착 후 경계'},{npc_key:'artemis',delay_minutes:20,location:'기사과 교관실',activity:'회의',reason:'정기 일정'}],hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
 const consequenceNpcKeys=consequenceNpcKeysForShortening(turn,{event_name:'약속 상대의 도착',reason:'약속 장소에 도착한다',secret_level:0},[],{emily:'에밀리',artemis:'아르테미스'});
 assert.deepEqual(consequenceNpcKeys,['emily'],'a visible NPC named in the consequence-bearing sentence must be attributed even when the queued title did not name them');
 const consequenceEffects=consequenceNpcEffectsForShortening(turn,{event_name:'약속 상대의 도착',reason:'약속 장소에 도착한다',secret_level:0},[],{emily:'에밀리',artemis:'아르테미스'});
@@ -204,6 +210,9 @@ applySceneMomentumTimeFloor({action:'40분 기다린다.',saveState:consequenceS
 assert.equal(turn.state_delta.advance_minutes,20,'a due consequence inside a longer wait must stop at its exact trigger');
 assert.deepEqual(turn.state_delta.npc_state_updates,[{npc_key:'emily',location:'중앙광장',status:'도착'}],'NPC state attributable to the resolved consequence must survive shortening');
 assert.deepEqual(turn.state_delta.npc_schedule_updates,[],'relative NPC schedules must fail closed because their delay cannot be safely rebased to the shortened boundary');
+assert.deepEqual(turn.state_delta.relationship_changes,[arrivalRelationship],'a relationship effect visibly caused by the consequence must survive boundary shortening');
+assert.deepEqual(turn.state_delta.pc_knowledge_add,[arrivalKnowledge],'knowledge visibly learned from the consequence must survive boundary shortening');
+assert.deepEqual(turn.state_delta.memories_add,[arrivalMemory],'a memory visibly formed by the consequence must survive boundary shortening');
 assert.deepEqual(turn.state_delta.hooks_update,[{id:consequenceHook.id,status:'resolved'}],'the preserved consequence state and its resolved lifecycle must remain aligned');
 
 const rangedConsequenceSave={...consequenceSave,world:{...consequenceSave.world,time:'08:40'}};

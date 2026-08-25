@@ -356,9 +356,17 @@ function consequenceEvidenceSegments(turn,consequence){
   const matched=segments.filter(segment=>(eventName.length>=3&&segment.includes(eventName))||(tokens.length&&tokens.filter(token=>segment.includes(token)).length>=Math.min(2,Math.max(1,tokens.length))));
   return{tokens,segments,matched};
 }
+function consequenceEffectMatches(value,segments=[]){
+  const text=(typeof value==='string'?value:[value?.reason,value?.cause,value?.fact,value?.description,value?.summary,value?.note,value?.title,value?.event_name,value?.name,value?.status,value?.source].filter(Boolean).join(' ')).trim().toLowerCase();
+  if(text.length<2||!segments.length)return false;
+  if(text.length>=4&&segments.some(segment=>segment.includes(text)))return true;
+  const generic=new Set(['결과','후속','사건','상황','변화','발생','진행','관련','상태','event','result','consequence']);
+  const tokens=[...new Set((text.match(/[가-힣a-z0-9_]{2,}/g)||[]).map(token=>token.replace(/(?:에게서|에게|한테|께서|으로|에서|까지|부터|처럼|보다|에는|은|는|이|가|을|를|와|과|도|의)$/u,'').replace(/(?:하였다|했습니다|했다|합니다|한다|되었다|됐다|됩니다|된다|이었다|였다|입니다|이다)$/u,'')).filter(token=>token.length>=2&&!generic.has(token)))];
+  return tokens.length>=2&&segments.some(segment=>tokens.filter(token=>segment.includes(token)).length>=Math.min(2,tokens.length));
+}
 function consequenceNpcEffectsForShortening(turn,consequence,routedKeys=[],registry=CHARACTER_REGISTRY){
   const routed=new Set(array(routedKeys).map(value=>String(value||'').trim()).filter(value=>Object.prototype.hasOwnProperty.call(registry,value))),keys=new Set(routed),evidence=consequenceEvidenceSegments(turn,consequence);
-  if(!evidence.tokens.length&&!evidence.matched.length)return{npc_keys:[...keys].slice(0,4),npc_state_updates:[],npc_schedule_updates:[],attribution_safe:true};
+  if(!evidence.tokens.length&&!evidence.matched.length)return{npc_keys:[...keys].slice(0,4),npc_state_updates:[],npc_schedule_updates:[],preserved_delta:{},attribution_safe:true};
   const updated=new Set([...array(turn?.state_delta?.npc_state_updates),...array(turn?.state_delta?.npc_schedule_updates)].map(row=>String(row?.npc_key||row?.key||'').trim()).filter(Boolean));
   for(const key of updated){
     if(!Object.prototype.hasOwnProperty.call(registry,key))continue;
@@ -378,8 +386,25 @@ function consequenceNpcEffectsForShortening(turn,consequence,routedKeys=[],regis
     if(Object.keys(kept).length>1)preservedState.push(kept);
   }
   const preservedSchedule=[];
-  const relevantCount=[...array(turn?.state_delta?.npc_state_updates),...array(turn?.state_delta?.npc_schedule_updates)].filter(row=>limitedKeys.has(String(row?.npc_key||row?.key||'').trim())).length;
-  return{npc_keys:[...limitedKeys],npc_state_updates:preservedState,npc_schedule_updates:preservedSchedule,attribution_safe:relevantCount===0||preservedState.length+preservedSchedule.length>0};
+  const delta=object(turn?.state_delta),preservedDelta={};
+  const linkedRelationshipFields=['relationship_changes','relationship_milestones_add','intimacy_changes'];
+  let linkedRelationshipCount=0,preservedLinkedRelationshipCount=0;
+  for(const field of linkedRelationshipFields){
+    const rows=array(delta[field]).filter(row=>limitedKeys.has(String(row?.npc_key||row?.key||'').trim()));
+    linkedRelationshipCount+=rows.length;
+    const kept=rows.filter(row=>consequenceEffectMatches(row,effectSegments.get(String(row?.npc_key||row?.key||'').trim())||[]));
+    preservedLinkedRelationshipCount+=kept.length;if(kept.length)preservedDelta[field]=kept;
+  }
+  const linkedNpcRelationships=array(delta.npc_relationship_changes).filter(row=>limitedKeys.has(String(row?.source_npc_key||'').trim())||limitedKeys.has(String(row?.target_npc_key||'').trim()));
+  linkedRelationshipCount+=linkedNpcRelationships.length;
+  const keptNpcRelationships=linkedNpcRelationships.filter(row=>consequenceEffectMatches(row,evidence.matched));
+  preservedLinkedRelationshipCount+=keptNpcRelationships.length;if(keptNpcRelationships.length)preservedDelta.npc_relationship_changes=keptNpcRelationships;
+  const reservedFields=new Set([...linkedRelationshipFields,'npc_relationship_changes','npc_state_updates','npc_schedule_updates','hooks_update']),evidenceFields=Object.entries(delta).filter(([field,value])=>Array.isArray(value)&&!reservedFields.has(field)).map(([field])=>field);
+  for(const field of evidenceFields){const kept=array(delta[field]).filter(row=>consequenceEffectMatches(row,evidence.matched));if(kept.length)preservedDelta[field]=kept;}
+  for(const field of ['pc_knowledge_add','memories_add'])if(array(delta[field]).length!==array(preservedDelta[field]).length)return{npc_keys:[...limitedKeys],npc_state_updates:preservedState,npc_schedule_updates:preservedSchedule,preserved_delta:preservedDelta,attribution_safe:false};
+  const relevantNpcCount=[...array(delta.npc_state_updates),...array(delta.npc_schedule_updates)].filter(row=>limitedKeys.has(String(row?.npc_key||row?.key||'').trim())).length;
+  const npcAttributionSafe=relevantNpcCount===0||preservedState.length+preservedSchedule.length>0,relationshipAttributionSafe=linkedRelationshipCount===preservedLinkedRelationshipCount;
+  return{npc_keys:[...limitedKeys],npc_state_updates:preservedState,npc_schedule_updates:preservedSchedule,preserved_delta:preservedDelta,attribution_safe:npcAttributionSafe&&relationshipAttributionSafe};
 }
 function consequenceNpcKeysForShortening(turn,consequence,routedKeys=[],registry=CHARACTER_REGISTRY){
   return consequenceNpcEffectsForShortening(turn,consequence,routedKeys,registry).npc_keys;
@@ -391,12 +416,13 @@ function reconcileReachedScheduleStart(turn,boundaryIds=new Set()){
   const completionSignals=[progress.active_beat,progress.activeBeat,progress.status,...array(progress.completed_beats||progress.completedBeats)].map(value=>String(value||'').trim().toLowerCase());
   if(boundaryIds.has(eventId)&&completionSignals.some(value=>terminal.has(value)))turn.event_progress=null;
 }
-function reconcileShortenedTimedTurn(turn,{preserveConsequenceId='',preserveNpcStateUpdates=[],preserveNpcScheduleUpdates=[]}={}){
+function reconcileShortenedTimedTurn(turn,{preserveConsequenceId='',preserveNpcStateUpdates=[],preserveNpcScheduleUpdates=[],preserveDelta={}}={}){
   const delta=object(turn?.state_delta);if(!turn?.state_delta)return;
   const consequenceId=String(preserveConsequenceId||'').trim();
-  const hooksUpdate=consequenceId?array(delta.hooks_update).filter(row=>String(row?.id||'').trim()===consequenceId):[],frozen={};
+  const hooksUpdate=consequenceId?array(delta.hooks_update).filter(row=>String(row?.id||'').trim()===consequenceId):[],frozen={},attributed={};
   for(const [field,value] of Object.entries(delta))frozen[field]=Array.isArray(value)?[]:typeof value==='number'?0:null;
-  turn.state_delta={...frozen,advance_minutes:0,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0,npc_state_updates:array(preserveNpcStateUpdates),npc_schedule_updates:array(preserveNpcScheduleUpdates),hooks_update:hooksUpdate};
+  for(const [field,value] of Object.entries(object(preserveDelta)))if(Array.isArray(delta[field])&&Array.isArray(value)&&!['npc_state_updates','npc_schedule_updates','hooks_update'].includes(field))attributed[field]=value;
+  turn.state_delta={...frozen,...attributed,advance_minutes:0,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0,npc_state_updates:array(preserveNpcStateUpdates),npc_schedule_updates:array(preserveNpcScheduleUpdates),hooks_update:hooksUpdate};
   turn.event_progress=null;
 }
 function reconcileExplicitZeroTurn(turn){
@@ -459,7 +485,7 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
     else consequenceLifecycle.evidence='deferred-by-earlier-boundary';
     consequenceLifecycle.status='open';
   }
-  if(reconcileTruncatedTurn)reconcileShortenedTimedTurn(turn,{preserveConsequenceId:appliedConsequenceBoundary||consequenceLifecycle?.evidence==='ambiguous-npc-effect'?consequenceLifecycle?.selected_id:'',preserveNpcStateUpdates:appliedConsequenceBoundary?consequenceLifecycle?.npc_state_updates:[],preserveNpcScheduleUpdates:appliedConsequenceBoundary?consequenceLifecycle?.npc_schedule_updates:[]});
+  if(reconcileTruncatedTurn)reconcileShortenedTimedTurn(turn,{preserveConsequenceId:appliedConsequenceBoundary||consequenceLifecycle?.evidence==='ambiguous-npc-effect'?consequenceLifecycle?.selected_id:'',preserveNpcStateUpdates:appliedConsequenceBoundary?consequenceLifecycle?.npc_state_updates:[],preserveNpcScheduleUpdates:appliedConsequenceBoundary?consequenceLifecycle?.npc_schedule_updates:[],preserveDelta:appliedConsequenceBoundary?consequenceLifecycle?.preserved_delta:{}});
   else if(appliedScheduleBoundary)reconcileReachedScheduleStart(turn,boundaryIds);
   turn.state_delta.advance_minutes=applied;
   return intent;

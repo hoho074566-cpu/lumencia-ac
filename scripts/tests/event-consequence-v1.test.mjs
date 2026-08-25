@@ -165,6 +165,10 @@ test('an explicit wait routes to its consequence boundary and an earlier fixed s
   assert.equal(ranged.telemetry.event_director_v2.result,'EVENT_CONSEQUENCE_DUE','a consequence inside the valid 30–120 minute training range must be routed before the model call');
   assert.equal(ranged.telemetry.event_director_v2.event_consequence_trigger_minutes,60);
 
+  const relativeStart=routeOpenAIParams({instructions,input},{mode:'game',incoming:{action:'1시간 후에 훈련한다.',saveState:waitingSave,recentTurns:[]}});
+  assert.equal(relativeStart.telemetry.event_director_v2.result,'EVENT_CONSEQUENCE_DUE','a consequence before a relative future activity start must route before the model call');
+  assert.equal(relativeStart.telemetry.event_director_v2.event_consequence_trigger_minutes,20);
+
   const scheduled={id:'class#1',title:'필수 수업',date:'1285-03-01',time:'09:30',kind:'academic',status:'scheduled',participants:[]};
   const scheduledSave={...waitingSave,pc:{name:'아리아',department:'기사과'},scheduledEvents:[scheduled],scheduleContext:{due:[],upcoming:[scheduled]}};
   const routed=routeOpenAIParams({instructions,input},{mode:'game',incoming:{action:'40분 기다린다.',saveState:scheduledSave,recentTurns:[]}});
