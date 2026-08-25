@@ -221,6 +221,32 @@ const liveImperativeCorrectionAccepted = deriveCombatGrowthState({
 assert.equal(liveImperativeCorrectionAccepted.evidence_tier, 1, 'an applied technical instruction in the resolved PC repetition is visible basic correction evidence');
 assert.deepEqual(liveImperativeCorrectionAccepted.accepted_stat_progress, [{ stat:'신체', amount:1, reason:'실패 뒤 교관의 보법 교정 적용' }], 'the exact live failure-and-imperative-correction scene must retain bounded physical growth');
 
+const linkedInstructorCorrectionAccepted = deriveCombatGrowthState({
+  pc,
+  action:'나는 이번에는 신체 단련을 위해 별도의 후퇴 보법을 세 번 연습한다. 첫 두 번은 발이 교차되어 실패한다. 교관에게 새 오류를 봐 달라고 요청하고, 교관의 뒷발 각도와 무게중심 지시를 직접 적용한 마지막 반복을 성공시켜 실패 원인을 확인한다.',
+  scene:[
+    { kind:'narration', text:'후퇴할 때도 앞선 두 번은 발이 교차하며 중심이 무너졌다. 요청을 받은 교관은 뒷발을 진행 방향에서 비스듬히 빼고, 체중을 앞발에 남기지 말라고 짧게 지적했다.' },
+    { kind:'dialogue', speaker_name:'교관', text:'뒷발부터 길을 만들어. 몸이 먼저 물러나면 발이 얽힌다.' },
+    { kind:'narration', text:'마지막 반복에서는 뒷발의 각도를 먼저 열고 중심을 낮췄다. 발이 교차하지 않은 채 한 걸음이 깔끔하게 빠진다. 원인은 뒷발의 닫힌 각도와 앞쪽에 남은 무게였다.' },
+  ],
+  resolutionLog:{ triggered:false, outcome:'none', abilities:[] },
+  statChanges:[{ stat:'신체', amount:1, reason:'실패 뒤 교관의 후퇴 보법 교정 적용' }],
+});
+assert.equal(linkedInstructorCorrectionAccepted.evidence_tier, 1, 'adjacent instructor guidance and a subjectless successful final repetition form visible basic correction evidence');
+assert.deepEqual(linkedInstructorCorrectionAccepted.accepted_stat_progress, [{ stat:'신체', amount:1, reason:'실패 뒤 교관의 후퇴 보법 교정 적용' }], 'natural narration may link correction and application across adjacent scene rows');
+
+const linkedNpcCorrectionRejected = deriveCombatGrowthState({
+  pc,
+  action:'나는 후퇴 보법을 연습한다.',
+  scene:[
+    { kind:'narration', text:'교관이 뒷발 각도와 체중 이동을 짧게 지적했다.' },
+    { kind:'narration', text:'릴리아는 마지막 반복에서 뒷발을 먼저 열어 깔끔하게 성공했다.' },
+  ],
+  resolutionLog:{ triggered:false, outcome:'none', abilities:[] },
+  statChanges:[{ stat:'신체', amount:1, reason:'릴리아의 후퇴 보법 교정 적용' }],
+});
+assert.deepEqual(linkedNpcCorrectionRejected.accepted_stat_progress, [], 'an explicitly named NPC correction outcome must not transfer through adjacent guidance');
+
 const npcInstructionApplicationRejected = deriveCombatGrowthState({
   pc,
   action:'신체 단련용 보법을 반복 연습한다.',
