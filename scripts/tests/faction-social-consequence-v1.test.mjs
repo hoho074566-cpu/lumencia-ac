@@ -103,7 +103,7 @@ const compact=compactFactionSocialForContext({reputations:{
   white_rose:{reputation:-2,stance:'경계',updated_turn:2,history:Array.from({length:4},(_,index)=>({turn:index,reason:`rose-${index}`,evidence_type:'public_event'}))},
   blue_knights:{reputation:1,stance:'중립',updated_turn:40,history:[]},
   knight_department:{reputation:1,stance:'중립',updated_turn:30,history:[]},
-}},{text:'계속 그 평판을 확인한다.',recentText:'직전 턴에는 백장미회 평판을 확인했다.',keywords:['student_council','white_rose','blue_knights','knight_department'],maxFactions:3,historyLimit:2});
+}},{text:'계속 그 평판을 확인한다.',recentTexts:['그 전에는 학생회 평판을 확인했다.','직전 턴에는 백장미회 평판을 확인했다.'],keywords:['student_council','white_rose','blue_knights','knight_department'],maxFactions:3,historyLimit:2});
 assert.ok(compact.reputations.white_rose,'an explicitly relevant faction must survive context selection even when older');
 assert.equal(Object.keys(compact.reputations).length,3,'routed faction context must stay bounded');
 assert.equal(compact.reputations.white_rose.history.length,2,'routed faction history must keep only the latest causal rows');
@@ -175,9 +175,13 @@ assert.doesNotMatch(JSON.stringify(minimumFactionSocial),/removed_npc/,'routed f
 
 const indirectRouted=routeOpenAIParams(
   {instructions,input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}'},
-  {incoming:{action:'계속 그 평판을 확인한다.',saveState:{turnNumber:12,world:{location:'academy'},sceneRuntime:{participants:['lucia'],faction_social:denseFactionState},npcInnerStates:{}},recentTurns:[{action:'백장미회의 오래된 평판을 확인한다.',summary:'루시아에게 백장미회의 태도를 물었다.',scene:[]}]},mode:'game'},
+  {incoming:{action:'계속 그 평판을 확인한다.',proReasoning:true,saveState:{turnNumber:12,world:{location:'academy'},sceneRuntime:{participants:['lucia'],faction_social:denseFactionState},npcInnerStates:{}},recentTurns:[
+    {action:'학생회의 평판을 확인한다.',summary:'학생회의 태도를 확인했다.',scene:[]},
+    {action:'청기사단의 평판을 확인한다.',summary:'청기사단의 태도를 확인했다.',scene:[]},
+    {action:'백장미회의 오래된 평판을 확인한다.',summary:'가장 최근에 백장미회의 태도를 물었다.',scene:[]},
+  ]},mode:'game'},
 );
 const indirectMinimumText=indirectRouted.params.input.split('===== AUTHORITATIVE SAVE_STATE (ROUTED MINIMUM) =====\n')[1].split('\n\n=====')[0];
-assert.ok(JSON.parse(indirectMinimumText).sceneRuntime.faction_social.reputations.white_rose,'recently discussed older faction must survive an indirect follow-up despite save-derived keywords for every faction');
+assert.ok(JSON.parse(indirectMinimumText).sceneRuntime.faction_social.reputations.white_rose,'most recently discussed older faction must survive an indirect important-turn follow-up despite two newer stored factions and broad save keywords');
 
 console.log('PASS Faction / Social Consequence V1 schema, evidence, bounds, routing, freeze, and momentum regressions');
