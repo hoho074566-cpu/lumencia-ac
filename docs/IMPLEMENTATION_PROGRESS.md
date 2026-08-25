@@ -7,12 +7,13 @@ Narrative Engine continuation — Combat Growth V2 implementation and protected-
 - Repo: `hoho074566-cpu/lumencia-ac`
 - Main: `88ce7b4c17ceb6ab1234c5cedc8bc86c5c3e1dbe` (PR #50 merge).
 - Working branch: `codex/combat-growth-v2`, based directly on that verified merge.
-- PR #51 is open from `codex/combat-growth-v2`; initial exact code head is `5866bced8963e2dcdd70c0899c3717dddb6a3b88`.
+- PR #51 is open from `codex/combat-growth-v2`; current code/test checkpoint is `d125b650f9d75c2071daede21c7ea00ef23de0d3` and the initial implementation head was `5866bced8963e2dcdd70c0899c3717dddb6a3b88`.
 - PR #50 is **merged** from exact reviewed head `1eb316b498d892c1d5fbb816a8a5464831d2f112` as `88ce7b4c17ceb6ab1234c5cedc8bc86c5c3e1dbe`. Final-head Safety/Vercel, fresh Codex P0/P1=0, and no-conflict Merge Readiness passed.
 - PR #50 merge and reviewed-head trees both equal `2a3a52fc00c7034fb09a032764433bb653b88367`. Production `/api/health` advertises Awakening/Talent V1, and the merged-main dependency-free clean-LF full regression passes.
-- Combat Growth V2 focused suites and the dependency-free clean-LF full regression pass at `5866bce...`. The final docs exact head must repeat the full check and hosted authority cycle.
-- Initial-head Codex review reported P0/P1=0 and three P2 notes. The current bounded closure rejects English third-person NPC growth, disambiguates overlapping skill names, and prevents mixed combat/training text from bypassing exact resolution membership.
+- Combat Growth V2 focused/affected suites and the dependency-free clean-LF full regression pass at code checkpoint `d125b65...`. The docs checkpoint must repeat the hosted authority cycle on its new exact head.
+- Reviews at `5866bce...` and fresh exact head `c715ec5...` both reported P0/P1=0. `d125b65...` closes ten accumulated behavior P2 counterexamples inside the helper/tests—NPC/observer attribution, English/Korean grammar, exact compound skill identity, combat-resolution relevance, ability-specific evidence, scoped negation, and hypothetical endings—while this docs checkpoint closes the one stale-head note.
 - Current automatic correction count for PR #51 is **0/5**.
+- Prior exact head `c715ec5...` passed Safety #377 and Vercel Ready. Exact Preview acceptance remains pending because Chrome tab discovery succeeded but user-tab claim/navigation timed out; protection tokens must not be extracted and the same browser-setting work must not be requested again.
 - PR #48: **merged** from exact reviewed head `a4772b80cc9e135433fb677460ca3fb5e9cde85e`. Safety #359/#360/#361, Vercel, fresh exact-head Codex P0/P1=0, instructor attribution Preview acceptance, and CONTINUE/META freeze all passed.
 - PR #48 merge `8329646...` and reviewed head share tree `5c8f8fa061742d6c851d09fb03ccf02e4795a559`; no unexpected merge delta exists. Main Vercel and production `/api/health` are green, and the merged tree passes the authoritative clean-LF full check.
 - PR #47: **merged** from exact final head `866c991fb52a77079a191a5d7452e7fecf035ce9` as `54327ea2a5c559a18681f4a4bc8795cc9c1c57a8`. Merge/reviewed trees both equal `143b56d473825969763e9440aca0c4c3100ab3b5`; production health is green on app `1.5.6` / adapter `0.8.3`.
@@ -54,8 +55,8 @@ Narrative Engine continuation — Combat Growth V2 implementation and protected-
 - Existing skill names are canonicalized. Combat XP must match an ability in the exact resolution log; deliberate named noncombat training may progress without combat resolution. An early negated attempt does not erase later affirmative learning evidence.
 - META/AUTO/CONTINUE clear or freeze both arrays. Rejected rows are removed before `localSceneRuntime`, so they cannot fake Scene Momentum. Compact pipeline/route telemetry advertises Combat Growth without duplicating authoritative state.
 - `scripts/tests/combat-growth-v2.test.mjs` permanently covers ownership, questions, NPC variants, negation ordering, evidence tiers, grades, exact combat matching, noncombat training, row bounds, zero/negative behavior, freeze, schema stability, health, and one-call architecture.
-- Dedicated and affected Skill Learning, Awakening, Scene Momentum, Orchestration, Router, authority-tail, CONTINUE, core, debug, and save suites pass. Exact code head `5866bce...` also passes the dependency-free clean-LF full PR check.
-- Initial-head Codex review found no P0/P1. Three P2 hardening notes are closed with real counterexample regressions for English NPC-only turns, `검술` versus `대검술`, and combat actions whose resolution used a different skill.
+- Dedicated and affected Skill Learning, Awakening, Scene Momentum, Orchestration, Router, authority-tail, CONTINUE, core, debug, and save suites pass. Code checkpoint `d125b65...` also passes the dependency-free clean-LF full PR check.
+- Both completed reviews found no P0/P1. Ten behavior P2s are closed with real counterexample regressions, including named observers, `연습해본다`, English sentence openers versus grammatical subjects, owned/unowned compound skill names, ability-specific resolution evidence, scoped negation, and `한다면`; the remaining P2 was this handover's stale head.
 - Current automatic correction count is **0/5**. The same exact-head → cause → minimum repair → focused/full → new head → Safety/Vercel → fresh review protocol remains in force.
 
 ## Awakening / Talent Evolution V1 — Merged in PR #50
@@ -426,7 +427,7 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only.
 
 ## NEXT ACTION
-1. Commit and push this PR #51 docs checkpoint, then rerun the authoritative clean-LF full check on the new exact head.
+1. Commit and push this PR #51 docs checkpoint, then confirm the new exact live branch head and its tree against code checkpoint `d125b65...`.
 2. Revalidate current main, merge-base, no conflict, one canonical core call, the 6,840-character routine ceiling, and the absence of migration/new endpoint/canonical `api/chat.js` or `app.js` changes.
 3. Require new-exact-head GitHub Safety, Vercel Ready, and a fresh Codex review. This protected-path PR remains human-merge only.
 4. On the Exact Preview, verify Combat Growth health visibility; bounded basic deliberate training; ordinary victory/mere-use rejection; failure-plus-correction growth; NPC-only/question-only rejection; and META/AUTO/CONTINUE freeze. Do not extract a protection token or bypass Preview protection.
@@ -474,4 +475,4 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed: PR #48 final reviewed head `a4772b8...` merged as `8329646...`; reviewed and merged trees are identical, main Vercel/production health are green, and merged-main clean-LF full regression passes.
 - Completed: PR #49 final reviewed head `ff50084...` merged as `93f5644...`; reviewed and merged trees are identical, final hosted readiness had P0/P1=0 with no conflict, and main Vercel/production health/merged-main clean-LF regression pass.
 - Completed: PR #50 final reviewed head `1eb316b...` merged as `88ce7b4...`; reviewed and merged trees are identical, production health advertises Awakening/Talent V1, and merged-main clean-LF full regression passes.
-- Current candidate: Combat Growth V2 in open PR #51 on `codex/combat-growth-v2`; initial code head `5866bce...` adds deterministic player ownership, current-scene learning evidence, per-ability tiers, grade-aware caps, exact combat-resolution matching, deliberate-training support, and freeze/order guards using existing fields. Initial review P0/P1=0; the current bounded closure adds permanent regressions for all three P2 findings without changing router/core/schema. New exact-head clean-LF full regression, hosted gates/fresh review, and affected Preview acceptance remain; current correction count is 0/5.
+- Current candidate: Combat Growth V2 in open PR #51 on `codex/combat-growth-v2`; code checkpoint `d125b65...` adds and hardens deterministic player ownership, current-scene learning evidence, per-ability tiers, grade-aware caps, exact combat-resolution matching, deliberate-training support, and freeze/order guards using existing fields. Reviews at `5866bce...` and `c715ec5...` both had P0/P1=0; ten behavior P2s now have helper-scoped permanent regressions and the stale-head P2 is corrected in docs, without router/core/schema changes. New exact-head hosted gates/fresh review and affected Preview acceptance remain; clean-LF full regression already passes and the P0/P1 correction count is 0/5.
