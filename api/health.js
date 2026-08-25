@@ -22,6 +22,7 @@ export default async function handler(req, res) {
     relationshipReason: 'V1 cause/expression/followup + turn/source persistence',
     npcRelationship: 'V1 bounded directional NPC-to-NPC affinity/trust/status + causal history',
     factionSocialConsequence: 'V1 evidence-gated public-faction reputation + bounded causal history',
+    skillLearning: 'V1 evidence-gated bounded candidates + deterministic unlock at 100 progress',
     sceneMomentum: 'HF1 semantic action compression + deterministic State Delta/stall + NPC initiative + meaningful-stop policy',
     sceneNovelty: 'V1 bounded visible-term repetition tracking + change-first suppression',
     tokenBudget: { routine: 17000, routineSoftMax: 20000, scheduled: 18000, important: 20000, critical: 24000 },
