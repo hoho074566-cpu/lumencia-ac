@@ -127,12 +127,12 @@ assert.equal(turn.state_delta.advance_minutes,215,'a future class start plus its
 
 turn={
   event_progress:{event_instance_id:'next-morning',active_beat:'complete',completed_beats:['complete']},choices:[],
-  state_delta:{advance_minutes:960,new_location:'여관',fatigue_delta:-3,stat_progress:[{stat:'신체',amount:1}],active_events_add:['next-morning'],active_events_remove:['night'],completed_events_add:['next-morning'],scheduled_events_add:[{id:'future'}],scheduled_events_complete:['morning-class'],npc_state_updates:[{npc_key:'artemis',last_seen:'1285-03-02 07:20'}],pc_knowledge_add:['다음 날 결과'],memories_add:[{fact:'다음 날 결과'}],hooks_add:[{id:'future'}],hooks_update:[{id:'future',status:'resolved'}],delayed_consequences_add:[{event_name:'future'}]},
+  state_delta:{advance_minutes:960,new_location:'여관',fatigue_delta:-3,stat_progress:[{stat:'신체',amount:1}],active_events_add:['next-morning'],active_events_remove:['night'],completed_events_add:['next-morning'],scheduled_events_add:[{id:'future'}],scheduled_events_remove:['old-future'],scheduled_events_complete:['morning-class'],npc_state_updates:[{npc_key:'artemis',last_seen:'1285-03-02 07:20'}],npc_schedule_updates:[{npc_key:'artemis',time:'07:20'}],pc_knowledge_add:['다음 날 결과'],memories_add:[{fact:'다음 날 결과'}],hooks_add:[{id:'future'}],hooks_update:[{id:'future',status:'resolved'}],delayed_consequences_add:[{event_name:'future'}]},
 };
 applySceneMomentumTimeFloor({action:'잠을 잔다.',saveState:{world:{date:'1285-03-01',time:'15:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,480,'overshooting sleep still clamps to the profile maximum');
 assert.equal(turn.event_progress,null,'future event progress must not survive a shortened turn');
-for(const field of ['active_events_add','active_events_remove','completed_events_add','scheduled_events_add','scheduled_events_complete','npc_state_updates','pc_knowledge_add','memories_add','hooks_add','hooks_update','delayed_consequences_add'])assert.deepEqual(turn.state_delta[field],[],`${field} must fail closed when model time is shortened`);
+for(const field of ['active_events_add','active_events_remove','completed_events_add','scheduled_events_add','scheduled_events_remove','scheduled_events_complete','npc_state_updates','npc_schedule_updates','pc_knowledge_add','memories_add','hooks_add','hooks_update','delayed_consequences_add'])assert.deepEqual(turn.state_delta[field],[],`${field} must fail closed when model time is shortened`);
 assert.equal(turn.state_delta.new_location,'여관','action-local location completion survives time reconciliation');
 assert.equal(turn.state_delta.fatigue_delta,-3,'action-local resource effects survive time reconciliation');
 assert.equal(turn.state_delta.stat_progress.length,1,'action-local growth evidence survives time reconciliation');
@@ -153,6 +153,42 @@ applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:rangedSc
 assert.equal(turn.state_delta.advance_minutes,60,'a ranged activity that crosses an intervening required schedule must stop at that schedule');
 assert.deepEqual(turn.state_delta.scheduled_events_complete,[],'the crossed schedule must not remain completed after the clock is shortened to its start');
 assert.deepEqual(turn.state_delta.npc_state_updates,[],'future NPC state must not survive schedule-cap reconciliation');
+
+const underreportedScheduleSave={...rangedScheduleSave,world:{...rangedScheduleSave.world,time:'11:00'},scheduleContext:{due:[],upcoming:[{id:'knight-orientation',title:'기사과 1학년 필수 오리엔테이션',date:'1285-03-01',time:'12:00',kind:'academic'}]},scheduledEvents:[{id:'knight-orientation',title:'기사과 1학년 필수 오리엔테이션',date:'1285-03-01',time:'12:00',kind:'academic',status:'scheduled'}]};
+turn={scene_title:'훈련장의 마지막 보폭',scene:[{kind:'narration',text:'약 40분 뒤, 훈련장 외부에서 정오를 알리는 종이 울렸다.'},{kind:'narration',text:'기사과 필수 오리엔테이션에 대응할 시점이다.'}],state_delta:{advance_minutes:40,scheduled_events_complete:['knight-orientation'],completed_events_add:['knight-orientation'],active_events_remove:['knight-orientation']},choices:['오리엔테이션으로 간다','남는다','다른 곳으로 간다'],event_progress:null};
+applySceneMomentumTimeFloor({action:'기본 검술 자세와 발놀림을 충분히 훈련한다.',saveState:underreportedScheduleSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,60,'a visibly occurred boundary inside the activity range must align an underreported model clock');
+for(const field of ['scheduled_events_complete','completed_events_add','active_events_remove'])assert.deepEqual(turn.state_delta[field],[],`${field} must not complete the occurrence at its start boundary`);
+
+turn={scene_title:'훈련장의 기본기',scene:[{kind:'narration',text:'40분 동안 기본 자세를 반복했다.'},{kind:'narration',text:'기사과 필수 오리엔테이션은 정오에 예정되어 있어 아직 20분 남아 있다.'}],state_delta:{advance_minutes:40},choices:[],event_progress:null};
+applySceneMomentumTimeFloor({action:'기본 검술 자세와 발놀림을 충분히 훈련한다.',saveState:underreportedScheduleSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,40,'a future schedule mention must not stretch a completed short activity to the boundary');
+
+turn={scene_title:'훈련장의 예고',scene:[{kind:'narration',text:'곧 정오를 알리는 종이 울릴 것이다.'},{kind:'narration',text:'기사과 필수 오리엔테이션에 늦지 않을 만큼 시간이 남아 있다.'}],state_delta:{advance_minutes:40},choices:[],event_progress:null};
+applySceneMomentumTimeFloor({action:'기본 검술 자세와 발놀림을 충분히 훈련한다.',saveState:underreportedScheduleSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,40,'a predicted bell must not be mistaken for an already occurred boundary');
+
+turn={scene_title:'훈련장의 예고',scene:[{kind:'narration',text:'정오를 알리는 종이 울렸을 것이다.'},{kind:'narration',text:'기사과 필수 오리엔테이션의 시작 여부는 아직 확인되지 않았다.'}],state_delta:{advance_minutes:40},choices:[],event_progress:null};
+applySceneMomentumTimeFloor({action:'기본 검술 자세와 발놀림을 충분히 훈련한다.',saveState:underreportedScheduleSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,40,'a speculative past-form bell must not be treated as observed occurrence evidence');
+
+turn={scene_title:'기사과 필수 오리엔테이션 개막',scene:[{kind:'narration',text:'기사과 필수 오리엔테이션이 시작되었다.'}],state_delta:{advance_minutes:40},choices:['참석한다','남는다','다른 곳으로 간다'],event_progress:null};
+applySceneMomentumTimeFloor({action:'기본 검술 자세와 발놀림을 충분히 훈련한다.',saveState:underreportedScheduleSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,60,'an exact visibly started occurrence must align to its authoritative schedule even without a bell');
+
+turn={scene_title:'오리엔테이션 호출',scene:[{kind:'narration',text:'호출에 대응해야 한다.'}],state_delta:{advance_minutes:40,scheduled_events_complete:['knight-orientation']},choices:['참석한다','남는다','다른 곳으로 간다'],event_progress:{event_instance_id:'knight-orientation',active_beat:'start'}};
+applySceneMomentumTimeFloor({action:'기본 검술 자세와 발놀림을 충분히 훈련한다.',saveState:underreportedScheduleSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,60,'an exact structured occurrence ID must align an underreported clock without textual title matching');
+assert.deepEqual(turn.state_delta.scheduled_events_complete,[],'structured start evidence must not complete its own schedule at the boundary');
+
+turn={scene_title:'훈련장의 기본기',scene:[{kind:'narration',text:'기사과 필수 오리엔테이션은 10시에 예정되어 있다.'},{kind:'narration',text:'10시 30분을 알리는 종이 울렸다.'}],state_delta:{advance_minutes:40},choices:[],event_progress:null};
+applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:rangedScheduleSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,40,'a later clock sharing the same hour must not satisfy an earlier exact schedule boundary');
+
+const beyondProfileScheduleSave={...underreportedScheduleSave,scheduleContext:{due:[],upcoming:[{id:'late-orientation',title:'기사과 심화 오리엔테이션',date:'1285-03-01',time:'13:30',kind:'academic'}]},scheduledEvents:[{id:'late-orientation',title:'기사과 심화 오리엔테이션',date:'1285-03-01',time:'13:30',kind:'academic',status:'scheduled'}]};
+turn={scene_title:'기사과 심화 오리엔테이션 개막',scene:[{kind:'narration',text:'기사과 심화 오리엔테이션이 시작되었다.'}],state_delta:{advance_minutes:40},choices:['참석한다','남는다','다른 곳으로 간다'],event_progress:null};
+applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:beyondProfileScheduleSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,40,'visible schedule text beyond the activity maximum must not stretch the action to a distant boundary');
 
 turn={state_delta:{advance_minutes:10},choices:['대응한다','피한다','지켜본다'],event_progress:{event_instance_id:'director:interruption'}};
 applySceneMomentumTimeFloor({action:'잠을 잔다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');

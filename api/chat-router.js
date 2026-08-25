@@ -331,9 +331,29 @@ function scheduleRowMentioned(turn,row={}){
   const generic=new Set(['필수','일정','시작','종료','예정','행사','event','required']),raw=String(row.title||'').toLowerCase().match(/[가-힣a-z0-9]+/g)||[],tokens=[...new Set(raw.filter(token=>token.length>=2&&!generic.has(token)))];if(!tokens.length)return false;
   const matched=tokens.filter(token=>visible.includes(token)).length;return matched>=Math.min(2,tokens.length);
 }
+function scheduleTimeMentioned(text,row={}){
+  const match=String(row?.time||'').trim().match(/^(\d{1,2}):(\d{2})$/);if(!match)return false;
+  const hour=Number(match[1]),minute=Number(match[2]),value=String(text||'');if(!Number.isInteger(hour)||!Number.isInteger(minute))return false;
+  const hourToken=hour<10?`0?${hour}`:`${hour}`,minuteToken=String(minute).padStart(2,'0'),colon=new RegExp(`(?:^|\\D)${hourToken}:${minuteToken}(?!\\d)`),korean=minute===0?new RegExp(`(?:^|\\D)${hour}\\s*시(?!\\s*\\d+\\s*분)`):new RegExp(`(?:^|\\D)${hour}\\s*시\\s*${minute}\\s*분`);
+  if(colon.test(value)||korean.test(value))return true;
+  return minute===0&&((hour===12&&/정오/.test(value))||(hour===0&&/자정/.test(value)));
+}
+function scheduleBoundaryOccurred(turn,row={}){
+  if(!scheduleRowMentioned(turn,row))return false;
+  const segments=[turn?.scene_title,...array(turn?.scene).map(item=>item?.text)].filter(Boolean).flatMap(value=>String(value).split(/(?<=[.!?。！？])|\n+/)).map(value=>value.trim()).filter(Boolean);
+  const started=segments.some(text=>scheduleRowMentioned({scene:[{text}]},row)&&/(?:시작(?:되어(?!야)|되었|됐다|되었다|했으며|했다)|개막(?:하여(?!야)|했|했다)|개시(?:되어(?!야)|되었|됐다|되었다|했다))/.test(text));
+  if(started)return true;
+  const bellCue=/(?:종(?:이|소리가|소리도)?\s*(?:울렸다|울렸(?:다|고|으며|지만|는데)|울리기\s*시작했(?:다|고|으며)|들렸다|들렸(?:다|고|으며))|종소리가\s*(?:퍼졌다|퍼졌(?:다|고|으며)|들려왔다|들려왔(?:다|고|으며)|들렸다))/,bellSegments=segments.filter(text=>bellCue.test(text));
+  if(bellSegments.some(text=>scheduleTimeMentioned(text,row)))return true;
+  const title=String(turn?.scene_title||'');return bellSegments.length>0&&/종/.test(title)&&scheduleTimeMentioned(title,row);
+}
+function reconcileReachedScheduleStart(turn,boundaryIds=new Set()){
+  const delta=object(turn?.state_delta);if(!turn?.state_delta||!boundaryIds.size)return;
+  for(const field of ['active_events_remove','completed_events_add','scheduled_events_remove','scheduled_events_complete'])delta[field]=array(delta[field]).filter(value=>!boundaryIds.has(String(value||'').trim().toLowerCase()));
+}
 function reconcileShortenedTimedTurn(turn,{preserveConsequenceId=''}={}){
   const delta=object(turn?.state_delta);if(!turn?.state_delta)return;
-  for(const field of ['active_events_add','active_events_remove','completed_events_add','scheduled_events_add','scheduled_events_complete','npc_state_updates'])delta[field]=[];
+  for(const field of ['active_events_add','active_events_remove','completed_events_add','scheduled_events_add','scheduled_events_remove','scheduled_events_complete','npc_state_updates','npc_schedule_updates'])delta[field]=[];
   turn.event_progress=null;
   const consequenceId=String(preserveConsequenceId||'').trim();
   if(consequenceId){
@@ -354,20 +374,22 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   const boundaries=[scheduleBoundary,consequenceBoundary].filter(value=>value!=null&&Number.isFinite(Number(value))).map(Number);
   const boundary=boundaries.length?Math.min(...boundaries):null;
   const boundedFloor=boundary==null?requestedFloor:Math.min(requestedFloor,Math.max(0,boundary));
-  const allowedMax=scheduleBoundaryLimitMinutes(intent);
+  const hardStopLimit=scheduleBoundaryLimitMinutes(intent);
   const eventId=String(turn?.event_progress?.event_instance_id||turn?.event_progress?.eventInstanceId||'').trim().toLowerCase();
   const dueAtBoundary=new Set(scheduleBoundary==null?[]:scheduledIdsDueByTurnEnd(incoming?.saveState||{},scheduleBoundary).map(value=>String(value).trim().toLowerCase()));
   const dueBeforeBoundary=new Set(scheduleBoundary==null?[]:scheduledIdsDueByTurnEnd(incoming?.saveState||{},Math.max(0,scheduleBoundary-1)).map(value=>String(value).trim().toLowerCase()));
-  const boundaryRows=scheduleRowsAtBoundary(incoming?.saveState||{},scheduleBoundary),boundaryIds=new Set(boundaryRows.map(row=>String(row?.id||'').trim().toLowerCase()).filter(Boolean)),structuredBoundary=Boolean(eventId&&boundaryIds.has(eventId)&&dueAtBoundary.has(eventId)&&!dueBeforeBoundary.has(eventId)),visibleBoundary=Boolean(!eventId&&boundaryRows.some(row=>scheduleRowMentioned(turn,row)));
+  const boundaryRows=scheduleRowsAtBoundary(incoming?.saveState||{},scheduleBoundary),boundaryIds=new Set(boundaryRows.map(row=>String(row?.id||'').trim().toLowerCase()).filter(Boolean)),structuredBoundary=Boolean(eventId&&boundaryIds.has(eventId)&&dueAtBoundary.has(eventId)&&!dueBeforeBoundary.has(eventId)),visibleBoundary=Boolean(!eventId&&boundaryRows.some(row=>scheduleBoundaryOccurred(turn,row)));
   const crossedScheduledBoundary=Boolean(scheduleBoundary!=null&&scheduleBoundary===boundary&&scheduleBoundary<=profileMax&&current>scheduleBoundary);
-  const reachedScheduledBoundary=Boolean(scheduleBoundary!=null&&scheduleBoundary===boundary&&((boundary<=allowedMax&&(structuredBoundary||visibleBoundary))||crossedScheduledBoundary));
-  const reachedConsequenceBoundary=Boolean(consequenceBoundary!=null&&consequenceBoundary===boundary&&boundary<=allowedMax&&consequenceLifecycle?.status==='resolved');
+  const surfacedScheduledBoundary=Boolean(scheduleBoundary!=null&&scheduleBoundary===boundary&&scheduleBoundary<=profileMax&&(structuredBoundary||visibleBoundary));
+  const reachedScheduledBoundary=surfacedScheduledBoundary||crossedScheduledBoundary;
+  const reachedConsequenceBoundary=Boolean(consequenceBoundary!=null&&consequenceBoundary===boundary&&boundary<=hardStopLimit&&consequenceLifecycle?.status==='resolved');
   const previousEventId=String(incoming?.saveState?.sceneRuntime?.eventProgress?.eventInstanceId||incoming?.saveState?.sceneRuntime?.eventProgress?.event_instance_id||'').trim().toLowerCase();
   const structuredInterruption=Boolean(eventId.startsWith('director:')&&eventId!==previousEventId&&!structuredBoundary&&eventId!==String(consequenceLifecycle?.selected_id||'').trim().toLowerCase());
   let applied=current;
   if(reachedScheduledBoundary||reachedConsequenceBoundary)applied=boundary;
   else if(!structuredInterruption&&(!hasMeaningfulStop||current>0))applied=Math.min(profileMax,Math.max(current,boundedFloor));
   if(applied<current)reconcileShortenedTimedTurn(turn,{preserveConsequenceId:reachedConsequenceBoundary?consequenceLifecycle?.selected_id:''});
+  else if(reachedScheduledBoundary)reconcileReachedScheduleStart(turn,boundaryIds);
   turn.state_delta.advance_minutes=applied;
   return intent;
 }
