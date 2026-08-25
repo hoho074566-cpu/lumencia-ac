@@ -373,7 +373,7 @@ function consequenceEffectMatches(value,segments=[]){
 }
 function consequenceNpcEffectsForShortening(turn,consequence,routedKeys=[],registry=CHARACTER_REGISTRY){
   const routed=new Set(array(routedKeys).map(value=>String(value||'').trim()).filter(value=>Object.prototype.hasOwnProperty.call(registry,value))),keys=new Set(routed),evidence=consequenceEvidenceSegments(turn,consequence);
-  if(!evidence.tokens.length&&!evidence.matched.length){const delta=object(turn?.state_delta),hasUnattributedScalar=['gold_delta','fatigue_delta'].some(field=>Number(delta[field]||0)!==0);return{npc_keys:[...keys].slice(0,4),npc_state_updates:[],npc_schedule_updates:[],preserved_delta:{},attribution_safe:!hasUnattributedScalar};}
+  if(!evidence.tokens.length&&!evidence.matched.length){const delta=object(turn?.state_delta),hasUnpreservedEffect=Object.entries(delta).some(([field,value])=>{if(['advance_minutes','hooks_update'].includes(field))return false;if(Array.isArray(value))return value.length>0;if(typeof value==='number')return value!==0;return value!=null&&value!==''&&value!==false;});return{npc_keys:[...keys].slice(0,4),npc_state_updates:[],npc_schedule_updates:[],preserved_delta:{},attribution_safe:!hasUnpreservedEffect};}
   const updated=new Set([...array(turn?.state_delta?.npc_state_updates),...array(turn?.state_delta?.npc_schedule_updates)].map(row=>String(row?.npc_key||row?.key||'').trim()).filter(Boolean));
   for(const key of updated){
     if(!Object.prototype.hasOwnProperty.call(registry,key))continue;
@@ -524,11 +524,22 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   if(reconcileTimedTurn)reconcileShortenedTimedTurn(turn,{preserveConsequenceId:preserveAttributedConsequence||consequenceLifecycle?.evidence==='ambiguous-npc-effect'?consequenceLifecycle?.selected_id:'',preserveNpcStateUpdates:preserveAttributedConsequence?consequenceLifecycle?.npc_state_updates:[],preserveNpcScheduleUpdates:preserveAttributedConsequence?consequenceLifecycle?.npc_schedule_updates:[],preserveDelta:preserveAttributedConsequence?consequenceLifecycle?.preserved_delta:{},preserveIntermediateLocation});
   else if(appliedScheduleBoundary)rewoundScheduleCompletion=reconcileReachedScheduleStart(turn,boundaryRows);
   turn.state_delta.advance_minutes=applied;
-  return{...intent,runtimeSceneTrusted:!reconcileTimedTurn&&!rewoundScheduleCompletion};
+  const returnedSceneReconciled=Boolean(reconcileTimedTurn||rewoundScheduleCompletion),reconciliationReason=appliedScheduleBoundary||unsurfacedScheduleCapsFloor||overrunStartBoundary||rewoundScheduleCompletion?'schedule-boundary':appliedConsequenceBoundary||unresolvedConsequenceCapsFloor||ambiguousAppliedConsequence?'consequence-boundary':turnLimitCompletion?'turn-limit':'profile-cap';
+  if(returnedSceneReconciled)reconcileReturnedTimedTurn(turn,{reason:reconciliationReason,elapsed:applied});
+  return{...intent,runtimeSceneTrusted:!returnedSceneReconciled,returnedSceneReconciled,reconciliationReason:returnedSceneReconciled?reconciliationReason:null};
 }
 function runtimeSynthesisTurn(turn,intent={}){
   if(intent?.runtimeSceneTrusted!==false)return turn;
   return{...object(turn),scene:[],scene_title:'',scene_summary:'',choices:[],emotion_updates:[],director:null,runtime_incomplete_boundary:true};
+}
+function reconcileReturnedTimedTurn(turn,{reason='profile-cap',elapsed=0}={}){
+  if(!turn||typeof turn!=='object')return false;
+  const minutes=Math.max(0,Math.trunc(Number(elapsed)||0)),prefix=minutes>0?`${minutes}분 동안 행동을 진행한 뒤, `:'행동을 시작하려던 순간, ';
+  const detail=reason==='schedule-boundary'?'예정된 일정의 시작 시점에 도달했다.':reason==='consequence-boundary'?'후속 상황이 발현할 시점에 도달했다.':reason==='turn-limit'?'한 턴의 진행 한계에 도달했다.':'요청한 시간 범위의 끝에 도달했다.';
+  const text=`${prefix}${detail} 그 이후 과정은 아직 확정되지 않았다.`;
+  turn.scene_title=reason==='schedule-boundary'?'일정 경계':reason==='consequence-boundary'?'후속 상황 경계':reason==='turn-limit'?'진행 중':'행동 진행 중';
+  turn.scene_summary=text;turn.scene=[{kind:'narration',text}];turn.choices=[];turn.emotion_updates=[];turn.director=null;
+  return true;
 }
 function uniqText(rows,limit=4){return [...new Set(array(rows).map(x=>clampText(x,140).trim()).filter(Boolean))].slice(-limit);}
 function tinyHash(text=''){let h=0x811c9dc5;for(const ch of String(text)){h^=ch.charCodeAt(0);h=Math.imul(h,0x01000193);}return(h>>>0).toString(16).padStart(8,'0');}

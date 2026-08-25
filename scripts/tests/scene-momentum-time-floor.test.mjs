@@ -284,9 +284,13 @@ assert.equal(deferredTravelIntent.runtimeSceneTrusted,false,'premature deferred-
 turn={state_delta:{advance_minutes:15},choices:[]};
 applySceneMomentumTimeFloor({action:'쉰다.',saveState:boundarySave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'a positive model advance that crosses a required schedule must clamp to that schedule');
-turn={state_delta:{advance_minutes:400},choices:[]};
-applySceneMomentumTimeFloor({action:'6시간 쉰다.',saveState:fullScheduleSave},turn,'game');
+turn={scene_title:'휴식 완료',scene_summary:'여섯 시간을 모두 쉬고 일어났다.',scene:[{kind:'narration',text:'여섯 시간을 모두 쉬고 일어났다.'}],state_delta:{advance_minutes:400},choices:[]};
+const shortenedScheduleIntent=applySceneMomentumTimeFloor({action:'6시간 쉰다.',saveState:fullScheduleSave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,300,'an explicit duration that crosses a required schedule must clamp even when the model omits the boundary');
+assert.equal(shortenedScheduleIntent.reconciliationReason,'schedule-boundary','an authoritative schedule truncation must identify its reconciliation boundary');
+assert.equal(turn.scene_title,'일정 경계','the returned title must expose the reached schedule instead of a false completed rest');
+assert.match(turn.scene_summary,/300분 동안 행동을 진행한 뒤, 예정된 일정의 시작 시점에 도달했다/,'the returned narration must agree with the exact schedule boundary');
+assert.doesNotMatch(turn.scene_summary,/여섯 시간|모두 쉬고/,'post-boundary completion prose must not remain user-visible');
 
 turn={scene:[{kind:'narration',text:'잠에서 깨어나 몸을 일으켰다.'}],state_delta:{advance_minutes:60},choices:['일어난다','일정을 확인한다','더 쉰다']};
 applySceneMomentumTimeFloor({action:'잠을 잔다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
@@ -340,6 +344,11 @@ assert.deepEqual(turn.state_delta.hooks_update,[{id:consequenceHook.id,status:'r
 turn={scene:[{kind:'narration',text:'약속 시각이 되자 에밀리가 중앙광장에 도착해 후문 경계를 시작했다.'}],state_delta:{advance_minutes:40,npc_state_updates:[{npc_key:'emily',location:'중앙광장',status:'도착'}],npc_schedule_updates:[{npc_key:'emily',delay_minutes:20,location:'중앙광장',activity:'후문 경계',reason:'도착 후 경계'}],hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
 const scheduleCoupledEffects=consequenceNpcEffectsForShortening(turn,{event_name:'약속 상대의 도착',reason:'약속 장소에 도착한다',secret_level:0},['emily'],{emily:'에밀리'});
 assert.equal(scheduleCoupledEffects.attribution_safe,false,'an unrebased consequence-owned NPC schedule must keep attribution unresolved');
+const tokenlessSecretConsequence={id:'secret-result',event_name:'후속 결과',secret_level:5,reason:'숨겨진 원인'};
+const tokenlessEffects=consequenceNpcEffectsForShortening({scene:[{kind:'narration',text:'복도 저편에서 낯선 움직임이 번졌다.'}],state_delta:{advance_minutes:60,npc_state_updates:[{npc_key:'emily',status:'추적 중'}],npc_schedule_updates:[{npc_key:'emily',activity:'비밀 조사'}],relationship_changes:[{npc_key:'emily',affinity_delta:1,reason:'숨겨진 반응'}]}},tokenlessSecretConsequence,['emily']);
+assert.equal(tokenlessEffects.attribution_safe,false,'a tokenless consequence with any unpreserved NPC, schedule, or relationship effect must remain unresolved');
+const tokenlessLifecycleOnly=consequenceNpcEffectsForShortening({scene:[],state_delta:{advance_minutes:60,hooks_update:[{id:'secret-result',status:'resolved'}]}},tokenlessSecretConsequence,[]);
+assert.equal(tokenlessLifecycleOnly.attribution_safe,true,'a tokenless consequence with only its preservable hook lifecycle may still resolve');
 const scheduleCoupledLifecycle={selected_id:consequenceHook.id,status:'resolved',...scheduleCoupledEffects};
 applySceneMomentumTimeFloor({action:'40분 기다린다.',saveState:consequenceSave},turn,'game',scheduleCoupledLifecycle);
 assert.deepEqual(turn.state_delta.npc_state_updates,[],'partial NPC state must not be consumed while its causal schedule remains unresolved');
@@ -535,13 +544,17 @@ const futureScene=[{kind:'dialogue',speaker_key:'emily',text:'한참 뒤 에밀�
 turn={scene_title:'한참 뒤의 방문',scene_summary:'에밀리가 도착했다.',scene:futureScene,emotion_updates:[{npc_key:'emily',expression:'smile'}],state_delta:{advance_minutes:100,npc_state_updates:[{npc_key:'emily',location:'광장'}]},choices:['맞이한다','돌려보낸다','기다린다'],event_progress:null};
 const shortenedIntent=applySceneMomentumTimeFloor({action:'5분만 기다린다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(shortenedIntent.runtimeSceneTrusted,false,'a shortened turn must mark its unreconciled visible scene unsafe for runtime synthesis');
+assert.equal(shortenedIntent.returnedSceneReconciled,true,'a shortened turn must replace the user-visible response as well as runtime input');
+assert.equal(turn.scene_title,'행동 진행 중','a profile-capped response must expose a deterministic nonterminal title');
+assert.match(turn.scene_summary,/5분 동안 행동을 진행한 뒤/,'the returned summary must agree with the shortened authoritative clock');
+assert.doesNotMatch(turn.scene_summary,/에밀리|도착/,'the returned summary must not preserve post-cap events');
+assert.notStrictEqual(turn.scene,futureScene,'the user-visible response must no longer retain impossible post-cap narration');
 const safeRuntimeTurn=runtimeSynthesisTurn(turn,shortenedIntent);
 assert.deepEqual(safeRuntimeTurn.scene,[],'post-boundary speakers must not reach runtime synthesis');
 assert.deepEqual(safeRuntimeTurn.emotion_updates,[],'post-boundary speaker moods must not reach runtime synthesis');
 assert.deepEqual(safeRuntimeTurn.choices,[],'post-boundary choices must not influence runtime continuity');
 assert.equal(safeRuntimeTurn.state_delta.advance_minutes,5,'the reconciled bounded state delta must remain available to runtime synthesis');
 assert.equal(safeRuntimeTurn.runtime_incomplete_boundary,true,'runtime synthesis must mark the sanitized turn as an incomplete scene boundary');
-assert.strictEqual(turn.scene,futureScene,'runtime fail-closed filtering must not erase the user-visible response');
 turn={scene:[{kind:'narration',text:'하루 동안 수도를 향해 이동한 끝에 중간 마을에서 밤을 맞았다.'}],state_delta:{advance_minutes:1440,new_location:'중간 마을',pc_status:'이동 중',items_add:['도착 보상']},choices:[],event_progress:null};
 const cappedTravelIntent=applySceneMomentumTimeFloor({action:'48시간 동안 수도로 간다.',saveState:{world:{date:'1285-03-02',time:'07:20',location:'변경 도시'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,1440,'an overlong trip must stop at the one-turn cap');

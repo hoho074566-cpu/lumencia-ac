@@ -242,6 +242,15 @@ assert.equal(classifySceneIntent('내일 밤 1시에 잠을 잔다.', { location
 assert.deepEqual(classifySceneIntent('밤 11시부터 밤 1시까지 잠을 잔다.', { location:'개인실',currentTime:'22:00' }).suggestedAdvanceMinutes,[180,180],'a night interval ending at 1 AM must cross midnight');
 assert.deepEqual(classifySceneIntent('오후 11시부터 1시까지 잠을 잔다.', { location:'개인실',currentTime:'22:00' }).suggestedAdvanceMinutes,[180,180],'an unmarked end after a marked late-night start must roll into the next day');
 assert.deepEqual(classifySceneIntent('오전 11시부터 1시까지 수업을 듣는다.', { location:'강의실',currentTime:'10:00' }).suggestedAdvanceMinutes,[180,180],'an unmarked lower hour after an AM start must resolve to the same-day afternoon');
+const objectClockClass=classifySceneIntent('수업을 오전 10시에 듣는다.',{location:'강의실',currentTime:'08:00'});
+assert.equal(objectClockClass.kind,'class-attendance','an object-clock-verb class must retain its academic intent');
+assert.equal(objectClockClass.scheduledStartOffsetMinutes,120,'an object-clock-verb class must retain its scheduled start');
+assert.deepEqual(objectClockClass.suggestedAdvanceMinutes,[165,240],'the class profile must begin after the scheduled start offset');
+assert.deepEqual(classifySceneIntent('점심을 오전 10시에 먹는다.',{location:'식당',currentTime:'08:00'}).suggestedAdvanceMinutes,[140,165],'an object-clock-verb meal must retain schedule plus meal timing');
+assert.deepEqual(classifySceneIntent('훈련을 오전 10시에 한다.',{location:'훈련장',currentTime:'08:00'}).suggestedAdvanceMinutes,[150,240],'an object-clock-verb training action must retain schedule plus training timing');
+assert.deepEqual(classifySceneIntent('수업을 오전 10시에 두 시간 동안 듣는다.',{location:'강의실',currentTime:'08:00'}).suggestedAdvanceMinutes,[240,240],'a scheduled object-clock-verb activity must still preserve its explicit duration');
+assert.deepEqual(classifySceneIntent('오전 10시부터 10시 30분까지 수업을 듣고 8시간 잠을 잔다.',{location:'개인실',currentTime:'08:00'}).suggestedAdvanceMinutes,[630,630],'a preceding clock interval must contribute its exact wait and interval length');
+assert.deepEqual(classifySceneIntent('오전 10시부터 오후 1시까지 수업을 듣고 8시간 잠을 잔다.',{location:'개인실',currentTime:'08:00'}).suggestedAdvanceMinutes,[780,780],'a longer preceding clock interval must not fall back to the class range');
 
 const sleep = classifySceneIntent('잠을 잔다.', { location:'개인실' });
 assert.equal(sleep.kind, 'downtime');
