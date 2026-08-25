@@ -132,6 +132,34 @@ const npcCombatRejected = deriveSkillLearningState({
 });
 assert.deepEqual(npcCombatRejected.accepted_changes, [], 'an NPC combat action must not satisfy the PC-owned combat intent gate');
 
+const instructorSelfCorrectionRejected = deriveSkillLearningState({
+  changes: [{ skill: '반월 보법', amount: 15, basis: '교관이 공격을 교정했다.', reason: '교관의 자기 교정을 PC 진척으로 주장했다.' }],
+  action: '검으로 적을 공격한다.',
+  scene: [{ text: '교관이 자신의 자세를 교정하고 같은 공격을 재현했다.' }],
+});
+assert.deepEqual(instructorSelfCorrectionRejected.accepted_changes, [], 'an instructor correcting their own movement must not authenticate PC learning');
+
+const instructorCorrectionOnlyRejected = deriveSkillLearningState({
+  changes: [{ skill: '반월 보법', amount: 15, basis: '교관이 자세를 교정했다.', reason: '교관의 단독 교정을 PC 진척으로 주장했다.' }],
+  action: '검으로 적을 공격한다.',
+  scene: [{ text: '교관이 자신의 발 위치와 자세를 교정했다.' }],
+});
+assert.deepEqual(instructorCorrectionOnlyRejected.accepted_changes, [], 'a sole instructor correction without PC practice or receipt must remain third-party evidence');
+
+const npcReceivedInstructionRejected = deriveSkillLearningState({
+  changes: [{ skill: '반월 보법', amount: 15, basis: '아르테미스가 교정받았다.', reason: 'NPC가 받은 교정을 PC 진척으로 주장했다.' }],
+  action: '검으로 적을 공격한다.',
+  scene: [{ text: '아르테미스가 자세를 교정받은 뒤 같은 공격을 재현했다.' }],
+});
+assert.deepEqual(npcReceivedInstructionRejected.accepted_changes, [], 'instruction explicitly received by an NPC must not be attributed to the PC');
+
+const playerReceivedInstructionAccepted = deriveSkillLearningState({
+  changes: [{ skill: '반월 보법', amount: 6, basis: '발 위치를 직접 교정받았다.', reason: '교정 뒤 같은 궤적을 연속 재현했다.' }],
+  action: '반월 보법을 직접 반복 연습한다.',
+  scene: [{ text: '교관의 지도를 받아 발 위치를 교정하고 같은 궤적을 세 번 연속 재현했다.' }],
+});
+assert.equal(playerReceivedInstructionAccepted.candidates['반월 보법'].progress, 6, 'instruction received by the practicing PC must remain valid learning evidence');
+
 const observedThenPracticedAccepted = deriveSkillLearningState({
   changes: [{ skill: '반월 보법', amount: 7, basis: '시범 뒤 직접 발 위치를 교정했다.', reason: '직접 같은 궤적을 세 번 연속 재현했다.' }],
   action: '아르테미스의 시범을 지켜본 뒤 내가 직접 반월 보법을 반복 연습한다.',
