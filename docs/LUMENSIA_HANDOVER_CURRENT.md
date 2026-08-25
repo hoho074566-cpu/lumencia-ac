@@ -13,14 +13,12 @@ Repository: `hoho074566-cpu/lumencia-ac`
 # 0. SESSION STOP CHECKPOINT — 가장 먼저 읽을 것
 
 ## Live state immediately before this handover update
-- Branch: `codex/skill-learning-v1`
-- Base/current main: `54327ea2a5c559a18681f4a4bc8795cc9c1c57a8` (PR #47 merge).
-- PR #48 is **open / not merged**. Prior head `75d7f7c...` passed Repository checks and Vercel but failed Merge Readiness with exact-head Codex P1=1. Exact Preview also reproduced a separate progression bypass: `반월 보법 22/100` became F after one ordinary +15-capped training turn.
-- Corrected code head `1922f3c05c7c5ab19a0c13c15f60d367ebefe43d` removes model-authored `basis` / `reason` from evidence authority, requires positive player/combat plus visible-scene evidence, rejects negated learning claims, filters legacy `skill_experience` to canonical already-existing skill names, and freezes that experience path in AUTO. Exact 22→37 and false-evidence regressions pass, as does the authoritative clean-LF full PR check.
-- Published checkpoint `83377b83f7d54d4da7e8afce72f6204ab65831b9` passed Repository checks, Vercel, and full Exact Preview accumulation/unlock acceptance. A fresh exact-head review then found one P1 and one P2: ordinary combat plus a generic failure sentence could still authenticate a hallucinated learning row, and maximally long bounded skill/candidate identities could push the fixed routed input beyond the 6,840-character `.76` budget.
-- Published docs checkpoint `a0d76f5f904bd3f386a457359360e772e2232972` passed Repository Safety and Vercel Ready. Its affected Exact Preview cases passed ordinary failure rejection, direct 8→16 learning, and CONTINUE/META freeze; the earlier `83377b8...` Preview supplied the full 100→single-F→no-repeat acceptance. A fresh exact-head Codex review then found P1=1: an action in which the PC only watched or refused an NPC's training could combine with that NPC's visible practice and incorrectly grant the PC progress.
-- Published exact head `2d9ca9d41478881bb9c89ec5462c1ffc288a570c` passed Safety #356, Vercel Ready, and affected Exact Preview acceptance: observation/refusal stayed empty, direct PC practice created `반월 보법 6/100`, and CONTINUE/META preserved 6/100 at the same time/location. Fresh review `PRR_kwDOT8LCAs8AAAABKuEDKw` found P1=1: the broad instructor-feedback exception could treat an instructor correcting their own movement as feedback attributable to the PC. Its two P2s—lesson participation vocabulary and runtime own-property checks—remain nonblocking and outside this P1 correction.
-- Current local correction head `c7f97e85c9c8df765728fdbca2f099de844f2c3d` removes the broad instructor exception, distinguishes instructor self-correction and explicit NPC receipt from instruction received by the practicing PC, and preserves legitimate professor completion assessment. Permanent target/recipient regressions, the focused boundary matrix, syntax checks, `git diff --check`, and the authoritative clean-LF full PR check pass on this code head.
+- Branch: `codex/multi-system-scene-v1`.
+- Base/current main: `8329646cbb92934555afd15f4741b1fc6edb7d1d` (PR #48 merge).
+- PR #48 is **merged** from exact reviewed head `a4772b80cc9e135433fb677460ca3fb5e9cde85e`. Safety #359/#360/#361, Vercel Ready, fresh exact-head Codex P0/P1=0, affected Skill Learning Preview acceptance, and CONTINUE/META freeze passed.
+- Merge `8329646...` and reviewed head `a4772b8...` share tree `5c8f8fa061742d6c851d09fb03ccf02e4795a559`; no unexpected merge delta exists. Main Vercel, production `/api/health`, and the merged-tree authoritative clean-LF full check pass.
+- Current Multi-System Scene code checkpoint: `ef93af8`. It adds one bounded cross-system turn arbitration plan, reserves it after routing, repeats a compact plan after lower-priority authority blocks, and stores bounded observed/effect axes only under the existing `sceneRuntime` root.
+- Focused orchestration and all affected Momentum/Purpose/Exit/Hook/Consequence/Goal/Novelty/Off-screen/relationship/faction/skill/core suites pass. `git diff --check` and a clean-LF full repository check pass on the code checkpoint.
 - PR #47: **merged** from exact final head `866c991fb52a77079a191a5d7452e7fecf035ce9` as `54327ea2a5c559a18681f4a4bc8795cc9c1c57a8`. The merge and reviewed-head trees both equal `143b56d473825969763e9440aca0c4c3100ab3b5`; production `/api/health` is healthy on app `1.5.6` / adapter `0.8.3`.
 - PR #46: **merged** from exact reviewed head `2843e5bc9ee8169acb7e82b5db9b392beea93539` as `6204843e1cf6f45a9386c13b942c100cd6c7377b`. Merge and reviewed-head trees both equal `4c045c27ccb30f6593370ae2b8e811bebcb39691`; production `/api/health` is healthy on app `1.5.6` / adapter `0.8.3` and advertises Faction Social Consequence V1.
 - PR #45: **merged** from exact reviewed head `583b7622500b9916dd31697d0d6e845f81790ed6` as `71074ccc7a5fd00f193a6aec8b7a1ff82eae1aab`. Merge and reviewed-head trees both equal `690e6a88c015bd28e67bba0bf03bfdba6e73a6c8`; merged production `/api/health` is healthy on app `1.5.6` / adapter `0.8.3`.
@@ -53,17 +51,19 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Production `/api/health`: healthy; app `1.5.6`, canonical `/api/chat`, adapter `/api/chat-router`, `24h` prompt-cache retention.
 - Full post-merge `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
-## Current active work — Skill Learning V1
-- Current corrected code head: `c7f97e85c9c8df765728fdbca2f099de844f2c3d` on `codex/skill-learning-v1`, based directly on the verified PR #47 merge.
-- The previously declared `skill_learning` rows and `pc.skillCandidates` reference were not connected to persistence or unlock behavior. V1 completes that existing path without adding a save root, migration, endpoint, canonical `app.js` edit, or model call.
-- A normal player-owned GAME turn may accept at most two learning rows, each +1..15. Each row requires a bounded independent skill name, concrete `basis`, causal `reason`, a player-owned active learning/combat action, and learning-specific visible evidence attributable to the player. Bare combat/failure words, model-authored metadata, negated or refused learning, observation-only/NPC-only action, training-ground/map nouns, existing-skill names, spacing aliases, generic placeholders, basis-less claims, ordinary movement, duplicate rows, and excess candidates are rejected.
-- At most eight candidates persist under the existing `pc.skillCandidates` root. Each retains progress below 100 and at most six causal history rows. Same-skill legacy aliases keep the most recently updated progress instead of whichever property appeared first.
-- Reaching 100 removes the candidate and adds exactly one neutral `{ grade:'F', hiddenXp:0 }` entry to the existing `pc.skills` map. The stable runtime displays a `새 스킬 습득` notice and shows current candidate progress in PC info.
-- META and CONTINUE emit/freeze an empty learning mutation. AUTO clears both candidate learning and existing-skill experience. Normal turns canonicalize `skill_experience` only against already-existing `pc.skills`, so an active candidate cannot be promoted through the legacy immediate-F path. Accepted learning is resolved before Scene Momentum so rejected model rows cannot fake State Delta.
-- The adapter extends the existing canonical structured output at the one existing OpenAI parse interception and preserves exactly one `coreHandler` call. `store:false`, prompt cache, routing budgets, Event/NPC/relationship behavior, and player sovereignty remain unchanged.
-- Dense `.76` routing retains up to 24 bounded existing skill identities/grades and all eight bounded active candidate identities/progress values in the mandatory minimum. Candidate basis, timestamp, and history stay in routed detail instead of the fixed block; true maximum 80-character existing-skill and 48-character candidate names remain inside the 6,840-character routine input ceiling.
-- Permanent coverage is `scripts/tests/skill-learning-v1.test.mjs`. It includes self-authored/negated evidence rejection, ordinary-combat and ambiguous setting-noun rejection, NPC observation/refusal/sole-performer rejection, instructor self-correction and NPC-received-instruction rejection, PC-received-instruction/professor-assessment acceptance, positive combat insight, legacy experience isolation, the exact 22→37 live regression, and maximum-width context pressure. Dedicated/affected suites and the authoritative clean-LF full PR check pass on `c7f97e8...`; the full check must be rerun once more on the final docs head.
-- The user explicitly authorized up to five automatic correction cycles while P0/P1 remains. Current cycle count is **1/5** under that policy. Each cycle must perform exact-head confirmation, P0/P1 analysis, minimal focused repair, focused tests, full regression, a new exact head, Safety/Vercel, and a fresh Codex review. Continue without reconfirmation only for a new controllable P0/P1 type; stop for same-type recurrence, cross-core scope expansion, canon/player-sovereignty/one-call/stable-routing impact, five exhausted cycles, or conflicting unsafe guidance.
+## Current active work — Multi-System Scene Orchestration V1
+- Current code head: `ef93af8` on `codex/multi-system-scene-v1`, based directly on the verified PR #48 merge.
+- Scene Momentum, Purpose, Exit, Turn Hook, Event Consequence, Goal Tick, Off-screen Progression, Novelty, relationships, faction effects, and Skill Learning already worked independently. V1 adds the missing final contract that selects one primary turn driver and at most one physically/causally connected secondary response.
+- Current player action/question is primary. Due consequences, active events, reachable schedules, present-NPC goals, Director events, momentum recovery, and continuity are ordered without allowing a third unrelated beat. Direct questions are `answer-only`; AUTO retains an unanswered player boundary; CONTINUE/META use a frozen plan.
+- Relationship, faction, skill-learning, off-screen, and novelty systems remain effect-only. They may record evidence-backed consequences but cannot independently initiate another narrative beat.
+- The plan is reserved in routed context and its compact action frame is repeated after lower-priority Director/schedule detail. Maximum routine routing stays within the `.76` 6,840-character ceiling.
+- Post-response state persists only bounded driver/observed/effect axes under `sceneRuntime.orchestration`. There is no new save root, migration, endpoint, canonical `api/chat.js`/`app.js` change, structured schema change, or second model call.
+- Permanent coverage is `scripts/tests/scene-orchestration-v1.test.mjs` plus affected Router, authority-tail, Momentum, Purpose, Exit, Hook, Consequence, Goal, Novelty, Off-screen, relationship, faction, skill, and core-invariant suites.
+- The user-authorized P0/P1 correction allowance applies: up to five exact-head correction cycles for a new controllable issue type. Stop only for same-type recurrence, cross-core expansion, canon/player-sovereignty/one-call/stable-routing impact, five exhausted cycles, or conflicting unsafe guidance. Current count for this PR is **0/5**.
+
+## Completed active predecessor — Skill Learning V1
+- PR #48 merged from exact reviewed head `a4772b8...` as `8329646...` with identical trees after all hosted gates, affected Preview cases, and correction cycles passed.
+- Skill candidates now accumulate only from bounded player-owned, player-attributed learning evidence; reach 100 before a single neutral F-grade unlock; reject observation/refusal/NPC-only or legacy experience bypasses; and remain frozen in META/CONTINUE/AUTO as specified.
 
 ## Completed active predecessor — Faction / Social Consequence V1 P2 hardening
 - Adds `state_delta.faction_reputation_changes` for six canon-backed public academy organizations: student council, Blue Knights, White Rose, and the knight/magic/theology departments.
@@ -679,8 +679,8 @@ Immediately continue:
 8. deterministic novelty/repetition suppression — completed in PR #44;
 9. NPC↔NPC Relationship V1 — completed in PR #45;
 10. Faction / Social Consequence V1 — merged in PR #46; P2 hardening merged in PR #47;
-11. Skill Learning V1 — active on `codex/skill-learning-v1`;
-12. multi-system scene orchestration.
+11. Skill Learning V1 — completed in PR #48;
+12. Multi-System Scene Orchestration V1 — active on `codex/multi-system-scene-v1`.
 
 Longer roadmap:
 - Adaptive Time Scale V2
@@ -692,14 +692,15 @@ Longer roadmap:
 - NPC-vs-NPC conflict
 - Fail Forward
 - Off-screen World Progression expansion
-- Multi-System Scene
+- Multi-System Scene — active V1 candidate
 - Memory Hierarchy
 - full report-style -> scene-driven novel prose recovery
 
 Gameplay roadmap discussed:
 - NPC↔NPC Relationship V1 — completed in PR #45
 - Faction / Social Consequence V1 — merged in PR #46; P2 hardening merged in PR #47
-- Skill Learning V1 — active on `codex/skill-learning-v1`
+- Skill Learning V1 — completed in PR #48
+- Multi-System Scene Orchestration V1 — active on `codex/multi-system-scene-v1`
 - Awakening / Talent Evolution V1
 - Combat Growth V2
 - Living World / Event Director V3 / Long-term Consequence
@@ -709,16 +710,16 @@ Gameplay roadmap discussed:
 # 12. NEXT ACTION — CURRENT START POINT
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
-2. Confirm main contains PR #47 merge `54327ea2a5c559a18681f4a4bc8795cc9c1c57a8`; do **not** redo completed HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Turn Hook, Event Consequence, Goal Tick, Off-screen Progression, Scene Novelty, NPC↔NPC Relationship V1, or Faction Social V1.
-3. Continue only Skill Learning V1 on `codex/skill-learning-v1`: existing candidate persistence, evidence/bounds, deterministic F-grade unlock, frozen modes, compact minimum context, UI notice/info, and permanent regressions.
-4. Commit this docs checkpoint, rerun the authoritative clean-LF full PR check on that exact head, and inspect the exact diff.
-5. Push/update PR #48, then require fresh exact-head Safety, Vercel, and Codex review with current main/merge-base/no-conflict revalidation. The `2d9ca9d...` instructor-target P1 is superseded only after the new review completes.
-6. On the new Exact Preview, verify instructor self-correction/NPC receipt creates no PC learning, while direct PC practice with received correction remains bounded and CONTINUE/META stay frozen.
-7. If a new controllable P0/P1 type appears, continue with correction cycle 2/5 automatically. Stop only under the user's five explicit conditions recorded above.
-8. If every gate and affected Preview case passes, report the Skill Learning V1 protected-path PR ready for the user's human merge. Never merge it from Codex.
+2. Confirm main contains PR #48 merge `8329646cbb92934555afd15f4741b1fc6edb7d1d` and that merge/reviewed trees still match. Do **not** redo completed HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Turn Hook, Event Consequence, Goal Tick, Off-screen Progression, Scene Novelty, NPC↔NPC Relationship, Faction Social, or Skill Learning V1.
+3. Continue Multi-System Scene Orchestration V1 on `codex/multi-system-scene-v1` from code checkpoint `ef93af8`: one primary driver, at most one causal secondary response, effect-only supporting systems, player-boundary priority, and frozen CONTINUE/META/AUTO boundaries.
+4. Finish and commit the docs checkpoint, rerun the authoritative clean-LF full PR check on the exact head, inspect the exact diff, and perform the second regression/scope review.
+5. Push the branch and open the next focused PR against current main. Require fresh exact-head Safety, Vercel, and Codex review with current-main/merge-base/no-conflict revalidation.
+6. On the Exact Preview, verify direct-question answer-only behavior, active-event suppression of an unrelated cameo, schedule deferral of a competing NPC goal, ordinary exploration plus at most one causal NPC response, and frozen CONTINUE/AUTO player boundaries.
+7. If a new controllable P0/P1 type appears, continue automatically under the five-cycle policy. Stop only under the user's five explicit conditions recorded above.
+8. If every gate and affected Preview case passes, report the Multi-System Scene protected-path PR ready for the user's human merge. Never merge it from Codex.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #47은 reviewed head `866c991...`에서 main `54327ea...`로 merge됐고 merge tree가 reviewed tree와 정확히 같다. 완료된 HF1/HF2/HF3, 12-case acceptance, Scene Purpose/Exit/Turn Hook, Event Consequence, Goal Tick, Off-screen Progression, Scene Novelty, NPC↔NPC Relationship V1, Faction Social V1을 다시 분석하지 않는다. PR #48은 open/not-merged이고 현재 branch는 `codex/skill-learning-v1`, corrected code head는 `c7f97e8...`이다. `2d9ca9d...`의 instructor-target P1은 교관 자기 교정/NPC 수령/PC 수령을 분리하는 영구 회귀와 함께 교정됐다. 사용자는 P0/P1이 남는 동안 최대 5회의 자동 교정 주기를 명시적으로 승인했고 현재는 1/5이다. 같은 유형 재발, 여러 핵심 시스템 확장, canon/player sovereignty/one-call/stable-routing 영향, 5회 소진, 또는 상충하는 안전 지침일 때만 중단한다. 그 외 새 통제 가능한 P0/P1은 exact-head→원인→최소 수정→focused/full→새 head→Safety/Vercel→fresh review 순서로 자동 계속한다. 보호 경로이므로 최종 병합은 사람만 수행한다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #48은 exact reviewed head `a4772b8...`에서 main `8329646...`로 merge됐고 merge tree가 reviewed tree와 정확히 같다. 완료된 HF1/HF2/HF3, 12-case acceptance, Scene Purpose/Exit/Turn Hook, Event Consequence, Goal Tick, Off-screen Progression, Scene Novelty, NPC↔NPC Relationship V1, Faction Social V1, Skill Learning V1을 다시 분석하지 않는다. 현재 branch는 `codex/multi-system-scene-v1`, code checkpoint는 `ef93af8`이다. 이 후보는 한 턴에 primary driver 하나와 causal secondary response 최대 하나만 허용하며 relationship/faction/skill/off-screen/novelty는 effect-only로 둔다. 사용자 질문, 플레이어 선택 경계, CONTINUE/META/AUTO freeze, one canonical model call, stable routing을 보존한다. 사용자는 P0/P1이 남는 동안 최대 5회의 자동 교정 주기를 승인했다. 같은 유형 재발, 여러 핵심 시스템 확장, canon/player sovereignty/one-call/stable-routing 영향, 5회 소진, 또는 상충하는 안전 지침일 때만 중단한다. 그 외 새 통제 가능한 P0/P1은 exact-head→원인→최소 수정→focused/full→새 head→Safety/Vercel→fresh review 순서로 자동 계속한다. 보호 경로이므로 최종 병합은 사람만 수행한다.`
