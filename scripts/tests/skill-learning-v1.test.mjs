@@ -31,7 +31,7 @@ assert.match(runtime, /save\.pc\.skillCandidates = candidates/, 'client runtime 
 assert.match(runtime, /새 스킬 습득:/, 'client must surface deterministic unlocks to the player');
 assert.match(runtime, /학습 중: \$\{learning\}/, 'PC info must show active learning candidates');
 assert.match(app, /const skills = Object\.entries\(save\.pc\.skills \|\| \{\}\)[\s\S]*?const stats = Object\.entries\(save\.pc\.stats \|\| \{\}\)/, 'stable runtime render patch must still match the canonical app source');
-assert.match(contextRouter, /skillCandidates:compactSkillCandidates\(pc\.skillCandidates,0\)/, 'adaptive minimum context must retain bounded learning candidates without duplicating history');
+assert.match(contextRouter, /skillCandidates:compactMandatorySkillCandidates\(pc\.skillCandidates\)/, 'adaptive minimum context must retain bounded learning candidate identities and progress only');
 assert.match(sharedUtils, /validCandidateName\(row\.skill\) && row\.basis && row\.reason/, 'shared sanitizer must reject basis-less candidate rows');
 assert.match(health, /skillLearning:/, 'health response must advertise Skill Learning V1');
 assert.equal((router.match(/coreHandler\(/g) || []).length, 1, 'Skill Learning V1 must preserve one canonical core call site');
@@ -75,6 +75,28 @@ const negatedLearningRejected = deriveSkillLearningState({
   scene: [{ text: '평범하게 복도를 통과했고 훈련은 하지 않았다.' }],
 });
 assert.deepEqual(negatedLearningRejected.accepted_changes, [], 'negated learning language must not satisfy the positive evidence gate');
+
+const ordinaryCombatRejected = deriveSkillLearningState({
+  changes: [{ skill: '실패 보법', amount: 15, basis: '공격이 빗나갔다.', reason: '전투 실패를 학습으로 주장했다.' }],
+  action: '검으로 적을 공격한다.',
+  scene: [{ text: '전투에서 공격이 빗나가 실패했다.' }],
+});
+assert.deepEqual(ordinaryCombatRejected.accepted_changes, [], 'ordinary combat failure without learning-specific scene evidence must not create progress');
+
+const combatSettingWordsRejected = deriveSkillLearningState({
+  changes: [{ skill: '실패 보법', amount: 15, basis: '공격이 빗나갔다.', reason: '장소와 소품을 학습으로 주장했다.' }],
+  action: '검으로 적을 공격한다.',
+  scene: [{ text: '훈련장에서 지도를 펼친 채 전투를 벌였지만 공격이 빗나가 실패했다.' }],
+});
+assert.deepEqual(combatSettingWordsRejected.accepted_changes, [], 'training-ground and map nouns must not masquerade as active training or instruction');
+
+const combatInsightAccepted = deriveSkillLearningState({
+  changes: [{ skill: '반월 보법', amount: 9, basis: '빗나간 공격의 실패 원인을 분석하고 발 위치를 교정했다.', reason: '교정한 궤적을 연속 재현했다.' }],
+  action: '검으로 적을 공격하며 움직임을 시험한다.',
+  scene: [{ text: '실패 원인을 분석하고 발 위치를 교정한 뒤 새로운 원리를 깨달아 같은 궤적을 연속 재현했다.' }],
+  turnNumber: 8,
+});
+assert.equal(combatInsightAccepted.candidates['반월 보법'].progress, 9, 'combat may progress learning only when the visible scene contains a specific insight or reproducible correction');
 
 assert.deepEqual(filterExistingSkillExperience([
   { skill: ' 대 검 술 ', amount: 3, reason: '교수의 교정' },
@@ -215,13 +237,16 @@ const minimumSave = JSON.parse(minimumText);
 assert.equal(minimumSave.pc.skillCandidates['반월 보법'].progress, 8, 'active candidate progress must survive the mandatory minimum block');
 assert.equal(minimumSave.pc.skills['대검술'].grade, 'D', 'existing skill names must survive the mandatory minimum to prevent duplicate candidates');
 
-const pressureSkills = Object.fromEntries(Array.from({ length: 24 }, (_, index) => [`기존-${index}-${'장문기술명'.repeat(10)}`, { grade: 'A++', hiddenXp: 99, ignored: '중복 상태 '.repeat(100) }]));
-const pressureCandidates = Object.fromEntries(Array.from({ length: 8 }, (_, index) => [`후보-${index}-${'장문'.repeat(10)}`, {
+const fixedWidthName = (prefix, index, length) => `${prefix}${index}-`.padEnd(length, String(index % 10)).slice(0, length);
+const pressureSkills = Object.fromEntries(Array.from({ length: 24 }, (_, index) => [fixedWidthName('기존-', index, 80), { grade: 'A++', hiddenXp: 99, ignored: '중복 상태 '.repeat(100) }]));
+const pressureCandidates = Object.fromEntries(Array.from({ length: 8 }, (_, index) => [fixedWidthName('후보-', index, 48), {
   progress: 80 + index,
-  basis: `교수의 반복 교정 ${'긴 근거 '.repeat(30)}`,
+  basis: '근거'.repeat(60),
   updated_turn: index,
   history: [{ turn: index, amount: 15, basis: '오래된 훈련 '.repeat(30), reason: '오래된 이유 '.repeat(40) }],
 }]));
+assert.ok(Object.keys(pressureSkills).every((name) => name.length === 80), 'pressure fixture must exercise the maximum existing-skill identity width');
+assert.ok(Object.keys(pressureCandidates).every((name) => name.length === 48), 'pressure fixture must exercise the maximum candidate identity width');
 const pressureRouted = routeOpenAIParams(
   { instructions, input: '===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}' },
   { incoming: {
@@ -242,6 +267,6 @@ const pressureMinimumText = pressureRouted.params.input.split('===== AUTHORITATI
 const pressureMinimum = JSON.parse(pressureMinimumText);
 assert.equal(Object.keys(pressureMinimum.pc.skills).length, 24, 'mandatory learning authority must retain the bounded existing skill-name set');
 assert.equal(Object.keys(pressureMinimum.pc.skillCandidates).length, 8, 'mandatory learning authority must retain all bounded active candidates');
-assert.ok(Object.values(pressureMinimum.pc.skillCandidates).every((row) => !Object.prototype.hasOwnProperty.call(row, 'history')), 'candidate history must stay out of the mandatory minimum block');
+assert.ok(Object.values(pressureMinimum.pc.skillCandidates).every((row) => Object.keys(row).length === 1 && Object.prototype.hasOwnProperty.call(row, 'progress')), 'mandatory candidates must retain progress without duplicating basis, timestamps, or history');
 
 console.log('PASS Skill Learning V1 schema, evidence, bounds, persistence, freeze, routing, unlock, and one-call regressions');
