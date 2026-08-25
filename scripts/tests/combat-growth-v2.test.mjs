@@ -345,6 +345,93 @@ const splitRowNpcCauseMentioningPlayerRejected = deriveCombatGrowthState({
 });
 assert.deepEqual(splitRowNpcCauseMentioningPlayerRejected.accepted_stat_progress, [], 'mentioning the player later in an NPC-owned cause row must not change its attribution');
 
+const instructorFeedbackBridgeAccepted = deriveCombatGrowthState({
+  pc,
+  action:'나는 이번에는 신체 단련을 위해 별도의 나선 회피 보법을 세 번 연습한다. 첫 두 번은 축과 체중 전환이 어긋나 실패한다. 교관에게 새 오류를 봐 달라고 요청하고, 교관의 앞발 각도와 골반 회전 지시를 직접 적용한 마지막 반복을 마친 뒤 실패 원인을 확인한다.',
+  scene:[
+    { kind:'narration', text:'광장 가장자리에서 별도의 나선 회피 보법을 세 차례 반복했다. 첫 번째와 두 번째 시도에서는 회전축이 먼저 틀어지고 체중이 늦게 따라오며 발끝이 궤도 밖으로 밀렸다.' },
+    { kind:'dialogue', speaker_name:'교관', text:'앞발을 회전 방향으로 조금 더 열어. 골반이 먼저 길을 만들고 체중은 그다음에 옮겨.' },
+    { kind:'narration', text:'지시를 그대로 적용한 마지막 반복에서는 앞발이 궤도를 붙들고, 골반 회전 뒤에 체중이 자연스럽게 넘어갔다. 발이 교차하지 않은 채 나선형 이동이 끝까지 유지되었다.' },
+    { kind:'dialogue', speaker_name:'교관', text:'그래. 이번엔 축이 네 움직임을 끌고 가지 않았어. 네가 축을 정한 거지.' },
+    { kind:'narration', text:'실패 원인은 닫힌 앞발 각도 때문에 회전축이 먼저 무너지고, 골반과 체중 전환이 뒤따른 데 있었다.' },
+  ],
+  resolutionLog:{ triggered:false, outcome:'none', abilities:[] },
+  statChanges:[{ stat:'신체', amount:1, reason:'나선 회피 보법의 축과 체중 전환 교정 적용' }],
+});
+assert.equal(instructorFeedbackBridgeAccepted.evidence_tier, 1, 'one player-addressed instructor feedback row may bridge final application to its immediate cause narration');
+assert.deepEqual(instructorFeedbackBridgeAccepted.accepted_stat_progress, [{ stat:'신체', amount:1, reason:'나선 회피 보법의 축과 체중 전환 교정 적용' }], 'the exact correction-4 live split must retain bounded physical growth');
+
+const unrelatedDialogueBridgeRejected = deriveCombatGrowthState({
+  pc,
+  action:'나는 나선 회피 보법을 연습한다.',
+  scene:[
+    { kind:'dialogue', speaker_name:'교관', text:'앞발을 열고 골반부터 옮겨.' },
+    { kind:'narration', text:'마지막 반복에서는 지시를 그대로 적용해 나선형 이동을 끝까지 유지했다.' },
+    { kind:'dialogue', speaker_name:'릴리아', text:'네가 축을 정한 거네.' },
+    { kind:'narration', text:'실패 원인은 닫힌 앞발과 늦은 골반 회전에 있었다.' },
+  ],
+  resolutionLog:{ triggered:false, outcome:'none', abilities:[] },
+  statChanges:[{ stat:'신체', amount:1, reason:'릴리아 대사를 건넌 나선 교정' }],
+});
+assert.deepEqual(unrelatedDialogueBridgeRejected.accepted_stat_progress, [], 'a non-instructor dialogue must not bridge application and cause evidence');
+
+const unaddressedInstructorDialogueRejected = deriveCombatGrowthState({
+  pc,
+  action:'나는 나선 회피 보법을 연습한다.',
+  scene:[
+    { kind:'dialogue', speaker_name:'교관', text:'앞발을 열고 골반부터 옮겨.' },
+    { kind:'narration', text:'마지막 반복에서는 지시를 그대로 적용해 나선형 이동을 끝까지 유지했다.' },
+    { kind:'dialogue', speaker_name:'교관', text:'다른 신입생들은 다음 과제를 준비하도록.' },
+    { kind:'narration', text:'실패 원인은 닫힌 앞발과 늦은 골반 회전에 있었다.' },
+  ],
+  resolutionLog:{ triggered:false, outcome:'none', abilities:[] },
+  statChanges:[{ stat:'신체', amount:1, reason:'일반 교관 대사를 건넌 나선 교정' }],
+});
+assert.deepEqual(unaddressedInstructorDialogueRejected.accepted_stat_progress, [], 'an instructor dialogue that does not address the player must not bridge correction evidence');
+
+const twoDialogueBridgeRejected = deriveCombatGrowthState({
+  pc,
+  action:'나는 나선 회피 보법을 연습한다.',
+  scene:[
+    { kind:'dialogue', speaker_name:'교관', text:'앞발을 열고 골반부터 옮겨.' },
+    { kind:'narration', text:'마지막 반복에서는 지시를 그대로 적용해 나선형 이동을 끝까지 유지했다.' },
+    { kind:'dialogue', speaker_name:'교관', text:'그래. 네가 축을 정했어.' },
+    { kind:'dialogue', speaker_name:'교관', text:'이제 체중 이동도 기억해.' },
+    { kind:'narration', text:'실패 원인은 닫힌 앞발과 늦은 골반 회전에 있었다.' },
+  ],
+  resolutionLog:{ triggered:false, outcome:'none', abilities:[] },
+  statChanges:[{ stat:'신체', amount:1, reason:'두 대사를 건넌 나선 교정' }],
+});
+assert.deepEqual(twoDialogueBridgeRejected.accepted_stat_progress, [], 'the bounded bridge must not cross two dialogue rows');
+
+const postLeadNpcCauseRejected = deriveCombatGrowthState({
+  pc,
+  action:'나는 나선 회피 보법을 연습한다.',
+  scene:[
+    { kind:'dialogue', speaker_name:'교관', text:'앞발을 열고 골반부터 옮겨.' },
+    { kind:'narration', text:'마지막 반복에서는 지시를 그대로 적용해 나선형 이동을 끝까지 유지했다.' },
+    { kind:'dialogue', speaker_name:'교관', text:'그래. 네가 축을 정했어.' },
+    { kind:'narration', text:'실패 원인은 릴리아가 닫힌 앞발로 회전축을 비틀어 마지막 반복에 실패한 데 있었다.' },
+  ],
+  resolutionLog:{ triggered:false, outcome:'none', abilities:[] },
+  statChanges:[{ stat:'신체', amount:1, reason:'릴리아가 실패한 나선 교정' }],
+});
+assert.deepEqual(postLeadNpcCauseRejected.accepted_stat_progress, [], 'an NPC performer after the cause lead must invalidate the bridged correction bundle');
+
+const postLeadPlayerCauseAccepted = deriveCombatGrowthState({
+  pc,
+  action:'나는 나선 회피 보법을 연습한다.',
+  scene:[
+    { kind:'dialogue', speaker_name:'교관', text:'앞발을 열고 골반부터 옮겨.' },
+    { kind:'narration', text:'마지막 반복에서는 지시를 그대로 적용해 나선형 이동을 끝까지 유지했다.' },
+    { kind:'dialogue', speaker_name:'교관', text:'그래. 네가 축을 정했어.' },
+    { kind:'narration', text:'실패 원인은 카일이 앞발을 너무 닫고 같은 동작을 시도해 실패한 데 있었다.' },
+  ],
+  resolutionLog:{ triggered:false, outcome:'none', abilities:[] },
+  statChanges:[{ stat:'신체', amount:1, reason:'카일이 확인한 나선 교정' }],
+});
+assert.deepEqual(postLeadPlayerCauseAccepted.accepted_stat_progress, [{ stat:'신체', amount:1, reason:'카일이 확인한 나선 교정' }], 'the player may remain the explicit performer inside the bridged cause narration');
+
 const npcInstructionApplicationRejected = deriveCombatGrowthState({
   pc,
   action:'신체 단련용 보법을 반복 연습한다.',
