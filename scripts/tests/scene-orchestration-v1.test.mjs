@@ -1,0 +1,198 @@
+#!/usr/bin/env node
+
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { routeOpenAIParams } from '../../api/lib/context-router.js';
+import {
+  buildSceneOrchestrationDirective,
+  deriveSceneOrchestrationPlan,
+  deriveSceneOrchestrationState,
+  sceneOrchestrationActionFrame,
+} from '../../lib/scene-orchestration.js';
+
+const adapter = readFileSync('api/chat-router.js', 'utf8');
+const contextRouter = readFileSync('api/lib/context-router.js', 'utf8');
+const health = readFileSync('api/health.js', 'utf8');
+
+const directQuestion = deriveSceneOrchestrationPlan({
+  mode: 'game',
+  action: '그 제안을 받아들이면 어떻게 될까?',
+  saveState: { world: { location: '학생회실' }, sceneRuntime: { momentum: { pressure: 'required' } } },
+  directorTelemetry: { result: 'NPC_EVENT', selected_key: 'chloe' },
+});
+assert.equal(directQuestion.primary, 'user-action', 'a direct player question must remain the primary driver');
+assert.equal(directQuestion.secondary, 'none', 'a direct question must not acquire an unrelated secondary beat');
+assert.equal(directQuestion.order, 'answer-only', 'a direct question must stop after the answer instead of executing the contemplated action');
+assert.ok(directQuestion.suppressed.includes('director-event'), 'question sovereignty must suppress a random Director event');
+
+const activeEvent = deriveSceneOrchestrationPlan({
+  mode: 'game',
+  action: '주변의 변화를 살핀다.',
+  saveState: {
+    world: { location: '중앙광장' },
+    sceneRuntime: { eventProgress: { eventInstanceId: 'event:duel', activeBeat: null, paused: false } },
+  },
+  directorTelemetry: { result: 'NPC_EVENT', selected_key: 'chloe' },
+});
+assert.equal(activeEvent.primary, 'user-action', 'the current player action must still resolve first inside an active event');
+assert.equal(activeEvent.secondary, 'active-event', 'the active event must own the single secondary world beat');
+assert.ok(activeEvent.suppressed.includes('director-event'), 'an active event must suppress an unrelated random cameo');
+
+const dueActiveEvent = deriveSceneOrchestrationPlan({
+  mode: 'game',
+  action: '입학식의 다음 순서를 지켜본다.',
+  saveState: {
+    sceneRuntime: { eventProgress: { eventInstanceId: 'entrance_ceremony#1285-03-01t09:00', activeBeat: 'welcome', paused: false } },
+    scheduleContext: { due: [{ id: 'entrance_ceremony', kind: 'academic' }] },
+  },
+  directorTelemetry: { result: 'NO_RANDOM_EVENT_DUE' },
+});
+assert.equal(dueActiveEvent.secondary, 'active-event', 'a due schedule that is already the active occurrence must not displace its own event flow');
+
+const presentGoal = deriveSceneOrchestrationPlan({
+  mode: 'game',
+  action: '연무장을 돌아다닌다.',
+  saveState: { world: { location: '연무장' }, sceneRuntime: {} },
+  directorTelemetry: { result: 'PRESENT_NPC_GOAL_TICK', selected_key: 'artemis' },
+});
+assert.equal(presentGoal.primary, 'user-action');
+assert.equal(presentGoal.secondary, 'present-npc-goal');
+assert.equal(presentGoal.order, 'user-action-first', 'proactive NPC behavior must follow completion of the committed player action');
+assert.equal(presentGoal.max_drivers, 2, 'one turn may have only one primary plus one causally connected secondary driver');
+
+const scheduleBoundary = deriveSceneOrchestrationPlan({
+  mode: 'game',
+  action: '좀 쉰다.',
+  saveState: {
+    world: { date: '1285-03-01', time: '09:00', location: '기숙사' },
+    pc: { department: '기사과' },
+    scheduledEvents: [{ id: 'orientation', title: '기사과 오리엔테이션', kind: 'academic', date: '1285-03-01', time: '09:30' }],
+    sceneRuntime: {},
+  },
+  directorTelemetry: { result: 'PRESENT_NPC_GOAL_TICK', selected_key: 'artemis' },
+});
+assert.equal(scheduleBoundary.secondary, 'schedule-boundary', 'compressed downtime must stop at a reachable authoritative schedule');
+assert.equal(scheduleBoundary.trigger_minutes, 30);
+assert.ok(scheduleBoundary.suppressed.includes('present-npc-goal'), 'a reachable hard schedule must defer a competing NPC goal beat');
+
+const dueConsequence = deriveSceneOrchestrationPlan({
+  mode: 'game',
+  action: '잠시 기다린다.',
+  saveState: { sceneRuntime: { eventProgress: { eventInstanceId: 'event:lesson', activeBeat: 'lecture', paused: false } } },
+  directorTelemetry: { result: 'EVENT_CONSEQUENCE_DUE', event_consequence_trigger_minutes: 5 },
+});
+assert.equal(dueConsequence.secondary, 'event-consequence');
+assert.ok(dueConsequence.suppressed.includes('active-event'), 'the selected due consequence must keep an unrelated active event from becoming a third beat');
+
+const frozenBoundary = deriveSceneOrchestrationPlan({
+  mode: 'auto',
+  action: '',
+  saveState: { sceneRuntime: { turn_hook: { status: 'awaiting-player', kind: 'player-choice' } } },
+  directorTelemetry: { result: 'RNG_DISABLED_AUTO' },
+});
+assert.equal(frozenBoundary.primary, 'player-boundary');
+assert.equal(frozenBoundary.secondary, 'none');
+assert.equal(frozenBoundary.order, 'stop');
+
+const continueFreeze = deriveSceneOrchestrationPlan({ mode: 'continue', action: 'continue', saveState: {} });
+assert.equal(continueFreeze.primary, 'frozen');
+assert.equal(continueFreeze.max_drivers, 0);
+
+const directive = buildSceneOrchestrationDirective({ plan: presentGoal });
+assert.match(directive, /PRIMARY=user-action/);
+assert.match(directive, /SECONDARY=present-npc-goal/);
+assert.match(directive, /MAX_DRIVERS=2/);
+assert.match(directive, /EFFECT_ONLY=relationship\|faction\|skill-learning\|offscreen\|novelty/);
+assert.match(directive, /PC의 새 행동·대사·감정·생각·수락·거절·선택/);
+assert.match(sceneOrchestrationActionFrame(presentGoal), /TURN_PLAN=user-action>present-npc-goal/);
+
+const observed = deriveSceneOrchestrationState({
+  plan: presentGoal,
+  sceneDelta: {
+    score: 4,
+    structuralScore: 3,
+    flags: { locationChanged: true, timeAdvanced: true, relationshipChanged: true, growthChanged: true },
+  },
+  exitCondition: { status: 'reached' },
+  turnHook: { kind: 'new-lead', status: 'active' },
+  turnNumber: 8,
+});
+assert.equal(observed.status, 'reached');
+assert.deepEqual(observed.observed_axes, ['location', 'time', 'relationship', 'growth']);
+assert.deepEqual(observed.effect_axes, ['relationship', 'growth']);
+assert.equal(observed.actual_delta_score, 4);
+
+assert.match(contextRouter, /MULTI-SYSTEM SCENE ORCHESTRATION V1/, 'the cross-system plan must live in reserved routed context');
+assert.match(contextRouter, /sceneOrchestrationActionFrame\(orchestration\)/, 'the final action frame must repeat the compact arbitration result after lower-priority authority blocks');
+assert.match(contextRouter, /scene_orchestration:built\.orchestration/, 'route telemetry must expose the exact pre-response orchestration plan');
+assert.match(adapter, /deriveSceneOrchestrationState/, 'the stable adapter must persist bounded post-response orchestration evidence');
+assert.match(adapter, /orchestration:sceneOrchestration/, 'the compact orchestration state must remain inside the existing sceneRuntime root');
+assert.match(health, /sceneOrchestration:/, 'health must advertise the active cross-system arbitration layer');
+assert.equal((adapter.match(/coreHandler\(/g) || []).length, 1, 'Multi-System Scene V1 must preserve one canonical core call');
+
+const divider = '='.repeat(20);
+const instructions = `===== CHARACTER REGISTRY =====
+artemis=아르테미스
+===== WORLD CANON =====
+${divider}
+PUBLIC
+${divider}
+Public facts.
+===== NPC CANON =====
+${divider}
+아르테미스
+${divider}
+Canon.
+===== NPC SPEECH =====
+${divider}
+아르테미스
+${divider}
+Speech.
+===== OPTIONAL ADULT / INTIMACY SPEECH LAYER =====
+None.
+===== PC SYSTEM =====
+${divider}
+PC RULES
+${divider}
+Resolve.`;
+const routed = routeOpenAIParams(
+  { instructions, input: '===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}' },
+  { incoming: {
+    action: `연무장을 돌아다닌다. ${'긴 행동 '.repeat(1500)}`,
+    saveState: {
+      turnNumber: 8,
+      world: { location: '연무장' },
+      pc: { name: '아리아', department: '기사과', skills: {}, skillCandidates: {} },
+      sceneRuntime: { participants: ['artemis'] },
+      npcInnerStates: { artemis: { active_goal: { id: 'inspect', desire: '신입생의 기본기를 확인한다', priority: 5, urgency: 4, state: 'active', target_type: 'pc' } } },
+      routerFeedback: { routerVersion: '1.5.6-hf1', profile: 'routine-17k-v154', lastInputTokens: 100000 },
+    },
+    recentTurns: [],
+  }, mode: 'game' },
+);
+assert.equal(routed.telemetry.adaptive_scale, .76);
+assert.ok(routed.params.input.length <= 6840, `orchestration authority exceeded the adaptive routine budget: ${routed.params.input.length}`);
+assert.match(routed.params.input, /===== MULTI-SYSTEM SCENE ORCHESTRATION V1 =====/);
+assert.match(routed.params.input, /TURN_PLAN=user-action>present-npc-goal/);
+assert.equal(routed.telemetry.scene_orchestration.primary, 'user-action');
+assert.equal(routed.telemetry.scene_orchestration.secondary, 'present-npc-goal');
+
+const autoBoundaryRouted = routeOpenAIParams(
+  { instructions, input: '===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}' },
+  { incoming: {
+    action: '',
+    saveState: { world: { location: '학생회실' }, pc: { name: '아리아' }, sceneRuntime: { turn_hook: { kind: 'player-choice', status: 'awaiting-player', anchor: '대답' } } },
+    recentTurns: [],
+  }, mode: 'auto' },
+);
+assert.equal(autoBoundaryRouted.telemetry.scene_orchestration.primary, 'player-boundary', 'AUTO must preserve an unanswered player boundary');
+assert.match(autoBoundaryRouted.params.input, /TURN_PLAN=player-boundary; ORDER=stop; MAX_DRIVERS=0/);
+
+const continueRouted = routeOpenAIParams(
+  { instructions, input: '===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}' },
+  { incoming: { action: '[LUMENSIA V1.5.6 CONTINUE]', saveState: { world: { location: '학생회실' }, pc: { name: '아리아' }, sceneRuntime: {} }, recentTurns: [] }, mode: 'continue' },
+);
+assert.equal(continueRouted.telemetry.scene_orchestration.primary, 'frozen', 'CONTINUE must route a frozen cross-system plan');
+assert.match(continueRouted.params.input, /TURN_PLAN=frozen; ORDER=freeze; MAX_DRIVERS=0/);
+
+console.log('PASS Multi-System Scene Orchestration V1 priority, chaining, sovereignty, budget, persistence, and one-call regressions');
