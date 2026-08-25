@@ -7,6 +7,7 @@ import {
   activityRangeLimitMinutes,
   buildSceneMomentumDirective,
   classifySceneIntent,
+  deriveSceneDelta,
   scheduleBoundaryLimitMinutes,
 } from '../../lib/scene-momentum.js';
 
@@ -26,6 +27,9 @@ assert.equal(classifySceneIntent('에밀리가 한 시간 훈련하고 잠을 �
 assert.equal(classifySceneIntent('에밀리가 한 시간 훈련하고 나는 잠을 잔다.').kind,'downtime','an explicit terminal first-person subject must override an earlier NPC subject');
 assert.equal(classifySceneIntent('누군가 “죽이겠다”고 외치는 소리를 듣고 에밀리가 잠을 잔다.').kind,'generic','an attributed report must not hide an explicit third-party terminal subject');
 assert.equal(classifySceneIntent('카인이 잠을 잔다.',{actorName:'카인'}).kind,'downtime','the actual player name must remain a valid explicit subject');
+const namedActorDelta=deriveSceneDelta({saveState:{pc:{name:'카인'},world:{location:'기숙사',time:'22:00'}},action:'카인이 8시간 잠을 잔다.',turn:{state_delta:{advance_minutes:480},choices:[]}});
+assert.equal(namedActorDelta.intent,'downtime','runtime momentum must classify the saved player name consistently');
+assert.equal(namedActorDelta.target,2,'saved-name downtime must retain the downtime State Delta target');
 assert.deepEqual(classifySceneIntent('에밀리와는 1시간 동안 대화를 한다.').suggestedAdvanceMinutes,[60,60],'a comitative topic adjunct must not be mistaken for a third-party subject');
 assert.deepEqual(classifySceneIntent('에밀리에게는 1시간 동안 설명을 한다.').suggestedAdvanceMinutes,[60,60],'a dative topic adjunct must not be mistaken for a third-party subject');
 assert.equal(classifySceneIntent('에밀리와는 아르테미스가 1시간 동안 대화를 한다.').kind,'generic','skipping an adjunct must still preserve a following explicit third-party subject');
@@ -229,6 +233,10 @@ assert.deepEqual(regionalTravel.suggestedAdvanceMinutes, [15, 60]);
 assert.equal(classifySceneIntent('북쪽 숲으로 간다.', { location:'중앙광장' }).timeProfile, 'travel-regional');
 assert.equal(classifySceneIntent('계산대로 간다.', { location:'식당' }).timeProfile, 'travel-local', 'a place name containing 산 must not become regional travel');
 assert.deepEqual(classifySceneIntent('도서관으로 간다.').suggestedAdvanceMinutes, [3, 30], 'missing location context must preserve the proven fallback');
+assert.equal(classifySceneIntent('도서관으로 내일 10시에 간다.').semanticTarget,'도서관','future-date travel must remove the destination particle after date and clock qualifiers');
+assert.equal(classifySceneIntent('도로로 간다.').semanticTarget,'도로','a destination name ending in 로 must not lose part of its name');
+
+assert.deepEqual(classifySceneIntent('1시간 동안 쉬고 8시간 동안 잠을 잔다.').suggestedAdvanceMinutes,[540,540],'동안 connectors must not be mistaken for downtime negation');
 
 const boundarySave = {
   pc:{ department:'기사과' },

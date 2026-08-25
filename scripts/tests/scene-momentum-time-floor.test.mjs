@@ -318,8 +318,15 @@ assert.deepEqual(turn.state_delta.npc_state_updates,[{npc_key:'emily',location:'
 const unresolvedBeforeScheduleSave={pc:knightPc,world:{date:'1285-03-01',time:'09:00'},hooks:[{...consequenceHook,event_consequence:{...consequenceHook.event_consequence,due_at:'1285-03-01T09:30'}}],scheduleContext:{due:[],upcoming:[ownClass]},scheduledEvents:[ownClass]};
 turn={scene:[{kind:'narration',text:'훈련을 이어 갔다.'}],state_delta:{advance_minutes:90,new_location:'훈련장'},choices:[]};
 applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:unresolvedBeforeScheduleSave},turn,'game',{selected_id:consequenceHook.id,status:'open',attribution_safe:true});
-assert.equal(turn.state_delta.advance_minutes,60,'an earlier unresolved consequence must not hide a later crossed required schedule');
-assert.equal(turn.state_delta.new_location,null,'effects after the independently enforced schedule boundary must fail closed');
+assert.equal(turn.state_delta.advance_minutes,30,'an earlier unresolved consequence must remain the first hard boundary');
+assert.equal(turn.state_delta.new_location,null,'effects after the unresolved consequence boundary must fail closed');
+
+turn={scene:[{kind:'narration',text:'약속 상대가 나타나지 않은 채 기다림을 마쳤다.'}],state_delta:{advance_minutes:40,pc_knowledge_add:['40분 동안 아무도 오지 않았다.']},choices:[]};
+const unmanifestedLifecycle={selected_id:consequenceHook.id,status:'open',attribution_safe:true};
+applySceneMomentumTimeFloor({action:'40분 기다린다.',saveState:consequenceSave},turn,'game',unmanifestedLifecycle);
+assert.equal(turn.state_delta.advance_minutes,20,'an unmanifested selected consequence must stop authoritative time at its trigger');
+assert.deepEqual(turn.state_delta.pc_knowledge_add,[],'effects narrated beyond an unmanifested consequence boundary must fail closed');
+assert.equal(unmanifestedLifecycle.status,'open','an unmanifested consequence must remain open at the hard stop');
 
 const earlierSchedule={id:'early-class',title:'기사과 필수 수업',date:'1285-03-01',time:'09:10',kind:'academic',status:'scheduled'},scheduleBeforeResolvedConsequenceSave={...rangedConsequenceSave,pc:knightPc,scheduleContext:{due:[],upcoming:[earlierSchedule]},scheduledEvents:[earlierSchedule]};
 turn={scene:[{kind:'narration',text:'훈련 중 에밀리가 도착했다.'}],state_delta:{advance_minutes:90,hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
