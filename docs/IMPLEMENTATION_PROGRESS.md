@@ -1,18 +1,18 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Narrative Engine continuation — Combat Growth V2 implementation and protected-path validation.
+Narrative Engine continuation — Living World V1 bounded off-screen lifecycle and protected-path validation.
 
 ## Current GitHub State
 - Repo: `hoho074566-cpu/lumencia-ac`
-- Main: `88ce7b4c17ceb6ab1234c5cedc8bc86c5c3e1dbe` (PR #50 merge).
-- Working branch: `codex/combat-growth-v2`, based directly on that verified merge.
-- PR #51 is open from `codex/combat-growth-v2`; current code/test checkpoint is `e21b2070d5f6caa8aacb84e5dc1e803cdcaba47d`, current reviewed code/docs checkpoint is `ebd844fbb3f90ad0f041cc338fa0a1a360550946`, and the initial implementation head was `5866bced8963e2dcdd70c0899c3717dddb6a3b88`.
-- PR #50 is **merged** from exact reviewed head `1eb316b498d892c1d5fbb816a8a5464831d2f112` as `88ce7b4c17ceb6ab1234c5cedc8bc86c5c3e1dbe`. Final-head Safety/Vercel, fresh Codex P0/P1=0, and no-conflict Merge Readiness passed.
-- PR #50 merge and reviewed-head trees both equal `2a3a52fc00c7034fb09a032764433bb653b88367`. Production `/api/health` advertises Awakening/Talent V1, and the merged-main dependency-free clean-LF full regression passes.
-- Combat Growth V2 focused/affected suites and the dependency-free clean-LF full regression pass at correction-5 checkpoint `e21b207...` and reviewed checkpoint `ebd844f...`. The final acceptance docs checkpoint must repeat the hosted authority cycle on its new exact head.
-- Reviews at `5866bce...`, `c715ec5...`, and `7b63bab...` reported P0/P1=0. `d125b65...` closed the accumulated review P2 counterexamples; all live corrections remain inside the helper/tests only. Fresh review `5016807201` on exact `ebd844f...` reports P0/P1=0; three new notes remain non-blocking P2s after correction 5/5.
-- Current automatic correction count for PR #51 is **5/5**.
+- Main: `2ce8d0bd9379a3b99e3fa75ddf38b4cc4cb4a962` (PR #51 merge).
+- Working branch: `codex/living-world-v1`, based directly on that verified merge.
+- PR #52 is open from `codex/living-world-v1`; current code/test checkpoint is `4d82b6f08942e9cf6408fc6ff01c675cc3090bb7`, followed by this docs-only checkpoint.
+- PR #51 is **merged** from final reviewed/accepted head `68c9e846ded43030155e6d6bc9cbe455eb23125d` as `2ce8d0bd9379a3b99e3fa75ddf38b4cc4cb4a962`.
+- PR #51 merge and reviewed-head trees both equal `4f95d14094e86a6328719dcdc11da59fff5a5230`. Production `/api/health` is healthy on app `1.5.6` / adapter `0.8.3` with Combat Growth V2 advertised, and merged-main clean-LF full regression passes.
+- Living World V1 focused/affected suites and the authoritative clean-LF full regression pass at `4d82b6f...`. A second regression review closed the zero-minute explicit-completion boundary without widening scope.
+- The candidate extends only public non-PC off-screen schedule lifecycle processing: crossed starts plus explicit `scheduled_events_complete` endings for already-known absent NPCs. Time alone and generic completion never invent a result.
+- Current/foreground/model state, PC schedules, secret/restricted/future rows, unknown NPCs, and disabled background simulation remain protected. One canonical model call and stable routing budgets are unchanged.
 - Exact head `7b63bab...` passed Safety #379, Vercel Ready, and fresh P0/P1=0. Its Exact Preview passed basic deliberate physical training (`D 0→1`) and mere-use rejection (`1→1`), but failed failure-plus-visible-correction. Correction 1/5 `57085b0...` recognized the exact applied-instruction wording. Intermediate exact head `3a48337...` passed Repository checks and Vercel, but a new natural variant split the instructor correction and subjectless successful repetition across scene rows; telemetry again reported `evidence_tier:0` / `rejected_stat_count:1`. Correction 2/5 `451679f...` safely links only adjacent instructor technical guidance to a successful PC repetition, handles the leading `이번에는` discourse marker, expands bounded physical relevance, and preserves explicit named-NPC rejection. Focused and authoritative clean-LF full regression pass. The new exact-head hosted cycle and affected Preview rerun remain pending; protection tokens must not be extracted and the same browser-setting work must not be requested again.
 - Exact code/docs head `d980b33...` deployed successfully to Vercel. A fresh `이번에는` deliberate-training Preview turn visibly produced instructor guidance and `마지막 반복에서는 지시한 각도와 순서를 적용해 발이 엉키지 않은 채 진입을 끝냈다`, but `신체` remained `D [1/100]`; exported telemetry again showed `evidence_tier:0` / `rejected_stat_count:1`. The same evidence-classification type has now repeatedly recurred under different natural completion phrases. Automatic correction is stopped under user condition 1; do not add another wording-specific synonym patch without explicit user direction.
 - The user explicitly resumed. Correction 3/5 `717e85c...` replaces completion-word enumeration with a bounded structural predicate: player-owned deliberate action, visible instructor technical guidance, adjacent final repetition, applied guidance or technical adjustment, and identified cause are all required. Final-attempt lead stripping fixes the temporal-phrase/NPC-subject false positive while existing third-party checks remain authoritative. The exact failed live response now passes; missing-guidance and two named-NPC forms remain rejected. Focused and authoritative clean-LF full regression pass; new exact-head hosted and Preview cycles remain.
@@ -55,17 +55,19 @@ Narrative Engine continuation — Combat Growth V2 implementation and protected-
 - Production `/api/health`: `ok=true`, API configured, app `1.5.6`, adapter `/api/chat-router`, canonical core `/api/chat`, prompt cache retention `24h`.
 - Post-merge full `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
-## Combat Growth V2 — Current Candidate
-- Reuses the existing declared `state_delta.stat_progress`, `state_delta.skill_experience`, and exact `resolution_log`. It adds no schema field, save migration, new persistent root, endpoint, serverless function, canonical core edit, or second model call.
-- A normal GAME turn accepts only player-owned committed training, study, correction, or combat actions with player-attributed current-scene learning/adaptation evidence. Mere use, victory, defeat, observation, question/conditional input, named-NPC action, orders to another NPC, NPC self-growth dialogue, negation, mismatch, zero, and negative rows are rejected.
-- Evidence is tiered per ability: deliberate practice/correction, meaningful pressure/failure analysis, and decisive or life-or-death breakthrough. Grade-aware caps prevent inflated gains; SS+ requires tier 3. At most two stat rows and three skill rows survive.
-- Existing skill names are canonicalized. Combat XP must match an ability in the exact resolution log; deliberate named noncombat training may progress without combat resolution. An early negated attempt does not erase later affirmative learning evidence.
-- META/AUTO/CONTINUE clear or freeze both arrays. Rejected rows are removed before `localSceneRuntime`, so they cannot fake Scene Momentum. Compact pipeline/route telemetry advertises Combat Growth without duplicating authoritative state.
-- `scripts/tests/combat-growth-v2.test.mjs` permanently covers ownership, questions, NPC variants, negation ordering, evidence tiers, grades, exact combat matching, noncombat training, row bounds, zero/negative behavior, freeze, schema stability, health, and one-call architecture.
-- Dedicated and affected Skill Learning, Awakening, Scene Momentum, Orchestration, Router, authority-tail, CONTINUE, core, debug, and save suites pass. Code checkpoint `e21b207...` also passes the dependency-free clean-LF full PR check.
-- Both completed reviews found no P0/P1. Ten behavior P2s are closed with real counterexample regressions, including named observers, `연습해본다`, English sentence openers versus grammatical subjects, owned/unowned compound skill names, ability-specific resolution evidence, scoped negation, and `한다면`; the remaining P2 was this handover's stale head.
-- Corrections 1–5/5 culminate in `e21b207...`: the explicit-resume fifth correction adds only one player-addressed instructor-feedback bridge and closes the reviewed post-cause-lead NPC-performer counterexample. The same exact-head → cause → minimum repair → focused/full → new head → Safety/Vercel → fresh review protocol remains in force.
-- Current blocker: implementation and Exact Preview acceptance are complete at reviewed checkpoint `ebd844f...`. Publish this final acceptance docs checkpoint, rerun the clean-LF full regression and hosted Safety/Vercel/readiness on that docs-only head, then hand PR #51 to a person for merge. No further automatic correction remains.
+## Living World V1 — Current Candidate in PR #52
+- Code checkpoint `4d82b6f08942e9cf6408fc6ff01c675cc3090bb7` extends the existing Bounded Off-screen Progression module from schedule-start evidence to a two-phase public schedule lifecycle.
+- Only exact `scheduled_events_complete` IDs may produce completion propagation. The schedule must exist, be at or past its start, remain public/non-PC, and name an already-known absent NPC. Mere elapsed time and `completed_events_add` do not qualify.
+- Current speakers/runtime participants and any NPC directly updated by the model are excluded, so foreground state remains authoritative. Unknown, future, PC-relevant, completed/cancelled, secret/private/restricted, and background-disabled paths remain no-ops.
+- Starts may update location/status only when recent; old crossed starts become digest evidence only. Explicit completion changes only bounded status and appends an `종료 확정` digest row. It never creates an outcome, relationship, memory, faction change, goal progress, or player decision.
+- One turn accepts at most two event transitions and two NPC updates. Completion has priority, start/completion IDs have separate telemetry, and explicit completion at the current clock works even with zero time advance while ordinary zero-time turns freeze.
+- Adapter/health candidate `0.8.4` advertises `living_world_v1` / `offscreen_progression_v2`. No save root/schema/migration, endpoint, serverless function, `app.js`, canonical `api/chat.js`, routing-budget, prompt-cache, or one-call change exists.
+- Dedicated tests cover start, completion, same-turn start+completion, zero-time explicit completion, future/generic completion rejection, visibility/player/current/model/unknown guards, caps, cross-midnight, long skip, digest bounds, runtime wiring, and one-call architecture.
+- Focused related suites and authoritative clean-LF `scripts/lumensia-pr-check.mjs` pass after substantive second review. Exact-head hosted gates/review and targeted Preview lifecycle acceptance remain.
+
+## Combat Growth V2 — Merged in PR #51
+- Final reviewed/accepted head `68c9e846ded43030155e6d6bc9cbe455eb23125d` merged as `2ce8d0bd9379a3b99e3fa75ddf38b4cc4cb4a962`; reviewed and merged trees are identical.
+- Deliberate low-grade training, correction-after-failure, no-growth ordinary use/victory/NPC/question cases, and META/AUTO/CONTINUE freeze passed exact Preview acceptance before human merge.
 
 ## Awakening / Talent Evolution V1 — Merged in PR #50
 - Final reviewed head `1eb316b498d892c1d5fbb816a8a5464831d2f112` merged as `88ce7b4c17ceb6ab1234c5cedc8bc86c5c3e1dbe` with an identical tree. Final Safety/Vercel, fresh Codex P0/P1=0, readiness, production health, and merged-main full regression passed.
@@ -122,7 +124,7 @@ Narrative Engine continuation — Combat Growth V2 implementation and protected-
 - Hosted review closure `3395454...` requires an explicit terminal recap request instead of the old loose `다시…말`/unbounded English alternatives. Permanent negatives cover ordinary Korean movement/dialogue, `repeatedly`, and `Repeat the attack`; explicit Korean/English recap remains supported.
 - The same closure removes unconditional novelty-length truncation from USER ACTION. A 2,000-character action is retained when the routed input has room, while overall pressure still reserves enough authority for dense schedules and preserves long-action beginning/committed ending at the `.76` adaptive floor.
 
-## Bounded Off-screen Progression V1 — Completed
+## Bounded Off-screen Progression V1 — Baseline Completed; Lifecycle V2 in PR #52
 - Extends the existing local `backgroundDigest` path without adding a model call, API entrypoint, save root, or migration.
 - A real time advance may materialize at most two already-known, currently absent NPCs entering a public non-PC scheduled event that starts inside the elapsed interval.
 - Current-scene NPCs, model-authored NPC updates, unknown/unseen NPCs, PC-relevant schedules, secret/private schedules, completed/cancelled occurrences, META, CONTINUE, and disabled background simulation are excluded.
@@ -133,6 +135,7 @@ Narrative Engine continuation — Combat Growth V2 implementation and protected-
 - Exact Preview on `5431bbb...` passed all three targeted cases: the eligible other-department start produced one bounded Chloe update and one digest row; background disabled produced zero updates/digest rows; the PC-department schedule stopped at the important 12:00 choice and produced no off-screen mutation.
 - Fresh review on `5431bbb...` reported P0/P1=0 and four P2 edge cases. Code checkpoint `21e0279...` closes all four: strict calendar round-trip validation, explicit-public-only visibility/access, protection for every turn speaker, and latest-start precedence when a long skip crosses old and recent starts for one NPC. Focused regressions, syntax checks, `git diff --check`, and the substantive second review pass; exact-current-head hosted/full checks remain the next gate.
 - Final exact head `6b4f599...` passed Safety #329, Vercel Ready, fresh exact-head Codex P0/P1=0, the three affected Exact Preview cases, and the full clean-LF PR check before the user merged PR #43.
+- PR #52 code checkpoint `4d82b6f...` adds only explicit public schedule-completion propagation and separate lifecycle telemetry on top of this baseline. It does not infer event results or change the effect-only orchestration role.
 
 ## NPC Goal Tick V1 — Completed
 - Final reviewed head `6c115e661ed7257b3787b74d5f142a1c0b39e38d` merged as `8c5ca35a463356f375a4171148268a08abf0c83a`; targeted Preview acceptance and all exact-head gates passed.
@@ -435,10 +438,10 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only.
 
 ## NEXT ACTION
-1. Confirm PR #51 live branch tip includes correction-5 code checkpoint `e21b207...`; focused and authoritative clean-LF full regression already pass.
-2. Publish the docs checkpoint, then require GitHub Safety/Vercel/fresh Codex review on that exact head.
-3. Rerun the affected Exact Preview correction case. Do not extract a protection token or bypass Preview protection. This is correction 5/5, so any new failure must stop without another automatic repair.
-4. Only if every hosted gate and affected Preview case passes, report PR #51 ready for the user's human merge. Codex must not merge it.
+1. Commit and push the final acceptance docs checkpoint while preserving code checkpoint `4d82b6f...` and base/main `2ce8d0b...` with no conflict or behind state.
+2. Require the final docs exact head to pass GitHub Safety Gate, Vercel Ready, fresh Codex P0/P1=0, and the authoritative clean-LF full regression.
+3. Targeted Exact Preview lifecycle acceptance is complete: eligible public non-PC start, no time-only inferred completion, explicit completion, known-NPC status, and bounded start/finish digest each passed. Permanent deterministic coverage passes for generic/current/model/PC/secret/future exclusions, zero-time explicit completion, caps, cross-midnight/long skips, and background-disabled no-op. No protection token, cookie, or local storage was read.
+4. When the final exact-head gates are green, report PR #52 ready for human merge. Codex must not merge this protected-path PR. After the user merges it, verify tree equality, merged-main regression/Vercel/health, then begin the separate Event Director V3 result-surfacing analysis.
 
 ## Stop Record
 - Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.
@@ -481,4 +484,5 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed: PR #48 final reviewed head `a4772b8...` merged as `8329646...`; reviewed and merged trees are identical, main Vercel/production health are green, and merged-main clean-LF full regression passes.
 - Completed: PR #49 final reviewed head `ff50084...` merged as `93f5644...`; reviewed and merged trees are identical, final hosted readiness had P0/P1=0 with no conflict, and main Vercel/production health/merged-main clean-LF regression pass.
 - Completed: PR #50 final reviewed head `1eb316b...` merged as `88ce7b4...`; reviewed and merged trees are identical, production health advertises Awakening/Talent V1, and merged-main clean-LF full regression passes.
-- Current candidate: Combat Growth V2 in open PR #51 on `codex/combat-growth-v2`; explicit-resume correction 5/5 checkpoint `e21b207...` allows only one player-addressed instructor-feedback bridge and passes focused plus authoritative clean-LF full regression. Exact-head hosted authority and affected Preview acceptance are next; there is still no router/core/schema change.
+- Completed: PR #51 final reviewed/accepted head `68c9e84...` merged as `2ce8d0b...`; trees are identical, production health is green, and merged-main clean-LF full regression passes.
+- Current candidate: Living World V1 in open PR #52 on `codex/living-world-v1`; code checkpoint `4d82b6f...` passes focused and authoritative clean-LF full regression with no core/save/schema/model-call expansion. Pre-acceptance exact head `589510f...` passed Safety #392, Vercel Ready, Merge Readiness, and fresh Codex P0/P1=0. Exact Preview then passed public start, time-only no-inference, explicit completion, Lena `참여 중→일정을 마침`, and bounded start/finish digest validation. The final acceptance docs exact head must repeat hosted authority before human merge.
