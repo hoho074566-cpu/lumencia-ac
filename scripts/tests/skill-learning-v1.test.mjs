@@ -30,7 +30,7 @@ assert.match(runtime, /save\.pc\.skillCandidates = candidates/, 'client runtime 
 assert.match(runtime, /새 스킬 습득:/, 'client must surface deterministic unlocks to the player');
 assert.match(runtime, /학습 중: \$\{learning\}/, 'PC info must show active learning candidates');
 assert.match(app, /const skills = Object\.entries\(save\.pc\.skills \|\| \{\}\)[\s\S]*?const stats = Object\.entries\(save\.pc\.stats \|\| \{\}\)/, 'stable runtime render patch must still match the canonical app source');
-assert.match(contextRouter, /skillCandidates:compactSkillCandidates\(pc\.skillCandidates,1\)/, 'adaptive minimum context must retain bounded learning candidates');
+assert.match(contextRouter, /skillCandidates:compactSkillCandidates\(pc\.skillCandidates,0\)/, 'adaptive minimum context must retain bounded learning candidates without duplicating history');
 assert.match(sharedUtils, /validCandidateName\(row\.skill\) && row\.basis && row\.reason/, 'shared sanitizer must reject basis-less candidate rows');
 assert.match(health, /skillLearning:/, 'health response must advertise Skill Learning V1');
 assert.equal((router.match(/coreHandler\(/g) || []).length, 1, 'Skill Learning V1 must preserve one canonical core call site');
@@ -180,5 +180,34 @@ const minimumText = denseRouted.params.input.split('===== AUTHORITATIVE SAVE_STA
 const minimumSave = JSON.parse(minimumText);
 assert.equal(minimumSave.pc.skillCandidates['반월 보법'].progress, 8, 'active candidate progress must survive the mandatory minimum block');
 assert.equal(minimumSave.pc.skills['대검술'].grade, 'D', 'existing skill names must survive the mandatory minimum to prevent duplicate candidates');
+
+const pressureSkills = Object.fromEntries(Array.from({ length: 24 }, (_, index) => [`기존-${index}-${'장문기술명'.repeat(10)}`, { grade: 'A++', hiddenXp: 99, ignored: '중복 상태 '.repeat(100) }]));
+const pressureCandidates = Object.fromEntries(Array.from({ length: 8 }, (_, index) => [`후보-${index}-${'장문'.repeat(10)}`, {
+  progress: 80 + index,
+  basis: `교수의 반복 교정 ${'긴 근거 '.repeat(30)}`,
+  updated_turn: index,
+  history: [{ turn: index, amount: 15, basis: '오래된 훈련 '.repeat(30), reason: '오래된 이유 '.repeat(40) }],
+}]));
+const pressureRouted = routeOpenAIParams(
+  { instructions, input: '===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}' },
+  { incoming: {
+    action: `후보 기술을 계속 훈련한다. ${'장문 행동 '.repeat(1600)}`,
+    saveState: {
+      turnNumber: 21,
+      world: { location: '훈련장' },
+      pc: { name: '아리아', department: '기사과', skills: pressureSkills, skillCandidates: pressureCandidates },
+      sceneRuntime: { participants: ['artemis'] },
+      npcInnerStates: {},
+      routerFeedback: { routerVersion: '1.5.6-hf1', profile: 'routine-17k-v154', lastInputTokens: 100000 },
+    },
+    recentTurns: [],
+  }, mode: 'game' },
+);
+assert.ok(pressureRouted.params.input.length <= 6840, `maximal bounded learning context exceeded adaptive routine budget: ${pressureRouted.params.input.length}`);
+const pressureMinimumText = pressureRouted.params.input.split('===== AUTHORITATIVE SAVE_STATE (ROUTED MINIMUM) =====\n')[1].split('\n\n=====')[0];
+const pressureMinimum = JSON.parse(pressureMinimumText);
+assert.equal(Object.keys(pressureMinimum.pc.skills).length, 24, 'mandatory learning authority must retain the bounded existing skill-name set');
+assert.equal(Object.keys(pressureMinimum.pc.skillCandidates).length, 8, 'mandatory learning authority must retain all bounded active candidates');
+assert.ok(Object.values(pressureMinimum.pc.skillCandidates).every((row) => !Object.prototype.hasOwnProperty.call(row, 'history')), 'candidate history must stay out of the mandatory minimum block');
 
 console.log('PASS Skill Learning V1 schema, evidence, bounds, persistence, freeze, routing, unlock, and one-call regressions');
