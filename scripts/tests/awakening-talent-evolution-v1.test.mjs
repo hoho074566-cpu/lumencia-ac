@@ -280,6 +280,31 @@ assert.equal(minimumSave.pc.authorities['불변의서약'], true, 'existing Auth
 assert.equal(minimumSave.pc.awakeningCandidates.trait['공명 감각'].progress, 8, 'awakening progress must survive the minimum route');
 assert.equal(minimumSave.pc.awakeningCandidates.trait['공명 감각'].milestones, 0, 'awakening milestone count must survive the minimum route');
 
+const overflowTraits = Object.fromEntries(Array.from({ length:10 }, (_, index) => [`후순위 특성 ${index}`, { description:`특성 정의 ${index}`, limitation:`특성 제한 ${index}` }]));
+const overflowAuthorities = Object.fromEntries(Array.from({ length:10 }, (_, index) => [`후순위 권능 ${index}`, { description:`권능 정의 ${index}`, limitation:`권능 제한 ${index}` }]));
+const directlyMentionedOverflowTrait = Object.keys(overflowTraits).at(-1);
+const directlyMentionedOverflowAuthority = Object.keys(overflowAuthorities).at(-1);
+const relevantAbilityRoute = routeOpenAIParams(
+  { instructions, input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}' },
+  { incoming:{
+    action:`${directlyMentionedOverflowTrait}과 ${directlyMentionedOverflowAuthority}를 함께 사용한다.`,
+    saveState:{
+      turnNumber:24, world:{ location:'고대 유적' },
+      pc:{ name:'아리아', department:'기사과', status:'안정', traits:overflowTraits, authorities:overflowAuthorities },
+      sceneRuntime:{ participants:['artemis'] }, npcInnerStates:{},
+    },
+    recentTurns:[],
+  }, mode:'game' },
+);
+const relevantAbilityMinimum = JSON.parse(relevantAbilityRoute.params.input.split('===== AUTHORITATIVE SAVE_STATE (ROUTED MINIMUM) =====\n')[1].split('\n\n=====')[0]);
+const relevantAbilityDetail = JSON.parse(relevantAbilityRoute.params.input.split('===== AUTHORITATIVE SAVE_STATE (ROUTED DETAIL) =====\n')[1].split('\n\n===== ROLLING SUMMARY TAIL =====')[0]);
+assert.equal(relevantAbilityMinimum.pc.traits[directlyMentionedOverflowTrait], true, 'a directly invoked Trait beyond the first eight must survive minimum routing');
+assert.equal(relevantAbilityMinimum.pc.authorities[directlyMentionedOverflowAuthority], true, 'a directly invoked Authority beyond the first eight must survive minimum routing');
+assert.equal(relevantAbilityDetail.pc.traits[directlyMentionedOverflowTrait].description, '특성 정의 9', 'directly relevant Trait definition must survive detail routing');
+assert.equal(relevantAbilityDetail.pc.authorities[directlyMentionedOverflowAuthority].description, '권능 정의 9', 'directly relevant Authority definition must survive detail routing');
+assert.ok(Object.keys(relevantAbilityDetail.pc.traits).length <= 8, 'relevance selection must preserve the existing Trait bound');
+assert.ok(Object.keys(relevantAbilityDetail.pc.authorities).length <= 8, 'relevance selection must preserve the existing Authority bound');
+
 const fixedName = (prefix, index, length) => `${prefix}${index}-`.padEnd(length, String(index % 10)).slice(0, length);
 const maximalTraits = Object.fromEntries(Array.from({ length:8 }, (_, index) => [fixedName('Trait-', index, 64), { description:'설명 '.repeat(80), limitation:'조건과 대가 '.repeat(60) }]));
 const maximalAuthorities = Object.fromEntries(Array.from({ length:8 }, (_, index) => [fixedName('Authority-', index, 64), { description:'설명 '.repeat(80), limitation:'조건과 대가 '.repeat(60) }]));
