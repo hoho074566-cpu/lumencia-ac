@@ -79,6 +79,15 @@ const otherSameTimeClass={id:'advanced-class',title:'기사과 고급 수업',da
 assert.equal(nextScheduleBoundaryMinutes({...ownClassSave,scheduleContext:{due:[],upcoming:[ownClass,otherSameTimeClass]},scheduledEvents:[ownClass,otherSameTimeClass]},{futureOnly:true,action:ownClassAction,intent:ownClassIntent}),60,'a different same-time class must remain authoritative even when it shares a department token with the requested class');
 assert.equal(nextScheduleBoundaryMinutes({...ownClassSave,scheduleContext:{due:[],upcoming:[ownClass,otherSameTimeClass]},scheduledEvents:[ownClass,otherSameTimeClass]},{futureOnly:true,action:genericOwnClassAction,intent:genericOwnClassIntent}),60,'a generic request must remain ambiguous when multiple same-category events share its time');
 assert.doesNotMatch(buildSceneMomentumDirective({action:ownClassAction,saveState:ownClassSave}),/SCHEDULE_BOUNDARY=60min/,'the requested class start must remain part of class completion rather than become a new choice stop');
+const nextDayOwnClass={id:'next-basic-class',title:'기사과 기초 수업',date:'1285-03-02',time:'08:00',kind:'academic',status:'scheduled'};
+const nextDayOwnClassSave={pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'기숙사'},scheduleContext:{due:[],upcoming:[nextDayOwnClass]},scheduledEvents:[nextDayOwnClass]};
+const nextDayOwnClassAction='내일 오전 8시에 기사과 기초 수업을 듣는다.';
+const nextDayOwnClassIntent=classifySceneIntent(nextDayOwnClassAction,{location:'기숙사',currentTime:'09:00'});
+assert.equal(nextScheduleBoundaryMinutes(nextDayOwnClassSave,{futureOnly:true,action:nextDayOwnClassAction,intent:nextDayOwnClassIntent}),null,'a date-qualified requested class must not interrupt itself at its own absolute start time');
+turn={scene_title:'다음 날 기초 수업',scene:[{kind:'narration',text:'다음 날 기사과 기초 수업을 마쳤다.'}],state_delta:{advance_minutes:1425,skill_experience:[{skill:'검술',amount:1}]},choices:[]};
+applySceneMomentumTimeFloor({action:nextDayOwnClassAction,saveState:nextDayOwnClassSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,1425,'a completed date-qualified class inside the one-turn cap must not rewind to its own start');
+assert.deepEqual(turn.state_delta.skill_experience,[{skill:'검술',amount:1}],'the requested future class effects must survive when its own schedule is excluded');
 turn={scene_title:'기초 수업',scene:[{kind:'narration',text:'10시에 수업이 시작되어 첫 교시를 마쳤다.'}],state_delta:{advance_minutes:60,scheduled_events_complete:['basic-class']},choices:[],event_progress:{event_instance_id:'basic-class'}};
 applySceneMomentumTimeFloor({action:ownClassAction,saveState:ownClassSave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,105,'the requested class must advance through its start and minimum session duration');
@@ -319,6 +328,10 @@ assert.equal(turn.state_delta.advance_minutes,40,'visible schedule text beyond t
 turn={state_delta:{advance_minutes:10},choices:['대응한다','피한다','지켜본다'],event_progress:{event_instance_id:'director:interruption'}};
 applySceneMomentumTimeFloor({action:'잠을 잔다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'a structured unrelated interruption must preserve its model-produced early stop');
+turn={scene:[{kind:'narration',text:'한참 뒤 방문객이 도착했다.'}],state_delta:{advance_minutes:100,items_add:['방문객의 쪽지']},choices:['맞이한다','돌려보낸다','기다린다'],event_progress:null};
+applySceneMomentumTimeFloor({action:'5분만 기다린다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,5,'meaningful choices must not preserve time beyond an explicit maximum');
+assert.deepEqual(turn.state_delta.items_add,[],'effects from beyond the explicit maximum must be cleared when the turn is shortened');
 turn={scene:[{kind:'narration',text:'10분 동안 자세를 반복하던 중 훈련장 문밖에서 비명이 들렸다.'}],state_delta:{advance_minutes:10},choices:['밖으로 달려간다','교관을 부른다','훈련을 계속한다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'a positive-time hazard choice during an unfinished activity must stop at its actual moment');

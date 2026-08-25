@@ -42,7 +42,14 @@ assert.equal(classifySceneIntent('10분 전에 배운 동작을 훈련한다.').
 assert.equal(classifySceneIntent('한 시간 후에 검술을 훈련한다.').explicitDurationMinutes, null, 'future start time must not become a training duration');
 assert.equal(classifySceneIntent('10분 전에 배운 동작을 한 시간 동안 훈련한다.').explicitDurationMinutes, 60, 'a historical reference must not hide a separate explicit activity duration');
 assert.equal(classifySceneIntent('한 시간 훈련하고 20분 쉰다.').explicitDurationMinutes, 20, 'a terminal rest must use only the duration attached to that rest clause');
-assert.deepEqual(classifySceneIntent('30분 동안 훈련한 뒤 잠을 잔다.').suggestedAdvanceMinutes, [240, 480], 'an earlier training duration must not become the terminal sleep duration');
+assert.deepEqual(classifySceneIntent('30분 동안 훈련한 뒤 잠을 잔다.').suggestedAdvanceMinutes, [270, 510], 'an explicit preceding training duration must be added to the terminal sleep range');
+const compoundExplicitSleep=classifySceneIntent('1시간 동안 훈련을 하고 8시간 동안 잠을 잔다.');
+assert.equal(compoundExplicitSleep.explicitDurationMinutes,480,'the terminal explicit sleep duration must remain separately identifiable');
+assert.equal(compoundExplicitSleep.precedingActivityMinutes,60,'the committed preceding training duration must be retained');
+assert.deepEqual(compoundExplicitSleep.suggestedAdvanceMinutes,[540,540],'compound explicit activities must use their full declared total duration');
+const compoundExplicitDirective=buildSceneMomentumDirective({action:'1시간 동안 훈련을 하고 8시간 동안 잠을 잔다.',saveState:{world:{date:'1285-03-01',time:'09:00',location:'기숙사'}}});
+assert.match(compoundExplicitDirective,/PRECEDING_ACTIVITY_DURATION=60min/,'the model directive must expose the preceding activity duration');
+assert.match(compoundExplicitDirective,/사용자가 540분을 직접 지정했다\(앞선 행동 60분 포함\)/,'the explicit-duration rule must describe the full compound total without contradicting TIME_GUIDE');
 assert.equal(classifySceneIntent('한 시간 동안 친구하고 대화한다.').explicitDurationMinutes, 60, 'the comitative 하고 particle must not be mistaken for an activity boundary');
 
 const classAttendance = classifySceneIntent('강의에 참석한다.', { location:'강의실' });

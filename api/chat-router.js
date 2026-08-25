@@ -451,6 +451,7 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   const completedBeforeChoice=!hasMeaningfulStop||timedActionCompletionEvidence(turn,intent);
   let applied=current;
   if(reachedBoundary!=null)applied=reachedBoundary;
+  else if(current>profileMax)applied=profileMax;
   else if(!structuredInterruption&&completedBeforeChoice)applied=Math.min(profileMax,Math.max(current,boundedFloor));
   const boundaryTruncatesAction=Boolean(reachedBoundary!=null&&reachedBoundary<requestedFloor),reconcileTruncatedTurn=applied<current||boundaryTruncatesAction;
   if(reconcileTruncatedTurn&&consequenceLifecycle?.status==='resolved'&&!appliedConsequenceBoundary){
