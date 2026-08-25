@@ -7,7 +7,7 @@ Narrative Engine continuation — Faction / Social Consequence V1 is merged. Its
 - Repo: `hoho074566-cpu/lumencia-ac`
 - Main: `6204843e1cf6f45a9386c13b942c100cd6c7377b` (`Faction / Social Consequence V1`, PR #46 merge)
 - Working branch: `codex/faction-social-hardening-v1`
-- PR #47: **open**. Initial checkpoint `0cd75a7683f67196701b7f8376298ead1620f868` contains the three PR #46 review P2 hardenings; exact-head review on `f2689c7` returned P0/P1=0 plus two scope-relevant P2s, closed in `865e47fd4dc3a604a3fc9cb72e63c805afcb8898`. Protected adapter/context paths require human merge.
+- PR #47: **open**. Initial checkpoint `0cd75a7683f67196701b7f8376298ead1620f868` contains the three PR #46 review P2 hardenings; exact-head review on `f2689c7` returned P0/P1=0 plus two scope-relevant P2s, closed in `865e47fd4dc3a604a3fc9cb72e63c805afcb8898`. Closure review on `e4d80e0` returned P0/P1=0 plus one recent-turn-order P2, closed in the final permitted fix round `049c38353d15a07c739f8404e3d4cf154bc65ac3`. Protected adapter/context paths require human merge.
 - PR #46: **merged** from exact reviewed head `2843e5bc9ee8169acb7e82b5db9b392beea93539` as `6204843e1cf6f45a9386c13b942c100cd6c7377b`. Merge and reviewed-head trees both equal `4c045c27ccb30f6593370ae2b8e811bebcb39691`; production health is green on app `1.5.6` / adapter `0.8.3` with Faction Social V1 advertised.
 - PR #45: **merged** from exact reviewed head `583b7622500b9916dd31697d0d6e845f81790ed6` as `71074ccc7a5fd00f193a6aec8b7a1ff82eae1aab`. Merge and reviewed-head trees both equal `690e6a88c015bd28e67bba0bf03bfdba6e73a6c8`; production `/api/health` is healthy on app `1.5.6` / adapter `0.8.3`.
 - PR #44: **merged** from exact reviewed head `e5fae96ac271a617db42627a99d53a720299a213` as `fe6b4a5dcc0f0a96b71d8fcffcf8666caeefd82b`. Merge and reviewed trees both equal `f4aeadd44c116682d60385c265e3f35f3b48ea0e`; production health is green.
@@ -54,6 +54,7 @@ Narrative Engine continuation — Faction / Social Consequence V1 is merged. Its
 - Direct USER ACTION faction mentions outrank broad context keywords. Dense `.76` adaptive routing retains the explicitly queried faction while the fixed minimum remains inside 6,840 characters.
 - Pipeline and route diagnostics now expose only version, bounded faction keys, and current changed keys instead of duplicating reputation values and causal history into `qualityTelemetry`/rendered records.
 - Review closure `865e47f` compares normalized previous and accepted final faction state for telemetry, so rejected/no-op model rows cannot claim a mutation. It also ranks direct action text above bounded recent-turn discussion above broad save-derived keywords, preserving an indirectly referenced older faction without restoring all six rows.
+- Final closure `049c383` retains each bounded recent turn separately and weights newer mentions above older mentions. Important-profile coverage proves the latest discussed older faction survives a two-faction mandatory minimum even when two newer stored factions were also discussed.
 - Dedicated/affected suites pass after the closure; the full clean-LF `scripts/lumensia-pr-check.mjs origin/main HEAD` passed at the initial checkpoint and must be rerun on the final docs head. There is no new endpoint, save root, migration, model call, or gameplay semantic change.
 
 ## NPC↔NPC Relationship V1 — Completed
@@ -427,4 +428,4 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed: PR #44 exact reviewed head `e5fae96...` merged as `fe6b4a5...`; merge-tree equality and production health pass.
 - Completed: PR #45 exact reviewed head `583b762...` merged as `71074cc...`; merge-tree equality and production health pass.
 - Completed: PR #46 exact reviewed head `2843e5b...` merged as `6204843...`; merge-tree equality and production health pass.
-- Current candidate: PR #47 / Faction Social P2 hardening on `codex/faction-social-hardening-v1`; initial checkpoint `0cd75a7`, first exact-head review P0/P1=0, and closure `865e47f` with dedicated/affected tests complete. Final docs checkpoint, clean-LF full check, and fresh exact-head hosted Safety/Vercel/Codex authority remain.
+- Current candidate: PR #47 / Faction Social P2 hardening on `codex/faction-social-hardening-v1`; initial checkpoint `0cd75a7`, two exact-head reviews with P0/P1=0, first closure `865e47f`, and final permitted closure `049c383` with dedicated/affected tests complete. Final docs checkpoint, clean-LF full check, and fresh exact-head hosted Safety/Vercel/Codex authority remain.
