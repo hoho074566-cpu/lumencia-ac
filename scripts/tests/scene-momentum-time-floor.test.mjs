@@ -106,6 +106,10 @@ const keyedConsultAction='10시에 emily와 상담한다.';
 assert.equal(nextScheduleBoundaryMinutes(personalConsultSave,{futureOnly:true,action:keyedConsultAction,intent:classifySceneIntent(keyedConsultAction,{location:'기숙사',currentTime:'09:00'})}),null,'a participant key must identify its otherwise generic scheduled consultation');
 const namedConsultAction='10시에 에밀리와 상담한다.';
 assert.equal(nextScheduleBoundaryMinutes(personalConsultSave,{futureOnly:true,action:namedConsultAction,intent:classifySceneIntent(namedConsultAction,{location:'기숙사',currentTime:'09:00'}),registry:{emily:'에밀리'}}),null,'a canonical participant label must identify its otherwise generic scheduled consultation');
+const halfHourConsult={...personalConsult,time:'15:30'};
+const halfHourConsultSave={...personalConsultSave,world:{...personalConsultSave.world,time:'14:00'},scheduleContext:{due:[],upcoming:[halfHourConsult]},scheduledEvents:[halfHourConsult]};
+const modifiedConsultAction='오늘 오후 3시 반에 에밀리와 진지하게 상담한다.';
+assert.equal(nextScheduleBoundaryMinutes(halfHourConsultSave,{futureOnly:true,action:modifiedConsultAction,intent:classifySceneIntent(modifiedConsultAction,{location:'기숙사',currentTime:'14:00'}),registry:{emily:'에밀리'}}),null,'a half-hour clock and incidental adverb must not prevent matching the requested consultation');
 const classroomConsult={...personalConsult,location:'기사과 강의실'};
 const classroomConsultSave={...personalConsultSave,scheduleContext:{due:[],upcoming:[classroomConsult]},scheduledEvents:[classroomConsult]};
 assert.equal(nextScheduleBoundaryMinutes(classroomConsultSave,{futureOnly:true,action:namedConsultAction,intent:classifySceneIntent(namedConsultAction,{location:'기숙사',currentTime:'09:00'}),registry:{emily:'에밀리'}}),null,'an ancillary classroom location must not reclassify a dialogue appointment as an academic event');
@@ -114,6 +118,10 @@ assert.equal(nextScheduleBoundaryMinutes(personalConsultSave,{futureOnly:true,ac
 const notedConsult={...personalConsult,note:'기사과 수업 후 진행'};
 const notedConsultSave={...personalConsultSave,scheduleContext:{due:[],upcoming:[notedConsult]},scheduledEvents:[notedConsult]};
 assert.equal(nextScheduleBoundaryMinutes(notedConsultSave,{futureOnly:true,action:namedConsultAction,intent:classifySceneIntent(namedConsultAction,{location:'기숙사',currentTime:'09:00'}),registry:{emily:'에밀리'}}),null,'an academic note must not reclassify a personal dialogue appointment');
+const orientation={id:'entrance-orientation',title:'기사과 오리엔테이션',date:'1285-03-01',time:'12:00',kind:'academic',status:'scheduled'};
+const orientationSave={pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'기숙사'},scheduleContext:{due:[],upcoming:[orientation]},scheduledEvents:[orientation]};
+const orientationAction='12시에 기사과 오리엔테이션에 참석한다.';
+assert.equal(nextScheduleBoundaryMinutes(orientationSave,{futureOnly:true,action:orientationAction,intent:classifySceneIntent(orientationAction,{location:'기숙사',currentTime:'09:00'})}),null,'a requested scheduled orientation must not interrupt itself at its start');
 
 const boundaryChoiceSave={...boundarySave,pc:knightPc,scheduledEvents:[{id:'past-ceremony',date:'1285-03-01',time:'08:00',status:'scheduled'},{id:'class',date:'1285-03-01',time:'10:00',status:'scheduled'}]};
 turn={state_delta:{advance_minutes:0},choices:['수업에 간다','남는다','다른 일을 한다'],event_progress:{event_instance_id:'class'}};
@@ -388,6 +396,9 @@ assert.equal(turn.state_delta.advance_minutes,30,'a clearly completed activity m
 turn={scene:[{kind:'narration',text:'회의를 마쳤고 다음 의제를 고르라고 했다.'}],state_delta:{advance_minutes:10},choices:['조사를 계속한다','휴식한다','자리를 뜬다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'1시간 동안 회의를 한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,60,'all dialogue activity vocabulary must share the same completion evidence');
+turn={scene:[{kind:'narration',text:'오리엔테이션을 마쳤고 다음 일정을 고르라고 했다.'}],state_delta:{advance_minutes:10},choices:['기숙사로 간다','교관에게 묻는다','광장으로 간다'],event_progress:null};
+applySceneMomentumTimeFloor({action:'1시간 동안 오리엔테이션에 참석한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,60,'scheduled academic vocabulary must share completion evidence with ordinary classes');
 turn={scene:[{kind:'narration',text:'잠에서 깨어나 몸을 일으켰다.'}],state_delta:{advance_minutes:60},choices:['일어난다','일정을 확인한다','더 쉰다'],event_progress:{event_instance_id:'active:rest'}};
 applySceneMomentumTimeFloor({action:'잠을 잔다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]},sceneRuntime:{eventProgress:{eventInstanceId:'active:rest'}}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,240,'continuing the same structured scene is not a new interruption and must retain the sleep floor');

@@ -334,9 +334,10 @@ function scheduleRowMentioned(turn,row={}){
 function scheduleTimeMentioned(text,row={}){
   const match=String(row?.time||'').trim().match(/^(\d{1,2}):(\d{2})$/);if(!match)return false;
   const hour=Number(match[1]),minute=Number(match[2]),value=String(text||'');if(!Number.isInteger(hour)||!Number.isInteger(minute))return false;
-  const hourToken=hour<10?`0?${hour}`:`${hour}`,minuteToken=String(minute).padStart(2,'0'),colon=new RegExp(`(?:^|\\D)${hourToken}:${minuteToken}(?!\\d)`),korean=minute===0?new RegExp(`(?:^|\\D)${hour}\\s*시(?!\\s*\\d+\\s*분)`):new RegExp(`(?:^|\\D)${hour}\\s*시\\s*${minute}\\s*분`),unmarkedValue=value.replace(/(?:오전|오후|아침|저녁|밤)\s*\d{1,2}\s*시(?:\s*\d{1,2}\s*분)?/g,' ');
-  const period=hour<12?'(?:오전|아침)':'(?:오후|저녁|밤)',twelveHour=hour%12||12,twelveHourKorean=minute===0?new RegExp(`${period}\\s*${twelveHour}\\s*시(?!\\s*\\d+\\s*분)`):new RegExp(`${period}\\s*${twelveHour}\\s*시\\s*${minute}\\s*분`);
-  if(colon.test(value)||korean.test(unmarkedValue)||twelveHourKorean.test(value))return true;
+  const hourToken=hour<10?`0?${hour}`:`${hour}`,minuteToken=String(minute).padStart(2,'0'),colon=new RegExp(`(?:^|\\D)${hourToken}:${minuteToken}(?!\\d)`),korean=minute===0?new RegExp(`(?:^|\\D)${hour}\\s*시(?!\\s*(?:\\d+\\s*분|반))`):minute===30?new RegExp(`(?:^|\\D)${hour}\\s*시\\s*(?:30\\s*분|반)`):new RegExp(`(?:^|\\D)${hour}\\s*시\\s*${minute}\\s*분`),unmarkedValue=value.replace(/(?:오전|오후|아침|저녁|밤)\s*\d{1,2}(?:\s*시(?:\s*(?:\d{1,2}\s*분|반))?|:\d{2})/g,' ');
+  const period=hour<12?'(?:오전|아침)':'(?:오후|저녁|밤)',twelveHour=hour%12||12,twelveHourKorean=minute===0?new RegExp(`${period}\\s*${twelveHour}\\s*시(?!\\s*(?:\\d+\\s*분|반))`):minute===30?new RegExp(`${period}\\s*${twelveHour}\\s*시\\s*(?:30\\s*분|반)`):new RegExp(`${period}\\s*${twelveHour}\\s*시\\s*${minute}\\s*분`);
+  const twelveHourColon=new RegExp(`${period}\\s*${twelveHour}:${minuteToken}(?!\\d)`);
+  if(colon.test(unmarkedValue)||korean.test(unmarkedValue)||twelveHourKorean.test(value)||twelveHourColon.test(value))return true;
   return minute===0&&((hour===12&&/정오/.test(value))||(hour===0&&/자정/.test(value)));
 }
 function scheduleBoundaryOccurred(turn,row={}){
@@ -440,7 +441,7 @@ function timedActionCompletionEvidence(turn,intent={}){
     wait:/(?:기다림을\s*마쳤|대기를\s*마쳤|요청한\s*시간이\s*(?:흘렀|지났)|시간을\s*보낸\s*뒤)/,
     meal:/(?:식사를\s*(?:마쳤|끝냈)|밥을\s*다\s*먹었|식사\s*후)/,
     training:/(?:훈련|연습|수련|단련)(?:을|를)?\s*(?:마쳤|끝냈|완료했|마무리했)/,
-    'class-attendance':/(?:수업|강의|세미나|실습)(?:을|를)?\s*(?:마쳤|끝냈|완료했|수료했)|(?:수업|강의|세미나|실습)이\s*(?:끝났|종료되었|종료됐다)/,
+    'class-attendance':/(?:수업|강의|세미나|실습|오리엔테이션|교육|입학식)(?:을|를)?\s*(?:마쳤|끝냈|완료했|수료했)|(?:수업|강의|세미나|실습|오리엔테이션|교육|입학식)(?:이|가)\s*(?:끝났|종료되었|종료됐다)/,
     dialogue:/(?:대화|이야기|질문|답변|설명|상담|논의|면담|회의|브리핑)(?:을|를)?\s*(?:마쳤|끝냈|마무리했)|(?:대화|이야기|질문|답변|설명|상담|논의|면담|회의|브리핑)(?:이|가)\s*(?:끝났|마무리되었)/,
     travel:/(?:목적지|행선지|[^\s]{2,24})(?:에|로)\s*(?:도착했|도착했다|도착했다가|닿았|다다랐)/,
     explore:/(?:탐색|구경|둘러보기|순회)(?:를)?\s*(?:마쳤|끝냈|마무리했)/,
