@@ -109,11 +109,19 @@ assert.equal(nextScheduleBoundaryMinutes(personalConsultSave,{futureOnly:true,ac
 const classroomConsult={...personalConsult,location:'기사과 강의실'};
 const classroomConsultSave={...personalConsultSave,scheduleContext:{due:[],upcoming:[classroomConsult]},scheduledEvents:[classroomConsult]};
 assert.equal(nextScheduleBoundaryMinutes(classroomConsultSave,{futureOnly:true,action:namedConsultAction,intent:classifySceneIntent(namedConsultAction,{location:'기숙사',currentTime:'09:00'}),registry:{emily:'에밀리'}}),null,'an ancillary classroom location must not reclassify a dialogue appointment as an academic event');
+const objectMarkedConsultAction='10시에 에밀리와 상담을 한다.';
+assert.equal(nextScheduleBoundaryMinutes(personalConsultSave,{futureOnly:true,action:objectMarkedConsultAction,intent:classifySceneIntent(objectMarkedConsultAction,{location:'기숙사',currentTime:'09:00'}),registry:{emily:'에밀리'}}),null,'an object-marked dialogue form must still exclude its own matching appointment boundary');
 
 const boundaryChoiceSave={...boundarySave,pc:knightPc,scheduledEvents:[{id:'past-ceremony',date:'1285-03-01',time:'08:00',status:'scheduled'},{id:'class',date:'1285-03-01',time:'10:00',status:'scheduled'}]};
 turn={state_delta:{advance_minutes:0},choices:['수업에 간다','남는다','다른 일을 한다'],event_progress:{event_instance_id:'class'}};
 applySceneMomentumTimeFloor({action:'두 시간 쉰다.',saveState:boundaryChoiceSave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'an unrelated overdue row must not hide the structured future schedule boundary');
+const eveningClass={id:'evening-class',title:'기사과 수업',date:'1285-03-01',time:'20:00',kind:'academic',status:'scheduled'};
+const eveningClassSave={pc:knightPc,world:{date:'1285-03-01',time:'19:30',location:'훈련장'},scheduleContext:{due:[],upcoming:[eveningClass]},scheduledEvents:[eveningClass]};
+turn={scene_title:'오후 수업의 종',scene:[{kind:'narration',text:'오후 8시, 기사과 수업 종이 울렸다.'}],state_delta:{advance_minutes:30,skill_experience:[{skill:'검술',amount:1}]},choices:['수업에 간다','훈련을 멈춘다','다른 곳으로 간다']};
+applySceneMomentumTimeFloor({action:'2시간 동안 검술을 훈련한다.',saveState:eveningClassSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,30,'an equivalent twelve-hour timestamp must surface the exact saved schedule boundary');
+assert.deepEqual(turn.state_delta.skill_experience,[],'completion effects beyond a twelve-hour-form boundary must fail closed');
 turn={scene_title:'정오의 호출',scene:[{kind:'narration',text:'기사과 1학년 필수 오리엔테이션이 시작되어 참석 여부를 정해야 한다.'}],state_delta:{advance_minutes:0},choices:['참석한다','남는다','다른 일을 한다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'두 시간 쉰다.',saveState:{...boundaryChoiceSave,scheduledEvents:[{id:'class',title:'기사과 필수 오리엔테이션',date:'1285-03-01',time:'10:00',status:'scheduled'}]}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'authoritative boundary title evidence must align the clock even when event_progress is omitted');

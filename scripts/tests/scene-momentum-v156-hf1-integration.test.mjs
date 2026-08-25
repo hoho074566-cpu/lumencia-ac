@@ -51,6 +51,7 @@ assert.match(chat,/const reachedConsequenceBoundary=/,'manifested delayed result
 assert.match(chat,/applySceneMomentumTimeFloor\([^;]+consequenceLifecycle\)/,'the selected consequence lifecycle must reach the elapsed-time guard');
 assert.doesNotMatch(chat,/hasMeaningfulStop[^;\n]*importance[^;\n]*critical/i,'critical scene severity must not suppress deterministic elapsed time');
 assert.equal((chat.match(/allowProgress:mode==='game'&&!zeroElapsedIntent/g)||[]).length,3,'explicit zero-minute actions must freeze combat growth, skill learning, and awakening/talent runtime packets');
+assert.match(chat,/zeroElapsedIntent=mode==='game'&&growthIntent\.explicitDurationMinutes===0&&Number\(growthIntent\.minAdvanceMinutes\|\|0\)<=0/,'zero-growth freeze must use the total requested turn duration rather than only the terminal duration');
 const timeReconciliationIndex=chat.indexOf('const sceneIntent=applySceneMomentumTimeFloor');
 for(const marker of ['persistedCombatGrowthState=deriveCombatGrowthState','persistedSkillLearningState=deriveSkillLearningState','persistedAwakeningTalentState=deriveAwakeningTalentState']){
   assert.ok(timeReconciliationIndex>=0&&chat.lastIndexOf(marker)>timeReconciliationIndex,`${marker} must be recomputed after time-boundary reconciliation freezes rejected completion deltas`);

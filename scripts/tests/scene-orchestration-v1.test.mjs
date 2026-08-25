@@ -102,6 +102,16 @@ const namedScheduledActivity=deriveSceneOrchestrationPlan({
 assert.equal(namedScheduledActivity.secondary,'world-response','canonical participant labels must keep a requested personal appointment out of schedule arbitration');
 assert.equal(namedScheduledActivity.trigger_minutes,null);
 
+const futureDateInterrupted=deriveSceneOrchestrationPlan({
+  mode:'game',
+  action:'내일 오전 8시에 기사과 기초 수업을 듣는다.',
+  saveState:{world:{date:'1285-03-01',time:'09:00',location:'기숙사'},pc:{department:'기사과'},scheduledEvents:[{id:'today-briefing',title:'기사과 필수 브리핑',kind:'academic',date:'1285-03-01',time:'09:30',status:'scheduled'}],scheduleContext:{due:[],upcoming:[{id:'today-briefing',title:'기사과 필수 브리핑',kind:'academic',date:'1285-03-01',time:'09:30',status:'scheduled'}]},sceneRuntime:{}},
+  directorTelemetry:{result:'NO_RANDOM_EVENT_DUE'},
+});
+assert.equal(futureDateInterrupted.secondary,'schedule-boundary','a bounded future-date plan must yield to an earlier authoritative schedule');
+assert.equal(futureDateInterrupted.order,'action-until-interruption','orchestration must agree with the date-qualified Scene Momentum boundary');
+assert.equal(futureDateInterrupted.trigger_minutes,30);
+
 const dueScheduleDoesNotFreezeAction = deriveSceneOrchestrationPlan({
   mode: 'game',
   action: '기숙사로 간다.',
