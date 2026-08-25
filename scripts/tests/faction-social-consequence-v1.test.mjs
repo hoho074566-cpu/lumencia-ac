@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { routeOpenAIParams } from '../../api/lib/context-router.js';
 import {
   compactFactionSocialForContext,
+  compactFactionSocialTelemetry,
   deriveFactionSocialState,
   FACTION_KEYS,
   factionReputationChangeIsReal,
@@ -25,6 +26,7 @@ assert.match(chat,/credible_rumor에는 실제 출처나 전달 경로를 source
 assert.match(chat,/집단 평판은 개인 NPC 관계나 NPC 간 관계를 자동 변경하지 않는다/,'faction reputation must stay separate from personal relationships');
 assert.match(router,/faction_reputation_changes:\[\]/,'CONTINUE freeze must clear faction reputation changes');
 assert.match(router,/deriveFactionSocialState\(\{/,'stable router must derive bounded faction state from accepted changes');
+assert.match(router,/faction_social:factionSocialTelemetry/,'pipeline telemetry must not duplicate full faction runtime state');
 assert.match(runtime,/faction_reputation_changes: \[\]/,'client-side frozen delta must clear faction reputation changes');
 assert.match(runtime,/save\.sceneRuntime = \{ \.\.\.\(save\.sceneRuntime \|\| \{\}\), \.\.\.runtime\.scene_runtime \}/,'client runtime must persist server-derived faction state through the existing scene runtime merge');
 assert.match(health,/factionSocialConsequence:/,'health response must advertise Faction Social Consequence V1');
@@ -82,6 +84,14 @@ const taintedHistory=normalizeFactionSocial({reputations:{student_council:{reput
 ]}}});
 assert.deepEqual(taintedHistory.reputations.student_council.history.map((row)=>row.reason),['유효한 공식 기록'],'invalid or unsupported saved evidence must be dropped rather than relabeled as public evidence');
 
+const staleObserverHistory=normalizeFactionSocial({reputations:{white_rose:{reputation:2,history:[
+  {turn:1,reputation_delta:1,evidence_type:'witnessed_action',observer_npc_keys:['removed_npc'],reason:'삭제된 NPC만 목격한 기록'},
+  {turn:2,reputation_delta:1,evidence_type:'credible_rumor',observer_npc_keys:['lucia','removed_npc'],source:'엘리제의 전달',reason:'등록 NPC에게 전달된 기록'},
+  {turn:3,reputation_delta:1,evidence_type:'official_record',observer_npc_keys:['removed_npc'],reason:'공식 기록'},
+]}}},{registeredNpcKeys:registered});
+assert.deepEqual(staleObserverHistory.reputations.white_rose.history.map((row)=>row.reason),['등록 NPC에게 전달된 기록','공식 기록'],'saved evidence that requires a witness must drop rows left without a registered observer');
+assert.deepEqual(staleObserverHistory.reputations.white_rose.history.flatMap((row)=>row.observer_npc_keys),['lucia'],'stale or malformed observer keys must not survive save normalization');
+
 const noOp=deriveFactionSocialState({previous:bounded,turnNumber:11,changes:[{faction_key:'student_council',reputation_delta:0,stance:'우호',evidence_type:'public_event',observer_npc_keys:[],reason:'동일 상태 재출력'}]});
 assert.deepEqual(noOp,bounded,'same-stance zero-delta rows must not append false social history');
 const invalid=deriveFactionSocialState({previous:bounded,turnNumber:11,changes:[{faction_key:'invented_faction',reputation_delta:10,stance:'우호',evidence_type:'public_event',observer_npc_keys:[],reason:'미등록 조직'}]});
@@ -93,10 +103,16 @@ const compact=compactFactionSocialForContext({reputations:{
   white_rose:{reputation:-2,stance:'경계',updated_turn:2,history:Array.from({length:4},(_,index)=>({turn:index,reason:`rose-${index}`,evidence_type:'public_event'}))},
   blue_knights:{reputation:1,stance:'중립',updated_turn:40,history:[]},
   knight_department:{reputation:1,stance:'중립',updated_turn:30,history:[]},
-}},{text:'백장미회가 나를 어떻게 보는지 확인한다.',maxFactions:3,historyLimit:2});
+}},{text:'계속 그 평판을 확인한다.',recentTexts:['그 전에는 학생회 평판을 확인했다.','직전 턴에는 백장미회 평판을 확인했다.'],keywords:['student_council','white_rose','blue_knights','knight_department'],maxFactions:3,historyLimit:2});
 assert.ok(compact.reputations.white_rose,'an explicitly relevant faction must survive context selection even when older');
 assert.equal(Object.keys(compact.reputations).length,3,'routed faction context must stay bounded');
 assert.equal(compact.reputations.white_rose.history.length,2,'routed faction history must keep only the latest causal rows');
+
+const compactTelemetry=compactFactionSocialTelemetry(official,first);
+assert.deepEqual(compactTelemetry.changed_faction_keys,['blue_knights'],'telemetry must report only faction rows that differ in the accepted final state');
+assert.ok(compactTelemetry.faction_keys.includes('student_council'),'telemetry may retain bounded faction identifiers');
+assert.doesNotMatch(JSON.stringify(compactTelemetry),/history|reason|observer_npc_keys|reputation/,'telemetry must not duplicate authoritative faction values or causal history');
+assert.deepEqual(compactFactionSocialTelemetry(first,first).changed_faction_keys,[],'rejected or no-op model rows cannot appear as accepted telemetry changes');
 
 const saveState={sceneRuntime:{faction_social:first},relationships:{anastasia:{affinity:7}},npcInnerStates:{lucia:{npc_relationships:{elise:{affinity:9}}}}};
 const personalBefore=JSON.stringify({relationships:saveState.relationships,npcInnerStates:saveState.npcInnerStates});
@@ -139,5 +155,33 @@ const routed=routeOpenAIParams(
 );
 assert.match(routed.params.input,/"white_rose":\{"reputation":-2,"stance":"경계"/,'relevant faction reputation must reach authoritative routed context');
 assert.match(routed.params.instructions,/사적 행동\/단순 동석으로 바꾸거나 개인 관계와 자동 연동하지 않는다/,'routed prompt must preserve evidence and personal-relation boundaries');
+
+const denseFactionState={reputations:Object.fromEntries(FACTION_KEYS.map((key,index)=>[key,{
+  reputation:index+1,stance:'관심',updated_turn:100-index,
+  history:Array.from({length:8},(_,historyIndex)=>({turn:historyIndex+1,reputation_delta:1,evidence_type:'public_event',observer_npc_keys:['removed_npc'],reason:`${key}-${historyIndex}-${'긴 근거 '.repeat(80)}`})),
+}]))};
+const denseRouted=routeOpenAIParams(
+  {instructions,input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}'},
+  {incoming:{action:`백장미회의 오래된 평판을 확인한다. ${'긴 행동 '.repeat(1200)}`,saveState:{turnNumber:11,world:{location:'academy'},sceneRuntime:{participants:['lucia'],faction_social:denseFactionState},npcInnerStates:{},routerFeedback:{routerVersion:'1.5.6-hf1',profile:'routine-17k-v154',lastInputTokens:100000}},recentTurns:[]},mode:'game'},
+);
+assert.equal(denseRouted.telemetry.adaptive_scale,.76,'dense faction fixture must exercise minimum adaptive routing scale');
+assert.ok(denseRouted.params.input.length<=6840,`dense faction input exceeded adaptive routine budget: ${denseRouted.params.input.length}`);
+const minimumText=denseRouted.params.input.split('===== AUTHORITATIVE SAVE_STATE (ROUTED MINIMUM) =====\n')[1].split('\n\n=====')[0];
+const minimumFactionSocial=JSON.parse(minimumText).sceneRuntime.faction_social;
+assert.ok(minimumFactionSocial.reputations.white_rose,'explicitly relevant faction must survive the mandatory minimum block');
+assert.ok(Object.keys(minimumFactionSocial.reputations).length<=2,'mandatory minimum must include at most two relevant factions');
+assert.ok(Object.values(minimumFactionSocial.reputations).every((row)=>row.history.length<=1),'mandatory minimum must include at most one causal row per faction');
+assert.doesNotMatch(JSON.stringify(minimumFactionSocial),/removed_npc/,'routed faction context must remove stale observer keys');
+
+const indirectRouted=routeOpenAIParams(
+  {instructions,input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}'},
+  {incoming:{action:'계속 그 평판을 확인한다.',proReasoning:true,saveState:{turnNumber:12,world:{location:'academy'},sceneRuntime:{participants:['lucia'],faction_social:denseFactionState},npcInnerStates:{}},recentTurns:[
+    {action:'학생회의 평판을 확인한다.',summary:'학생회의 태도를 확인했다.',scene:[]},
+    {action:'청기사단의 평판을 확인한다.',summary:'청기사단의 태도를 확인했다.',scene:[]},
+    {action:'백장미회의 오래된 평판을 확인한다.',summary:'가장 최근에 백장미회의 태도를 물었다.',scene:[]},
+  ]},mode:'game'},
+);
+const indirectMinimumText=indirectRouted.params.input.split('===== AUTHORITATIVE SAVE_STATE (ROUTED MINIMUM) =====\n')[1].split('\n\n=====')[0];
+assert.ok(JSON.parse(indirectMinimumText).sceneRuntime.faction_social.reputations.white_rose,'most recently discussed older faction must survive an indirect important-turn follow-up despite two newer stored factions and broad save keywords');
 
 console.log('PASS Faction / Social Consequence V1 schema, evidence, bounds, routing, freeze, and momentum regressions');

@@ -13,8 +13,9 @@ Repository: `hoho074566-cpu/lumencia-ac`
 # 0. SESSION STOP CHECKPOINT — 가장 먼저 읽을 것
 
 ## Live state immediately before this handover update
-- Branch: `codex/faction-social-consequence-v1`
-- Base/current main: `71074ccc7a5fd00f193a6aec8b7a1ff82eae1aab` (`NPC↔NPC Relationship V1`, PR #45 merge).
+- Branch: `codex/faction-social-hardening-v1`
+- Base/current main: `6204843e1cf6f45a9386c13b942c100cd6c7377b` (`Faction / Social Consequence V1`, PR #46 merge).
+- PR #46: **merged** from exact reviewed head `2843e5bc9ee8169acb7e82b5db9b392beea93539` as `6204843e1cf6f45a9386c13b942c100cd6c7377b`. Merge and reviewed-head trees both equal `4c045c27ccb30f6593370ae2b8e811bebcb39691`; production `/api/health` is healthy on app `1.5.6` / adapter `0.8.3` and advertises Faction Social Consequence V1.
 - PR #45: **merged** from exact reviewed head `583b7622500b9916dd31697d0d6e845f81790ed6` as `71074ccc7a5fd00f193a6aec8b7a1ff82eae1aab`. Merge and reviewed-head trees both equal `690e6a88c015bd28e67bba0bf03bfdba6e73a6c8`; merged production `/api/health` is healthy on app `1.5.6` / adapter `0.8.3`.
 - PR #44: **merged** from exact reviewed head `e5fae96ac271a617db42627a99d53a720299a213` as `fe6b4a5dcc0f0a96b71d8fcffcf8666caeefd82b`. Merge and reviewed-head trees both equal `f4aeadd44c116682d60385c265e3f35f3b48ea0e`; merged production `/api/health` is healthy on app `1.5.6` / adapter `0.8.3`.
 - PR #43: **merged** from exact reviewed/accepted head `6b4f5990278ce8d3446c7b5be94a899a72d9fc80` as `fd2bcff13007fdf66c04477b9f69066f7c9b871e`. Its merge tree exactly equals reviewed head tree `5b6b56b272de438e3db6a53027ce13b75ff7cace`; merged-main Vercel, production `/api/health`, and the clean-LF full PR check pass.
@@ -45,17 +46,23 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Production `/api/health`: healthy; app `1.5.6`, canonical `/api/chat`, adapter `/api/chat-router`, `24h` prompt-cache retention.
 - Full post-merge `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
-## Current active work — Faction / Social Consequence V1
+## Current active work — Faction / Social Consequence V1 P2 hardening
 - Adds `state_delta.faction_reputation_changes` for six canon-backed public academy organizations: student council, Blue Knights, White Rose, and the knight/magic/theology departments.
 - Reuses the flexible `sceneRuntime.faction_social` root. There is no new save root, migration, endpoint, model call, or canonical `app.js` change.
-- Reputation clamps to ±100; one turn accepts at most 4 changes; each faction keeps at most 8 causal history rows; routed context retains at most 6 registered factions with 2 recent causes.
+- Reputation clamps to ±100; one turn accepts at most 4 changes; each faction keeps at most 8 causal history rows. The hardening routes at most 3 relevant factions with 2 recent causes in detail and at most 2 factions with 1 cause in the mandatory minimum block.
 - A change requires a public event, official record, registered NPC witness, or a sourced credible rumor. Unwitnessed private conduct, unregistered observers, mere co-presence, invented factions, and same-state no-ops are rejected.
 - Group reputation never auto-mutates PC↔NPC or NPC↔NPC relationships. Delayed retaliation, invitation, summons, or administrative response continues through the existing bounded `delayed_consequences_add` lifecycle rather than a new queue.
 - META and CONTINUE clear the new delta field. A real faction mutation counts once on Scene Momentum's existing social-relationship axis; no-op rows cannot fake momentum.
 - Permanent coverage lives in `scripts/tests/faction-social-consequence-v1.test.mjs` and covers schema, evidence gates, opposite faction polarity, clamping/history/context bounds, invalid/no-op rejection, personal-relation isolation, runtime persistence wiring, freeze paths, health visibility, and the one-call invariant.
 - Code checkpoint `193e12a` rejects invalid or unsupported saved history evidence instead of relabeling it as public evidence. Codex review on `48d0555...` reported P0/P1=0 and one P2 provenance gap: a registered receiver alone could authorize `credible_rumor` without an identifiable source.
 - Review closure `2721ff2` adds a bounded nullable `source` field and requires both a registered receiving NPC and an explicit source/transmission path for `credible_rumor`; source-less saved history is dropped. Dedicated/affected suites and the authoritative clean-LF full PR check pass. The second closure review found no remaining blocker across evidence integrity, bounds, personal-relation isolation, META/CONTINUE freeze, context secrecy, persistence, one-call architecture, or scope.
-- PR #46 is open; Vercel is Ready at `https://lumencia-ac-git-codex-faction-social-consequence-v1-ah-203c.vercel.app`.
+- PR #46 is merged and its reviewed tree is running in production.
+- PR #47 is open from `codex/faction-social-hardening-v1`; initial code checkpoint `0cd75a7` closes PR #46's final-review P2 findings: dense routed-context pressure, stale/unregistered saved observers, and duplicated full-state pipeline/route telemetry.
+- Direct USER ACTION faction mentions now outrank broad context-seed keywords, so an explicitly queried older faction survives the bounded minimum even when every saved faction key appears in routing keywords.
+- Pipeline/route telemetry carries only version, bounded faction keys, and current-turn changed keys. The authoritative reputation values and causal history remain only in `runtime_state.scene_runtime.faction_social`.
+- Exact-head review on `f2689c7` reported P0/P1=0 and two P2s within the hardening scope. Closure `865e47f` derives telemetry changes only from normalized previous-versus-accepted-final state and adds an explicit action > recent-turn text > broad-keyword relevance order for indirect faction follow-ups.
+- Exact-head closure review on `e4d80e0` again reported P0/P1=0 and one P2: multiple retained recent turns shared one Boolean tier. Final allowed closure `049c383` preserves oldest-to-newest recent-turn order and gives newer mentions a higher bounded score below the direct-action tier.
+- Dedicated and affected Context Router, authority-tail, Scene Momentum, and Event Consequence suites pass after both closures. The authoritative clean-LF full `scripts/lumensia-pr-check.mjs origin/main HEAD` passed at `0cd75a7` and must be rerun on the final docs head.
 - Exact Preview acceptance passes: one public forum produced student council `+2` and White Rose `-1` with separate evidence; an unwitnessed private action produced zero faction mutation; CONTINUE retained the exact prior bounded state with all delta arrays empty; META emitted zero faction mutation; an existing faction consequence did not fire after 5 minutes, surfaced/resolved at its 15-minute boundary, and did not repeat on the following turn.
 - Closure Preview verification passes on the deployed `2721ff2` code: the app/API still return 200 under the stricter schema; the served faction module rejects a `credible_rumor` with registered Lucia but no source and accepts/persists the same row only when `source='엘리제→루시아 직접 전달'` is present.
 
@@ -652,8 +659,9 @@ Immediately continue:
 7. bounded off-screen progression — completed in PR #43;
 8. deterministic novelty/repetition suppression — completed in PR #44;
 9. NPC↔NPC Relationship V1 — completed in PR #45;
-10. Faction / Social Consequence V1 — active on `codex/faction-social-consequence-v1`;
-11. multi-system scene orchestration.
+10. Faction / Social Consequence V1 — merged in PR #46; P2 hardening active in PR #47;
+11. Skill Learning V1 after PR #47 acceptance;
+12. multi-system scene orchestration.
 
 Longer roadmap:
 - Adaptive Time Scale V2
@@ -671,8 +679,8 @@ Longer roadmap:
 
 Gameplay roadmap discussed:
 - NPC↔NPC Relationship V1 — completed in PR #45
-- Faction / Social Consequence V1 — active candidate
-- Skill Learning V1
+- Faction / Social Consequence V1 — merged in PR #46; P2 hardening active in PR #47
+- Skill Learning V1 — next after PR #47 acceptance
 - Awakening / Talent Evolution V1
 - Combat Growth V2
 - Living World / Event Director V3 / Long-term Consequence
@@ -682,15 +690,15 @@ Gameplay roadmap discussed:
 # 12. NEXT ACTION — CURRENT START POINT
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
-2. Confirm main contains PR #45 merge `71074ccc7a5fd00f193a6aec8b7a1ff82eae1aab`; do **not** redo completed HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Turn Hook, Event Consequence, Goal Tick, Off-screen Progression, Scene Novelty, or NPC↔NPC Relationship V1 diagnosis.
-3. Continue only Faction / Social Consequence V1 on `codex/faction-social-consequence-v1`. Keep personal relationships, player sovereignty, META/CONTINUE freeze, relevant-context secrecy, bounded Event Consequence behavior, and the one-call architecture unchanged.
-4. Commit and push this review-closure docs checkpoint to PR #46; closure code is `2721ff2`.
-5. Require fresh current-docs-head Safety/Vercel plus Codex P0/P1=0. Revalidate current main, merge-base, no conflict, bounded storage/context, and no new API entrypoint or save migration.
-6. Do not rerun Preview unless code changes; the original targeted cases plus the source-less/source-present rumor gate already pass on the closure deployment.
-7. If all gates pass, report the protected-path PR ready for the user's human merge. Do not start Skill Learning V1 before this acceptance is complete.
+2. Confirm main contains PR #46 merge `6204843e1cf6f45a9386c13b942c100cd6c7377b`; do **not** redo completed HF1/HF2/HF3, 12-case acceptance, Scene Purpose, Scene Exit, Turn Hook, Event Consequence, Goal Tick, Off-screen Progression, Scene Novelty, NPC↔NPC Relationship V1, or Faction Social V1 acceptance.
+3. Continue only the three bounded P2 hardenings on PR #47 / `codex/faction-social-hardening-v1`. Keep gameplay semantics, personal relationships, player sovereignty, META/CONTINUE freeze, relevant-context secrecy, bounded Event Consequence behavior, and the one-call architecture unchanged.
+4. Commit/push this status checkpoint, then require fresh exact-head Safety/Vercel plus Codex P0/P1=0.
+5. Revalidate current main, merge-base, no conflict, dense `.76` context bounds, stale-observer removal, compact telemetry, and no new endpoint/save migration/model call.
+6. Rerun only the affected protected Preview smoke if hosted review or checks identify runtime risk; the PR #46 gameplay acceptance remains authoritative for unchanged gameplay semantics.
+7. If all gates pass, report protected-path PR #47 ready for the user's human merge. Begin Skill Learning V1 only after that acceptance.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #45는 reviewed head `583b762...`에서 main `71074cc...`로 merge됐고 merge tree가 reviewed tree와 정확히 같다. 완료된 HF1/HF2/HF3, 12-case acceptance, Scene Purpose/Exit/Turn Hook, Event Consequence, Goal Tick, Off-screen Progression, Scene Novelty, NPC↔NPC Relationship V1을 다시 분석하지 않는다. 현재 branch는 `codex/faction-social-consequence-v1`이며 활성 범위는 증거가 있는 공개 조직의 PC 집단 평판을 기존 `sceneRuntime`에 bounded 저장하고 관련 컨텍스트에만 전달하는 Faction / Social Consequence V1이다. 새 save root/migration/endpoint/model call, 사적 행동 전파, 미등록 파벌, 개인 관계 자동 변경, 별도 결과 큐는 범위 밖이다. exact diff/second review, clean-LF full check, protected-path hosted review/gates, Exact Preview evidence/persistence/freeze/delayed-response acceptance 뒤 사용자 human merge로 진행한다. Skill Learning V1은 그 전까지 시작하지 않는다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #46은 reviewed head `2843e5b...`에서 main `6204843...`로 merge됐고 merge tree가 reviewed tree와 정확히 같다. 완료된 HF1/HF2/HF3, 12-case acceptance, Scene Purpose/Exit/Turn Hook, Event Consequence, Goal Tick, Off-screen Progression, Scene Novelty, NPC↔NPC Relationship V1, Faction Social V1을 다시 분석하지 않는다. 현재 branch/PR은 `codex/faction-social-hardening-v1` / #47이며 활성 범위는 dense context 최소 블록, 저장된 미등록 observer 제거, compact telemetry의 세 P2 안정화뿐이다. 새 gameplay semantics/save root/migration/endpoint/model call, 개인 관계 변경, 별도 결과 큐는 범위 밖이다. exact diff/second review, clean-LF full check, protected-path hosted review/gates 뒤 사용자 human merge로 진행한다. Skill Learning V1은 그 전까지 시작하지 않는다.`
