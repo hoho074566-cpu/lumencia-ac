@@ -103,19 +103,16 @@ const compact=compactFactionSocialForContext({reputations:{
   white_rose:{reputation:-2,stance:'경계',updated_turn:2,history:Array.from({length:4},(_,index)=>({turn:index,reason:`rose-${index}`,evidence_type:'public_event'}))},
   blue_knights:{reputation:1,stance:'중립',updated_turn:40,history:[]},
   knight_department:{reputation:1,stance:'중립',updated_turn:30,history:[]},
-}},{text:'백장미회가 나를 어떻게 보는지 확인한다.',keywords:['student_council','white_rose','blue_knights','knight_department'],maxFactions:3,historyLimit:2});
+}},{text:'계속 그 평판을 확인한다.',recentText:'직전 턴에는 백장미회 평판을 확인했다.',keywords:['student_council','white_rose','blue_knights','knight_department'],maxFactions:3,historyLimit:2});
 assert.ok(compact.reputations.white_rose,'an explicitly relevant faction must survive context selection even when older');
 assert.equal(Object.keys(compact.reputations).length,3,'routed faction context must stay bounded');
 assert.equal(compact.reputations.white_rose.history.length,2,'routed faction history must keep only the latest causal rows');
 
-const compactTelemetry=compactFactionSocialTelemetry(first,[
-  {faction_key:'white_rose'},
-  {faction_key:'white_rose'},
-  {faction_key:'invented_faction'},
-]);
-assert.deepEqual(compactTelemetry.changed_faction_keys,['white_rose'],'telemetry must retain only unique registered factions changed this turn');
+const compactTelemetry=compactFactionSocialTelemetry(official,first);
+assert.deepEqual(compactTelemetry.changed_faction_keys,['blue_knights'],'telemetry must report only faction rows that differ in the accepted final state');
 assert.ok(compactTelemetry.faction_keys.includes('student_council'),'telemetry may retain bounded faction identifiers');
 assert.doesNotMatch(JSON.stringify(compactTelemetry),/history|reason|observer_npc_keys|reputation/,'telemetry must not duplicate authoritative faction values or causal history');
+assert.deepEqual(compactFactionSocialTelemetry(first,first).changed_faction_keys,[],'rejected or no-op model rows cannot appear as accepted telemetry changes');
 
 const saveState={sceneRuntime:{faction_social:first},relationships:{anastasia:{affinity:7}},npcInnerStates:{lucia:{npc_relationships:{elise:{affinity:9}}}}};
 const personalBefore=JSON.stringify({relationships:saveState.relationships,npcInnerStates:saveState.npcInnerStates});
@@ -175,5 +172,12 @@ assert.ok(minimumFactionSocial.reputations.white_rose,'explicitly relevant facti
 assert.ok(Object.keys(minimumFactionSocial.reputations).length<=2,'mandatory minimum must include at most two relevant factions');
 assert.ok(Object.values(minimumFactionSocial.reputations).every((row)=>row.history.length<=1),'mandatory minimum must include at most one causal row per faction');
 assert.doesNotMatch(JSON.stringify(minimumFactionSocial),/removed_npc/,'routed faction context must remove stale observer keys');
+
+const indirectRouted=routeOpenAIParams(
+  {instructions,input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}'},
+  {incoming:{action:'계속 그 평판을 확인한다.',saveState:{turnNumber:12,world:{location:'academy'},sceneRuntime:{participants:['lucia'],faction_social:denseFactionState},npcInnerStates:{}},recentTurns:[{action:'백장미회의 오래된 평판을 확인한다.',summary:'루시아에게 백장미회의 태도를 물었다.',scene:[]}]},mode:'game'},
+);
+const indirectMinimumText=indirectRouted.params.input.split('===== AUTHORITATIVE SAVE_STATE (ROUTED MINIMUM) =====\n')[1].split('\n\n=====')[0];
+assert.ok(JSON.parse(indirectMinimumText).sceneRuntime.faction_social.reputations.white_rose,'recently discussed older faction must survive an indirect follow-up despite save-derived keywords for every faction');
 
 console.log('PASS Faction / Social Consequence V1 schema, evidence, bounds, routing, freeze, and momentum regressions');
