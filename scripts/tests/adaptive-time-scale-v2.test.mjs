@@ -85,6 +85,11 @@ const todayTerminalClass=classifySceneIntent('내일 계획을 세운 뒤 오늘
 assert.equal(todayTerminalClass.dateQualifiedStart,false,'an earlier next-day planning clause must not date-qualify the terminal today activity');
 assert.equal(todayTerminalClass.scheduledStartOffsetMinutes,60,'the terminal today clock must remain the selected activity start');
 assert.deepEqual(todayTerminalClass.suggestedAdvanceMinutes,[105,180],'the terminal today class must retain same-day wait plus activity timing');
+const topicQualifiedClass=classifySceneIntent('내일은 오전 8시에 기사과 기초 수업을 듣는다.', { location:'기숙사',currentTime:'09:00' });
+assert.equal(topicQualifiedClass.dateQualifiedStart,true,'a future-day topic particle must preserve the date-qualified activity');
+assert.equal(topicQualifiedClass.compression,false,'a topic-qualified next-day class must not receive the immediate class floor');
+assert.deepEqual(topicQualifiedClass.suggestedAdvanceMinutes,[0,1440]);
+assert.equal(classifySceneIntent('모레는 오전 8시에 수업을 듣는다.', { location:'기숙사',currentTime:'09:00' }).dateQualifiedStart,true,'모레는 must remain a future date qualifier');
 assert.equal(classifySceneIntent('정오에 수업을 듣는다.', { location:'강의실',currentTime:'09:00' }).scheduledStartOffsetMinutes,180,'noon must normalize to the same-day 12:00 start');
 assert.equal(classifySceneIntent('자정에 훈련한다.', { location:'훈련장',currentTime:'09:00' }).scheduledStartOffsetMinutes,900,'midnight must normalize to the next upcoming 00:00 start');
 
@@ -98,6 +103,17 @@ assert.notEqual(classifySceneIntent('잠을 자지 않는다.', { location:'개�
 assert.match(buildSceneMomentumDirective({ action:'잠을 잔다.', saveState:{ world:{ date:'1285-03-02', time:'07:20', location:'개인실' } } }), /완료 시간과 advance_minutes를 TIME_GUIDE 240-480 안에 두며/, 'completed sleep must receive explicit hard profile bounds');
 assert.deepEqual(classifySceneIntent('한 시간 잠을 잔다.').suggestedAdvanceMinutes, [60, 60], 'explicit sleep duration must remain exact');
 assert.equal(classifySceneIntent('잠깐 눈을 붙인다.').timeProfile, 'rest', 'a short-rest cue must not become a four-hour sleep floor');
+const scheduledSleep=classifySceneIntent('오늘 오후 10시에 잠을 잔다.', { location:'개인실',currentTime:'09:00' });
+assert.equal(scheduledSleep.scheduledStartOffsetMinutes,780,'same-day scheduled sleep must retain its start offset');
+assert.deepEqual(scheduledSleep.suggestedAdvanceMinutes,[1020,1260],'scheduled sleep timing must include waiting until start plus the sleep range');
+const futureSleep=classifySceneIntent('내일 오전 8시에 잠을 잔다.', { location:'개인실',currentTime:'09:00' });
+assert.equal(futureSleep.dateQualifiedStart,true,'next-day sleep must use future-date handling');
+assert.equal(futureSleep.compression,false,'next-day sleep must not execute on the immediate sleep profile');
+assert.deepEqual(futureSleep.suggestedAdvanceMinutes,[0,1440]);
+const scheduledWait=classifySceneIntent('오늘 오전 10시에 기다린다.', { location:'광장',currentTime:'09:00' });
+assert.equal(scheduledWait.kind,'wait','a clock-qualified wait must still be recognized as committed waiting');
+assert.equal(scheduledWait.scheduledStartOffsetMinutes,60);
+assert.deepEqual(scheduledWait.suggestedAdvanceMinutes,[70,120],'scheduled waiting must include its start offset plus the ordinary wait range');
 
 const withinBuilding = classifySceneIntent('A동 복도로 간다.', { location:'A동 개인실' });
 assert.equal(withinBuilding.timeProfile, 'travel-within-building');

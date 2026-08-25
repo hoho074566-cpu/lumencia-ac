@@ -88,6 +88,11 @@ turn={scene_title:'다음 날 기초 수업',scene:[{kind:'narration',text:'다�
 applySceneMomentumTimeFloor({action:nextDayOwnClassAction,saveState:nextDayOwnClassSave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,1425,'a completed date-qualified class inside the one-turn cap must not rewind to its own start');
 assert.deepEqual(turn.state_delta.skill_experience,[{skill:'검술',amount:1}],'the requested future class effects must survive when its own schedule is excluded');
+const nextDayOwnRest={id:'next-rest',title:'개인 수면',date:'1285-03-02',time:'08:00',kind:'personal',status:'scheduled'};
+const nextDayOwnRestSave={pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'기숙사'},scheduleContext:{due:[],upcoming:[nextDayOwnRest]},scheduledEvents:[nextDayOwnRest]};
+const nextDayOwnRestAction='내일은 오전 8시에 잠을 잔다.';
+const nextDayOwnRestIntent=classifySceneIntent(nextDayOwnRestAction,{location:'기숙사',currentTime:'09:00'});
+assert.equal(nextScheduleBoundaryMinutes(nextDayOwnRestSave,{futureOnly:true,action:nextDayOwnRestAction,intent:nextDayOwnRestIntent}),null,'a date-qualified requested rest must not interrupt itself at its own start');
 turn={scene_title:'기초 수업',scene:[{kind:'narration',text:'10시에 수업이 시작되어 첫 교시를 마쳤다.'}],state_delta:{advance_minutes:60,scheduled_events_complete:['basic-class']},choices:[],event_progress:{event_instance_id:'basic-class'}};
 applySceneMomentumTimeFloor({action:ownClassAction,saveState:ownClassSave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,105,'the requested class must advance through its start and minimum session duration');
@@ -371,6 +376,11 @@ assert.equal(zeroProgressState.eventProgress?.eventInstanceId,priorZeroProgress.
 assert.equal(zeroProgressState.eventProgress?.activeBeat,priorZeroProgress.activeBeat,'rejected zero-minute progress must preserve the authoritative prior active beat');
 assert.deepEqual(zeroProgressState.eventProgress?.completedBeats,priorZeroProgress.completedBeats,'rejected zero-minute progress must preserve authoritative completed beats');
 assert.equal(mergeRoutedEventProgressState(null,{},turn.event_progress).eventProgress,null,'rejected zero-minute progress must not start a new event');
+
+turn={state_delta:{advance_minutes:60,skill_experience:[{skill:'검술',amount:1}]},choices:[]};
+applySceneMomentumTimeFloor({action:'1시간 동안 훈련을 하고 0분 동안 잠을 잔다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,60,'a zero-duration terminal activity must preserve real preceding work');
+assert.deepEqual(turn.state_delta.skill_experience,[{skill:'검술',amount:1}],'preceding training effects must survive when only the terminal duration is zero');
 
 turn={state_delta:{advance_minutes:0},choices:[]};
 applySceneMomentumTimeFloor({action:'쉰다.',saveState:{world:{date:'1285-03-01',time:'10:00'},scheduleContext:{due:[{id:'class'}],upcoming:[]}}},turn,'game');

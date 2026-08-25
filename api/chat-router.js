@@ -429,7 +429,7 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   const hasMeaningfulStop=array(turn?.choices).length>0;
   const current=Math.max(0,Number(turn.state_delta.advance_minutes||0));
   const requestedFloor=Math.min(1440,Math.max(0,Number(intent.minAdvanceMinutes||0)));
-  if(intent.explicitDurationMinutes===0){reconcileExplicitZeroTurn(turn);return intent;}
+  if(intent.explicitDurationMinutes===0&&requestedFloor<=0&&boundaryLookahead<=0&&Number(intent.scheduledStartOffsetMinutes||0)<=0){reconcileExplicitZeroTurn(turn);return intent;}
   if(requestedFloor<=0&&boundaryLookahead<=0)return intent;
   const profileMax=boundaryLookahead>0?boundaryLookahead:Math.min(1440,Math.max(requestedFloor,Number(array(intent.suggestedAdvanceMinutes)[1]||0)));
   const scheduleBoundary=nextScheduleBoundaryMinutes(incoming?.saveState||{},{futureOnly:true,action:incoming?.action||'',intent,registry:CHARACTER_REGISTRY});
