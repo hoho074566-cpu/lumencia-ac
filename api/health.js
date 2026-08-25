@@ -6,7 +6,7 @@ export default async function handler(req, res) {
     terra: process.env.OPENAI_MODEL_TERRA || 'gpt-5.6-terra',
     accessTokenRequired: Boolean(process.env.LUMENSIA_ACCESS_TOKEN),
     promptCacheRetention: '24h',
-    version: '0.8.6',
+    version: '0.8.7',
     appVersion: '1.5.6',
     adapter: '/api/chat-router',
     canonicalCore: '/api/chat',

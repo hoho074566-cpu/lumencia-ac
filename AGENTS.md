@@ -5,7 +5,7 @@ These rules apply to the entire repository and must be followed whenever Codex m
 ## Current Versions
 
 - Stable app: `1.5.4`
-- External API adapter: `0.8.6`
+- External API adapter: `0.8.7`
 - Canonical core server: `0.5.6`
 
 ## Stable Architecture

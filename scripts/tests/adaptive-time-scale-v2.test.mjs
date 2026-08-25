@@ -119,8 +119,8 @@ assert.match(router, /ADAPTIVE_TIME_SCALE_VERSION/);
 assert.match(router, /adaptive_time_scale_v2:true/);
 assert.match(router, /mode!==['"]game['"]/, 'META/AUTO/CONTINUE must stay outside the deterministic time floor');
 assert.match(fs.readFileSync(new URL('../../api/lib/context-router.js', import.meta.url), 'utf8'), /sceneIntent\.compression&&sceneIntent\.minAdvanceMinutes>0\?activityRangeLimitMinutes\(sceneIntent\):0/, 'all compressed timed activities must expose their full valid consequence lookahead');
-assert.match(health, /version:\s*'0\.8\.6'/);
-assert.match(repositoryRules, /External API adapter:\s*`0\.8\.6`/, 'the authoritative release manifest must match the adapter and health surface');
+assert.match(health, /version:\s*'0\.8\.7'/);
+assert.match(repositoryRules, /External API adapter:\s*`0\.8\.7`/, 'the authoritative release manifest must match the adapter and health surface');
 assert.match(health, /adaptiveTimeScale:\s*'V2/);
 assert.equal((router.match(/coreHandler\(/g) || []).length, 1, 'Adaptive Time Scale V2 must preserve one canonical core model call');
 

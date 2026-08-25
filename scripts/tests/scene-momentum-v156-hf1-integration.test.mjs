@@ -44,14 +44,14 @@ assert.match(chat,/scene_purpose_v1:true/);
 assert.match(chat,/scene_exit_condition_v1:true/);
 assert.match(chat,/turn_hook_v1:true/);
 assert.match(chat,/event_consequence_v1:true/);
-assert.match(chat,/const ADAPTER_VERSION = '0\.8\.6'/);
+assert.match(chat,/const ADAPTER_VERSION = '0\.8\.7'/);
 assert.equal((chat.match(/coreHandler\(/g)||[]).length,1,'stable adapter must keep exactly one canonical coreHandler call site');
 assert.match(chat,/const hasMeaningfulStop=array\(turn\?\.choices\)\.length>0/,'time-floor stop evidence must come from an explicit player decision');
 assert.match(chat,/const reachedConsequenceBoundary=/,'manifested delayed results must be recognized as compression boundaries');
 assert.match(chat,/applySceneMomentumTimeFloor\([^;]+consequenceLifecycle\)/,'the selected consequence lifecycle must reach the elapsed-time guard');
 assert.doesNotMatch(chat,/hasMeaningfulStop[^;\n]*importance[^;\n]*critical/i,'critical scene severity must not suppress deterministic elapsed time');
 
-assert.match(health,/version: '0\.8\.6'/);
+assert.match(health,/version: '0\.8\.7'/);
 assert.match(health,/appVersion: '1\.5\.6'/);
 assert.match(health,/sceneMomentum:/);
 assert.match(health,/sceneNovelty:/);

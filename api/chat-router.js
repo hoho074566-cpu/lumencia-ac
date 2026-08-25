@@ -1,5 +1,5 @@
 // LUMENSIA MOBILE V1.5.6 — Stable Router + Event Director V3 + Living World V1 + Adaptive Time Scale V2
-// External API version: 0.8.6
+// External API version: 0.8.7
 // NPC Goal V2 + Relationship Reason V1.
 // One canonical core call per turn, but intercepts the final OpenAI request server-side
 // and replaces full CANON/save/history with a relevance-routed context budget.
@@ -27,7 +27,7 @@ import { deriveWorldResultSurfaceState } from '../lib/world-result-surfacing.js'
 
 export const config = { maxDuration: 300 };
 
-const ADAPTER_VERSION = '0.8.6';
+const ADAPTER_VERSION = '0.8.7';
 const APP_VERSION = '1.5.6';
 const SUPPORTED_MODES = new Set(['game','meta','auto','continue']);
 const ROUTER_CONTEXT = new AsyncLocalStorage();
@@ -347,20 +347,47 @@ function scheduleBoundaryOccurred(turn,row={}){
   if(bellSegments.some(text=>scheduleTimeMentioned(text,row)))return true;
   const title=String(turn?.scene_title||'');return bellSegments.length>0&&/종/.test(title)&&scheduleTimeMentioned(title,row);
 }
-function consequenceNpcKeysForShortening(turn,consequence,routedKeys=[],registry=CHARACTER_REGISTRY){
-  const keys=new Set(array(routedKeys).map(value=>String(value||'').trim()).filter(value=>Object.prototype.hasOwnProperty.call(registry,value)));
+function consequenceEvidenceSegments(turn,consequence){
   const source=[consequence?.event_name,Number(consequence?.secret_level||0)<=2?consequence?.reason:''].filter(Boolean).join(' ').toLowerCase();
   const generic=new Set(['결과','후속','사건','상황','변화','발생','진행','관련','event','result','consequence']);
   const tokens=[...new Set((source.match(/[가-힣a-z0-9_]{2,}/g)||[]).map(token=>token.replace(/(?:에게서|에게|한테|께서|으로|에서|까지|부터|처럼|보다|에는|은|는|이|가|을|를|와|과|도|의)$/u,'')).filter(token=>token.length>=2&&!generic.has(token)))];
-  if(!tokens.length)return[...keys].slice(0,4);
   const segments=[turn?.scene_title,turn?.scene_summary,...array(turn?.scene).map(item=>item?.text)].filter(Boolean).flatMap(value=>String(value).toLowerCase().split(/(?<=[.!?。！？])|\n+/)).map(value=>value.trim()).filter(Boolean);
+  const eventName=String(consequence?.event_name||'').trim().toLowerCase();
+  const matched=segments.filter(segment=>(eventName.length>=3&&segment.includes(eventName))||(tokens.length&&tokens.filter(token=>segment.includes(token)).length>=Math.min(2,Math.max(1,tokens.length))));
+  return{tokens,segments,matched};
+}
+function consequenceNpcEffectsForShortening(turn,consequence,routedKeys=[],registry=CHARACTER_REGISTRY){
+  const routed=new Set(array(routedKeys).map(value=>String(value||'').trim()).filter(value=>Object.prototype.hasOwnProperty.call(registry,value))),keys=new Set(routed),evidence=consequenceEvidenceSegments(turn,consequence);
+  if(!evidence.tokens.length&&!evidence.matched.length)return{npc_keys:[...keys].slice(0,4),npc_state_updates:[],npc_schedule_updates:[],attribution_safe:true};
   const updated=new Set([...array(turn?.state_delta?.npc_state_updates),...array(turn?.state_delta?.npc_schedule_updates)].map(row=>String(row?.npc_key||row?.key||'').trim()).filter(Boolean));
   for(const key of updated){
     if(!Object.prototype.hasOwnProperty.call(registry,key))continue;
     const labels=[key,String(registry[key]||'').trim().toLowerCase()].filter(value=>value.length>=2);
-    if(segments.some(segment=>labels.some(label=>segment.includes(label))&&tokens.some(token=>segment.includes(token))))keys.add(key);
+    if(evidence.matched.some(segment=>labels.some(label=>segment.includes(label))))keys.add(key);
   }
-  return[...keys].slice(0,4);
+  const limitedKeys=new Set([...keys].slice(0,4)),effectSegments=new Map();
+  for(const key of limitedKeys){
+    const labels=[key,String(registry[key]||'').trim().toLowerCase()].filter(value=>value.length>=2),rows=evidence.segments.filter(segment=>labels.some(label=>segment.includes(label))&&(evidence.matched.includes(segment)||(routed.has(key)&&evidence.tokens.some(token=>segment.includes(token)))));
+    effectSegments.set(key,rows);
+  }
+  const stateFields=new Set(['location','status','current_goal','long_term_goal','short_term_goal','obstacle','next_activity','next_location','goal_reason','goal_next_action','last_seen']),preservedState=[];
+  for(const row of array(turn?.state_delta?.npc_state_updates)){
+    const key=String(row?.npc_key||row?.key||'').trim(),segments=effectSegments.get(key)||[];if(!limitedKeys.has(key)||!segments.length)continue;
+    const visible=segments.join(' '),kept={npc_key:key};
+    for(const [field,value] of Object.entries(object(row))){if(!stateFields.has(field)||value==null)continue;const text=String(value).trim().toLowerCase();if(text.length>=2&&visible.includes(text))kept[field]=value;}
+    if(Object.keys(kept).length>1)preservedState.push(kept);
+  }
+  const preservedSchedule=[];
+  for(const row of array(turn?.state_delta?.npc_schedule_updates)){
+    const key=String(row?.npc_key||row?.key||'').trim(),segments=effectSegments.get(key)||[];if(!limitedKeys.has(key)||!segments.length)continue;
+    const visible=segments.join(' '),location=String(row?.location||'').trim().toLowerCase(),activityTokens=(String(row?.activity||'').toLowerCase().match(/[가-힣a-z0-9_]{2,}/g)||[]);
+    if(location.length>=2&&visible.includes(location)&&activityTokens.some(token=>visible.includes(token)))preservedSchedule.push(row);
+  }
+  const relevantCount=[...array(turn?.state_delta?.npc_state_updates),...array(turn?.state_delta?.npc_schedule_updates)].filter(row=>limitedKeys.has(String(row?.npc_key||row?.key||'').trim())).length;
+  return{npc_keys:[...limitedKeys],npc_state_updates:preservedState,npc_schedule_updates:preservedSchedule,attribution_safe:relevantCount===0||preservedState.length+preservedSchedule.length>0};
+}
+function consequenceNpcKeysForShortening(turn,consequence,routedKeys=[],registry=CHARACTER_REGISTRY){
+  return consequenceNpcEffectsForShortening(turn,consequence,routedKeys,registry).npc_keys;
 }
 function reconcileReachedScheduleStart(turn,boundaryIds=new Set()){
   const delta=object(turn?.state_delta);if(!turn?.state_delta||!boundaryIds.size)return;
@@ -369,14 +396,11 @@ function reconcileReachedScheduleStart(turn,boundaryIds=new Set()){
   const completionSignals=[progress.active_beat,progress.activeBeat,progress.status,...array(progress.completed_beats||progress.completedBeats)].map(value=>String(value||'').trim().toLowerCase());
   if(boundaryIds.has(eventId)&&completionSignals.some(value=>terminal.has(value)))turn.event_progress=null;
 }
-function reconcileShortenedTimedTurn(turn,{preserveConsequenceId='',preserveNpcKeys=[]}={}){
+function reconcileShortenedTimedTurn(turn,{preserveConsequenceId='',preserveNpcStateUpdates=[],preserveNpcScheduleUpdates=[]}={}){
   const delta=object(turn?.state_delta);if(!turn?.state_delta)return;
-  const npcKeys=new Set(array(preserveNpcKeys).map(value=>String(value||'').trim().toLowerCase()).filter(Boolean));
-  const preservedNpcState=array(delta.npc_state_updates).filter(row=>npcKeys.has(String(row?.npc_key||row?.key||'').trim().toLowerCase()));
-  const preservedNpcSchedule=array(delta.npc_schedule_updates).filter(row=>npcKeys.has(String(row?.npc_key||row?.key||'').trim().toLowerCase()));
   for(const field of ['active_events_add','active_events_remove','completed_events_add','scheduled_events_add','scheduled_events_remove','scheduled_events_complete'])delta[field]=[];
-  delta.npc_state_updates=preservedNpcState;
-  delta.npc_schedule_updates=preservedNpcSchedule;
+  delta.npc_state_updates=array(preserveNpcStateUpdates);
+  delta.npc_schedule_updates=array(preserveNpcScheduleUpdates);
   turn.event_progress=null;
   const consequenceId=String(preserveConsequenceId||'').trim();
   if(consequenceId){
@@ -385,12 +409,29 @@ function reconcileShortenedTimedTurn(turn,{preserveConsequenceId='',preserveNpcK
     for(const field of ['pc_knowledge_add','memories_add','hooks_add','hooks_update','delayed_consequences_add'])delta[field]=[];
   }
 }
+function timedActionCompletionEvidence(turn,intent={}){
+  const visible=[turn?.scene_title,turn?.scene_summary,...array(turn?.scene).map(item=>item?.text)].filter(Boolean).join(' '),kind=String(intent?.kind||'');if(!visible)return false;
+  const patterns={
+    downtime:/(?:잠에서\s*깨어|눈을\s*떴|잠을\s*(?:푹\s*)?잤|수면을\s*마쳤|휴식을\s*마쳤|충분히\s*쉬었)/,
+    wait:/(?:기다림을\s*마쳤|대기를\s*마쳤|요청한\s*시간이\s*(?:흘렀|지났)|시간을\s*보낸\s*뒤)/,
+    meal:/(?:식사를\s*(?:마쳤|끝냈)|밥을\s*다\s*먹었|식사\s*후)/,
+    training:/(?:훈련|연습|수련|단련)(?:을|를)?\s*(?:마쳤|끝냈|완료했|마무리했)/,
+    'class-attendance':/(?:수업|강의|세미나|실습)(?:을|를)?\s*(?:마쳤|끝냈|완료했|수료했)|(?:수업|강의|세미나|실습)이\s*(?:끝났|종료되었|종료됐다)/,
+    dialogue:/(?:대화|이야기|상담|논의)(?:를)?\s*(?:마쳤|끝냈|마무리했)|(?:대화|이야기|상담|논의)가\s*(?:끝났|마무리되었)/,
+    travel:/(?:목적지|행선지|[^\s]{2,24})(?:에|로)\s*(?:도착했|도착했다|도착했다가|닿았|다다랐)/,
+    explore:/(?:탐색|구경|둘러보기|순회)(?:를)?\s*(?:마쳤|끝냈|마무리했)/,
+    'exit-exterior':/(?:건물|기숙사|방)\s*밖(?:에|으로)\s*(?:나왔|도착했)/,
+  };
+  return Boolean(patterns[kind]?.test(visible));
+}
 function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecycle=null){
   const intent=classifySceneIntent(incoming?.action||'',{location:incoming?.saveState?.world?.location||'',currentTime:incoming?.saveState?.world?.time||''});
-  if(mode!=='game'||!turn?.state_delta||!intent.compression||intent.minAdvanceMinutes<=0)return intent;
+  if(mode!=='game'||!turn?.state_delta||!intent.compression)return intent;
   const hasMeaningfulStop=array(turn?.choices).length>0;
   const current=Math.max(0,Number(turn.state_delta.advance_minutes||0));
   const requestedFloor=Math.min(1440,Math.max(0,Number(intent.minAdvanceMinutes||0)));
+  if(intent.explicitDurationMinutes===0){if(current>0)reconcileShortenedTimedTurn(turn);turn.state_delta.advance_minutes=0;return intent;}
+  if(requestedFloor<=0)return intent;
   const profileMax=Math.min(1440,Math.max(requestedFloor,Number(array(intent.suggestedAdvanceMinutes)[1]||0)));
   const scheduleBoundary=nextScheduleBoundaryMinutes(incoming?.saveState||{},{futureOnly:true,action:incoming?.action||'',intent});
   const consequenceBoundary=consequenceLifecycle?.selected_id?minutesUntilEventConsequence(incoming?.saveState||{},consequenceLifecycle.selected_id):null;
@@ -404,13 +445,15 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   const crossedScheduledBoundary=Boolean(scheduleBoundary!=null&&scheduleBoundary===boundary&&scheduleBoundary<=profileMax&&current>scheduleBoundary);
   const surfacedScheduledBoundary=Boolean(scheduleBoundary!=null&&scheduleBoundary===boundary&&scheduleBoundary<=profileMax&&(structuredBoundary||visibleBoundary));
   const reachedScheduledBoundary=surfacedScheduledBoundary||crossedScheduledBoundary;
-  const reachedConsequenceBoundary=Boolean(consequenceBoundary!=null&&consequenceBoundary===boundary&&boundary<=profileMax&&consequenceLifecycle?.status==='resolved');
+  const reachedConsequenceBoundary=Boolean(consequenceBoundary!=null&&consequenceBoundary===boundary&&boundary<=profileMax&&consequenceLifecycle?.status==='resolved'&&consequenceLifecycle?.attribution_safe!==false);
   const previousEventId=String(incoming?.saveState?.sceneRuntime?.eventProgress?.eventInstanceId||incoming?.saveState?.sceneRuntime?.eventProgress?.event_instance_id||'').trim().toLowerCase();
   const structuredInterruption=Boolean(eventId.startsWith('director:')&&eventId!==previousEventId&&!structuredBoundary&&eventId!==String(consequenceLifecycle?.selected_id||'').trim().toLowerCase());
+  const completedBeforeChoice=!hasMeaningfulStop||timedActionCompletionEvidence(turn,intent);
   let applied=current;
   if(reachedScheduledBoundary||reachedConsequenceBoundary)applied=boundary;
-  else if(!structuredInterruption&&(!hasMeaningfulStop||current>0))applied=Math.min(profileMax,Math.max(current,boundedFloor));
-  if(applied<current)reconcileShortenedTimedTurn(turn,{preserveConsequenceId:reachedConsequenceBoundary?consequenceLifecycle?.selected_id:'',preserveNpcKeys:reachedConsequenceBoundary?consequenceLifecycle?.npc_keys:[]});
+  else if(!structuredInterruption&&completedBeforeChoice)applied=Math.min(profileMax,Math.max(current,boundedFloor));
+  if(applied<current&&consequenceLifecycle?.status==='resolved'&&consequenceLifecycle?.attribution_safe===false){const id=String(consequenceLifecycle.selected_id||'');turn.state_delta.hooks_update=[...array(turn.state_delta.hooks_update).filter(row=>String(row?.id||'')!==id),{id,status:'open',reason:'발현 시각 도달; NPC 경계 효과 귀속 대기'}].slice(0,8);consequenceLifecycle.status='open';consequenceLifecycle.evidence='ambiguous-npc-effect';}
+  if(applied<current)reconcileShortenedTimedTurn(turn,{preserveConsequenceId:reachedConsequenceBoundary||consequenceLifecycle?.evidence==='ambiguous-npc-effect'?consequenceLifecycle?.selected_id:'',preserveNpcStateUpdates:reachedConsequenceBoundary?consequenceLifecycle?.npc_state_updates:[],preserveNpcScheduleUpdates:reachedConsequenceBoundary?consequenceLifecycle?.npc_schedule_updates:[]});
   else if(reachedScheduledBoundary)reconcileReachedScheduleStart(turn,boundaryIds);
   turn.state_delta.advance_minutes=applied;
   return intent;
@@ -730,7 +773,8 @@ export default async function handler(req,res){
     }
     const consequenceId=String(telemetry?.event_director_v2?.event_consequence_id||'');
     const selectedConsequence=findEventConsequence(incoming.saveState,consequenceId);
-    const consequenceLifecycle={...reconcileEventConsequenceLifecycle({saveState:incoming.saveState,turn:data.turn,selectedConsequence}),npc_keys:consequenceNpcKeysForShortening(data.turn,selectedConsequence,telemetry?.event_director_v2?.event_consequence_npc_keys)};
+    const consequenceEffects=consequenceNpcEffectsForShortening(data.turn,selectedConsequence,telemetry?.event_director_v2?.event_consequence_npc_keys),consequenceLifecycleBase=reconcileEventConsequenceLifecycle({saveState:incoming.saveState,turn:data.turn,selectedConsequence});
+    const consequenceLifecycle={...consequenceLifecycleBase,...consequenceEffects};
     const sceneIntent=applySceneMomentumTimeFloor({...incoming0,saveState:incoming.saveState,action:incoming0.action||''},data.turn,mode,consequenceLifecycle);
     const sceneRuntime=localSceneRuntime({...incoming0,saveState:incoming.saveState,action:incoming0.action||''},data.turn,telemetry?.event_director_v2,mode,telemetry?.scene_orchestration);
     const npcUpdates=incoming0.qualityPipeline===false?{}:localNpcUpdates(incoming0,data.turn);
