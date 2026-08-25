@@ -64,6 +64,15 @@ const explicitMeal = classifySceneIntent('한 시간 동안 점심 식사를 한
 assert.equal(explicitMeal.explicitDurationMinutes, 60);
 assert.deepEqual(explicitMeal.suggestedAdvanceMinutes, [60, 60]);
 assert.deepEqual(classifySceneIntent('점심을 한 시간 동안 먹는다.', { location:'식당' }).suggestedAdvanceMinutes, [60, 60], 'object-duration-verb meal order must honor the explicit duration');
+for(const food of ['빵','스테이크']){
+  const timedFood=classifySceneIntent(`30분 동안 ${food}을 먹는다.`,{location:'식당'});
+  assert.equal(timedFood.kind,'meal',`a timed food-object action must retain the meal profile: ${food}`);
+  assert.equal(timedFood.explicitDurationMinutes,30,`a timed food-object action must retain its declared duration: ${food}`);
+  assert.deepEqual(timedFood.suggestedAdvanceMinutes,[30,30],`a timed food-object action must advance exactly as declared: ${food}`);
+}
+assert.deepEqual(classifySceneIntent('빵을 30분 동안 먹는다.',{location:'식당'}).suggestedAdvanceMinutes,[30,30],'object-first timed eating must retain the same exact meal duration');
+assert.equal(classifySceneIntent('에밀리가 30분 동안 빵을 먹는다.',{location:'식당'}).kind,'generic','a timed food object must not execute a third-party meal as the PC');
+assert.equal(classifySceneIntent('30분 후에 빵을 먹는다.',{location:'식당'}).kind,'generic','a future eating start without a declared eating duration must not become a timed meal');
 
 const training = classifySceneIntent('검술을 훈련한다.', { location:'훈련장' });
 assert.equal(training.kind, 'training');
@@ -84,6 +93,11 @@ assert.equal(sharedHourRange.explicitDurationMinutes,null,'a shared-unit hour ra
 assert.deepEqual(sharedHourRange.explicitDurationRangeMinutes,[60,120],'shared-unit hour shorthand must retain both endpoints');
 assert.deepEqual(sharedHourRange.suggestedAdvanceMinutes,[60,120],'shared-unit hour shorthand must bound the time guide');
 assert.deepEqual(classifySceneIntent('30~60분 동안 기다린다.').suggestedAdvanceMinutes,[30,60],'shared-unit minute shorthand must retain both endpoints');
+const zeroMinimumWait=classifySceneIntent('0분에서 10분 동안 기다린다.');
+assert.equal(zeroMinimumWait.kind,'wait','a zero-minimum explicit range must retain its timed intent');
+assert.deepEqual(zeroMinimumWait.explicitDurationRangeMinutes,[0,10],'a zero-minimum explicit range must retain its positive lookahead');
+assert.deepEqual(zeroMinimumWait.suggestedAdvanceMinutes,[0,10],'a zero-minimum wait may compress anywhere inside its declared range');
+assert.equal(activityRangeLimitMinutes(zeroMinimumWait),10,'consequence lookahead must use the positive range maximum even when its floor is zero');
 assert.deepEqual(classifySceneIntent('문 앞에서는 기다리지 않고 로비에서 1시간 동안 기다린다.').suggestedAdvanceMinutes,[60,60],'a negated earlier wait must not cancel a committed terminal wait');
 assert.deepEqual(classifySceneIntent('훈련을 1시간부터 2시간까지 한다.').suggestedAdvanceMinutes,[60,120],'object-marked from/to duration ranges must remain bounded ranges');
 const rangedFutureStart=classifySceneIntent('1시간에서 2시간 후에 훈련한다.',{currentTime:'09:00'});
@@ -98,6 +112,10 @@ const compoundExplicitSleep=classifySceneIntent('1시간 동안 훈련을 하고
 assert.equal(compoundExplicitSleep.explicitDurationMinutes,480,'the terminal explicit sleep duration must remain separately identifiable');
 assert.equal(compoundExplicitSleep.precedingActivityMinutes,60,'the committed preceding training duration must be retained');
 assert.deepEqual(compoundExplicitSleep.suggestedAdvanceMinutes,[540,540],'compound explicit activities must use their full declared total duration');
+const scheduledPrecedingClassSleep=classifySceneIntent('오전 10시에 1시간 동안 수업을 듣고 8시간 동안 잠을 잔다.',{currentTime:'08:00'});
+assert.equal(scheduledPrecedingClassSleep.precedingActivityMinutes,180,'a preceding scheduled class must include the wait until its fixed start plus its duration');
+assert.deepEqual(scheduledPrecedingClassSleep.suggestedAdvanceMinutes,[660,660],'terminal sleep timing must include the preceding scheduled start delay');
+assert.deepEqual(classifySceneIntent('2시간 후에 1시간 동안 수업을 듣고 8시간 동안 잠을 잔다.').suggestedAdvanceMinutes,[660,660],'a relative start delay on a preceding clause must contribute to the full compound timeline');
 const untimedCompoundSleep=classifySceneIntent('훈련하고 8시간 동안 잠을 잔다.');
 assert.deepEqual(untimedCompoundSleep.precedingActivityRangeMinutes,[30,120],'an untimed preceding training activity must retain its bounded profile');
 assert.deepEqual(untimedCompoundSleep.suggestedAdvanceMinutes,[510,600],'terminal explicit sleep must include the natural range of an untimed preceding training action');
@@ -149,6 +167,11 @@ assert.deepEqual(classifySceneIntent('자정부터 오전 2시까지 잠을 잔�
 const pastClockInterval=classifySceneIntent('오늘 10시부터 11시까지 수업을 듣는다.',{location:'강의실',currentTime:'11:30'});
 assert.equal(pastClockInterval.explicitDurationMinutes,0,'an entirely past clock interval must be recognized as having no remaining duration');
 assert.deepEqual(pastClockInterval.suggestedAdvanceMinutes,[0,0],'an entirely past interval must not replay from the current moment');
+const elapsedTodayTraining=classifySceneIntent('오늘 오전 1시에 훈련한다.',{location:'훈련장',currentTime:'09:00'});
+assert.equal(elapsedTodayTraining.kind,'decision-sensitive','an explicitly elapsed today start must not execute as an immediate activity');
+assert.equal(elapsedTodayTraining.timeProfile,'elapsed-scheduled-start','an elapsed today start must retain its rejection reason');
+assert.deepEqual(elapsedTodayTraining.suggestedAdvanceMinutes,[0,0],'rejecting an elapsed today start must preserve the current moment');
+assert.match(buildSceneMomentumDirective({action:'오늘 오전 1시에 훈련한다.',saveState:{world:{date:'1285-03-01',time:'09:00',location:'훈련장'}}}),/ELAPSED START 규칙/,'the model must be told not to replay or roll over an elapsed today start');
 assert.deepEqual(classifySceneIntent('22시부터 2시까지 잠을 잔다.', { location:'개인실',currentTime:'20:00' }).suggestedAdvanceMinutes,[360,360],'an unmarked 24-hour interval ending before its start must cross midnight');
 assert.deepEqual(classifySceneIntent('오후 11시부터 자정까지 잠을 잔다.', { location:'개인실',currentTime:'22:00' }).suggestedAdvanceMinutes,[120,120],'a named midnight endpoint must produce an exact interval plus its start wait');
 assert.deepEqual(classifySceneIntent('자정부터 오전 2시까지 잠을 잔다.', { location:'개인실',currentTime:'22:00' }).suggestedAdvanceMinutes,[240,240],'a named midnight start must remain available to interval parsing');
@@ -256,6 +279,11 @@ assert.equal(twoDayTravel.explicitDurationMinutes,2880,'multi-day travel must re
 assert.deepEqual(twoDayTravel.suggestedAdvanceMinutes,[1440,1440],'multi-day travel must stop at the one-turn cap');
 assert.equal(twoDayTravel.turnLimitTruncated,true,'multi-day travel must remain incomplete at the cap');
 assert.match(buildSceneMomentumDirective({action:'2일 동안 수도로 간다.',saveState:{world:{date:'1285-03-01',time:'09:00',location:'중앙광장'}}}),/아직 끝나지 않은 활동으로 남긴다/,'multi-day travel must fail closed instead of completing early');
+assert.equal(classifySceneIntent('3월 1일에 훈련한다.').explicitDurationMinutes,null,'a calendar date must not become a one-day activity duration');
+assert.deepEqual(classifySceneIntent('3월 1일에 훈련한다.').suggestedAdvanceMinutes,[30,120],'a calendar-dated training mention must retain the ordinary training profile');
+assert.equal(classifySceneIntent('1일차 훈련을 한다.').explicitDurationMinutes,null,'an ordinal day label must not become an activity duration');
+assert.deepEqual(classifySceneIntent('1일차 훈련을 한다.').suggestedAdvanceMinutes,[30,120],'an ordinal training label must retain the ordinary profile');
+assert.equal(classifySceneIntent('1~2일차 훈련을 한다.').explicitDurationRangeMinutes,null,'an ordinal day range label must not become an activity duration range');
 const partlyCappedRange=classifySceneIntent('12~30시간 동안 잠을 잔다.');
 assert.deepEqual(partlyCappedRange.explicitDurationRangeMinutes,[720,1800],'the original explicit range must remain available for intent telemetry');
 assert.equal(partlyCappedRange.minAdvanceMinutes,720,'an in-cap lower endpoint must remain a valid completion floor');

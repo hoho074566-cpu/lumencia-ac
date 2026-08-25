@@ -143,6 +143,12 @@ test('an explicit wait routes to its consequence boundary and an earlier fixed s
   assert.equal(waiting.telemetry.event_director_v2.event_consequence_trigger_minutes,20);
   assert.match(waiting.params.input,/TRIGGER_IN=20min/);
 
+  const zeroRangeSave={...waitingSave,world:{...waitingSave.world,time:'09:35'}};
+  const zeroRange=routeOpenAIParams({instructions,input},{mode:'game',incoming:{action:'0분에서 10분 동안 기다린다.',saveState:zeroRangeSave,recentTurns:[]}});
+  assert.equal(zeroRange.telemetry.event_director_v2.result,'EVENT_CONSEQUENCE_DUE','a consequence inside a zero-minimum positive range must route before the model call');
+  assert.equal(zeroRange.telemetry.event_director_v2.event_consequence_trigger_minutes,5,'zero-minimum range lookahead must retain the positive upper endpoint');
+  assert.match(zeroRange.params.input,/TRIGGER_IN=5min/,'the routed consequence must preserve its exact trigger inside the zero-minimum range');
+
   for(const action of ['검술을 훈련한다.','기초 수업에 참석한다.']){
     const timed=routeOpenAIParams({instructions,input},{mode:'game',incoming:{action,saveState:waitingSave,recentTurns:[]}});
     assert.equal(timed.telemetry.event_director_v2.result,'EVENT_CONSEQUENCE_DUE',`${action}: a consequence due before the activity minimum must route before the model call`);
