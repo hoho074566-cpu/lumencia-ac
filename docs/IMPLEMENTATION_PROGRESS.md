@@ -7,7 +7,7 @@ Narrative Engine continuation — Adaptive Time Scale V2 action-sensitive elapse
 - Repo: `hoho074566-cpu/lumencia-ac`
 - Main: `1018d8c27c451dc122982fb14bf7d3e3902c70ca` (PR #53 merge).
 - Working branch: `codex/adaptive-time-scale-v2`, based directly on that verified merge.
-- Latest reviewed/Preview-tested Adaptive Time Scale V2 head: `8f5051cda8dd428dc6d9cdedb137a9038bcc7c9b`; its fresh-review correction is locally complete and pending commit/push.
+- Latest hosted Adaptive Time Scale V2 head: `aa48223540c58904389a92bf3784240839149235`; Safety #400, Vercel, current-base mergeability, and full local regression pass, while fresh review is pending. Its first affected Preview clock-start case found one remaining P1 whose bounded correction is locally complete and pending commit/push.
 - PR #53 is **merged** from final reviewed/accepted head `eae16c036c51767f2059b86cd5f0ef077764a3c8`; merge and reviewed-head trees both equal `e2a4b99a89640a553dfbf0fa7f1748a201c039f3`.
 - PR #53 post-merge main Vercel, production `/api/health` on app `1.5.6` / adapter `0.8.5`, and merged-main clean-LF full regression pass.
 - Adaptive Time Scale V2 extends the existing deterministic Scene Momentum intent layer with dialogue `2–10`, meal `20–45`, training `30–120`, class `45–120`, sleep `240–480`, within-building travel `2–8`, campus travel `5–20`, and regional travel `15–60` minute guides.
@@ -73,6 +73,7 @@ Narrative Engine continuation — Adaptive Time Scale V2 action-sensitive elapse
 - Prior-head Codex P1 on object-duration-verb order is closed at code checkpoint `4a2533a7a08d7b3e7348e02ae21e7011d0f6a089`: `점심을 한 시간 동안 먹는다` and `수업을 두 시간 동안 듣는다` now parse as exact `60`/`120` minute activity durations. The P2 dialogue/regional/building-anchor suggestions remain non-blocking and outside this correction. Focused plus full clean-LF regression pass.
 - Exact head `8f5051c...` passed Safety #399 and Vercel Ready. Its affected-first and full Preview matrix passed the schedule boundary, plain/compound sleep, dialogue/meal/training/class/travel, explicit duration, direct/historical question, CONTINUE, META, and within-building cases. AUTO remained a model-owned world-flow/no-floor path rather than inheriting the preceding sleep profile.
 - Fresh review `PRR_kwDOT8LCAs8AAAABKyN9EQ` on `8f5051c...` produced four P1s. The local correction excludes `10시 30분에` clock components while retaining a separate real duration, clamps ranged activities when their returned time crosses a PC-relevant schedule, extends consequence lookahead to compressed timed activities, and clears future schedule/event/NPC/memory state when the adapter shortens model time while preserving action-local location/resource/growth effects. Focused/affected suites, syntax, `git diff --check`, and full `scripts/lumensia-pr-check.mjs` pass.
+- Exact head `aa48223...` passed Safety #400, Vercel Ready, current-base/mergeability checks, and full local regression. The first affected Preview rerun proved that merely masking clock minutes was insufficient: `07:40 → 10시 30분에 기초 수업을 듣는다` narrated a 10:30 start while the clock was capped at `09:40`. The local next correction treats a future clock as a start offset and adds the activity duration after it; the reproduction now has a `215–290` total guide and deterministic `215` minimum. Past ambiguous clocks do not roll to the next day. Focused/affected suites, syntax, `git diff --check`, and full `scripts/lumensia-pr-check.mjs` pass.
 
 ## Event Director V3 — Merged in PR #53
 - Final reviewed/accepted head `eae16c036c51767f2059b86cd5f0ef077764a3c8` merged as `1018d8c27c451dc122982fb14bf7d3e3902c70ca`; reviewed and merged trees are identical.
@@ -461,9 +462,9 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only.
 
 ## NEXT ACTION
-1. Commit and push the fresh-review P1 correction, then confirm the new exact head is current against main `1018d8c...`.
+1. Commit and push the future-clock-start correction on top of hosted head `aa48223...`, then confirm the new exact head is current against main `1018d8c...`.
 2. Require the new exact-head GitHub Safety Gate, Vercel Ready, Merge Readiness/current mergeability, and a fresh exact-head Codex review with P0/P1=0.
-3. On the new Exact Preview, rerun clock masking, ranged schedule cap, timed consequence routing, and shortened-time reconciliation first; rerun the full matrix only if a shared-path regression appears.
+3. On the new Exact Preview, rerun the exact `07:40 → 10시 30분 수업` clock-start case first, then ranged schedule cap and ordinary sleep/shortening shared paths. Deterministic tests remain authoritative for due-consequence routing; rerun the full matrix only if a shared-path regression appears.
 4. When deterministic, hosted, review, and Preview gates all pass, report the protected-path PR ready for human merge. Codex must not merge it.
 
 ## Stop Record
@@ -510,4 +511,4 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed: PR #51 final reviewed/accepted head `68c9e84...` merged as `2ce8d0b...`; trees are identical, production health is green, and merged-main clean-LF full regression passes.
 - Completed: Living World V1 final reviewed/accepted head `10de71a...` merged in PR #52 as `4bbe3fb...`; reviewed and merged trees are identical, production health is green, and merged-main clean-LF regression passes.
 - Completed: Event Director V3 final reviewed/accepted head `eae16c0...` merged in PR #53 as `1018d8c...`; reviewed and merged trees are identical, production health is green, and merged-main clean-LF regression passes.
-- Current candidate: Adaptive Time Scale V2 in PR #54 on `codex/adaptive-time-scale-v2`; exact head `8f5051c...` passed hosted gates and full Preview ranges but its fresh review produced four P1 edge cases. The local correction and full regression pass; commit/push, a new exact-head hosted/fresh-review cycle, and affected Preview reruns remain.
+- Current candidate: Adaptive Time Scale V2 in PR #54 on `codex/adaptive-time-scale-v2`; hosted head `aa48223...` passed Safety #400/Vercel/current-base mergeability, but its first affected clock-start Preview case exposed a 10:30 narration / 09:40 clock mismatch. The bounded start-offset correction and full regression pass locally; commit/push, a new exact-head hosted/fresh-review cycle, and affected Preview reruns remain.

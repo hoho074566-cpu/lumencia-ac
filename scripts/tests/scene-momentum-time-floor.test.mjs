@@ -121,6 +121,10 @@ turn={state_delta:{advance_minutes:960},choices:[]};
 applySceneMomentumTimeFloor({action:'잠을 잔다.',saveState:{world:{date:'1285-03-01',time:'15:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,480,'a completed sleep action must not jump to a convenient next morning beyond its profile maximum');
 
+turn={scene_title:'기초 수업의 첫 교시',scene:[{kind:'narration',text:'10시 30분에 기초 수업이 시작되었다.'}],state_delta:{advance_minutes:120},choices:[]};
+applySceneMomentumTimeFloor({action:'10시 30분에 기초 수업을 듣는다.',saveState:{world:{date:'1285-03-02',time:'07:40'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,215,'a future class start plus its minimum duration must not be clamped to the unscheduled class maximum');
+
 turn={
   event_progress:{event_instance_id:'next-morning',active_beat:'complete',completed_beats:['complete']},choices:[],
   state_delta:{advance_minutes:960,new_location:'여관',fatigue_delta:-3,stat_progress:[{stat:'신체',amount:1}],active_events_add:['next-morning'],active_events_remove:['night'],completed_events_add:['next-morning'],scheduled_events_add:[{id:'future'}],scheduled_events_complete:['morning-class'],npc_state_updates:[{npc_key:'artemis',last_seen:'1285-03-02 07:20'}],pc_knowledge_add:['다음 날 결과'],memories_add:[{fact:'다음 날 결과'}],hooks_add:[{id:'future'}],hooks_update:[{id:'future',status:'resolved'}],delayed_consequences_add:[{event_name:'future'}]},

@@ -51,6 +51,14 @@ assert.deepEqual(explicitClass.suggestedAdvanceMinutes, [120, 120]);
 assert.deepEqual(classifySceneIntent('수업을 두 시간 동안 듣는다.', { location:'강의실' }).suggestedAdvanceMinutes, [120, 120], 'object-duration-verb class order must honor the explicit duration');
 assert.equal(classifySceneIntent('10시 30분에 수업을 듣는다.', { location:'강의실' }).explicitDurationMinutes, null, 'a clock minute component must not become an activity duration');
 assert.deepEqual(classifySceneIntent('10시 30분에 수업을 한 시간 동안 듣는다.', { location:'강의실' }).suggestedAdvanceMinutes, [60, 60], 'masking a clock must preserve a separate explicit activity duration');
+const futureClockClass=classifySceneIntent('10시 30분에 수업을 듣는다.', { location:'여관',currentTime:'07:40' });
+assert.equal(futureClockClass.scheduledStartOffsetMinutes,170,'a future clock must become a start offset, not a duration');
+assert.deepEqual(futureClockClass.suggestedAdvanceMinutes,[215,290],'scheduled activity time must include waiting until the start plus the class duration');
+assert.deepEqual(classifySceneIntent('10시 30분에 수업을 한 시간 동안 듣는다.', { location:'여관',currentTime:'07:40' }).suggestedAdvanceMinutes,[230,230],'a separate explicit duration must be added after the scheduled start');
+assert.deepEqual(classifySceneIntent('10:30에 수업을 듣는다.', { location:'여관',currentTime:'07:40' }).suggestedAdvanceMinutes,[215,290],'colon clock notation must use the same scheduled-start semantics');
+assert.equal(classifySceneIntent('10시 30분부터 11시 30분까지 수업을 듣는다.', { location:'여관',currentTime:'07:40' }).explicitDurationMinutes,null,'both clock minute components must stay out of duration parsing');
+assert.equal(classifySceneIntent('10시 30분에 수업을 듣는다.', { location:'강의실',currentTime:'12:00' }).scheduledStartOffsetMinutes,null,'an already-past ambiguous clock must not silently roll into the next day');
+assert.equal(classifySceneIntent('내일 10시 30분에 수업을 듣는다.', { location:'여관',currentTime:'07:40' }).scheduledStartOffsetMinutes,null,'a next-day clock must not be collapsed onto today');
 
 const sleep = classifySceneIntent('잠을 잔다.', { location:'개인실' });
 assert.equal(sleep.kind, 'downtime');

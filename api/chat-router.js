@@ -343,7 +343,7 @@ function reconcileShortenedTimedTurn(turn,{preserveConsequenceId=''}={}){
   }
 }
 function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecycle=null){
-  const intent=classifySceneIntent(incoming?.action||'',{location:incoming?.saveState?.world?.location||''});
+  const intent=classifySceneIntent(incoming?.action||'',{location:incoming?.saveState?.world?.location||'',currentTime:incoming?.saveState?.world?.time||''});
   if(mode!=='game'||!turn?.state_delta||!intent.compression||intent.minAdvanceMinutes<=0)return intent;
   const hasMeaningfulStop=array(turn?.choices).length>0;
   const current=Math.max(0,Number(turn.state_delta.advance_minutes||0));
