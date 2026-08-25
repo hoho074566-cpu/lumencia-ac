@@ -62,6 +62,7 @@ assert.deepEqual(classifySceneIntent('10시 30분에 수업을 한 시간 동안
 const compoundClockClass=classifySceneIntent('9시에 아침을 먹고 10시에 수업을 듣는다.', { location:'여관',currentTime:'08:00' });
 assert.equal(compoundClockClass.scheduledStartOffsetMinutes,120,'a terminal class must bind to its own clock rather than an earlier compound meal clock');
 assert.deepEqual(compoundClockClass.suggestedAdvanceMinutes,[165,240],'the terminal activity clock offset must be added to the class duration range');
+assert.equal(classifySceneIntent('내일 9시에 아침을 먹고 10시에 수업을 듣는다.', { location:'여관',currentTime:'08:00' }).scheduledStartOffsetMinutes,null,'scoping to the terminal activity must not collapse an inherited next-day compound clock onto today');
 assert.deepEqual(classifySceneIntent('10:30에 수업을 듣는다.', { location:'여관',currentTime:'07:40' }).suggestedAdvanceMinutes,[215,290],'colon clock notation must use the same scheduled-start semantics');
 assert.equal(classifySceneIntent('10시 30분부터 11시 30분까지 수업을 듣는다.', { location:'여관',currentTime:'07:40' }).explicitDurationMinutes,null,'both clock minute components must stay out of duration parsing');
 assert.equal(classifySceneIntent('10시 30분에 수업을 듣는다.', { location:'강의실',currentTime:'12:00' }).scheduledStartOffsetMinutes,null,'an already-past ambiguous clock must not silently roll into the next day');
