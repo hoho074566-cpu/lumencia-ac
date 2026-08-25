@@ -13,19 +13,17 @@ Repository: `hoho074566-cpu/lumencia-ac`
 # 0. SESSION STOP CHECKPOINT — 가장 먼저 읽을 것
 
 ## Live state immediately before this handover update
-- Branch: `codex/awakening-talent-evolution-v1`.
-- Base/current main: `93f5644314dada6c9de50f5038bf479f00b7da48` (PR #49 merge).
-- PR #49 is **merged** from exact reviewed head `ff500841487f804fab6031d8bad62c745119cbc2`. Final-head Safety/Vercel passed, fresh Codex found no major issue, and Lumensia Merge Readiness reported current P0/P1=0 with no conflict.
-- Merge `93f5644...` and reviewed head `ff50084...` share tree `48f7a3e28dc7bdc27e31156696a56cd540bcc15f`; no unexpected merge delta exists. Main Vercel, production `/api/health`, and the merged-main authoritative clean-LF full check pass.
-- PR #50 is open from `codex/awakening-talent-evolution-v1`. Initial exact code head: `966da63985b78f3d1dfcd9e3bc01aa3e120ee421`.
-- Awakening / Talent Evolution V1 now turns the existing declared growth fields into bounded runtime behavior: evidence-gated Trait/Authority candidates, distinct causal milestones, thresholded promotion, and mythic-source-only one-step talent evolution.
-- Candidate and talent changes require a player-action or pre-turn-state anchor; model-authored rare prose alone cannot authenticate growth. Duplicate causes, same-name Trait-to-Authority conversion, drifting candidate definitions, unbounded limitations, ordinary training, and oversized talent increases are rejected.
-- META/AUTO/CONTINUE remain frozen; accepted changes are replay-idempotent, visible in the PC UI, and counted as growth State Delta. No save migration, new save root, endpoint, canonical `api/chat.js`/`app.js` change, or second model call is introduced.
-- Dedicated and all affected growth/router/momentum/orchestration/continue/core/save suites pass. First docs head `5e74ef8` reached Vercel but failed hosted Repository checks because the new deterministic test directly imported `api/chat-router.js` and the dependency-free Safety runner does not install `openai`.
-- Automatic correction 1/5 at `eded605` removes that hosted-only test dependency and instead extracts/executes the real schema patch helper from source. Focused testing and a clean-LF full repository run with no `node_modules` both pass; product code and workflows are unchanged.
-- The first Codex code review of original head `966da63` then reported one P1: Trait/Authority maps were sliced to eight before action relevance, so a directly invoked ninth-or-later ability could vanish. Four P2 hardening notes are non-blocking and remain recorded separately.
-- Automatic correction 2/5 at `e1e1166` ranks directly named Trait/Authority entries before the existing eight-entry bound. A ten-entry regression proves the invoked late ability survives both minimum identity and detailed definition routing; focused Router tests and the dependency-free clean-LF full check pass.
-- Substantive second review closed empty growth context stealing old routing budget, missing pre-turn evidence anchoring, unbounded limitation acceptance, and pathological combined-max context overflow. Current automatic correction count for PR #50 is **2/5**.
+- Branch: `codex/combat-growth-v2`.
+- Base/current main: `88ce7b4c17ceb6ab1234c5cedc8bc86c5c3e1dbe` (PR #50 merge).
+- PR #50 is **merged** from exact reviewed head `1eb316b498d892c1d5fbb816a8a5464831d2f112`. Final-head Safety/Vercel, fresh Codex P0/P1=0, and Lumensia Merge Readiness passed.
+- Merge `88ce7b4...` and reviewed head `1eb316b...` share tree `2a3a52fc00c7034fb09a032764433bb653b88367`; no unexpected merge delta exists. Production `/api/health` advertises Awakening/Talent V1, and the merged-main authoritative clean-LF full check passes.
+- PR #51 is open from `codex/combat-growth-v2`. Initial exact code head: `5866bced8963e2dcdd70c0899c3717dddb6a3b88`.
+- Combat Growth V2 turns the existing `state_delta.stat_progress`, `state_delta.skill_experience`, and `resolution_log` contracts into deterministic bounded growth. It adds no schema field, save root, migration, endpoint, serverless function, or second model call.
+- Only player-owned committed training, study, correction, or combat actions with current-scene learning/adaptation evidence can progress an exact existing stat or skill. Mere use/victory/defeat, observation, question/conditional, NPC-only, negated, mismatched, zero, and negative rows are rejected.
+- Basic practice, meaningful pressure/failure correction, and extreme breakthrough use separate evidence tiers with grade-aware caps. Combat skill XP additionally requires an exact matching ability in `resolution_log`; deliberate named training may progress without a combat resolution.
+- Rejected rows are removed before `localSceneRuntime`, so invalid growth cannot fake Scene Momentum. META/AUTO/CONTINUE remain frozen, while normal GAME turns retain one canonical `runCore` call and stable routing.
+- Dedicated Combat Growth plus affected Skill Learning, Awakening, Scene Momentum, Orchestration, Context Router, CONTINUE, core, debug, and save suites pass. Exact code head `5866bce...` also passes the dependency-free clean-LF full repository check.
+- Current automatic correction count for PR #51 is **0/5**.
 - PR #47: **merged** from exact final head `866c991fb52a77079a191a5d7452e7fecf035ce9` as `54327ea2a5c559a18681f4a4bc8795cc9c1c57a8`. The merge and reviewed-head trees both equal `143b56d473825969763e9440aca0c4c3100ab3b5`; production `/api/health` is healthy on app `1.5.6` / adapter `0.8.3`.
 - PR #46: **merged** from exact reviewed head `2843e5bc9ee8169acb7e82b5db9b392beea93539` as `6204843e1cf6f45a9386c13b942c100cd6c7377b`. Merge and reviewed-head trees both equal `4c045c27ccb30f6593370ae2b8e811bebcb39691`; production `/api/health` is healthy on app `1.5.6` / adapter `0.8.3` and advertises Faction Social Consequence V1.
 - PR #45: **merged** from exact reviewed head `583b7622500b9916dd31697d0d6e845f81790ed6` as `71074ccc7a5fd00f193a6aec8b7a1ff82eae1aab`. Merge and reviewed-head trees both equal `690e6a88c015bd28e67bba0bf03bfdba6e73a6c8`; merged production `/api/health` is healthy on app `1.5.6` / adapter `0.8.3`.
@@ -58,16 +56,20 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Production `/api/health`: healthy; app `1.5.6`, canonical `/api/chat`, adapter `/api/chat-router`, `24h` prompt-cache retention.
 - Full post-merge `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
-## Current active work — Awakening / Talent Evolution V1
-- Current corrected code/test head: `e1e11664b30e0fb145beb68120c3cfb3fb80fb6c` on `codex/awakening-talent-evolution-v1`, based directly on the verified PR #49 merge. PR #50 is open and unmerged.
-- Existing `state_delta.awakening_progress`, flexible `pc.awakeningCandidates`, Trait/Authority ability lists, and talent values are reused. There is no save migration or new persistent root.
-- Trait candidates require 100 progress plus three distinct decisive milestones; Authority candidates require 100 plus four. At most four candidates per kind and eight history rows per candidate are retained. Definitions stay canonical after creation, and a Trait cannot evolve into the same-name Authority.
-- New candidates require bounded rare evidence plus an independent pre-turn anchor in the user action or saved state. Existing candidates may advance from their saved identity. Duplicate normalized causes, model-only invented evidence, negated evidence, and unlimited limitations are rejected.
-- `talent_evolution` accepts at most one exact +1 change per turn, only for an anchored mythic source and an irreversible ceiling/potential change. Talent is capped at 10 and the same source cannot increase the same talent twice; audit history is bounded to twelve rows.
-- META and CONTINUE clear both growth fields, AUTO cannot progress them, and the stable runtime applies accepted changes replay-idempotently. The PC panel shows learned Traits/Authorities and candidate progress.
-- Mandatory routing carries only existing talent/ability/candidate identity and progress that actually exists. Pathological combined maximum state is relevance-compacted under the existing 6,840-character routine ceiling without broad canon exposure.
-- `scripts/tests/awakening-talent-evolution-v1.test.mjs` plus affected Skill Learning, Router, Momentum, Orchestration, CONTINUE, core-invariant, debug, and save tests pass. `e1e1166` also passes `git diff --check` and the authoritative clean-LF full PR check in a dependency-free checkout matching GitHub Safety.
-- The user-authorized P0/P1 correction allowance applies: up to five exact-head correction cycles for a new controllable issue type. Stop only for same-type recurrence, cross-core expansion, canon/player-sovereignty/one-call/stable-routing impact, five exhausted cycles, or conflicting unsafe guidance. Current count for this PR is **2/5**.
+## Current active work — Combat Growth V2
+- Current code/test head: `5866bced8963e2dcdd70c0899c3717dddb6a3b88` on `codex/combat-growth-v2`, based directly on the verified PR #50 merge. PR #51 is open and unmerged.
+- The implementation reuses the existing declared stat/skill delta arrays and exact combat resolution log. There is no structured-schema change, save migration, new persistent root, or canonical core/runtime rewrite.
+- Deterministic ownership and evidence guards require a committed PC action plus visible current-scene learning, correction, adaptation, or deliberate practice. Named NPC actions, instructions for another NPC, NPC self-growth dialogue, observation, questions, conditionals, negation, and unsupported model rows cannot authenticate PC growth.
+- Evidence is evaluated per ability. Tier 1 practice, tier 2 pressure/correction, and tier 3 decisive breakthrough receive bounded grade-aware gains; SS+ growth requires tier 3. At most two stat rows and three skill rows survive.
+- Existing skill identity is canonicalized. Combat XP requires an exact `resolution_log` ability match, while deliberate named noncombat training can progress the named existing skill. Zero/negative rows remain zero instead of being clamped into accidental gains.
+- META/AUTO/CONTINUE clear or freeze both arrays. Filtering precedes Scene Momentum synthesis, and compact telemetry exposes only the Combat Growth version/state without duplicating authoritative full state.
+- `scripts/tests/combat-growth-v2.test.mjs` plus all affected growth/router/momentum/orchestration/continue/core/debug/save suites pass. The exact code head also passes `git diff --check` and the dependency-free authoritative clean-LF full PR check.
+- The user-authorized P0/P1 correction allowance applies: up to five exact-head correction cycles for a new controllable issue type. Stop only for same-type recurrence, cross-core expansion, canon/player-sovereignty/one-call/stable-routing impact, five exhausted cycles, or conflicting unsafe guidance. Current count for this PR is **0/5**.
+
+## Completed active predecessor — Awakening / Talent Evolution V1
+- Final reviewed head `1eb316b498d892c1d5fbb816a8a5464831d2f112` merged in PR #50 as `88ce7b4c17ceb6ab1234c5cedc8bc86c5c3e1dbe`; reviewed and merged trees are identical.
+- The merged implementation reuses existing PC growth fields for evidence-gated Trait/Authority candidates, distinct milestone thresholds, anchored mythic +1 talent evolution, bounded audit history, META/AUTO/CONTINUE freeze, replay-idempotent runtime application, and PC-panel visibility.
+- Correction 1/5 removed a dependency-free Safety-runner test import problem; correction 2/5 preserved directly invoked late Trait/Authority entries before the eight-entry routing bound. Final hosted gates, fresh review, readiness, production health, and merged-main full regression passed.
 
 ## Completed active predecessor — Multi-System Scene Orchestration V1
 - Final reviewed head `ff500841487f804fab6031d8bad62c745119cbc2` merged in PR #49 as `93f5644314dada6c9de50f5038bf479f00b7da48`; reviewed and merged trees are identical.
@@ -699,7 +701,7 @@ Immediately continue:
 9. NPC↔NPC Relationship V1 — completed in PR #45;
 10. Faction / Social Consequence V1 — merged in PR #46; P2 hardening merged in PR #47;
 11. Skill Learning V1 — completed in PR #48;
-12. Multi-System Scene Orchestration V1 — active on `codex/multi-system-scene-v1`.
+12. Multi-System Scene Orchestration V1 — completed in PR #49.
 
 Longer roadmap:
 - Adaptive Time Scale V2
@@ -711,7 +713,7 @@ Longer roadmap:
 - NPC-vs-NPC conflict
 - Fail Forward
 - Off-screen World Progression expansion
-- Multi-System Scene — active V1 candidate
+- Multi-System Scene — completed V1 foundation
 - Memory Hierarchy
 - full report-style -> scene-driven novel prose recovery
 
@@ -720,8 +722,8 @@ Gameplay roadmap discussed:
 - Faction / Social Consequence V1 — merged in PR #46; P2 hardening merged in PR #47
 - Skill Learning V1 — completed in PR #48
 - Multi-System Scene Orchestration V1 — completed in PR #49
-- Awakening / Talent Evolution V1 — active in PR #50 on `codex/awakening-talent-evolution-v1`
-- Combat Growth V2
+- Awakening / Talent Evolution V1 — completed in PR #50
+- Combat Growth V2 — active in PR #51 on `codex/combat-growth-v2`
 - Living World / Event Director V3 / Long-term Consequence
 
 ---
@@ -729,16 +731,16 @@ Gameplay roadmap discussed:
 # 12. NEXT ACTION — CURRENT START POINT
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
-2. Confirm main contains PR #49 merge `93f5644314dada6c9de50f5038bf479f00b7da48` and that its tree still matches reviewed head `ff500841487f804fab6031d8bad62c745119cbc2`. Do **not** redo completed HF1/HF2/HF3 through Multi-System Scene Orchestration V1.
-3. Continue Awakening / Talent Evolution V1 in open PR #50 on `codex/awakening-talent-evolution-v1` from corrected code/test head `e1e11664b30e0fb145beb68120c3cfb3fb80fb6c`.
+2. Confirm main contains PR #50 merge `88ce7b4c17ceb6ab1234c5cedc8bc86c5c3e1dbe` and that its tree still matches reviewed head `1eb316b498d892c1d5fbb816a8a5464831d2f112`. Do **not** redo completed HF1/HF2/HF3 through Awakening / Talent Evolution V1.
+3. Continue Combat Growth V2 in open PR #51 on `codex/combat-growth-v2` from code/test head `5866bced8963e2dcdd70c0899c3717dddb6a3b88`.
 4. Commit and push this docs checkpoint, then rerun the authoritative clean-LF full PR check on the new exact head, inspect the exact diff, and repeat the architecture/regression review.
 5. Require new-exact-head GitHub Safety, Vercel Ready, and a fresh Codex review. Revalidate current main, merge-base, no conflict, one canonical core call, stable routing ceiling, and no migration/new endpoint/canonical-core edit.
-6. On the exact Preview, verify health/UI boot, ordinary-training negative behavior, META/AUTO/CONTINUE freeze, and replay-safe candidate/ability visibility. Run an anchored rare-growth positive fixture only without extracting a protection token or bypassing Preview protection.
+6. On the exact Preview, verify health advertises Combat Growth; a low-grade exact existing stat/skill gains only a bounded amount from basic deliberate training; ordinary victory/mere use is negative; failure plus visible correction is positive; NPC-only/question-only inputs are negative; and META/AUTO/CONTINUE remain frozen. Do not extract a protection token or bypass Preview protection.
 7. If a new controllable P0/P1 type appears, continue automatically under the five-cycle policy. Stop only under the user's five explicit conditions recorded above.
-8. If every gate and affected Preview case passes, report PR #50 ready for the user's human merge. Never merge this protected-path PR from Codex.
+8. If every gate and affected Preview case passes, report PR #51 ready for the user's human merge. Never merge this protected-path PR from Codex.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #49는 exact reviewed head `ff50084...`에서 main `93f5644...`로 merge됐고 merge tree가 reviewed tree와 정확히 같다. 완료된 HF1/HF2/HF3부터 Multi-System Scene Orchestration V1까지 다시 분석하지 않는다. 현재 branch는 `codex/awakening-talent-evolution-v1`, open PR은 #50, corrected code/test head는 `e1e1166...`이다. 이 후보는 existing flexible PC growth fields를 사용해 evidence-gated Trait/Authority awakening, distinct milestone thresholds, anchored mythic +1 talent evolution, bounded audit, META/AUTO/CONTINUE freeze, replay-idempotent runtime/UI를 추가한다. 새 save root/migration/endpoint/serverless function/canonical `api/chat.js`/`app.js` change/second model call은 없다. substantive second review는 empty-context budget theft, missing pre-turn anchor, unbounded limitation, pathological combined-max routing overflow를 닫았다. Correction 1/5 `eded605`는 dependency-free Safety runner test import failure를 제품/워크플로 변경 없이 닫았다. Original-head Codex P1은 Trait/Authority가 8개를 넘을 때 직접 언급한 후순위 능력이 선행 slice로 사라지는 문제였다. Correction 2/5 `e1e1166`은 relevance-before-bound 선택과 10-entry permanent regression으로 minimum/detail routing을 모두 보존하며 no-node_modules clean-LF full check가 PASS했다. 네 P2 hardening notes는 비차단으로 기록돼 있다. 다음은 correction-2 docs checkpoint commit/push, 새 exact-head Safety/Vercel/fresh Codex review, Exact Preview health/UI/negative/freeze/replay acceptance다. 새 통제 가능한 P0/P1은 exact-head→원인→최소 수정→focused/full→새 head→Safety/Vercel→fresh review 순서로 자동 계속한다. 같은 유형 재발, 여러 핵심 시스템 확장, canon/player sovereignty/one-call/stable-routing 영향, 5회 소진, 또는 상충하는 안전 지침일 때만 중단한다. 보호 경로이므로 최종 병합은 사람만 수행한다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #50은 exact reviewed head `1eb316b...`에서 main `88ce7b4...`로 merge됐고 merge tree가 reviewed tree와 정확히 같다. 완료된 HF1/HF2/HF3부터 Awakening / Talent Evolution V1까지 다시 분석하지 않는다. 현재 branch는 `codex/combat-growth-v2`, open PR은 #51, code/test head는 `5866bce...`이다. 이 후보는 existing `stat_progress`, `skill_experience`, `resolution_log`를 사용해 player-owned current-scene learning evidence, per-ability evidence tier, grade-aware bounded gain, exact combat ability matching, deliberate-training support, zero/negative rejection, META/AUTO/CONTINUE freeze, pre-Momentum filtering을 추가한다. 새 schema/save root/migration/endpoint/serverless function/canonical `api/chat.js`/`app.js` change/second model call은 없다. focused suites와 dependency-free clean-LF full check가 PASS했고 correction count는 0/5다. 다음은 docs checkpoint commit/push, 새 exact-head full check/diff/second review, Safety/Vercel/fresh Codex review, Exact Preview health/basic-training/mere-use/failure-correction/NPC-only/question-only/freeze acceptance다. 새 통제 가능한 P0/P1은 exact-head→원인→최소 수정→focused/full→새 head→Safety/Vercel→fresh review 순서로 자동 계속한다. 같은 유형 재발, 여러 핵심 시스템 확장, canon/player sovereignty/one-call/stable-routing 영향, 5회 소진, 또는 상충하는 안전 지침일 때만 중단한다. 보호 경로이므로 최종 병합은 사람만 수행한다.`
