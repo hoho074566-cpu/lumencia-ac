@@ -164,13 +164,13 @@ assert.deepEqual(turn.state_delta.npc_schedule_updates,[{npc_key:'emily',delay_m
 assert.deepEqual(turn.state_delta.hooks_update,[{id:consequenceHook.id,status:'resolved'}],'the preserved consequence state and its resolved lifecycle must remain aligned');
 
 const rangedConsequenceSave={...consequenceSave,world:{...consequenceSave.world,time:'08:40'}};
-turn={scene:[{kind:'narration',text:'한 시간째 에밀리가 중앙광장에 도착했다.'}],state_delta:{advance_minutes:90,npc_state_updates:[{npc_key:'emily',location:'중앙광장',status:'도착'}],hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
+turn={scene:[{kind:'narration',text:'한 시간째 약속 시각이 되어 에밀리가 중앙광장에 도착했다.'}],state_delta:{advance_minutes:90,npc_state_updates:[{npc_key:'emily',location:'중앙광장',status:'도착'}],hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
 const rangedEffects=consequenceNpcEffectsForShortening(turn,{event_name:'약속 상대의 도착',reason:'약속 장소에 도착한다',secret_level:0},['emily'],{emily:'에밀리'});
 applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:rangedConsequenceSave},turn,'game',{selected_id:consequenceHook.id,status:'resolved',...rangedEffects});
 assert.equal(turn.state_delta.advance_minutes,60,'a resolved consequence inside the full valid training range must align to its routed trigger');
 assert.deepEqual(turn.state_delta.npc_state_updates,[{npc_key:'emily',location:'중앙광장',status:'도착'}],'full-range consequence alignment must retain its attributable NPC state');
 
-turn={scene:[{kind:'narration',text:'한 시간째 에밀리가 중앙광장에 도착했다.'},{kind:'narration',text:'그 뒤 에밀리는 기숙사로 떠났다.'}],state_delta:{advance_minutes:90,npc_state_updates:[{npc_key:'emily',location:'기숙사',status:'떠남'}],npc_schedule_updates:[{npc_key:'emily',delay_minutes:30,location:'기숙사',activity:'휴식',reason:'약속 종료'}],hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
+turn={scene:[{kind:'narration',text:'한 시간째 약속 시각이 되어 에밀리가 중앙광장에 도착했다.'},{kind:'narration',text:'그 뒤 에밀리는 기숙사로 떠났다.'}],state_delta:{advance_minutes:90,npc_state_updates:[{npc_key:'emily',location:'기숙사',status:'떠남'}],npc_schedule_updates:[{npc_key:'emily',delay_minutes:30,location:'기숙사',activity:'휴식',reason:'약속 종료'}],hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
 const ambiguousEffects=consequenceNpcEffectsForShortening(turn,{event_name:'약속 상대의 도착',reason:'약속 장소에 도착한다',secret_level:0},['emily'],{emily:'에밀리'});
 assert.equal(ambiguousEffects.attribution_safe,false,'a later final state for the same NPC must not be attributed to the earlier consequence boundary');
 assert.deepEqual(ambiguousEffects.npc_state_updates,[],'future same-NPC state must fail closed when it does not match the boundary effect');
@@ -179,7 +179,11 @@ const ambiguousLifecycle={selected_id:consequenceHook.id,status:'resolved',evide
 applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:rangedConsequenceSave},turn,'game',ambiguousLifecycle);
 assert.equal(turn.state_delta.advance_minutes,90,'an unshortened full response may retain its later same-NPC state at the matching final clock');
 assert.deepEqual(turn.state_delta.npc_state_updates,[{npc_key:'emily',location:'기숙사',status:'떠남'}],'full-clock state remains aligned when unsafe boundary attribution prevents shortening');
-turn={scene:[{kind:'narration',text:'한 시간째 에밀리가 중앙광장에 도착했다.'},{kind:'narration',text:'그 뒤 에밀리는 기숙사로 떠났다.'}],state_delta:{advance_minutes:180,npc_state_updates:[{npc_key:'emily',location:'기숙사',status:'떠남'}],hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
+const sameLocationLaterTurn={scene:[{kind:'narration',text:'약속 시각이 되어 에밀리가 중앙광장에 도착했다.'},{kind:'narration',text:'그 뒤 에밀리는 중앙광장에 남아 약속 종료 후 휴식할 계획을 세웠다.'}],state_delta:{npc_state_updates:[{npc_key:'emily',location:'중앙광장',status:'도착'}],npc_schedule_updates:[{npc_key:'emily',delay_minutes:30,location:'중앙광장',activity:'약속 종료 후 휴식',reason:'후속 계획'}]}};
+const sameLocationLaterEffects=consequenceNpcEffectsForShortening(sameLocationLaterTurn,{event_name:'약속 상대의 도착',reason:'약속 장소에 도착한다',secret_level:0},['emily'],{emily:'에밀리'});
+assert.deepEqual(sameLocationLaterEffects.npc_state_updates,[{npc_key:'emily',location:'중앙광장',status:'도착'}],'matching boundary state may survive even when a later same-location plan is present');
+assert.deepEqual(sameLocationLaterEffects.npc_schedule_updates,[],'a later same-location schedule must not survive from a partial event-token overlap');
+turn={scene:[{kind:'narration',text:'한 시간째 약속 시각이 되어 에밀리가 중앙광장에 도착했다.'},{kind:'narration',text:'그 뒤 에밀리는 기숙사로 떠났다.'}],state_delta:{advance_minutes:180,npc_state_updates:[{npc_key:'emily',location:'기숙사',status:'떠남'}],hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
 const cappedAmbiguousLifecycle={selected_id:consequenceHook.id,status:'resolved',evidence:'visible-result',...ambiguousEffects};
 applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:rangedConsequenceSave},turn,'game',cappedAmbiguousLifecycle);
 assert.equal(turn.state_delta.advance_minutes,120,'an unsafe oversized response still obeys the activity maximum without rewinding to the consequence boundary');

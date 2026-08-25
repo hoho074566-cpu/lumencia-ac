@@ -367,7 +367,7 @@ function consequenceNpcEffectsForShortening(turn,consequence,routedKeys=[],regis
   }
   const limitedKeys=new Set([...keys].slice(0,4)),effectSegments=new Map();
   for(const key of limitedKeys){
-    const labels=[key,String(registry[key]||'').trim().toLowerCase()].filter(value=>value.length>=2),rows=evidence.segments.filter(segment=>labels.some(label=>segment.includes(label))&&(evidence.matched.includes(segment)||(routed.has(key)&&evidence.tokens.some(token=>segment.includes(token)))));
+    const labels=[key,String(registry[key]||'').trim().toLowerCase()].filter(value=>value.length>=2),rows=evidence.matched.filter(segment=>labels.some(label=>segment.includes(label)));
     effectSegments.set(key,rows);
   }
   const stateFields=new Set(['location','status','current_goal','long_term_goal','short_term_goal','obstacle','next_activity','next_location','goal_reason','goal_next_action','last_seen']),preservedState=[];
@@ -380,8 +380,8 @@ function consequenceNpcEffectsForShortening(turn,consequence,routedKeys=[],regis
   const preservedSchedule=[];
   for(const row of array(turn?.state_delta?.npc_schedule_updates)){
     const key=String(row?.npc_key||row?.key||'').trim(),segments=effectSegments.get(key)||[];if(!limitedKeys.has(key)||!segments.length)continue;
-    const visible=segments.join(' '),location=String(row?.location||'').trim().toLowerCase(),activityTokens=(String(row?.activity||'').toLowerCase().match(/[가-힣a-z0-9_]{2,}/g)||[]);
-    if(location.length>=2&&visible.includes(location)&&activityTokens.some(token=>visible.includes(token)))preservedSchedule.push(row);
+    const visible=segments.join(' '),location=String(row?.location||'').trim().toLowerCase(),activity=String(row?.activity||'').trim().toLowerCase(),activityTokens=(activity.match(/[가-힣a-z0-9_]{2,}/g)||[]),activityMatched=activity.length>=2&&(visible.includes(activity)||(activityTokens.length>0&&activityTokens.every(token=>visible.includes(token))));
+    if(location.length>=2&&visible.includes(location)&&activityMatched)preservedSchedule.push(row);
   }
   const relevantCount=[...array(turn?.state_delta?.npc_state_updates),...array(turn?.state_delta?.npc_schedule_updates)].filter(row=>limitedKeys.has(String(row?.npc_key||row?.key||'').trim())).length;
   return{npc_keys:[...limitedKeys],npc_state_updates:preservedState,npc_schedule_updates:preservedSchedule,attribution_safe:relevantCount===0||preservedState.length+preservedSchedule.length>0};
