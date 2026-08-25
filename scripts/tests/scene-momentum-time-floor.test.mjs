@@ -161,7 +161,7 @@ assert.equal(turn.state_delta.advance_minutes,215,'a future class start plus its
 
 turn={
   event_progress:{event_instance_id:'next-morning',active_beat:'complete',completed_beats:['complete']},choices:[],
-  state_delta:{advance_minutes:960,new_location:'여관',pc_status:'숙면 완료',fatigue_delta:-3,gold_delta:5,relationship_changes:[{npc_key:'artemis',affinity_delta:1}],stat_progress:[{stat:'신체',amount:1}],items_add:['아침 보상'],items_remove:['야식'],active_events_add:['next-morning'],active_events_remove:['night'],completed_events_add:['next-morning'],scheduled_events_add:[{id:'future'}],scheduled_events_remove:['old-future'],scheduled_events_complete:['morning-class'],npc_state_updates:[{npc_key:'artemis',last_seen:'1285-03-02 07:20'}],npc_schedule_updates:[{npc_key:'artemis',time:'07:20'}],pc_knowledge_add:['다음 날 결과'],memories_add:[{fact:'다음 날 결과'}],hooks_add:[{id:'future'}],hooks_update:[{id:'future',status:'resolved'}],delayed_consequences_add:[{event_name:'future'}]},
+  state_delta:{advance_minutes:960,new_location:'여관',pc_status:'숙면 완료',fatigue_delta:-3,gold_delta:5,relationship_changes:[{npc_key:'artemis',affinity_delta:1}],stat_progress:[{stat:'신체',amount:1}],skill_experience:[{skill:'대검술',amount:1}],skill_learning:[{skill:'반월 보법',amount:5,basis:'교정',reason:'훈련'}],awakening_progress:[{kind:'trait',name:'새 감각',amount:5}],talent_evolution:[{talent:'martial',amount:1,cause:'유물'}],items_add:['아침 보상'],items_remove:['야식'],active_events_add:['next-morning'],active_events_remove:['night'],completed_events_add:['next-morning'],scheduled_events_add:[{id:'future'}],scheduled_events_remove:['old-future'],scheduled_events_complete:['morning-class'],npc_state_updates:[{npc_key:'artemis',last_seen:'1285-03-02 07:20'}],npc_schedule_updates:[{npc_key:'artemis',time:'07:20'}],pc_knowledge_add:['다음 날 결과'],memories_add:[{fact:'다음 날 결과'}],hooks_add:[{id:'future'}],hooks_update:[{id:'future',status:'resolved'}],delayed_consequences_add:[{event_name:'future'}]},
 };
 applySceneMomentumTimeFloor({action:'잠을 잔다.',saveState:{world:{date:'1285-03-01',time:'15:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,480,'overshooting sleep still clamps to the profile maximum');
@@ -171,7 +171,7 @@ assert.equal(turn.state_delta.new_location,null,'a destination reached after the
 assert.equal(turn.state_delta.pc_status,null,'a post-boundary player status must fail closed');
 assert.equal(turn.state_delta.fatigue_delta,0,'post-boundary resource effects must fail closed');
 assert.equal(turn.state_delta.gold_delta,0,'post-boundary currency effects must fail closed');
-for(const field of ['relationship_changes','stat_progress','items_add','items_remove'])assert.deepEqual(turn.state_delta[field],[],`${field} must fail closed when model time is shortened`);
+for(const field of ['relationship_changes','stat_progress','skill_experience','skill_learning','awakening_progress','talent_evolution','items_add','items_remove'])assert.deepEqual(turn.state_delta[field],[],`${field} must fail closed when model time is shortened`);
 
 const consequenceHook={id:'consequence:emily-arrival',title:'에밀리의 도착',status:'deferred',importance:3,event_consequence:{version:'1.0',event_name:'에밀리의 도착',target_bucket:'active',reason:'에밀리가 약속 장소에 도착한다',secret_level:0,due_at:'1285-03-01T09:40',expires_at:'1285-03-04T09:40'}};
 const consequenceSave={world:{date:'1285-03-01',time:'09:20'},hooks:[consequenceHook],scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]};

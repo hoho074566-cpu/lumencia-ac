@@ -302,10 +302,10 @@ function buildEventDirectorV2(incoming,originalInput,registry,mode='game'){
   const fixedDirective=(reason)=>({telemetry:{...base,result:reason},selectedKey:null,directive:`[EVENT DIRECTOR V2.1]\nMODE=FIXED_FLOW\n${reason}. 기존 일정·사용자 직접 행동·진행 중인 훅을 우선하고, 이 지시 때문에 새 우연 사건을 추가하지 마라.`});
   if(['meta','continue'].includes(mode))return fixedDirective(`RNG_DISABLED_${mode.toUpperCase()}`);
   const explicit=mentionedNpcKeys(incoming.action||'',registry);
-  if(explicit.length||plan.focused.length||DIRECT_NPC_PRONOUN_RE.test(String(incoming.action||'')))return fixedDirective('DIRECT_USER_FOCUS');
-  if(plan.payoffDue||plan.callbacks)return fixedDirective('CALLBACK_PRIORITY');
-  if(plan.intervention==='aftermath')return fixedDirective('AFTERMATH_FIXED_FLOW');
-  if(plan.intervention==='combat'||plan.intervention==='critical'||hasAffirmedActionKeyword(incoming.action||'',COMBAT_RE))return fixedDirective('ACTIVE_COMBAT_FIXED_FLOW');
+  const directUserFocus=Boolean(explicit.length||plan.focused.length||DIRECT_NPC_PRONOUN_RE.test(String(incoming.action||'')));
+  if(!directUserFocus&&(plan.payoffDue||plan.callbacks))return fixedDirective('CALLBACK_PRIORITY');
+  if(!directUserFocus&&plan.intervention==='aftermath')return fixedDirective('AFTERMATH_FIXED_FLOW');
+  if(!directUserFocus&&(plan.intervention==='combat'||plan.intervention==='critical'||hasAffirmedActionKeyword(incoming.action||'',COMBAT_RE)))return fixedDirective('ACTIVE_COMBAT_FIXED_FLOW');
 
   const consequenceLookahead=sceneIntent.compression&&sceneIntent.minAdvanceMinutes>0?activityRangeLimitMinutes(sceneIntent):0;
   const dueConsequence=plan.intervention==='scheduled'||['decision-sensitive','committed-consequence'].includes(sceneIntent.kind)?null:selectDueEventConsequence(save,{lookaheadMinutes:consequenceLookahead});
@@ -322,6 +322,7 @@ function buildEventDirectorV2(incoming,originalInput,registry,mode='game'){
     const consequenceDirective=buildEventConsequenceDirective(dueConsequence,{currentAction:incoming.action||'',triggerMinutes:consequenceMinutes});
     return{telemetry,selectedKey,consequenceKeys,directive:`[EVENT DIRECTOR V2.1]\nMODE=FIXED_FLOW\nRESULT=EVENT_CONSEQUENCE_DUE\nCONSEQUENCE_ID=${dueConsequence.id}\n이전 인과 결과를 우선하며 새 랜덤 사건을 추가하지 마라.`,consequenceDirective};
   }
+  if(directUserFocus)return fixedDirective('DIRECT_USER_FOCUS');
   if(mode==='auto')return fixedDirective('RNG_DISABLED_AUTO');
 
   const scheduled=plan.intervention==='scheduled';

@@ -51,6 +51,13 @@ assert.match(chat,/const reachedConsequenceBoundary=/,'manifested delayed result
 assert.match(chat,/applySceneMomentumTimeFloor\([^;]+consequenceLifecycle\)/,'the selected consequence lifecycle must reach the elapsed-time guard');
 assert.doesNotMatch(chat,/hasMeaningfulStop[^;\n]*importance[^;\n]*critical/i,'critical scene severity must not suppress deterministic elapsed time');
 assert.equal((chat.match(/allowProgress:mode==='game'&&!zeroElapsedIntent/g)||[]).length,3,'explicit zero-minute actions must freeze combat growth, skill learning, and awakening/talent runtime packets');
+const timeReconciliationIndex=chat.indexOf('const sceneIntent=applySceneMomentumTimeFloor');
+for(const marker of ['persistedCombatGrowthState=deriveCombatGrowthState','persistedSkillLearningState=deriveSkillLearningState','persistedAwakeningTalentState=deriveAwakeningTalentState']){
+  assert.ok(timeReconciliationIndex>=0&&chat.lastIndexOf(marker)>timeReconciliationIndex,`${marker} must be recomputed after time-boundary reconciliation freezes rejected completion deltas`);
+}
+assert.match(chat,/data\.turn\.state_delta\.skill_learning!==skillLearningState\.accepted_changes[\s\S]*persistedSkillLearningState=deriveSkillLearningState\([\s\S]*allowProgress:false/,'a shortened turn must rebuild the persisted skill-learning packet from the frozen final delta');
+assert.match(chat,/data\.turn\.state_delta\.awakening_progress!==awakeningTalentState\.accepted_awakening_changes[\s\S]*persistedAwakeningTalentState=deriveAwakeningTalentState\([\s\S]*allowProgress:false/,'a shortened turn must rebuild awakening and talent persistence from the frozen final delta');
+assert.match(chat,/runtime_state=\{[^\n]*skill_learning:persistedSkillLearningState,awakening_talent:persistedAwakeningTalentState/,'the client must receive only the post-reconciliation growth packets');
 
 assert.match(health,/version: '0\.8\.7'/);
 assert.match(health,/appVersion: '1\.5\.6'/);
