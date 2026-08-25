@@ -1,13 +1,14 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Narrative Engine continuation — Faction / Social Consequence V1 is merged. Its focused P2 hardening is active before Skill Learning V1.
+Narrative Engine continuation — Skill Learning V1 implementation and protected-path validation.
 
 ## Current GitHub State
 - Repo: `hoho074566-cpu/lumencia-ac`
-- Main: `6204843e1cf6f45a9386c13b942c100cd6c7377b` (`Faction / Social Consequence V1`, PR #46 merge)
-- Working branch: `codex/faction-social-hardening-v1`
-- PR #47: **open**. Initial checkpoint `0cd75a7683f67196701b7f8376298ead1620f868` contains the three PR #46 review P2 hardenings; exact-head review on `f2689c7` returned P0/P1=0 plus two scope-relevant P2s, closed in `865e47fd4dc3a604a3fc9cb72e63c805afcb8898`. Closure review on `e4d80e0` returned P0/P1=0 plus one recent-turn-order P2, closed in the final permitted fix round `049c38353d15a07c739f8404e3d4cf154bc65ac3`. Protected adapter/context paths require human merge.
+- Main: `54327ea2a5c559a18681f4a4bc8795cc9c1c57a8` (PR #47 merge)
+- Working branch: `codex/skill-learning-v1`
+- Skill Learning V1 current code head: `85fef8008eb0c03a30615f99e9a408526a6b9bd7`. Protected adapter/context/runtime paths require human merge after exact-head gates and acceptance.
+- PR #47: **merged** from exact final head `866c991fb52a77079a191a5d7452e7fecf035ce9` as `54327ea2a5c559a18681f4a4bc8795cc9c1c57a8`. Merge/reviewed trees both equal `143b56d473825969763e9440aca0c4c3100ab3b5`; production health is green on app `1.5.6` / adapter `0.8.3`.
 - PR #46: **merged** from exact reviewed head `2843e5bc9ee8169acb7e82b5db9b392beea93539` as `6204843e1cf6f45a9386c13b942c100cd6c7377b`. Merge and reviewed-head trees both equal `4c045c27ccb30f6593370ae2b8e811bebcb39691`; production health is green on app `1.5.6` / adapter `0.8.3` with Faction Social V1 advertised.
 - PR #45: **merged** from exact reviewed head `583b7622500b9916dd31697d0d6e845f81790ed6` as `71074ccc7a5fd00f193a6aec8b7a1ff82eae1aab`. Merge and reviewed-head trees both equal `690e6a88c015bd28e67bba0bf03bfdba6e73a6c8`; production `/api/health` is healthy on app `1.5.6` / adapter `0.8.3`.
 - PR #44: **merged** from exact reviewed head `e5fae96ac271a617db42627a99d53a720299a213` as `fe6b4a5dcc0f0a96b71d8fcffcf8666caeefd82b`. Merge and reviewed trees both equal `f4aeadd44c116682d60385c265e3f35f3b48ea0e`; production health is green.
@@ -39,7 +40,18 @@ Narrative Engine continuation — Faction / Social Consequence V1 is merged. Its
 - Production `/api/health`: `ok=true`, API configured, app `1.5.6`, adapter `/api/chat-router`, canonical core `/api/chat`, prompt cache retention `24h`.
 - Post-merge full `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
-## Faction / Social Consequence V1 — Merged; P2 Hardening Current Candidate
+## Skill Learning V1 — Current Candidate
+- Completes the already-declared `state_delta.skill_learning` / `pc.skillCandidates` path. No new save root, migration, API entrypoint, canonical `app.js` edit, or second model call is introduced.
+- A normal player GAME turn accepts at most two +1..15 rows. Independent skill name, concrete `basis`, causal `reason`, and actual training/instruction/correction/practice/combat-learning evidence are mandatory. Existing skills and spacing aliases, generic names, basis-less claims, ordinary movement, duplicates, and excess rows are rejected.
+- Up to eight candidates and six history rows per candidate persist under `pc.skillCandidates`. Alias cleanup preserves the newest authoritative entry. Progress remains 0..99 until a real accepted update reaches 100.
+- At 100 the candidate is removed and added once to `pc.skills` at neutral F grade / 0 hidden XP. The stable runtime emits a visible unlock notice and the PC panel shows active candidate progress.
+- AUTO cannot progress PC learning; META and CONTINUE explicitly clear the delta. Rejected learning rows are removed before deterministic Scene Momentum measures State Delta.
+- The existing structured-output interception adds the bounded field and parser merge while retaining one canonical `coreHandler` call. `store:false`, prompt cache, context profiles, player sovereignty, and all prior Event/NPC/relationship systems remain unchanged.
+- Mandatory `.76` context retains at most 24 compact existing skills and eight active candidates without candidate history. A maximal long-name/history fixture remains within the 6,840-character routine input ceiling.
+- `scripts/tests/skill-learning-v1.test.mjs` permanently covers schema/parser wiring, evidence, bounds, alias normalization, persistence, unlock, UI, AUTO/META/CONTINUE freeze, State Delta ordering, dense minimum context, health, and the one-call invariant.
+- Code commits: `76ffa46` initial implementation; `0295ccc` newest-alias preservation; `85fef80` maximal mandatory-context bound. Both permitted local hardening rounds are consumed, and the substantive final review found no P0/P1 blocker.
+
+## Faction / Social Consequence V1 — Merged; P2 Hardening Completed
 - Adds bounded `state_delta.faction_reputation_changes` rows for the six canon-backed public academy organizations: student council, Blue Knights, White Rose, and the knight/magic/theology departments.
 - Persists inside `sceneRuntime.faction_social`; there is no new save root/migration, API entrypoint, model call, or `app.js` change.
 - Reputation clamps to ±100. One turn accepts at most 4 changes; each public faction retains at most 8 causal rows. PR #47 routes at most 3 relevant factions / 2 causes in detail and 2 factions / 1 cause in the mandatory minimum.
@@ -55,7 +67,7 @@ Narrative Engine continuation — Faction / Social Consequence V1 is merged. Its
 - Pipeline and route diagnostics now expose only version, bounded faction keys, and current changed keys instead of duplicating reputation values and causal history into `qualityTelemetry`/rendered records.
 - Review closure `865e47f` compares normalized previous and accepted final faction state for telemetry, so rejected/no-op model rows cannot claim a mutation. It also ranks direct action text above bounded recent-turn discussion above broad save-derived keywords, preserving an indirectly referenced older faction without restoring all six rows.
 - Final closure `049c383` retains each bounded recent turn separately and weights newer mentions above older mentions. Important-profile coverage proves the latest discussed older faction survives a two-faction mandatory minimum even when two newer stored factions were also discussed.
-- Dedicated/affected suites pass after the closure; the full clean-LF `scripts/lumensia-pr-check.mjs origin/main HEAD` passed at the initial checkpoint and must be rerun on the final docs head. There is no new endpoint, save root, migration, model call, or gameplay semantic change.
+- Dedicated/affected suites and the final clean-LF full check passed before PR #47 was merged with an identical reviewed tree. There is no new endpoint, save root, migration, model call, or gameplay semantic change.
 
 ## NPC↔NPC Relationship V1 — Completed
 - PR #45 merged after exact-head Safety/Vercel/Codex and Exact Preview acceptance. Directional registered NPC affinity/trust/status plus causal history persists in the existing `npcInnerStates` root; reverse and PC relationships remain independent.
@@ -384,12 +396,12 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only unless the user explicitly authorizes that exact merge.
 
 ## NEXT ACTION
-1. Commit/push this status checkpoint to PR #47 and confirm the exact diff contains only the three P2 hardenings, their permanent regressions, and status docs.
-2. Require fresh exact-head Safety/Vercel/Codex P0/P1=0.
-3. Revalidate current main/merge-base/no conflict, one-call architecture, `.76` context bound, registered-observer normalization, compact telemetry, and no endpoint/save migration.
-4. Perform the final second regression review and fix only blockers within this focused scope.
-5. If every gate passes, report protected-path PR #47 ready for human merge.
-6. Start Skill Learning V1 only after PR #47 is accepted and merged.
+1. Commit the Skill Learning V1 status checkpoint and rerun the authoritative clean-LF full check on the exact docs head.
+2. Confirm the final diff is limited to the stable adapter/runtime/context path, bounded learning module, existing prompt/sanitizer/health metadata, permanent regressions, and status docs.
+3. Push/open the focused protected-path PR and require fresh exact-head Safety/Vercel/Codex P0/P1=0.
+4. Revalidate current main/merge-base/no conflict, one-call architecture, `.76` maximal candidate context, AUTO/META/CONTINUE freeze, deterministic single unlock, and no endpoint/save migration/canonical `app.js` change.
+5. Run affected Exact Preview acceptance for candidate creation, no ordinary-movement learning, frozen modes, existing-skill isolation, and one-time F-grade unlock.
+6. If every gate passes, report the protected-path Skill Learning V1 PR ready for human merge. Codex must not merge it.
 
 ## Stop Record
 - Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.
@@ -428,4 +440,5 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed: PR #44 exact reviewed head `e5fae96...` merged as `fe6b4a5...`; merge-tree equality and production health pass.
 - Completed: PR #45 exact reviewed head `583b762...` merged as `71074cc...`; merge-tree equality and production health pass.
 - Completed: PR #46 exact reviewed head `2843e5b...` merged as `6204843...`; merge-tree equality and production health pass.
-- Current candidate: PR #47 / Faction Social P2 hardening on `codex/faction-social-hardening-v1`; initial checkpoint `0cd75a7`, two exact-head reviews with P0/P1=0, first closure `865e47f`, and final permitted closure `049c383` with dedicated/affected tests complete. Final docs checkpoint, clean-LF full check, and fresh exact-head hosted Safety/Vercel/Codex authority remain.
+- Completed: PR #47 final head `866c991...` merged as `54327ea...`; reviewed and merged trees are identical and production health is green.
+- Current candidate: Skill Learning V1 on `codex/skill-learning-v1`; code commits `76ffa46`, `0295ccc`, and `85fef80` complete the bounded candidate/unlock path and both permitted local hardening rounds. Final docs checkpoint, exact-head clean-LF full check, hosted gates/review, and affected Exact Preview acceptance remain.
