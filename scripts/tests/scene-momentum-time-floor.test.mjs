@@ -128,14 +128,15 @@ turn={state_delta:{advance_minutes:0},choices:['수업에 간다','남는다','�
 applySceneMomentumTimeFloor({action:'두 시간 쉰다.',saveState:boundaryChoiceSave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'an unrelated overdue row must not hide the structured future schedule boundary');
 turn={
-  scene_title:'수업 종료',scene:[{kind:'narration',text:'기초 수업을 모두 마치고 보상을 받았다.'}],choices:['다음 수업으로 간다','교관에게 묻는다','자리를 뜬다'],
+  scene_title:'수업 종료',scene:[{kind:'narration',text:'기초 수업을 모두 마치고 보상을 받은 뒤 피로가 쌓였다.'}],choices:['다음 수업으로 간다','교관에게 묻는다','자리를 뜬다'],
   event_progress:{event_instance_id:'class',active_beat:'complete',completed_beats:['complete']},
-  state_delta:{advance_minutes:10,scheduled_events_complete:['class'],completed_events_add:['class'],pc_knowledge_add:['기초 수업 내용'],items_add:['수료 보상'],gold_delta:5,relationship_changes:[{npc_key:'artemis',affinity_delta:1,reason:'기초 수업 수료'}],npc_state_updates:[{npc_key:'artemis',status:'수업 종료'}]},
+  state_delta:{advance_minutes:10,scheduled_events_complete:['class'],completed_events_add:['class'],pc_knowledge_add:['기초 수업 내용'],items_add:['수료 보상'],gold_delta:5,fatigue_delta:2,relationship_changes:[{npc_key:'artemis',affinity_delta:1,reason:'기초 수업 수료'}],npc_state_updates:[{npc_key:'artemis',status:'수업 종료'}]},
 };
 const rewoundBoundaryIntent=applySceneMomentumTimeFloor({action:'10분 기다린다.',saveState:boundaryChoiceSave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'rewinding premature completion must retain the exact schedule-start clock');
 for(const field of ['scheduled_events_complete','completed_events_add','pc_knowledge_add','items_add','relationship_changes','npc_state_updates'])assert.deepEqual(turn.state_delta[field],[],`${field} must fail closed when a schedule is only beginning`);
 assert.equal(turn.state_delta.gold_delta,0,'currency awarded by a prematurely completed schedule must fail closed');
+assert.equal(turn.state_delta.fatigue_delta,0,'fatigue attributed to a prematurely completed schedule must fail closed');
 assert.equal(turn.event_progress,null,'terminal event progress must not survive rewinding to the schedule start');
 assert.equal(rewoundBoundaryIntent.runtimeSceneTrusted,false,'runtime synthesis must ignore narration that completes a schedule at its start');
 turn={scene_title:'수업 시작',scene:[{kind:'narration',text:'기초 수업이 막 시작되었다.'}],choices:['참석한다','남는다','다른 곳으로 간다'],event_progress:{event_instance_id:'class',active_beat:'start',completed_beats:[]},state_delta:{advance_minutes:10,active_events_add:['class'],scheduled_events_remove:['class'],pc_knowledge_add:['기다리는 동안 확인한 복도 공지']}};
@@ -167,6 +168,15 @@ assert.deepEqual(turn.state_delta.relationship_changes,[],'relationship effects 
 assert.deepEqual(turn.state_delta.npc_state_updates,[],'NPC effects attributable to the premature schedule must be removed');
 assert.equal(turn.event_progress,null,'the schedule event must remain incomplete at its start');
 assert.equal(exactTrainingBoundaryIntent.runtimeSceneTrusted,false,'mixed completion narration must not feed runtime synthesis after selective state reconciliation');
+const compoundBoundary={id:'compound-class',title:'기사과 필수 수업',date:'1285-03-01',time:'11:00',kind:'academic',status:'scheduled'},compoundBoundarySave={pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[compoundBoundary]},scheduledEvents:[compoundBoundary]},prefixSkill={skill:'검술',amount:1,reason:'한 시간 검술 훈련을 완료했다'};
+turn={scene_title:'훈련과 수면 완료',scene:[{kind:'narration',text:'한 시간 검술 훈련을 마치고 피로가 조금 쌓였으며 훈련 기록표와 검술 자세 교정법을 얻었다.'},{kind:'narration',text:'이어 여덟 시간 수면을 마치고 숙면 보상을 받았다.'}],choices:[],state_delta:{advance_minutes:540,fatigue_delta:2,skill_experience:[prefixSkill],items_add:['훈련 기록표','숙면 보상'],pc_knowledge_add:['검술 자세 교정법','꿈 내용']}};
+const compoundBoundaryIntent=applySceneMomentumTimeFloor({action:'1시간 동안 검술을 훈련하고 8시간 동안 잠을 잔다.',saveState:compoundBoundarySave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,120,'an unrelated schedule must truncate only the unfinished terminal sleep');
+assert.equal(turn.state_delta.fatigue_delta,2,'fatigue visibly earned by the completed prefix training must survive');
+assert.deepEqual(turn.state_delta.skill_experience,[prefixSkill],'growth visibly earned by the completed prefix training must survive');
+assert.deepEqual(turn.state_delta.items_add,['훈련 기록표'],'a prefix item must survive while a terminal sleep reward is cleared');
+assert.deepEqual(turn.state_delta.pc_knowledge_add,['검술 자세 교정법'],'prefix knowledge must survive while terminal sleep knowledge is cleared');
+assert.equal(compoundBoundaryIntent.reconciliationReason,'schedule-boundary','compound truncation must retain schedule-boundary telemetry');
 turn={
   scene_title:'훈련 완료와 수업 종료',scene:[{kind:'narration',text:'네 시간의 검술 훈련을 마쳤다.'},{kind:'narration',text:'10시가 되자 기사과 기초 수업까지 수료하고 보상을 받았다.'}],choices:[],
   state_delta:{advance_minutes:240,skill_experience:[trainingGrowth,prematureClassGrowth],items_add:['훈련 기록표','수료 보상']},

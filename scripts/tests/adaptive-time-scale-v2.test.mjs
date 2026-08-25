@@ -99,6 +99,9 @@ assert.deepEqual(zeroMinimumWait.explicitDurationRangeMinutes,[0,10],'a zero-min
 assert.deepEqual(zeroMinimumWait.suggestedAdvanceMinutes,[0,10],'a zero-minimum wait may compress anywhere inside its declared range');
 assert.equal(activityRangeLimitMinutes(zeroMinimumWait),10,'consequence lookahead must use the positive range maximum even when its floor is zero');
 assert.deepEqual(classifySceneIntent('문 앞에서는 기다리지 않고 로비에서 1시간 동안 기다린다.').suggestedAdvanceMinutes,[60,60],'a negated earlier wait must not cancel a committed terminal wait');
+assert.deepEqual(classifySceneIntent('피로가 풀리도록 8시간 동안 잠을 잔다.').suggestedAdvanceMinutes,[480,480],'a subordinate purpose subject must not replace the omitted PC sleep subject');
+assert.deepEqual(classifySceneIntent('친구가 올 때까지 1시간 동안 기다린다.').suggestedAdvanceMinutes,[60,60],'a subordinate arrival subject must not replace the omitted PC wait subject');
+assert.deepEqual(classifySceneIntent('배가 고프므로 30분 동안 식사를 한다.').suggestedAdvanceMinutes,[30,30],'a subordinate cause subject must not replace the omitted PC meal subject');
 assert.deepEqual(classifySceneIntent('훈련을 1시간부터 2시간까지 한다.').suggestedAdvanceMinutes,[60,120],'object-marked from/to duration ranges must remain bounded ranges');
 const rangedFutureStart=classifySceneIntent('1시간에서 2시간 후에 훈련한다.',{currentTime:'09:00'});
 assert.equal(rangedFutureStart.explicitDurationRangeMinutes,null,'a future start window must not become an activity duration range');
@@ -207,6 +210,12 @@ const todayTerminalClass=classifySceneIntent('내일 계획을 세운 뒤 오늘
 assert.equal(todayTerminalClass.dateQualifiedStart,false,'an earlier next-day planning clause must not date-qualify the terminal today activity');
 assert.equal(todayTerminalClass.scheduledStartOffsetMinutes,60,'the terminal today clock must remain the selected activity start');
 assert.deepEqual(todayTerminalClass.suggestedAdvanceMinutes,[105,180],'the terminal today class must retain same-day wait plus activity timing');
+const immediateTrainingAfterFutureSentence=classifySceneIntent('내일 출발 예정. 지금 1시간 동안 훈련한다.', { location:'훈련장',currentTime:'09:00' });
+assert.equal(immediateTrainingAfterFutureSentence.dateQualifiedStart,false,'a future date in an earlier sentence must not qualify the terminal training');
+assert.deepEqual(immediateTrainingAfterFutureSentence.suggestedAdvanceMinutes,[60,60],'the terminal immediate training must retain its explicit duration');
+const immediateWaitAfterFutureSentence=classifySceneIntent('내일. 지금 30분 동안 기다린다.', { location:'광장',currentTime:'09:00' });
+assert.equal(immediateWaitAfterFutureSentence.dateQualifiedStart,false,'a standalone earlier future date must not qualify the terminal wait');
+assert.deepEqual(immediateWaitAfterFutureSentence.suggestedAdvanceMinutes,[30,30],'the immediate wait must not become a one-day deferred action');
 const topicQualifiedClass=classifySceneIntent('내일은 오전 8시에 기사과 기초 수업을 듣는다.', { location:'기숙사',currentTime:'09:00' });
 assert.equal(topicQualifiedClass.dateQualifiedStart,true,'a future-day topic particle must preserve the date-qualified activity');
 assert.equal(topicQualifiedClass.scheduledStartOffsetMinutes,1380,'a topic-qualified next-day start with a reachable lower range must retain its real offset');
@@ -222,6 +231,8 @@ const namedPcOrientation={id:'newcomer-orientation',title:'신입생 오리엔�
 assert.equal(isRequestedScheduledActivity(namedPcScheduleSave,namedPcOrientation,namedPcOrientationAction),true,'the saved PC subject must not prevent matching their requested schedule');
 const precedingClass={id:'preceding-class',title:'기사과 기초 수업',date:'1285-03-01',time:'10:00',kind:'academic',status:'scheduled'},precedingClassSave={pc:{name:'카인',department:'기사과'},world:{date:'1285-03-01',time:'08:00',location:'기숙사'},scheduledEvents:[precedingClass],scheduleContext:{due:[],upcoming:[precedingClass]}},classThenSleep='오전 10시에 기사과 기초 수업을 듣고 8시간 동안 잠을 잔다.';
 assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,classThenSleep),true,'an explicitly requested schedule in a preceding compound clause must not become an unrelated boundary');
+assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,'오전 10시에 기사과 기초 수업을 듣고, 8시간 동안 잠을 잔다.'),true,'punctuation after a preceding connector must not break requested-schedule identity');
+assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,'오전 10시에 기사과 기초 수업을 들은 후 8시간 동안 잠을 잔다.'),true,'a preceding 후 clause must remain attributable to its requested schedule');
 const durationQualifiedClassAction='오전 10시에 기사과 기초 수업을 1시간 동안 듣는다.';
 assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,durationQualifiedClassAction),true,'duration glue must not make the requested schedule look unrelated');
 assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,'오전 10시에 기사과 기초수업을 듣는다.'),true,'Korean spacing alone must not make the requested schedule look unrelated');
