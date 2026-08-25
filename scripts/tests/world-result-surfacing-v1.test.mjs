@@ -223,7 +223,7 @@ const health = readFileSync('api/health.js', 'utf8');
 assert.equal((adapter.match(/coreHandler\(/g) || []).length, 1, 'Event Director V3 must preserve one canonical core call');
 assert.match(adapter, /world_result_surface:worldResultSurface/, 'the checkpoint must stay under the existing sceneRuntime root');
 assert.match(adapter, /event_director_v3_enabled:true/);
-assert.match(health, /version: '0\.8\.5'/);
+assert.match(health, /version: '0\.8\.6'/);
 assert.match(health, /eventDirector: 'V3 public world-result surfacing/);
 
 console.log('PASS Event Director V3 bounded public world-result surfacing, priority, retry, evidence, freeze, and one-call regressions');
