@@ -28,6 +28,9 @@ assert.match(context,/DIRECTOR_COOLDOWN_TURNS/,'momentum must preserve cooldown 
 
 assert.match(chat,/SCENE_MOMENTUM_VERSION/);
 assert.match(chat,/applySceneMomentumTimeFloor/);
+assert.match(chat,/const runtimeTurn=runtimeSynthesisTurn\(data\.turn,sceneIntent\)/,'time-shortened visible scenes must be filtered before runtime synthesis');
+assert.match(chat,/localSceneRuntime\([^;]+,runtimeTurn,/,'scene runtime synthesis must consume the filtered turn');
+assert.match(chat,/localNpcUpdates\(incoming0,runtimeTurn\)/,'NPC runtime synthesis must consume the filtered turn');
 assert.match(chat,/deriveSceneDelta/);
 assert.match(chat,/updateSceneMomentum/);
 assert.match(chat,/deriveScenePurpose/);

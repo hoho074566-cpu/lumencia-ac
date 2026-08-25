@@ -11,11 +11,11 @@ const start=source.indexOf('function bounded(');
 const end=source.indexOf('function uniqText(');
 assert.ok(start>=0&&end>start,'Scene Momentum time-floor source markers missing');
 const timeFloorSource=source.slice(start,end);
-const makeHelpers=new Function('array','object','classifySceneIntent','isPcRelevantScheduleEvent','nextScheduleBoundaryMinutes','scheduleBoundaryLimitMinutes','scheduledIdsDueByTurnEnd','minutesUntilEventConsequence','CHARACTER_REGISTRY',`${timeFloorSource}\nreturn {applySceneMomentumTimeFloor,consequenceNpcKeysForShortening,consequenceNpcEffectsForShortening};`);
+const makeHelpers=new Function('array','object','classifySceneIntent','isPcRelevantScheduleEvent','nextScheduleBoundaryMinutes','scheduleBoundaryLimitMinutes','scheduledIdsDueByTurnEnd','minutesUntilEventConsequence','CHARACTER_REGISTRY',`${timeFloorSource}\nreturn {applySceneMomentumTimeFloor,consequenceNpcKeysForShortening,consequenceNpcEffectsForShortening,runtimeSynthesisTurn};`);
 const array=(value)=>Array.isArray(value)?value:[];
 const object=(value)=>value&&typeof value==='object'&&!Array.isArray(value)?value:{};
 const testRegistry={artemis:'아르테미스',emily:'에밀리'};
-const {applySceneMomentumTimeFloor,consequenceNpcKeysForShortening,consequenceNpcEffectsForShortening}=makeHelpers(array,object,classifySceneIntent,isPcRelevantScheduleEvent,nextScheduleBoundaryMinutes,scheduleBoundaryLimitMinutes,scheduledIdsDueByTurnEnd,minutesUntilEventConsequence,testRegistry);
+const {applySceneMomentumTimeFloor,consequenceNpcKeysForShortening,consequenceNpcEffectsForShortening,runtimeSynthesisTurn}=makeHelpers(array,object,classifySceneIntent,isPcRelevantScheduleEvent,nextScheduleBoundaryMinutes,scheduleBoundaryLimitMinutes,scheduledIdsDueByTurnEnd,minutesUntilEventConsequence,testRegistry);
 
 const knightPc={name:'카인',department:'기사과'};
 const irrelevantScheduleSave={
@@ -374,6 +374,16 @@ turn={scene:[{kind:'narration',text:'한참 뒤 방문객이 도착했다.'}],st
 applySceneMomentumTimeFloor({action:'5분만 기다린다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,5,'meaningful choices must not preserve time beyond an explicit maximum');
 assert.deepEqual(turn.state_delta.items_add,[],'effects from beyond the explicit maximum must be cleared when the turn is shortened');
+const futureScene=[{kind:'dialogue',speaker_key:'emily',text:'한참 뒤 에밀리가 도착해 말을 걸었다.'}];
+turn={scene_title:'한참 뒤의 방문',scene_summary:'에밀리가 도착했다.',scene:futureScene,emotion_updates:[{npc_key:'emily',expression:'smile'}],state_delta:{advance_minutes:100,npc_state_updates:[{npc_key:'emily',location:'광장'}]},choices:['맞이한다','돌려보낸다','기다린다'],event_progress:null};
+const shortenedIntent=applySceneMomentumTimeFloor({action:'5분만 기다린다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(shortenedIntent.runtimeSceneTrusted,false,'a shortened turn must mark its unreconciled visible scene unsafe for runtime synthesis');
+const safeRuntimeTurn=runtimeSynthesisTurn(turn,shortenedIntent);
+assert.deepEqual(safeRuntimeTurn.scene,[],'post-boundary speakers must not reach runtime synthesis');
+assert.deepEqual(safeRuntimeTurn.emotion_updates,[],'post-boundary speaker moods must not reach runtime synthesis');
+assert.deepEqual(safeRuntimeTurn.choices,[],'post-boundary choices must not influence runtime continuity');
+assert.equal(safeRuntimeTurn.state_delta.advance_minutes,5,'the reconciled bounded state delta must remain available to runtime synthesis');
+assert.strictEqual(turn.scene,futureScene,'runtime fail-closed filtering must not erase the user-visible response');
 turn={scene:[{kind:'narration',text:'기다림을 마쳤다.'}],state_delta:{advance_minutes:100,skill_experience:[{skill:'검술',amount:1}]},choices:[],event_progress:null};
 applySceneMomentumTimeFloor({action:'0분에서 10분 동안 기다린다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'a zero-minimum range must still enforce its positive maximum');

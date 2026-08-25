@@ -19,6 +19,13 @@ assert.deepEqual(dialogue.suggestedAdvanceMinutes, [2, 10]);
 assert.equal(dialogue.compression, true);
 assert.equal(classifySceneIntent('10시에 에밀리와 면담을 한다.', { location:'상담실',currentTime:'09:00' }).kind,'dialogue','object-marked 면담 must use the dialogue profile');
 assert.equal(classifySceneIntent('에밀리와 대화를 한다.', { location:'상담실' }).kind,'dialogue','object-marked 대화 must remain a committed dialogue action');
+assert.deepEqual(classifySceneIntent('회의를 1시간 동안 한다.', { location:'회의실' }).suggestedAdvanceMinutes,[60,60],'a duration between a dialogue object and verb must remain exact');
+for(const action of ['에밀리가 잠을 잔다.','에밀리가 기다린다.','에밀리가 회의를 한다.','에밀리가 검술을 훈련한다.','에밀리가 도서관으로 간다.'])assert.equal(classifySceneIntent(action).kind,'generic',`a third-party subject must not execute a PC timed action: ${action}`);
+assert.equal(classifySceneIntent('에밀리와 아르테미스가 잠을 잔다.').kind,'generic','a coordinated third-party subject must not execute PC downtime');
+assert.equal(classifySceneIntent('에밀리가 한 시간 훈련하고 잠을 잔다.').kind,'generic','a leading third-party subject must carry across its compound action');
+assert.equal(classifySceneIntent('에밀리가 한 시간 훈련하고 나는 잠을 잔다.').kind,'downtime','an explicit terminal first-person subject must override an earlier NPC subject');
+assert.equal(classifySceneIntent('누군가 “죽이겠다”고 외치는 소리를 듣고 에밀리가 잠을 잔다.').kind,'generic','an attributed report must not hide an explicit third-party terminal subject');
+assert.equal(classifySceneIntent('카인이 잠을 잔다.',{actorName:'카인'}).kind,'downtime','the actual player name must remain a valid explicit subject');
 
 const directQuestion = classifySceneIntent('아르테미스에게 오리엔테이션이 끝났느냐고 묻는다?', { location:'A동 복도' });
 assert.equal(directQuestion.kind, 'decision-sensitive', 'a direct question must retain same-moment player sovereignty');
@@ -99,6 +106,8 @@ const intervalClockClass=classifySceneIntent('10시 30분부터 11시 30분까�
 assert.equal(intervalClockClass.explicitDurationMinutes,60,'an explicit start-to-end clock interval must derive the activity duration');
 assert.deepEqual(intervalClockClass.suggestedAdvanceMinutes,[230,230],'an explicit clock interval must include the wait to start and end at the requested clock');
 assert.deepEqual(classifySceneIntent('22시부터 2시까지 잠을 잔다.', { location:'개인실',currentTime:'20:00' }).suggestedAdvanceMinutes,[360,360],'an unmarked 24-hour interval ending before its start must cross midnight');
+assert.deepEqual(classifySceneIntent('오후 11시부터 자정까지 잠을 잔다.', { location:'개인실',currentTime:'22:00' }).suggestedAdvanceMinutes,[120,120],'a named midnight endpoint must produce an exact interval plus its start wait');
+assert.deepEqual(classifySceneIntent('자정부터 오전 2시까지 잠을 잔다.', { location:'개인실',currentTime:'22:00' }).suggestedAdvanceMinutes,[240,240],'a named midnight start must remain available to interval parsing');
 assert.equal(classifySceneIntent('10시 30분에 수업을 듣는다.', { location:'강의실',currentTime:'12:00' }).scheduledStartOffsetMinutes,null,'an already-past ambiguous clock must not silently roll into the next day');
 const nextDayClass=classifySceneIntent('내일 10시 30분에 수업을 듣는다.', { location:'여관',currentTime:'07:40' });
 assert.equal(nextDayClass.scheduledStartOffsetMinutes,null,'a next-day clock must not be collapsed onto today');
