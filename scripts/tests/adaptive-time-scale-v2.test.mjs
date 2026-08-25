@@ -64,7 +64,9 @@ assert.equal(compoundClockClass.scheduledStartOffsetMinutes,120,'a terminal clas
 assert.deepEqual(compoundClockClass.suggestedAdvanceMinutes,[165,240],'the terminal activity clock offset must be added to the class duration range');
 assert.equal(classifySceneIntent('내일 9시에 아침을 먹고 10시에 수업을 듣는다.', { location:'여관',currentTime:'08:00' }).scheduledStartOffsetMinutes,null,'scoping to the terminal activity must not collapse an inherited next-day compound clock onto today');
 assert.deepEqual(classifySceneIntent('10:30에 수업을 듣는다.', { location:'여관',currentTime:'07:40' }).suggestedAdvanceMinutes,[215,290],'colon clock notation must use the same scheduled-start semantics');
-assert.equal(classifySceneIntent('10시 30분부터 11시 30분까지 수업을 듣는다.', { location:'여관',currentTime:'07:40' }).explicitDurationMinutes,null,'both clock minute components must stay out of duration parsing');
+const intervalClockClass=classifySceneIntent('10시 30분부터 11시 30분까지 수업을 듣는다.', { location:'여관',currentTime:'07:40' });
+assert.equal(intervalClockClass.explicitDurationMinutes,60,'an explicit start-to-end clock interval must derive the activity duration');
+assert.deepEqual(intervalClockClass.suggestedAdvanceMinutes,[230,230],'an explicit clock interval must include the wait to start and end at the requested clock');
 assert.equal(classifySceneIntent('10시 30분에 수업을 듣는다.', { location:'강의실',currentTime:'12:00' }).scheduledStartOffsetMinutes,null,'an already-past ambiguous clock must not silently roll into the next day');
 assert.equal(classifySceneIntent('내일 10시 30분에 수업을 듣는다.', { location:'여관',currentTime:'07:40' }).scheduledStartOffsetMinutes,null,'a next-day clock must not be collapsed onto today');
 
@@ -92,6 +94,13 @@ assert.equal(explicitTravel.kind,'travel');
 assert.equal(explicitTravel.semanticTarget,'기숙사','the duration phrase must not pollute the travel destination');
 assert.equal(explicitTravel.explicitDurationMinutes,30);
 assert.deepEqual(explicitTravel.suggestedAdvanceMinutes,[30,30],'an explicit travel duration must override the natural distance range');
+const scheduledTravel=classifySceneIntent('10시에 도서관으로 간다.', { location:'A동 개인실',currentTime:'09:00' });
+assert.equal(scheduledTravel.semanticTarget,'도서관','a scheduled-start clock must not pollute the travel destination');
+assert.equal(scheduledTravel.scheduledStartOffsetMinutes,60,'scheduled travel must retain the wait until departure');
+assert.deepEqual(scheduledTravel.suggestedAdvanceMinutes,[65,80],'scheduled travel must add the departure offset to the natural travel range');
+const intervalTravel=classifySceneIntent('10시부터 11시까지 도서관으로 간다.', { location:'A동 개인실',currentTime:'09:00' });
+assert.equal(intervalTravel.semanticTarget,'도서관','a clock interval must not pollute the travel destination');
+assert.deepEqual(intervalTravel.suggestedAdvanceMinutes,[120,120],'a travel clock interval must end at the explicit requested clock');
 
 const regionalTravel = classifySceneIntent('왕도로 간다.', { location:'중앙광장' });
 assert.equal(regionalTravel.timeProfile, 'travel-regional');
