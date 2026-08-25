@@ -1,18 +1,18 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Narrative Engine continuation — Living World V1 bounded off-screen lifecycle and protected-path validation.
+Narrative Engine continuation — Event Director V3 bounded public world-result surfacing and protected-path validation.
 
 ## Current GitHub State
 - Repo: `hoho074566-cpu/lumencia-ac`
-- Main: `2ce8d0bd9379a3b99e3fa75ddf38b4cc4cb4a962` (PR #51 merge).
-- Working branch: `codex/living-world-v1`, based directly on that verified merge.
-- PR #52 is open from `codex/living-world-v1`; current code/test checkpoint is `4d82b6f08942e9cf6408fc6ff01c675cc3090bb7`, followed by this docs-only checkpoint.
-- PR #51 is **merged** from final reviewed/accepted head `68c9e846ded43030155e6d6bc9cbe455eb23125d` as `2ce8d0bd9379a3b99e3fa75ddf38b4cc4cb4a962`.
-- PR #51 merge and reviewed-head trees both equal `4f95d14094e86a6328719dcdc11da59fff5a5230`. Production `/api/health` is healthy on app `1.5.6` / adapter `0.8.3` with Combat Growth V2 advertised, and merged-main clean-LF full regression passes.
-- Living World V1 focused/affected suites and the authoritative clean-LF full regression pass at `4d82b6f...`. A second regression review closed the zero-minute explicit-completion boundary without widening scope.
-- The candidate extends only public non-PC off-screen schedule lifecycle processing: crossed starts plus explicit `scheduled_events_complete` endings for already-known absent NPCs. Time alone and generic completion never invent a result.
-- Current/foreground/model state, PC schedules, secret/restricted/future rows, unknown NPCs, and disabled background simulation remain protected. One canonical model call and stable routing budgets are unchanged.
+- Main: `4bbe3fb801152b3cfd66680f8dd0bb3a4a609f2f` (PR #52 merge).
+- Working branch: `codex/event-director-v3-result-surfacing`, based directly on that verified merge.
+- PR #53 is open from this branch; current code/test checkpoint is `5845cda6b7a5aaa09fc56b2cb8a4f609cf5a2f2d`, followed by this docs-only checkpoint.
+- PR #52 is **merged** from final reviewed/accepted head `10de71aea55a4056e353689b1f58db68bb43dcb9` as `4bbe3fb801152b3cfd66680f8dd0bb3a4a609f2f`.
+- PR #52 merge and reviewed-head trees both equal `3473b4995ad922b8d432fb8a6d8c70ea921dcb12`. Production `/api/health` is healthy on app `1.5.6` / adapter `0.8.4` with Living World V1 advertised, and merged-main clean-LF full regression passes.
+- Event Director V3 focused/affected suites and the authoritative clean-LF full regression pass at `5845cda...`. A substantive second review tightened future-clock, title/NPC safety, visible-only evidence, negated completion, minimum-budget guards, and stale-backlog behavior without widening scope.
+- The candidate consumes only the latest deterministic public Living World completion fact and delivers it as the existing single Director beat. It never creates an event occurrence or invents an outcome.
+- Consequence, direct-question/focus, combat, player-stop, active-event, reachable-schedule, present-NPC-goal, background-disabled, AUTO/META/CONTINUE guards remain protected. One canonical model call and stable routing budgets are unchanged.
 - Exact head `7b63bab...` passed Safety #379, Vercel Ready, and fresh P0/P1=0. Its Exact Preview passed basic deliberate physical training (`D 0→1`) and mere-use rejection (`1→1`), but failed failure-plus-visible-correction. Correction 1/5 `57085b0...` recognized the exact applied-instruction wording. Intermediate exact head `3a48337...` passed Repository checks and Vercel, but a new natural variant split the instructor correction and subjectless successful repetition across scene rows; telemetry again reported `evidence_tier:0` / `rejected_stat_count:1`. Correction 2/5 `451679f...` safely links only adjacent instructor technical guidance to a successful PC repetition, handles the leading `이번에는` discourse marker, expands bounded physical relevance, and preserves explicit named-NPC rejection. Focused and authoritative clean-LF full regression pass. The new exact-head hosted cycle and affected Preview rerun remain pending; protection tokens must not be extracted and the same browser-setting work must not be requested again.
 - Exact code/docs head `d980b33...` deployed successfully to Vercel. A fresh `이번에는` deliberate-training Preview turn visibly produced instructor guidance and `마지막 반복에서는 지시한 각도와 순서를 적용해 발이 엉키지 않은 채 진입을 끝냈다`, but `신체` remained `D [1/100]`; exported telemetry again showed `evidence_tier:0` / `rejected_stat_count:1`. The same evidence-classification type has now repeatedly recurred under different natural completion phrases. Automatic correction is stopped under user condition 1; do not add another wording-specific synonym patch without explicit user direction.
 - The user explicitly resumed. Correction 3/5 `717e85c...` replaces completion-word enumeration with a bounded structural predicate: player-owned deliberate action, visible instructor technical guidance, adjacent final repetition, applied guidance or technical adjustment, and identified cause are all required. Final-attempt lead stripping fixes the temporal-phrase/NPC-subject false positive while existing third-party checks remain authoritative. The exact failed live response now passes; missing-guidance and two named-NPC forms remain rejected. Focused and authoritative clean-LF full regression pass; new exact-head hosted and Preview cycles remain.
@@ -55,7 +55,17 @@ Narrative Engine continuation — Living World V1 bounded off-screen lifecycle a
 - Production `/api/health`: `ok=true`, API configured, app `1.5.6`, adapter `/api/chat-router`, canonical core `/api/chat`, prompt cache retention `24h`.
 - Post-merge full `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
-## Living World V1 — Current Candidate in PR #52
+## Event Director V3 — Current Candidate in PR #53
+- `lib/world-result-surfacing.js` parses only exact, valid, known-NPC Living World `종료 확정` rows and selects the newest public fact. Future/invalid clocks, unsafe or extra NPC keys, directive-shaped titles, starts, generic background rows, and unknown NPCs are rejected.
+- Selection occurs after due Event Consequence and eligible present-NPC Goal Tick priority, but before a new weighted random event. Direct focus/question, combat, player-owned stop, active event, reachable schedule, scheduled fixed flow, background-disabled, AUTO, META, and CONTINUE paths cannot surface a result.
+- Scene Orchestration treats `WORLD_RESULT_SURFACE` as the existing one `director-event` beat. The player action remains first, only one visible channel is allowed, and no new occurrence/event lifecycle is created.
+- The routed minimum carries the exact `PUBLIC_FACT` and guards against multiple traces, outcome/reward/injury/secret/relationship invention, internal `[OFFSCREEN]` log exposure, teleportation, premature PC knowledge, and PC control even at adaptive scale `.76`.
+- `sceneRuntime.world_result_surface` records a bounded visible-evidence checkpoint. A selected NPC merely appearing, a future choice, internal summary, unrelated return, title-only mention, or negated completion cannot close it. One ignored attempt may retry once; after manifestation or two attempts the newest row stops, and older rows do not become a stale backlog.
+- Adapter/health candidate `0.8.5` adds `event_director_v3` and `world_result_surfacing_v1` telemetry while retaining the compatibility `event_director_v2` object and its V2.1 weighted core version.
+- No new save root/schema/migration, endpoint, serverless function, `app.js`, canonical `api/chat.js`, canon access, prompt-cache behavior, routing profile, or model call was added.
+- `scripts/tests/world-result-surfacing-v1.test.mjs` plus affected Router, authority-tail, Event Consequence, Goal Tick, Scene Orchestration, Scene Momentum, Living World, and core-invariant suites pass. The exact code checkpoint passes the full repository check in a clean-LF worktree.
+
+## Living World V1 — Merged in PR #52
 - Code checkpoint `4d82b6f08942e9cf6408fc6ff01c675cc3090bb7` extends the existing Bounded Off-screen Progression module from schedule-start evidence to a two-phase public schedule lifecycle.
 - Only exact `scheduled_events_complete` IDs may produce completion propagation. The schedule must exist, be at or past its start, remain public/non-PC, and name an already-known absent NPC. Mere elapsed time and `completed_events_add` do not qualify.
 - Current speakers/runtime participants and any NPC directly updated by the model are excluded, so foreground state remains authoritative. Unknown, future, PC-relevant, completed/cancelled, secret/private/restricted, and background-disabled paths remain no-ops.
@@ -63,7 +73,7 @@ Narrative Engine continuation — Living World V1 bounded off-screen lifecycle a
 - One turn accepts at most two event transitions and two NPC updates. Completion has priority, start/completion IDs have separate telemetry, and explicit completion at the current clock works even with zero time advance while ordinary zero-time turns freeze.
 - Adapter/health candidate `0.8.4` advertises `living_world_v1` / `offscreen_progression_v2`. No save root/schema/migration, endpoint, serverless function, `app.js`, canonical `api/chat.js`, routing-budget, prompt-cache, or one-call change exists.
 - Dedicated tests cover start, completion, same-turn start+completion, zero-time explicit completion, future/generic completion rejection, visibility/player/current/model/unknown guards, caps, cross-midnight, long skip, digest bounds, runtime wiring, and one-call architecture.
-- Focused related suites and authoritative clean-LF `scripts/lumensia-pr-check.mjs` pass after substantive second review. Exact-head hosted gates/review and targeted Preview lifecycle acceptance remain.
+- Final reviewed/accepted head `10de71aea55a4056e353689b1f58db68bb43dcb9` merged as `4bbe3fb801152b3cfd66680f8dd0bb3a4a609f2f`; reviewed and merged trees are identical. Exact-head hosted gates/review, targeted Preview lifecycle acceptance, merged-main clean-LF regression, and production health passed.
 
 ## Combat Growth V2 — Merged in PR #51
 - Final reviewed/accepted head `68c9e846ded43030155e6d6bc9cbe455eb23125d` merged as `2ce8d0bd9379a3b99e3fa75ddf38b4cc4cb4a962`; reviewed and merged trees are identical.
@@ -438,10 +448,10 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - protected core/runtime PRs remain exact-head reviewed and human-merge only.
 
 ## NEXT ACTION
-1. Commit and push the final acceptance docs checkpoint while preserving code checkpoint `4d82b6f...` and base/main `2ce8d0b...` with no conflict or behind state.
-2. Require the final docs exact head to pass GitHub Safety Gate, Vercel Ready, fresh Codex P0/P1=0, and the authoritative clean-LF full regression.
-3. Targeted Exact Preview lifecycle acceptance is complete: eligible public non-PC start, no time-only inferred completion, explicit completion, known-NPC status, and bounded start/finish digest each passed. Permanent deterministic coverage passes for generic/current/model/PC/secret/future exclusions, zero-time explicit completion, caps, cross-midnight/long skips, and background-disabled no-op. No protection token, cookie, or local storage was read.
-4. When the final exact-head gates are green, report PR #52 ready for human merge. Codex must not merge this protected-path PR. After the user merges it, verify tree equality, merged-main regression/Vercel/health, then begin the separate Event Director V3 result-surfacing analysis.
+1. Commit and push this Event Director V3 docs checkpoint while preserving code checkpoint `5845cda...` and base/main `4bbe3fb...` with no conflict or behind state.
+2. Require the final exact head to pass GitHub Safety Gate, Vercel Ready, Merge Readiness, fresh Codex P0/P1=0, and the authoritative clean-LF full regression.
+3. In Exact Preview, verify one eligible public completion surfaces exactly once through a plausible visible channel without invented outcome or new active event. Then verify direct question, combat/active event or reachable schedule, present-NPC Goal Tick, background-disabled, AUTO, META, and CONTINUE suppression. Do not inspect protection tokens, cookies, or local storage.
+4. When every gate is green, report PR #53 ready for human merge. Codex must not merge this protected-path PR. After human merge, verify reviewed/merge tree equality, merged-main regression/Vercel/health, then continue to the next separate roadmap phase.
 
 ## Stop Record
 - Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.
@@ -485,4 +495,5 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed: PR #49 final reviewed head `ff50084...` merged as `93f5644...`; reviewed and merged trees are identical, final hosted readiness had P0/P1=0 with no conflict, and main Vercel/production health/merged-main clean-LF regression pass.
 - Completed: PR #50 final reviewed head `1eb316b...` merged as `88ce7b4...`; reviewed and merged trees are identical, production health advertises Awakening/Talent V1, and merged-main clean-LF full regression passes.
 - Completed: PR #51 final reviewed/accepted head `68c9e84...` merged as `2ce8d0b...`; trees are identical, production health is green, and merged-main clean-LF full regression passes.
-- Current candidate: Living World V1 in open PR #52 on `codex/living-world-v1`; code checkpoint `4d82b6f...` passes focused and authoritative clean-LF full regression with no core/save/schema/model-call expansion. Pre-acceptance exact head `589510f...` passed Safety #392, Vercel Ready, Merge Readiness, and fresh Codex P0/P1=0. Exact Preview then passed public start, time-only no-inference, explicit completion, Lena `참여 중→일정을 마침`, and bounded start/finish digest validation. The final acceptance docs exact head must repeat hosted authority before human merge.
+- Completed: Living World V1 final reviewed/accepted head `10de71a...` merged in PR #52 as `4bbe3fb...`; reviewed and merged trees are identical, production health is green, and merged-main clean-LF regression passes.
+- Current candidate: Event Director V3 in open PR #53 on `codex/event-director-v3-result-surfacing`; code checkpoint `5845cda...` passes focused and authoritative clean-LF full regression with no new save root/schema/model call. Final docs exact-head hosted authority, fresh review, and targeted Preview acceptance remain before human merge.
