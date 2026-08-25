@@ -127,6 +127,17 @@ const boundaryChoiceSave={...boundarySave,pc:knightPc,scheduledEvents:[{id:'past
 turn={state_delta:{advance_minutes:0},choices:['수업에 간다','남는다','다른 일을 한다'],event_progress:{event_instance_id:'class'}};
 applySceneMomentumTimeFloor({action:'두 시간 쉰다.',saveState:boundaryChoiceSave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'an unrelated overdue row must not hide the structured future schedule boundary');
+turn={
+  scene_title:'수업 종료',scene:[{kind:'narration',text:'기초 수업을 모두 마치고 보상을 받았다.'}],choices:['다음 수업으로 간다','교관에게 묻는다','자리를 뜬다'],
+  event_progress:{event_instance_id:'class',active_beat:'complete',completed_beats:['complete']},
+  state_delta:{advance_minutes:10,scheduled_events_complete:['class'],completed_events_add:['class'],pc_knowledge_add:['기초 수업 내용'],items_add:['수료 보상'],gold_delta:5,relationship_changes:[{npc_key:'artemis',affinity_delta:1}],npc_state_updates:[{npc_key:'artemis',status:'수업 종료'}]},
+};
+const rewoundBoundaryIntent=applySceneMomentumTimeFloor({action:'10분 기다린다.',saveState:boundaryChoiceSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,10,'rewinding premature completion must retain the exact schedule-start clock');
+for(const field of ['scheduled_events_complete','completed_events_add','pc_knowledge_add','items_add','relationship_changes','npc_state_updates'])assert.deepEqual(turn.state_delta[field],[],`${field} must fail closed when a schedule is only beginning`);
+assert.equal(turn.state_delta.gold_delta,0,'currency awarded by a prematurely completed schedule must fail closed');
+assert.equal(turn.event_progress,null,'terminal event progress must not survive rewinding to the schedule start');
+assert.equal(rewoundBoundaryIntent.runtimeSceneTrusted,false,'runtime synthesis must ignore narration that completes a schedule at its start');
 const eveningClass={id:'evening-class',title:'기사과 수업',date:'1285-03-01',time:'20:00',kind:'academic',status:'scheduled'};
 const eveningClassSave={pc:knightPc,world:{date:'1285-03-01',time:'19:30',location:'훈련장'},scheduleContext:{due:[],upcoming:[eveningClass]},scheduledEvents:[eveningClass]};
 turn={scene_title:'오후 수업의 종',scene:[{kind:'narration',text:'오후 8시, 기사과 수업 종이 울렸다.'}],state_delta:{advance_minutes:30,skill_experience:[{skill:'검술',amount:1}]},choices:['수업에 간다','훈련을 멈춘다','다른 곳으로 간다']};
@@ -167,6 +178,21 @@ assert.equal(nextScheduleBoundaryMinutes(nextDaySave),120,'next-day authoritativ
 turn={state_delta:{advance_minutes:0},choices:[]};
 applySceneMomentumTimeFloor({action:'6시간 쉰다.',saveState:nextDaySave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,120,'long downtime must not cross a next-day scheduled event');
+const nextDaySleep={id:'personal-sleep',title:'개인 수면',date:'1285-03-02',time:'01:00',kind:'personal',status:'scheduled'};
+const nextDaySleepSave={pc:knightPc,world:{date:'1285-03-01',time:'23:00',location:'기숙사'},scheduleContext:{due:[],upcoming:[nextDaySleep]},scheduledEvents:[nextDaySleep]};
+const nextDaySleepAction='내일 밤 1시에 잠을 잔다.';
+assert.equal(nextScheduleBoundaryMinutes(nextDaySleepSave,{futureOnly:true,action:nextDaySleepAction,intent:classifySceneIntent(nextDaySleepAction,{location:'기숙사',currentTime:'23:00'})}),null,'an early-night clock must identify and exclude its own next-day scheduled activity');
+const earlyNightClass={id:'early-night-class',title:'기사과 필수 수업',date:'1285-03-02',time:'01:00',kind:'academic',status:'scheduled'};
+const earlyNightClassSave={pc:knightPc,world:{date:'1285-03-01',time:'23:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[earlyNightClass]},scheduledEvents:[earlyNightClass]};
+turn={scene_title:'밤의 필수 수업',scene:[{kind:'narration',text:'밤 1시, 기사과 필수 수업 종이 울렸다.'}],state_delta:{advance_minutes:120,skill_experience:[{skill:'검술',amount:1}]},choices:['수업에 간다','훈련을 멈춘다','다른 곳으로 간다']};
+applySceneMomentumTimeFloor({action:'6시간 쉰다.',saveState:earlyNightClassSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,120,'밤 1시 narration must surface a saved 01:00 schedule boundary');
+assert.deepEqual(turn.state_delta.skill_experience,[],'effects beyond the surfaced 01:00 boundary must fail closed');
+const afternoonClass={...earlyNightClass,id:'afternoon-class',date:'1285-03-01',time:'13:00'};
+const afternoonClassSave={pc:knightPc,world:{date:'1285-03-01',time:'12:30',location:'훈련장'},scheduleContext:{due:[],upcoming:[afternoonClass]},scheduledEvents:[afternoonClass]};
+turn={scene_title:'밤의 필수 수업 예고',scene:[{kind:'narration',text:'밤 1시, 기사과 필수 수업 종이 울렸다.'}],state_delta:{advance_minutes:10},choices:['훈련을 계속한다','교관에게 묻는다','자리를 뜬다']};
+applySceneMomentumTimeFloor({action:'2시간 동안 검술을 훈련한다.',saveState:afternoonClassSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,10,'밤 1시 must not be mistaken for a saved 13:00 schedule boundary');
 
 const ignoredSchedule={world:{date:'1285-03-01',time:'07:00'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[{id:'done',date:'1285-03-01',time:'08:00',status:'completed'},{id:'cancelled',date:'1285-03-01',time:'09:00',status:'cancelled'}]};
 assert.equal(nextScheduleBoundaryMinutes(ignoredSchedule),null,'completed/cancelled authoritative events must not create a time boundary');

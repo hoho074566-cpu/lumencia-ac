@@ -26,6 +26,20 @@ assert.equal(classifySceneIntent('에밀리가 한 시간 훈련하고 잠을 �
 assert.equal(classifySceneIntent('에밀리가 한 시간 훈련하고 나는 잠을 잔다.').kind,'downtime','an explicit terminal first-person subject must override an earlier NPC subject');
 assert.equal(classifySceneIntent('누군가 “죽이겠다”고 외치는 소리를 듣고 에밀리가 잠을 잔다.').kind,'generic','an attributed report must not hide an explicit third-party terminal subject');
 assert.equal(classifySceneIntent('카인이 잠을 잔다.',{actorName:'카인'}).kind,'downtime','the actual player name must remain a valid explicit subject');
+assert.deepEqual(classifySceneIntent('에밀리와는 1시간 동안 대화를 한다.').suggestedAdvanceMinutes,[60,60],'a comitative topic adjunct must not be mistaken for a third-party subject');
+assert.deepEqual(classifySceneIntent('에밀리에게는 1시간 동안 설명을 한다.').suggestedAdvanceMinutes,[60,60],'a dative topic adjunct must not be mistaken for a third-party subject');
+assert.equal(classifySceneIntent('에밀리와는 아르테미스가 1시간 동안 대화를 한다.').kind,'generic','skipping an adjunct must still preserve a following explicit third-party subject');
+
+for(const [action,kind] of [
+  ['1시간 동안 훈련하겠다.','training'],['1시간 동안 훈련할게.','training'],
+  ['수업을 듣겠다.','class-attendance'],['수업을 들을게.','class-attendance'],
+  ['8시간 잠을 자겠다.','downtime'],['8시간 잠을 잘게.','downtime'],
+  ['30분 기다리겠다.','wait'],['30분 기다릴게.','wait'],
+  ['20분 동안 식사하겠다.','meal'],['20분 동안 식사할게.','meal'],
+  ['10분 동안 대화하겠다.','dialogue'],['10분 동안 대화할게.','dialogue'],
+])assert.equal(classifySceneIntent(action).kind,kind,`a committed future-tense action must retain its timed profile: ${action}`);
+assert.deepEqual(classifySceneIntent('1시간 동안 훈련하겠다.').suggestedAdvanceMinutes,[60,60],'겠다 training must preserve its exact duration');
+assert.deepEqual(classifySceneIntent('8시간 잠을 잘게.').suggestedAdvanceMinutes,[480,480],'할게 sleep must preserve its exact duration');
 
 const directQuestion = classifySceneIntent('아르테미스에게 오리엔테이션이 끝났느냐고 묻는다?', { location:'A동 복도' });
 assert.equal(directQuestion.kind, 'decision-sensitive', 'a direct question must retain same-moment player sovereignty');
@@ -132,6 +146,9 @@ assert.equal(classifySceneIntent('12시에 입학식에 참석한다.', { locati
 assert.equal(classifySceneIntent('오늘 아침 8시에 수업을 듣는다.', { location:'강의실',currentTime:'07:00' }).scheduledStartOffsetMinutes,60,'아침 must normalize to an AM clock marker');
 assert.equal(classifySceneIntent('오늘 저녁 8시에 수업을 듣는다.', { location:'강의실',currentTime:'19:00' }).scheduledStartOffsetMinutes,60,'저녁 must normalize to a PM clock marker');
 assert.equal(classifySceneIntent('오늘 밤 10시에 훈련한다.', { location:'훈련장',currentTime:'21:00' }).scheduledStartOffsetMinutes,60,'밤 must normalize to a PM clock marker');
+assert.equal(classifySceneIntent('밤 1시에 잠을 잔다.', { location:'개인실',currentTime:'23:00' }).scheduledStartOffsetMinutes,120,'early-night clocks must roll forward to the next calendar day');
+assert.equal(classifySceneIntent('내일 밤 1시에 잠을 잔다.', { location:'개인실',currentTime:'23:00' }).dateQualifiedStart,true,'a date-qualified early-night clock must preserve the requested future date');
+assert.deepEqual(classifySceneIntent('밤 11시부터 밤 1시까지 잠을 잔다.', { location:'개인실',currentTime:'22:00' }).suggestedAdvanceMinutes,[180,180],'a night interval ending at 1 AM must cross midnight');
 
 const sleep = classifySceneIntent('잠을 잔다.', { location:'개인실' });
 assert.equal(sleep.kind, 'downtime');
@@ -213,7 +230,9 @@ const repositoryRules = fs.readFileSync(new URL('../../AGENTS.md', import.meta.u
 assert.match(router, /ADAPTIVE_TIME_SCALE_VERSION/);
 assert.match(router, /adaptive_time_scale_v2:true/);
 assert.match(router, /mode!==['"]game['"]/, 'META/AUTO/CONTINUE must stay outside the deterministic time floor');
-assert.match(fs.readFileSync(new URL('../../api/lib/context-router.js', import.meta.url), 'utf8'), /boundaryLookahead>0\?activityRangeLimitMinutes\(sceneIntent\):0/, 'compressed timed and bounded future-date activities must expose their full valid consequence lookahead');
+const contextRouter = fs.readFileSync(new URL('../../api/lib/context-router.js', import.meta.url), 'utf8');
+assert.match(contextRouter, /boundaryLookahead>0\?activityRangeLimitMinutes\(sceneIntent\):0/, 'compressed timed and bounded future-date activities must expose their full valid consequence lookahead');
+assert.match(contextRouter, /classifySceneIntent\(incoming\.action\|\|'',\{[^}]*actorName:save\?\.pc\?\.name\|\|''/s, 'the Director classifier must receive the canonical player name');
 assert.match(health, /version:\s*'0\.8\.7'/);
 assert.match(repositoryRules, /External API adapter:\s*`0\.8\.7`/, 'the authoritative release manifest must match the adapter and health surface');
 assert.match(health, /adaptiveTimeScale:\s*'V2/);

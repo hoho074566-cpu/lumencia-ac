@@ -335,7 +335,7 @@ function scheduleTimeMentioned(text,row={}){
   const match=String(row?.time||'').trim().match(/^(\d{1,2}):(\d{2})$/);if(!match)return false;
   const hour=Number(match[1]),minute=Number(match[2]),value=String(text||'');if(!Number.isInteger(hour)||!Number.isInteger(minute))return false;
   const hourToken=hour<10?`0?${hour}`:`${hour}`,minuteToken=String(minute).padStart(2,'0'),colon=new RegExp(`(?:^|\\D)${hourToken}:${minuteToken}(?!\\d)`),korean=minute===0?new RegExp(`(?:^|\\D)${hour}\\s*시(?!\\s*(?:\\d+\\s*분|반))`):minute===30?new RegExp(`(?:^|\\D)${hour}\\s*시\\s*(?:30\\s*분|반)`):new RegExp(`(?:^|\\D)${hour}\\s*시\\s*${minute}\\s*분`),unmarkedValue=value.replace(/(?:오전|오후|아침|저녁|밤)\s*\d{1,2}(?:\s*시(?:\s*(?:\d{1,2}\s*분|반))?|:\d{2})/g,' ');
-  const period=hour<12?'(?:오전|아침)':'(?:오후|저녁|밤)',twelveHour=hour%12||12,twelveHourKorean=minute===0?new RegExp(`${period}\\s*${twelveHour}\\s*시(?!\\s*(?:\\d+\\s*분|반))`):minute===30?new RegExp(`${period}\\s*${twelveHour}\\s*시\\s*(?:30\\s*분|반)`):new RegExp(`${period}\\s*${twelveHour}\\s*시\\s*${minute}\\s*분`);
+  const period=hour===0?'밤':hour<=5?'밤':hour<=11?'(?:오전|아침)':hour<=17?'오후':'(?:오후|저녁|밤)',twelveHour=hour%12||12,twelveHourKorean=minute===0?new RegExp(`${period}\\s*${twelveHour}\\s*시(?!\\s*(?:\\d+\\s*분|반))`):minute===30?new RegExp(`${period}\\s*${twelveHour}\\s*시\\s*(?:30\\s*분|반)`):new RegExp(`${period}\\s*${twelveHour}\\s*시\\s*${minute}\\s*분`);
   const twelveHourColon=new RegExp(`${period}\\s*${twelveHour}:${minuteToken}(?!\\d)`);
   if(colon.test(unmarkedValue)||korean.test(unmarkedValue)||twelveHourKorean.test(value)||twelveHourColon.test(value))return true;
   return minute===0&&((hour===12&&/정오/.test(value))||(hour===0&&/자정/.test(value)));
@@ -412,11 +412,14 @@ function consequenceNpcKeysForShortening(turn,consequence,routedKeys=[],registry
   return consequenceNpcEffectsForShortening(turn,consequence,routedKeys,registry).npc_keys;
 }
 function reconcileReachedScheduleStart(turn,boundaryIds=new Set()){
-  const delta=object(turn?.state_delta);if(!turn?.state_delta||!boundaryIds.size)return;
+  const delta=object(turn?.state_delta);if(!turn?.state_delta||!boundaryIds.size)return false;
+  const lifecycleCompleted=['active_events_remove','completed_events_add','scheduled_events_remove','scheduled_events_complete'].some(field=>array(delta[field]).some(value=>boundaryIds.has(String(value||'').trim().toLowerCase())));
   for(const field of ['active_events_remove','completed_events_add','scheduled_events_remove','scheduled_events_complete'])delta[field]=array(delta[field]).filter(value=>!boundaryIds.has(String(value||'').trim().toLowerCase()));
   const progress=object(turn?.event_progress),eventId=String(progress.event_instance_id||progress.eventInstanceId||'').trim().toLowerCase(),terminal=new Set(['complete','completed','done','finished','end']);
   const completionSignals=[progress.active_beat,progress.activeBeat,progress.status,...array(progress.completed_beats||progress.completedBeats)].map(value=>String(value||'').trim().toLowerCase());
-  if(boundaryIds.has(eventId)&&completionSignals.some(value=>terminal.has(value)))turn.event_progress=null;
+  const terminalProgress=boundaryIds.has(eventId)&&completionSignals.some(value=>terminal.has(value));
+  if(terminalProgress)turn.event_progress=null;
+  return lifecycleCompleted||terminalProgress;
 }
 function reconcileShortenedTimedTurn(turn,{preserveConsequenceId='',preserveNpcStateUpdates=[],preserveNpcScheduleUpdates=[],preserveDelta={}}={}){
   const delta=object(turn?.state_delta);if(!turn?.state_delta)return;
@@ -488,10 +491,11 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
     else consequenceLifecycle.evidence='deferred-by-earlier-boundary';
     consequenceLifecycle.status='open';
   }
+  let rewoundScheduleCompletion=false;
   if(reconcileTruncatedTurn)reconcileShortenedTimedTurn(turn,{preserveConsequenceId:appliedConsequenceBoundary||consequenceLifecycle?.evidence==='ambiguous-npc-effect'?consequenceLifecycle?.selected_id:'',preserveNpcStateUpdates:appliedConsequenceBoundary?consequenceLifecycle?.npc_state_updates:[],preserveNpcScheduleUpdates:appliedConsequenceBoundary?consequenceLifecycle?.npc_schedule_updates:[],preserveDelta:appliedConsequenceBoundary?consequenceLifecycle?.preserved_delta:{}});
-  else if(appliedScheduleBoundary)reconcileReachedScheduleStart(turn,boundaryIds);
+  else if(appliedScheduleBoundary){rewoundScheduleCompletion=reconcileReachedScheduleStart(turn,boundaryIds);if(rewoundScheduleCompletion)reconcileShortenedTimedTurn(turn);}
   turn.state_delta.advance_minutes=applied;
-  return{...intent,runtimeSceneTrusted:!reconcileTruncatedTurn};
+  return{...intent,runtimeSceneTrusted:!reconcileTruncatedTurn&&!rewoundScheduleCompletion};
 }
 function runtimeSynthesisTurn(turn,intent={}){
   if(intent?.runtimeSceneTrusted!==false)return turn;
