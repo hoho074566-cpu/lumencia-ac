@@ -430,7 +430,7 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   if(intent.explicitDurationMinutes===0){reconcileExplicitZeroTurn(turn);return intent;}
   if(requestedFloor<=0)return intent;
   const profileMax=Math.min(1440,Math.max(requestedFloor,Number(array(intent.suggestedAdvanceMinutes)[1]||0)));
-  const scheduleBoundary=nextScheduleBoundaryMinutes(incoming?.saveState||{},{futureOnly:true,action:incoming?.action||'',intent});
+  const scheduleBoundary=nextScheduleBoundaryMinutes(incoming?.saveState||{},{futureOnly:true,action:incoming?.action||'',intent,registry:CHARACTER_REGISTRY});
   const consequenceBoundary=consequenceLifecycle?.selected_id?minutesUntilEventConsequence(incoming?.saveState||{},consequenceLifecycle.selected_id):null;
   const reachedConsequenceBoundary=Boolean(consequenceBoundary!=null&&Number.isFinite(Number(consequenceBoundary))&&consequenceBoundary<=profileMax&&consequenceLifecycle?.status==='resolved'&&consequenceLifecycle?.attribution_safe!==false);
   const floorBoundaries=[scheduleBoundary,reachedConsequenceBoundary?consequenceBoundary:null].filter(value=>value!=null&&Number.isFinite(Number(value))).map(Number),floorBoundary=floorBoundaries.length?Math.min(...floorBoundaries):null;
@@ -450,12 +450,13 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   let applied=current;
   if(reachedBoundary!=null)applied=reachedBoundary;
   else if(!structuredInterruption&&completedBeforeChoice)applied=Math.min(profileMax,Math.max(current,boundedFloor));
-  if(applied<current&&consequenceLifecycle?.status==='resolved'&&!appliedConsequenceBoundary){
+  const boundaryTruncatesAction=Boolean(reachedBoundary!=null&&reachedBoundary<requestedFloor),reconcileTruncatedTurn=applied<current||boundaryTruncatesAction;
+  if(reconcileTruncatedTurn&&consequenceLifecycle?.status==='resolved'&&!appliedConsequenceBoundary){
     if(consequenceLifecycle?.attribution_safe===false){const id=String(consequenceLifecycle.selected_id||'');turn.state_delta.hooks_update=[...array(turn.state_delta.hooks_update).filter(row=>String(row?.id||'')!==id),{id,status:'open',reason:'발현 시각 도달; NPC 경계 효과 귀속 대기'}].slice(0,8);consequenceLifecycle.evidence='ambiguous-npc-effect';}
     else consequenceLifecycle.evidence='deferred-by-earlier-boundary';
     consequenceLifecycle.status='open';
   }
-  if(applied<current)reconcileShortenedTimedTurn(turn,{preserveConsequenceId:appliedConsequenceBoundary||consequenceLifecycle?.evidence==='ambiguous-npc-effect'?consequenceLifecycle?.selected_id:'',preserveNpcStateUpdates:appliedConsequenceBoundary?consequenceLifecycle?.npc_state_updates:[],preserveNpcScheduleUpdates:appliedConsequenceBoundary?consequenceLifecycle?.npc_schedule_updates:[]});
+  if(reconcileTruncatedTurn)reconcileShortenedTimedTurn(turn,{preserveConsequenceId:appliedConsequenceBoundary||consequenceLifecycle?.evidence==='ambiguous-npc-effect'?consequenceLifecycle?.selected_id:'',preserveNpcStateUpdates:appliedConsequenceBoundary?consequenceLifecycle?.npc_state_updates:[],preserveNpcScheduleUpdates:appliedConsequenceBoundary?consequenceLifecycle?.npc_schedule_updates:[]});
   else if(appliedScheduleBoundary)reconcileReachedScheduleStart(turn,boundaryIds);
   turn.state_delta.advance_minutes=applied;
   return intent;

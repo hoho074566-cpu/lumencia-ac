@@ -11,10 +11,11 @@ const start=source.indexOf('function bounded(');
 const end=source.indexOf('function uniqText(');
 assert.ok(start>=0&&end>start,'Scene Momentum time-floor source markers missing');
 const timeFloorSource=source.slice(start,end);
-const makeHelpers=new Function('array','object','classifySceneIntent','isPcRelevantScheduleEvent','nextScheduleBoundaryMinutes','scheduleBoundaryLimitMinutes','scheduledIdsDueByTurnEnd','minutesUntilEventConsequence',`${timeFloorSource}\nreturn {applySceneMomentumTimeFloor,consequenceNpcKeysForShortening,consequenceNpcEffectsForShortening};`);
+const makeHelpers=new Function('array','object','classifySceneIntent','isPcRelevantScheduleEvent','nextScheduleBoundaryMinutes','scheduleBoundaryLimitMinutes','scheduledIdsDueByTurnEnd','minutesUntilEventConsequence','CHARACTER_REGISTRY',`${timeFloorSource}\nreturn {applySceneMomentumTimeFloor,consequenceNpcKeysForShortening,consequenceNpcEffectsForShortening};`);
 const array=(value)=>Array.isArray(value)?value:[];
 const object=(value)=>value&&typeof value==='object'&&!Array.isArray(value)?value:{};
-const {applySceneMomentumTimeFloor,consequenceNpcKeysForShortening,consequenceNpcEffectsForShortening}=makeHelpers(array,object,classifySceneIntent,isPcRelevantScheduleEvent,nextScheduleBoundaryMinutes,scheduleBoundaryLimitMinutes,scheduledIdsDueByTurnEnd,minutesUntilEventConsequence);
+const testRegistry={artemis:'아르테미스',emily:'에밀리'};
+const {applySceneMomentumTimeFloor,consequenceNpcKeysForShortening,consequenceNpcEffectsForShortening}=makeHelpers(array,object,classifySceneIntent,isPcRelevantScheduleEvent,nextScheduleBoundaryMinutes,scheduleBoundaryLimitMinutes,scheduledIdsDueByTurnEnd,minutesUntilEventConsequence,testRegistry);
 
 const knightPc={name:'카인',department:'기사과'};
 const irrelevantScheduleSave={
@@ -84,6 +85,13 @@ assert.equal(turn.state_delta.advance_minutes,105,'the requested class must adva
 assert.deepEqual(turn.state_delta.scheduled_events_complete,['basic-class'],'completing the requested class must survive because the turn was not shortened at its own start');
 const earlierAppointment={id:'mentor-meeting',title:'교수 면담',date:'1285-03-01',time:'09:30',kind:'personal',status:'scheduled'};
 assert.equal(nextScheduleBoundaryMinutes({...ownClassSave,scheduleContext:{due:[],upcoming:[earlierAppointment,ownClass]},scheduledEvents:[earlierAppointment,ownClass]},{futureOnly:true,action:ownClassAction,intent:ownClassIntent}),30,'excluding the requested class must not hide an earlier unrelated appointment');
+
+const personalConsult={id:'personal-consult',title:'개인 상담',date:'1285-03-01',time:'10:00',kind:'personal',status:'scheduled',participants:['emily']};
+const personalConsultSave={pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'기숙사'},scheduleContext:{due:[],upcoming:[personalConsult]},scheduledEvents:[personalConsult]};
+const keyedConsultAction='10시에 emily와 상담한다.';
+assert.equal(nextScheduleBoundaryMinutes(personalConsultSave,{futureOnly:true,action:keyedConsultAction,intent:classifySceneIntent(keyedConsultAction,{location:'기숙사',currentTime:'09:00'})}),null,'a participant key must identify its otherwise generic scheduled consultation');
+const namedConsultAction='10시에 에밀리와 상담한다.';
+assert.equal(nextScheduleBoundaryMinutes(personalConsultSave,{futureOnly:true,action:namedConsultAction,intent:classifySceneIntent(namedConsultAction,{location:'기숙사',currentTime:'09:00'}),registry:{emily:'에밀리'}}),null,'a canonical participant label must identify its otherwise generic scheduled consultation');
 
 const boundaryChoiceSave={...boundarySave,pc:knightPc,scheduledEvents:[{id:'past-ceremony',date:'1285-03-01',time:'08:00',status:'scheduled'},{id:'class',date:'1285-03-01',time:'10:00',status:'scheduled'}]};
 turn={state_delta:{advance_minutes:0},choices:['수업에 간다','남는다','다른 일을 한다'],event_progress:{event_instance_id:'class'}};
@@ -197,6 +205,17 @@ applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:schedule
 assert.equal(turn.state_delta.advance_minutes,30,'an earlier required schedule must win over a later resolved consequence');
 assert.deepEqual(turn.state_delta.hooks_update,[],'a consequence resolution after the applied schedule boundary must not persist');
 assert.equal(laterResolvedLifecycle.status,'open','consequence telemetry must remain open when its later boundary was not applied');
+
+const underreportedConsequenceSave={...consequenceSave,world:{...consequenceSave.world,time:'09:20',location:'기숙사'}};
+turn={scene:[{kind:'narration',text:'10분쯤 걷자 약속 시각이 되어 에밀리가 중앙광장에 도착했다.'}],state_delta:{advance_minutes:10,new_location:'도서관',pc_status:'이동 완료',gold_delta:3,items_add:['도착 보상'],hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
+const underreportedLifecycle={selected_id:consequenceHook.id,status:'resolved',attribution_safe:true,npc_state_updates:[],npc_schedule_updates:[]};
+applySceneMomentumTimeFloor({action:'30분 동안 도서관으로 간다.',saveState:underreportedConsequenceSave},turn,'game',underreportedLifecycle);
+assert.equal(turn.state_delta.advance_minutes,20,'a resolved boundary must align an underreported clock to its exact trigger');
+assert.equal(turn.state_delta.new_location,null,'a destination after a boundary-truncated action must fail closed even when the clock is raised');
+assert.equal(turn.state_delta.pc_status,null,'a completion status after a boundary-truncated action must fail closed even when the clock is raised');
+assert.equal(turn.state_delta.gold_delta,0,'a reward after a boundary-truncated action must fail closed even when the clock is raised');
+assert.deepEqual(turn.state_delta.items_add,[],'items after a boundary-truncated action must fail closed even when the clock is raised');
+assert.deepEqual(turn.state_delta.hooks_update,[{id:consequenceHook.id,status:'resolved'}],'the consequence applied at the raised boundary must retain its exact lifecycle update');
 
 turn={scene:[{kind:'narration',text:'한 시간째 약속 시각이 되어 에밀리가 중앙광장에 도착했다.'},{kind:'narration',text:'그 뒤 에밀리는 기숙사로 떠났다.'}],state_delta:{advance_minutes:90,npc_state_updates:[{npc_key:'emily',location:'기숙사',status:'떠남'}],npc_schedule_updates:[{npc_key:'emily',delay_minutes:30,location:'기숙사',activity:'휴식',reason:'약속 종료'}],hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
 const ambiguousEffects=consequenceNpcEffectsForShortening(turn,{event_name:'약속 상대의 도착',reason:'약속 장소에 도착한다',secret_level:0},['emily'],{emily:'에밀리'});
