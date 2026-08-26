@@ -507,7 +507,7 @@ function reconcileExplicitZeroTurn(turn){
 }
 function completionSegmentAttributedToPc(segment='',matchIndex=0,kind='',actorName=''){
   const allowedSubjects=new Set(['나','내','저','제','우리','저희',String(actorName||'').trim().toLowerCase()].filter(Boolean));
-  const activitySubjects={downtime:new Set(['잠','수면','휴식']),meal:new Set(['식사','밥','아침','점심','저녁']),training:new Set(['훈련','연습','수련','단련']),'class-attendance':new Set(['수업','강의','세미나','실습','오리엔테이션','교육','입학식']),dialogue:new Set(['대화','이야기','질문','답변','설명','상담','논의','면담','회의','브리핑'])}[kind]||new Set();
+  const activitySubjects={downtime:new Set(['잠','수면','휴식']),wait:new Set(['기다림','대기']),meal:new Set(['식사','밥','아침','점심','저녁']),training:new Set(['훈련','연습','수련','단련']),'class-attendance':new Set(['수업','강의','세미나','실습','오리엔테이션','교육','입학식']),dialogue:new Set(['대화','이야기','질문','답변','설명','상담','논의','면담','회의','브리핑'])}[kind]||new Set();
   let prefix=String(segment||'').slice(0,Math.max(0,Number(matchIndex)||0)).toLowerCase();
   const clauseBreaks=[...prefix.matchAll(/(?:해서|하여|하니|라서|어서|아서|기에|때문에|지만|는데|더니|고서)\s+/gu)],lastBreak=clauseBreaks.at(-1);if(lastBreak)prefix=prefix.slice((lastBreak.index||0)+lastBreak[0].length);
   const subjects=[...prefix.matchAll(/(?:^|[\s,])([^\s,]{1,32}?)(?:가|이|은|는|께서)\s+/gu)].map(match=>String(match[1]||'').trim().toLowerCase()),subject=subjects.at(-1);
@@ -534,7 +534,7 @@ function timedActionCompletionEvidence(turn,intent={},action='',actorName=''){
     return segments.some(segment=>{if(hypothetical.test(segment)||!arrival.test(segment)||!travelDestinationReachedForReconciliation(segment,intent?.semanticTarget))return false;const before=segment.slice(0,segment.search(arrival)),subjects=[...before.matchAll(/(?:^|[\s,])([^\s,]{1,32}?)(?:가|이|은|는|께서)\s+/gu)].map(match=>String(match[1]||'').trim().toLowerCase()),subject=subjects.at(-1);return!subject||allowedSubjects.has(subject);});
   }
   if(!patterns[kind])return false;
-  const pcAttributedKinds=new Set(['downtime','meal','training','class-attendance','dialogue']);
+  const pcAttributedKinds=new Set(['downtime','wait','meal','training','class-attendance','dialogue']);
   return segments.some(segment=>{if(hypothetical.test(segment)||kind==='wait'&&uncertainWait.test(segment))return false;const match=patterns[kind].exec(segment);if(match)return!pcAttributedKinds.has(kind)||completionSegmentAttributedToPc(segment,match.index,kind,actorName);const foodMatch=kind==='meal'&&foodCompletion?foodCompletion.exec(segment.toLowerCase()):null;return Boolean(foodMatch&&completionSegmentAttributedToPc(segment,foodMatch.index,kind,actorName));});
 }
 function travelDestinationReachedForReconciliation(location='',target=''){

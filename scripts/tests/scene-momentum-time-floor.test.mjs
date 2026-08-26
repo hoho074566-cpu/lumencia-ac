@@ -734,6 +734,16 @@ turn={scene:[{kind:'narration',text:'한 시간이 흘렀다. 기다리던 복�
 applySceneMomentumTimeFloor({action:'1시간 동안 기다린다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,60,'ordinary elapsed-wait completion prose must enforce the declared wait duration before choices');
 assert.match(turn.scene_summary,/60분.*행동을 마쳤다/,'reconciled wait narration must agree that the declared wait completed');
+turn={scene:[{kind:'narration',text:'10분 뒤 리나가 기다림을 마쳤다.'}],state_delta:{advance_minutes:10},choices:['리나에게 묻는다','계속 기다린다','자리를 뜬다'],event_progress:null};
+applySceneMomentumTimeFloor({action:'1시간 동안 기다린다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,10,'an NPC-owned wait completion must not force the player wait to its declared floor');
+assert.deepEqual(turn.choices,['리나에게 묻는다','계속 기다린다','자리를 뜬다'],'an NPC wait completion must preserve the legitimate player interruption');
+turn={scene:[{kind:'narration',text:'카인이 기다림을 마쳤다.'}],state_delta:{advance_minutes:10},choices:['주변을 본다','자리를 뜬다','다시 기다린다'],event_progress:null};
+applySceneMomentumTimeFloor({action:'1시간 동안 기다린다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,60,'a saved player subject must remain valid wait completion evidence');
+turn={scene:[{kind:'narration',text:'20분 뒤 기다림을 마쳤다.'}],state_delta:{advance_minutes:20},choices:['주변을 본다','자리를 뜬다','다시 기다린다'],event_progress:null};
+applySceneMomentumTimeFloor({action:'30분 미만 기다린다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,20,'completion before an explicit upper bound must preserve the returned elapsed time');
 for(const uncertain of ['한 시간이 지났는지 알 수 없다.','한 시간이 지났다고 착각했다.','한 시간이 지났다는 오해가 있었다.','한 시간이 지났다고 들었다.','한 시간이 지났다고 생각했지만 시계가 멈춰 있었다.']){
   turn={scene:[{kind:'narration',text:uncertain}],state_delta:{advance_minutes:10},choices:['계속 기다린다','시계를 확인한다','자리를 뜬다'],event_progress:null};
   applySceneMomentumTimeFloor({action:'1시간 동안 기다린다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');

@@ -126,6 +126,19 @@ assert.equal(zeroMinimumWait.kind,'wait','a zero-minimum explicit range must ret
 assert.deepEqual(zeroMinimumWait.explicitDurationRangeMinutes,[0,10],'a zero-minimum explicit range must retain its positive lookahead');
 assert.deepEqual(zeroMinimumWait.suggestedAdvanceMinutes,[0,10],'a zero-minimum wait may compress anywhere inside its declared range');
 assert.equal(activityRangeLimitMinutes(zeroMinimumWait),10,'consequence lookahead must use the positive range maximum even when its floor is zero');
+for(const [action,maximum] of [['30분 미만 기다린다.',29],['30분 이내 기다린다.',30],['최대 30분 기다린다.',30]]){
+  const upperBoundWait=classifySceneIntent(action);
+  assert.equal(upperBoundWait.kind,'wait',`an upper-bound qualifier must preserve committed wait intent: ${action}`);
+  assert.equal(upperBoundWait.explicitDurationMinutes,null,`an upper bound must not become an exact duration floor: ${action}`);
+  assert.equal(upperBoundWait.explicitDurationUpperBoundMinutes,maximum,`the deterministic upper bound must preserve inclusive/exclusive semantics: ${action}`);
+  assert.deepEqual(upperBoundWait.explicitDurationRangeMinutes,[0,maximum],`an upper-bound request must expose a zero-floor range: ${action}`);
+  assert.deepEqual(upperBoundWait.suggestedAdvanceMinutes,[0,maximum],`an upper-bound request may finish naturally before its cap: ${action}`);
+  assert.equal(scheduleBoundaryLimitMinutes(upperBoundWait),0,`an upper-bound wait must not target a schedule as its completion floor: ${action}`);
+}
+const upperBoundSchedule={id:'upper-bound-class',title:'기사과 필수 수업',date:'1285-03-01',time:'09:25',kind:'academic',status:'scheduled'},upperBoundScheduleSave={pc:{department:'기사과'},world:{date:'1285-03-01',time:'09:00',location:'복도'},scheduledEvents:[upperBoundSchedule],scheduleContext:{due:[],upcoming:[upperBoundSchedule]}};
+const upperBoundDirective=buildSceneMomentumDirective({action:'30분 미만 기다린다.',saveState:upperBoundScheduleSave});
+assert.doesNotMatch(upperBoundDirective,/SCHEDULE_BOUNDARY=25min/,'a schedule inside an upper bound must not become a mandatory completion target');
+assert.match(upperBoundDirective,/EXPLICIT_DURATION_UPPER_BOUND=29min/,'the model directive must distinguish the upper bound from an exact duration');
 assert.deepEqual(classifySceneIntent('문 앞에서는 기다리지 않고 로비에서 1시간 동안 기다린다.').suggestedAdvanceMinutes,[60,60],'a negated earlier wait must not cancel a committed terminal wait');
 assert.deepEqual(classifySceneIntent('피로가 풀리도록 8시간 동안 잠을 잔다.').suggestedAdvanceMinutes,[480,480],'a subordinate purpose subject must not replace the omitted PC sleep subject');
 assert.deepEqual(classifySceneIntent('친구가 올 때까지 1시간 동안 기다린다.').suggestedAdvanceMinutes,[60,60],'a subordinate arrival subject must not replace the omitted PC wait subject');
