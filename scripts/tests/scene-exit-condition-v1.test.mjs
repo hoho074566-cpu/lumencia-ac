@@ -34,6 +34,8 @@ assert.equal(namedPcTravel.destination,'도서관','saved-name travel must retai
 
 const question=deriveSceneExitCondition({action:'지금 입학식에 돌아갈까?',saveState:baseSave,turnNumber:13});
 assert.equal(question.kind,'question-answered');
+const futureWeekdayAction=deriveSceneExitCondition({action:'이번 목요일 오전 10시에 1시간 훈련한다.',saveState:{...baseSave,world:{date:'1285-03-01',weekday:'수요일',time:'11:00',location:'훈련장'}},turnNumber:13});
+assert.equal(futureWeekdayAction.kind,'action-resolved','scene exit must use the saved fantasy weekday instead of applying a question freeze to a future action');
 const answered=evaluateSceneExitCondition(question,{turn:{scene:[{kind:'dialogue',speaker_key:'guide',text:'아직 늦지는 않았어.'}],choices:[]},sceneDelta:{score:1,structuralScore:0,advanceMinutes:0,flags:{npcAction:true}}});
 assert.equal(answered.status,'reached');
 assert.match(buildSceneExitDirective({action:'지금 입학식에 돌아갈까?',saveState:baseSave}),/질문 속 가능 행동을 실행하거나 시간·위치·진행 상태를 바꾸지 않는다/);

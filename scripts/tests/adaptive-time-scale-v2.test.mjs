@@ -147,6 +147,14 @@ for(const [action,maximum] of [['30분 미만 기다린다.',29],['30분 이내 
   assert.deepEqual(upperBoundWait.suggestedAdvanceMinutes,[0,maximum],`an upper-bound request may finish naturally before its cap: ${action}`);
   assert.equal(scheduleBoundaryLimitMinutes(upperBoundWait),0,`an upper-bound wait must not target a schedule as its completion floor: ${action}`);
 }
+for(const [action,kind,maximum] of [['훈련을 최대 30분 동안 한다.','training',30],['수업을 30분 이내 듣는다.','class-attendance',30],['대화를 30분 미만 한다.','dialogue',29]]){
+  const postObjectUpperBound=classifySceneIntent(action,{location:'훈련장'});
+  assert.equal(postObjectUpperBound.kind,kind,`an upper bound after the activity object must retain its activity profile: ${action}`);
+  assert.equal(postObjectUpperBound.explicitDurationUpperBoundMinutes,maximum,`a post-object upper bound must preserve its deterministic maximum: ${action}`);
+  assert.deepEqual(postObjectUpperBound.suggestedAdvanceMinutes,[0,maximum],`a post-object upper bound must remain a zero-floor bounded range: ${action}`);
+}
+const postObjectUpperBoundarySave={pc:{department:'기사과'},world:{date:'1285-03-01',time:'09:45',location:'훈련장'},scheduledEvents:[{id:'upper-class',title:'기사과 필수 수업',date:'1285-03-01',time:'10:00',kind:'academic'}],scheduleContext:{due:[],upcoming:[{id:'upper-class',title:'기사과 필수 수업',date:'1285-03-01',time:'10:00',kind:'academic'}]}};
+assert.match(buildSceneMomentumDirective({action:'훈련을 최대 30분 동안 한다.',saveState:postObjectUpperBoundarySave}),/SCHEDULE_CAP=15min/,'a post-object upper bound must still expose an intervening required schedule as a non-padding cap');
 const upperBoundSchedule={id:'upper-bound-class',title:'기사과 필수 수업',date:'1285-03-01',time:'09:25',kind:'academic',status:'scheduled'},upperBoundScheduleSave={pc:{department:'기사과'},world:{date:'1285-03-01',time:'09:00',location:'복도'},scheduledEvents:[upperBoundSchedule],scheduleContext:{due:[],upcoming:[upperBoundSchedule]}};
 const upperBoundDirective=buildSceneMomentumDirective({action:'30분 미만 기다린다.',saveState:upperBoundScheduleSave});
 assert.doesNotMatch(upperBoundDirective,/SCHEDULE_BOUNDARY=25min/,'a schedule inside an upper bound must not become a mandatory completion target');
@@ -353,6 +361,11 @@ assert.equal(isRequestedScheduledActivity(absoluteDatedClassSave,absoluteDatedCl
 const durationQualifiedClassAction='오전 10시에 기사과 기초 수업을 1시간 동안 듣는다.';
 assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,durationQualifiedClassAction),true,'duration glue must not make the requested schedule look unrelated');
 assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,'오전 10시에 기사과 기초수업을 듣는다.'),true,'Korean spacing alone must not make the requested schedule look unrelated');
+const personalConsultation={id:'personal-consultation',title:'개인 상담',date:'1285-03-01',time:'10:00',kind:'meeting',status:'scheduled',pc_required:true,participants:['emily']},personalConsultationSave={pc:{name:'카인'},world:{date:'1285-03-01',time:'09:00',location:'상담실'},scheduledEvents:[personalConsultation],scheduleContext:{due:[],upcoming:[personalConsultation]}},importantConsultationAction='오전 10시에 에밀리와 중요한 상담을 한다.',importantConsultationIntent=classifySceneIntent(importantConsultationAction,{location:'상담실',currentTime:'09:00',actorName:'카인'}),consultationRegistry={emily:'에밀리'};
+assert.equal(isRequestedScheduledActivity(personalConsultationSave,personalConsultation,importantConsultationAction,importantConsultationIntent,consultationRegistry),true,'an incidental modifier must not make a strong participant/time/category match interrupt itself');
+assert.equal(nextScheduleBoundaryMinutes(personalConsultationSave,{futureOnly:true,action:importantConsultationAction,intent:importantConsultationIntent,registry:consultationRegistry}),null,'a uniquely participant-matched consultation must remain the requested schedule');
+const competingConsultation={id:'other-consultation',title:'개인 상담',date:'1285-03-01',time:'10:00',kind:'meeting',status:'scheduled',pc_required:true,participants:['lina']},ambiguousConsultationSave={...personalConsultationSave,scheduledEvents:[personalConsultation,competingConsultation],scheduleContext:{due:[],upcoming:[personalConsultation,competingConsultation]}};
+assert.equal(isRequestedScheduledActivity(ambiguousConsultationSave,personalConsultation,importantConsultationAction,importantConsultationIntent,{...consultationRegistry,lina:'리나'}),false,'participant fallback must fail closed when multiple same-category schedules share the requested time');
 const roomClass={id:'room-class',title:'101호 수업',date:'1285-03-01',time:'10:00',kind:'academic',status:'scheduled'},roomClassSave={pc:{name:'카인'},world:{date:'1285-03-01',time:'08:00',location:'기숙사'},scheduledEvents:[roomClass],scheduleContext:{due:[],upcoming:[roomClass]}},rightRoomAction='오전 10시에 101호 수업을 듣는다.',wrongRoomAction='오전 10시에 102호 수업을 듣는다.';
 assert.equal(isRequestedScheduledActivity(roomClassSave,roomClass,rightRoomAction),true,'matching non-time room identifiers must preserve requested-schedule identity');
 assert.equal(isRequestedScheduledActivity(roomClassSave,roomClass,wrongRoomAction),false,'a different room number must not collapse into the unique generic class fallback');

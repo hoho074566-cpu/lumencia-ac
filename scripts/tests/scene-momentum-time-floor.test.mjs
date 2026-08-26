@@ -743,6 +743,11 @@ const firstLongSleepIntent=applySceneMomentumTimeFloor({action:'이틀 동안 �
 const longSleepRuntime=deriveTimedActionRuntime({},firstLongSleepIntent,'이틀 동안 잠을 잔다.',turn,'game');
 assert.equal(longSleepRuntime.remaining_minutes,1440,'a capped two-day sleep must persist its remaining day');
 assert.equal(longSleepRuntime.total_minutes,2880,'the resumable record must retain the original exact duration');
+const unfinishedTrainingRuntime={version:'1.0',kind:'training',original_action:'이틀 동안 훈련한다.',semantic_target:'training-session-complete',total_minutes:2880,elapsed_minutes:1440,remaining_minutes:1440,remaining_wait_minutes:0,remaining_activity_minutes:1440,status:'active'};
+assert.equal(classifySceneIntent('수업을 계속한다.',{location:'강의실',resumeTimedAction:unfinishedTrainingRuntime}).kind,'class-attendance','a different explicit class action must not resume stored training');
+assert.equal(classifySceneIntent('대화를 계속한다.',{location:'상담실',resumeTimedAction:unfinishedTrainingRuntime}).kind,'dialogue','a different explicit dialogue action must not resume stored training');
+assert.equal(classifySceneIntent('계속한다.',{location:'훈련장',resumeTimedAction:unfinishedTrainingRuntime}).resumedTimedAction,true,'a genuinely generic continuation may resume the stored action kind');
+assert.equal(classifySceneIntent('훈련을 계속한다.',{location:'훈련장',resumeTimedAction:unfinishedTrainingRuntime}).resumedTimedAction,true,'an explicit matching action kind must resume its stored timeline');
 assert.deepEqual(deriveTimedActionRuntime({timed_action:longSleepRuntime},{},'',{},'auto'),longSleepRuntime,'AUTO must freeze an incomplete timed action');
 assert.deepEqual(deriveTimedActionRuntime({timed_action:longSleepRuntime},{},'',{},'continue'),longSleepRuntime,'CONTINUE must freeze an incomplete timed action');
 assert.deepEqual(deriveTimedActionRuntime({timed_action:longSleepRuntime},{},'',{},'meta'),longSleepRuntime,'META must freeze an incomplete timed action');

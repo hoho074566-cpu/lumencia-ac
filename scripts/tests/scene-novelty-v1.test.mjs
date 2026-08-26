@@ -84,6 +84,9 @@ assert.doesNotMatch(question,/중요한 선택점이 아니라면 기존 NPC 목
 const elapsedStartNovelty=buildSceneNoveltyDirective({action:'오늘 오전 1시에 훈련한다.',saveState:{...saveState,world:{...saveState.world,time:'09:00'}},recentTurns:[repeatedTurn]});
 assert.match(elapsedStartNovelty,/QUESTION BOUNDARY/,'novelty must share the elapsed-start freeze produced by the canonical current time');
 assert.doesNotMatch(elapsedStartNovelty,/현재 USER ACTION과 고정 일정\/진행 사건을 우선 완료한다/,'novelty must not tell the model to complete an elapsed today-start action');
+const futureWeekdayNovelty=buildSceneNoveltyDirective({action:'이번 목요일 오전 10시에 1시간 훈련한다.',saveState:{...saveState,world:{date:'1285-03-01',weekday:'수요일',time:'11:00',location:'훈련장'}},recentTurns:[repeatedTurn]});
+assert.doesNotMatch(futureWeekdayNovelty,/QUESTION BOUNDARY/,'novelty must use the saved fantasy weekday instead of freezing a future activity as elapsed');
+assert.match(futureWeekdayNovelty,/현재 USER ACTION과 고정 일정\/진행 사건을 우선 완료한다/,'novelty must agree with the time floor that the future weekday action remains executable');
 
 const recap=buildSceneNoveltyDirective({action:'게시판 내용을 다시 설명해 줘',saveState,recentTurns:[repeatedTurn]});
 assert.match(recap,/REQUESTED RECAP/);

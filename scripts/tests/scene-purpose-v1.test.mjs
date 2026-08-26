@@ -82,6 +82,8 @@ assert.match(currentActionDirective,/PURPOSE_MODE=current-action-first/);
 assert.match(currentActionDirective,/USER ACTION이 저장된 PURPOSE_FOCUS보다 우선한다/);
 assert.match(currentActionDirective,/현재 행동의 목표를 바꾸지 않는다/);
 assert.match(currentActionDirective,/USER ACTION에 명시되지 않은 PC의 추가 행동·대사·감정·생각·수락·거절·선택을 대신 만들지 않는다/);
+const futureWeekdayDirective=buildScenePurposeDirective({action:'이번 목요일 오전 10시에 1시간 훈련한다.',saveState:{world:{date:'1285-03-01',weekday:'수요일',time:'11:00',location:'훈련장'},sceneRuntime:{purpose:initial}}});
+assert.doesNotMatch(futureWeekdayDirective,/DIRECT QUESTION PRIORITY/,'scene purpose must use the saved fantasy weekday instead of treating a future action as elapsed');
 
 const directQuestionDirective=buildScenePurposeDirective({action:'안내인에게 기숙사가 어디인지 묻는다?',saveState:{world:{location:turn.scene_title},sceneRuntime:{purpose:initial}}});
 assert.match(directQuestionDirective,/PURPOSE_MODE=current-action-first/);
