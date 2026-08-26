@@ -388,6 +388,9 @@ assert.doesNotMatch(turn.scene_summary,/여섯 시간|모두 쉬고/,'post-bound
 turn={scene:[{kind:'narration',text:'잠에서 깨어나 몸을 일으켰다.'}],state_delta:{advance_minutes:60},choices:['일어난다','일정을 확인한다','더 쉰다']};
 applySceneMomentumTimeFloor({action:'잠을 잔다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,240,'post-sleep choices must not let a completed sleep action undercut its profile minimum');
+turn={scene:[{kind:'narration',text:'훈련이 끝났다.'}],state_delta:{advance_minutes:10},choices:['결과를 확인한다','교관에게 묻는다','자리를 뜬다']};
+applySceneMomentumTimeFloor({action:'1시간 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20',location:'훈련장'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,60,'a subject-form training completion must enforce the declared duration before post-training choices');
 turn={state_delta:{advance_minutes:960},choices:[]};
 applySceneMomentumTimeFloor({action:'잠을 잔다.',saveState:{world:{date:'1285-03-01',time:'15:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,480,'a completed sleep action must not jump to a convenient next morning beyond its profile maximum');
@@ -733,6 +736,28 @@ assert.equal(longSleepRuntime.total_minutes,2880,'the resumable record must reta
 assert.deepEqual(deriveTimedActionRuntime({timed_action:longSleepRuntime},{},'',{},'auto'),longSleepRuntime,'AUTO must freeze an incomplete timed action');
 assert.deepEqual(deriveTimedActionRuntime({timed_action:longSleepRuntime},{},'',{},'continue'),longSleepRuntime,'CONTINUE must freeze an incomplete timed action');
 assert.deepEqual(deriveTimedActionRuntime({timed_action:longSleepRuntime},{},'',{},'meta'),longSleepRuntime,'META must freeze an incomplete timed action');
+const deferredTrainingAction='내일 오전 10시에 1시간 훈련한다.';
+turn={scene:[{kind:'narration',text:'하루가 지나 요청한 훈련 시각을 기다리고 있다.'}],state_delta:{advance_minutes:1440},choices:[]};
+const deferredTrainingIntent=applySceneMomentumTimeFloor({action:deferredTrainingAction,saveState:{world:{date:'1285-03-01',time:'08:00',location:'훈련장'},sceneRuntime:{},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+const deferredTrainingRuntime=deriveTimedActionRuntime({},deferredTrainingIntent,deferredTrainingAction,turn,'game');
+assert.equal(deferredTrainingRuntime.total_minutes,1620,'a deferred date-qualified action must retain its absolute wait plus activity duration');
+assert.equal(deferredTrainingRuntime.remaining_wait_minutes,120,'the next turn must preserve the remaining wait until the declared start');
+assert.equal(deferredTrainingRuntime.remaining_activity_minutes,60,'the deferred record must preserve the activity duration separately from the wait');
+assert.equal(deferredTrainingRuntime.remaining_minutes,180,'the deferred record must retain the full remaining timeline');
+const resumedDeferredTraining=classifySceneIntent('계속 훈련한다.',{location:'훈련장',resumeTimedAction:deferredTrainingRuntime});
+assert.equal(resumedDeferredTraining.scheduledStartOffsetMinutes,120,'resuming a deferred action must wait until its original absolute start');
+assert.equal(resumedDeferredTraining.explicitDurationMinutes,60,'resuming a deferred action must retain its original activity duration');
+assert.deepEqual(resumedDeferredTraining.suggestedAdvanceMinutes,[180,180],'the resumed guide must combine only the remaining wait and activity');
+turn={scene:[{kind:'narration',text:'훈련이 끝났다.'}],state_delta:{advance_minutes:20},choices:['결과를 확인한다','교관에게 묻는다','자리를 뜬다']};
+const completedDeferredTrainingIntent=applySceneMomentumTimeFloor({action:'계속 훈련한다.',saveState:{world:{date:'1285-03-02',time:'08:00',location:'훈련장'},sceneRuntime:{timed_action:deferredTrainingRuntime},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,180,'a resumed deferred action must not begin before the saved start or finish before its saved duration');
+assert.equal(deriveTimedActionRuntime({timed_action:deferredTrainingRuntime},completedDeferredTrainingIntent,'계속 훈련한다.',turn,'game'),null,'the deferred record must clear after its remaining wait and activity complete');
+turn={scene:[{kind:'narration',text:'하루의 진행 한계에서 아직 잠들어 있다.'}],state_delta:{advance_minutes:1440},choices:[]};
+const cappedScheduledSleepIntent=applySceneMomentumTimeFloor({action:'오늘 오후 11시에 잠을 잔다.',saveState:{world:{date:'1285-03-01',time:'00:00',location:'개인실'},sceneRuntime:{},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+const cappedScheduledSleepRuntime=deriveTimedActionRuntime({},cappedScheduledSleepIntent,'오늘 오후 11시에 잠을 잔다.',turn,'game');
+assert.equal(cappedScheduledSleepRuntime.total_minutes,1620,'same-day scheduled actions must include their start delay in resumable totals');
+assert.equal(cappedScheduledSleepRuntime.remaining_wait_minutes,0,'elapsed time through the scheduled start must consume the saved wait first');
+assert.equal(cappedScheduledSleepRuntime.remaining_activity_minutes,180,'only the unfinished scheduled activity duration should remain');
 for(const [action,total] of [['이틀에서 사흘 동안 잠을 잔다.',2880],['이틀 넘게 잠을 잔다.',2881],['이틀 이상 잠을 잔다.',2880],['1시간 훈련하고 이틀 동안 잠을 잔다.',2940]]){
   turn={scene:[{kind:'narration',text:'하루 동안 요청한 행동을 진행했지만 아직 끝나지 않았다.'}],state_delta:{advance_minutes:1440},choices:[]};
   const cappedIntent=applySceneMomentumTimeFloor({action,saveState:{world:{date:'1285-03-02',time:'07:20',location:'개인실'},sceneRuntime:{},scheduleContext:{due:[],upcoming:[]}}},turn,'game');

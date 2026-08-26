@@ -367,6 +367,14 @@ assert.equal(classifySceneIntent('오늘 밤 10시에 훈련한다.', { location
 const daytimeTraining=classifySceneIntent('낮 2시에 1시간 훈련한다.',{location:'훈련장',currentTime:'09:00'});
 assert.equal(daytimeTraining.scheduledStartOffsetMinutes,300,'낮 must normalize an ordinary 2시 clock to 14:00');
 assert.deepEqual(daytimeTraining.suggestedAdvanceMinutes,[360,360],'a daytime scheduled action must include the wait until 14:00 and its explicit duration');
+const nativeClockTraining=classifySceneIntent('오후 두 시에 1시간 훈련한다.',{location:'훈련장',currentTime:'09:00'});
+assert.equal(nativeClockTraining.scheduledStartOffsetMinutes,300,'a native Korean clock hour must normalize to the requested absolute start');
+assert.deepEqual(nativeClockTraining.suggestedAdvanceMinutes,[360,360],'a native Korean clock must retain the following activity duration');
+const nativeHalfClockTraining=classifySceneIntent('오후 두 시 반에 1시간 훈련한다.',{location:'훈련장',currentTime:'09:00'});
+assert.equal(nativeHalfClockTraining.scheduledStartOffsetMinutes,330,'a native Korean half-hour clock must normalize to 14:30');
+assert.deepEqual(nativeHalfClockTraining.suggestedAdvanceMinutes,[390,390],'a native half-hour start must retain the following activity duration');
+const nativeClockBoundary={id:'native-clock-class',title:'기사과 필수 수업',date:'1285-03-01',time:'12:00',kind:'academic',status:'scheduled'},nativeClockBoundarySave={pc:{department:'기사과'},world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduledEvents:[nativeClockBoundary],scheduleContext:{due:[],upcoming:[nativeClockBoundary]}};
+assert.match(buildSceneMomentumDirective({action:'오후 두 시에 1시간 훈련한다.',saveState:nativeClockBoundarySave}),/SCHEDULE_BOUNDARY=180min/,'a required noon schedule must interrupt a later native-clock training plan');
 assert.equal(classifySceneIntent('밤 1시에 잠을 잔다.', { location:'개인실',currentTime:'23:00' }).scheduledStartOffsetMinutes,120,'early-night clocks must roll forward to the next calendar day');
 assert.equal(classifySceneIntent('내일 밤 1시에 잠을 잔다.', { location:'개인실',currentTime:'23:00' }).dateQualifiedStart,true,'a date-qualified early-night clock must preserve the requested future date');
 assert.deepEqual(classifySceneIntent('밤 11시부터 밤 1시까지 잠을 잔다.', { location:'개인실',currentTime:'22:00' }).suggestedAdvanceMinutes,[180,180],'a night interval ending at 1 AM must cross midnight');
