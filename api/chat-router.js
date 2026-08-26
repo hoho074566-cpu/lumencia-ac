@@ -371,6 +371,12 @@ function consequenceEffectMatches(value,segments=[]){
   const tokens=[...new Set((text.match(/[가-힣a-z0-9_]{2,}/g)||[]).map(token=>token.replace(/(?:에게서|에게|한테|께서|으로|에서|까지|부터|처럼|보다|에는|은|는|이|가|을|를|와|과|도|의)$/u,'').replace(/(?:하였다|했습니다|했다|합니다|한다|되었다|됐다|됩니다|된다|이었다|였다|입니다|이다)$/u,'')).filter(token=>token.length>=2&&!generic.has(token)))];
   return tokens.length>=2&&segments.some(segment=>tokens.filter(token=>segment.includes(token)).length>=Math.min(2,tokens.length));
 }
+function consequenceNpcScheduleMatches(row,segments=[]){
+  const source=object(row),visible=array(segments).join(' ').toLowerCase(),location=String(source.location||'').trim().toLowerCase(),activity=String(source.activity||'').trim().toLowerCase();
+  const visiblyMatches=(value)=>{if(visible.includes(value))return true;const tokens=value.match(/[가-힣a-z0-9_]{2,}/gi)||[];return tokens.length>0&&tokens.every(token=>visible.includes(token));};
+  if(!visible||!location||!activity||!visiblyMatches(location)||!visiblyMatches(activity))return false;
+  return array(segments).some(segment=>/(?:오늘|내일|모레|다음\s*날|익일|\d{1,4}\s*년|\d{1,2}\s*월\s*\d{1,2}\s*일|\d{3,4}[-/.]\d{1,2}[-/.]\d{1,2}|(?:\d+|한|두|세|네|다섯|여섯|일곱)\s*(?:분|시간|일|주)\s*(?:뒤|후)|(?:오전|오후|아침|새벽|저녁|밤)\s*\d{1,2}\s*(?:시|:\d{2})|정오|자정|나중|예정|계획|예약|하기로|기로\s*(?:했|한|한다)|(?:일정|회의|면담)(?:을|를)?\s*(?:잡|정하|정했|예약))/i.test(segment));
+}
 function consequenceNpcEffectsForShortening(turn,consequence,routedKeys=[],registry=CHARACTER_REGISTRY){
   const routed=new Set(array(routedKeys).map(value=>String(value||'').trim()).filter(value=>Object.prototype.hasOwnProperty.call(registry,value))),keys=new Set(routed),evidence=consequenceEvidenceSegments(turn,consequence);
   if(!evidence.tokens.length&&!evidence.matched.length){const delta=object(turn?.state_delta),hasUnpreservedEffect=Object.entries(delta).some(([field,value])=>{if(['advance_minutes','hooks_update'].includes(field))return false;if(Array.isArray(value))return value.length>0;if(typeof value==='number')return value!==0;return value!=null&&value!==''&&value!==false;});return{npc_keys:[...keys].slice(0,4),npc_state_updates:[],npc_schedule_updates:[],preserved_delta:{},attribution_safe:!hasUnpreservedEffect};}
@@ -392,8 +398,8 @@ function consequenceNpcEffectsForShortening(turn,consequence,routedKeys=[],regis
     for(const [field,value] of Object.entries(object(row))){if(['npc_key','key'].includes(field)||value==null||value===''||value===false||typeof value==='number'&&value===0||Array.isArray(value)&&value.length===0)continue;if(!stateFields.has(field)){stateAttributionSafe=false;continue;}const text=String(value).trim().toLowerCase();if(text.length>=2&&visible.includes(text))kept[field]=value;else stateAttributionSafe=false;}
     if(Object.keys(kept).length>1)preservedState.push(kept);
   }
-  const preservedSchedule=[];
   const delta=object(turn?.state_delta),preservedDelta={};
+  const preservedSchedule=array(delta.npc_schedule_updates).filter(row=>{const key=String(row?.npc_key||row?.key||'').trim();return limitedKeys.has(key)&&consequenceNpcScheduleMatches(row,effectSegments.get(key)||[]);});
   const linkedRelationshipFields=['relationship_changes','relationship_milestones_add','intimacy_changes'];
   let linkedRelationshipCount=0,preservedLinkedRelationshipCount=0;
   for(const field of linkedRelationshipFields){

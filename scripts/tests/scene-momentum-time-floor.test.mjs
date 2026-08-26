@@ -375,6 +375,14 @@ assert.equal(hiddenPcStateLifecycle.status,'open','PC state attribution telemetr
 turn={scene:[{kind:'narration',text:'약속 시각이 되자 에밀리가 중앙광장에 도착해 후문 경계를 시작했다.'}],state_delta:{advance_minutes:40,npc_state_updates:[{npc_key:'emily',location:'중앙광장',status:'도착'}],npc_schedule_updates:[{npc_key:'emily',delay_minutes:20,location:'중앙광장',activity:'후문 경계',reason:'도착 후 경계'}],hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
 const scheduleCoupledEffects=consequenceNpcEffectsForShortening(turn,{event_name:'약속 상대의 도착',reason:'약속 장소에 도착한다',secret_level:0},['emily'],{emily:'에밀리'});
 assert.equal(scheduleCoupledEffects.attribution_safe,false,'an unrebased consequence-owned NPC schedule must keep attribution unresolved');
+const arrangedMeeting={npc_key:'emily',delay_minutes:1440,location:'교관실',activity:'면담',reason:'도착 후 확인'};
+turn={scene:[{kind:'narration',text:'약속 시각이 되자 에밀리가 다음 날 교관실에서 면담하기로 일정을 잡았다.'}],state_delta:{advance_minutes:40,npc_schedule_updates:[arrangedMeeting],hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
+const arrangedMeetingEffects=consequenceNpcEffectsForShortening(turn,{event_name:'에밀리의 면담 예약',reason:'에밀리가 교관실 면담 일정을 잡는다',secret_level:0},['emily'],{emily:'에밀리'});
+assert.equal(arrangedMeetingEffects.attribution_safe,true,'a visibly arranged future NPC commitment must be attributable to the consequence');
+assert.deepEqual(arrangedMeetingEffects.npc_schedule_updates,[arrangedMeeting],'an evidence-attributed future NPC schedule must survive consequence shortening');
+applySceneMomentumTimeFloor({action:'40분 기다린다.',saveState:consequenceSave},turn,'game',{selected_id:consequenceHook.id,status:'resolved',...arrangedMeetingEffects},arrangedMeetingEffects.visible_scene);
+assert.deepEqual(turn.state_delta.npc_schedule_updates,[arrangedMeeting],'a manifested consequence must retain its visibly arranged NPC commitment at the exact boundary');
+assert.deepEqual(turn.state_delta.hooks_update,[{id:consequenceHook.id,status:'resolved'}],'a retained NPC commitment must resolve its owning consequence exactly once');
 const partialNpcEffects=consequenceNpcEffectsForShortening({scene:[{kind:'narration',text:'약속 시각이 되자 에밀리가 중앙광장에 도착했다.'}],state_delta:{advance_minutes:40,npc_state_updates:[{npc_key:'emily',location:'중앙광장',goal_progress_delta:20}],hooks_update:[{id:consequenceHook.id,status:'resolved'}]}},{event_name:'약속 상대의 도착',reason:'약속 장소에 도착한다',secret_level:0},['emily'],{emily:'에밀리'});
 assert.equal(partialNpcEffects.attribution_safe,false,'a partially preserved NPC row must not resolve while any material field remains unattributed');
 const mismatchedArrayEffects=consequenceNpcEffectsForShortening({scene:[{kind:'narration',text:'약속 시각이 되자 에밀리가 중앙광장에 도착해 치유 물약을 건넸다.'}],state_delta:{advance_minutes:40,items_add:['healing_potion'],hooks_update:[{id:consequenceHook.id,status:'resolved'}]}},{event_name:'약속 상대의 도착',reason:'약속 장소에 도착한다',secret_level:0},['emily'],{emily:'에밀리'});

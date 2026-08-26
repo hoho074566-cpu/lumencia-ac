@@ -332,6 +332,11 @@ assert.equal(oneAndHalfDaySleep.explicitDurationMinutes,2160,'하루 반 must re
 assert.deepEqual(oneAndHalfDaySleep.suggestedAdvanceMinutes,[1440,1440],'a one-and-a-half-day sleep must stop at the canonical one-turn cap');
 assert.equal(oneAndHalfDaySleep.turnLimitTruncated,true,'a one-and-a-half-day sleep must remain unfinished after one turn');
 assert.equal(classifySceneIntent('1일 반 동안 쉰다.').explicitDurationMinutes,2160,'numeric day-and-a-half durations must use the same normalization');
+const oneWeekSleep=classifySceneIntent('일주일 동안 잠을 잔다.');
+assert.equal(oneWeekSleep.explicitDurationMinutes,10080,'일주일 must normalize to seven days');
+assert.deepEqual(oneWeekSleep.suggestedAdvanceMinutes,[1440,1440],'a week-long sleep must stop at the canonical one-turn cap');
+assert.equal(oneWeekSleep.turnLimitTruncated,true,'a week-long sleep must remain unfinished after one turn');
+assert.equal(classifySceneIntent('2주 동안 쉰다.').explicitDurationMinutes,20160,'numeric week durations must normalize to minutes');
 const twoDayTravel=classifySceneIntent('2일 동안 수도로 간다.',{location:'중앙광장'});
 assert.equal(twoDayTravel.kind,'travel','a leading day duration must retain travel intent');
 assert.equal(twoDayTravel.semanticTarget,'수도','a leading day duration must not pollute the destination');
@@ -361,6 +366,12 @@ assert.equal(classifySceneIntent('잠깐 대화를 하고 잠을 잔다.').timeP
 const scheduledSleep=classifySceneIntent('오늘 오후 10시에 잠을 잔다.', { location:'개인실',currentTime:'09:00' });
 assert.equal(scheduledSleep.scheduledStartOffsetMinutes,780,'same-day scheduled sleep must retain its start offset');
 assert.deepEqual(scheduledSleep.suggestedAdvanceMinutes,[1020,1260],'scheduled sleep timing must include waiting until start plus the sleep range');
+const dawnTraining=classifySceneIntent('새벽 1시에 30분 훈련한다.',{location:'훈련장',currentTime:'23:00'});
+assert.equal(dawnTraining.scheduledStartOffsetMinutes,120,'새벽 must resolve to the next overnight occurrence near midnight');
+assert.deepEqual(dawnTraining.suggestedAdvanceMinutes,[150,150],'overnight dawn timing must include the wait plus the explicit training duration');
+const dawnMinuteTraining=classifySceneIntent('새벽 1시 30분에 훈련한다.',{location:'훈련장',currentTime:'23:00'});
+assert.equal(dawnMinuteTraining.explicitDurationMinutes,null,'a dawn clock minute must not become the activity duration');
+assert.deepEqual(dawnMinuteTraining.suggestedAdvanceMinutes,[180,270],'a dawn clock minute must retain the overnight wait plus the natural training range');
 const futureSleep=classifySceneIntent('내일 오전 8시에 잠을 잔다.', { location:'개인실',currentTime:'09:00' });
 assert.equal(futureSleep.dateQualifiedStart,true,'next-day sleep must use future-date handling');
 assert.equal(futureSleep.compression,true,'a reachable next-day sleep start must use deterministic start-boundary enforcement');
@@ -411,6 +422,9 @@ const regionalTravel = classifySceneIntent('왕도로 간다.', { location:'중�
 assert.equal(regionalTravel.timeProfile, 'travel-regional');
 assert.deepEqual(regionalTravel.suggestedAdvanceMinutes, [15, 60]);
 assert.equal(classifySceneIntent('북쪽 숲으로 간다.', { location:'중앙광장' }).timeProfile, 'travel-regional');
+const longRegionalTravel=classifySceneIntent('왕도 북부 제3 기사단 본부로 간다.',{location:'기숙사'});
+assert.equal(longRegionalTravel.semanticTarget,'제3 기사단 본부','a long destination may retain its bounded display target');
+assert.equal(longRegionalTravel.timeProfile,'travel-regional','a preserved regional anchor must select the regional travel profile');
 assert.equal(classifySceneIntent('계산대로 간다.', { location:'식당' }).timeProfile, 'travel-local', 'a place name containing 산 must not become regional travel');
 assert.deepEqual(classifySceneIntent('도서관으로 간다.').suggestedAdvanceMinutes, [3, 30], 'missing location context must preserve the proven fallback');
 assert.equal(classifySceneIntent('도서관으로 내일 10시에 간다.').semanticTarget,'도서관','future-date travel must remove the destination particle after date and clock qualifiers');
@@ -461,6 +475,11 @@ assert.equal(deferredAbsoluteDateTraining.compression,false,'an absolute start b
 assert.equal(deferredAbsoluteDateTraining.scheduledStartOffsetMinutes,null,'a future absolute date must not collapse onto today\'s matching clock');
 assert.deepEqual(deferredAbsoluteDateTraining.suggestedAdvanceMinutes,[0,1440],'an out-of-window absolute start must preserve the one-turn lookahead without executing the action');
 assert.equal(deferredAbsoluteDateTraining.turnLimitTruncated,true,'an out-of-window absolute start must remain unfinished');
+const deferredIsoDateTraining=classifySceneIntent('1285-03-01 오전 10시에 30분 훈련한다.',{currentDate:'1285-02-28',currentTime:'08:00'});
+assert.equal(deferredIsoDateTraining.dateQualifiedStart,true,'an ISO calendar date must resolve against the saved world date');
+assert.equal(deferredIsoDateTraining.scheduledStartOffsetMinutes,null,'an ISO date beyond one turn must not collapse onto today\'s matching clock');
+assert.deepEqual(deferredIsoDateTraining.suggestedAdvanceMinutes,[0,1440],'an out-of-window ISO date must remain deferred');
+assert.equal(classifySceneIntent('1285/03/01 오전 10시에 30분 훈련한다.',{currentDate:'1285-02-28',currentTime:'20:00'}).scheduledStartOffsetMinutes,840,'slash-separated absolute dates must use the same resolver');
 const reachableAbsoluteDateTraining=classifySceneIntent('3월 1일 오전 10시에 훈련한다.',{currentDate:'1285-02-28',currentTime:'20:00'});
 assert.equal(reachableAbsoluteDateTraining.scheduledStartOffsetMinutes,840,'a reachable absolute calendar start must include the date boundary');
 assert.deepEqual(reachableAbsoluteDateTraining.suggestedAdvanceMinutes,[870,960],'a reachable absolute start must add its next-day wait to the training range');
