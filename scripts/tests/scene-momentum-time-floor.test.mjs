@@ -231,7 +231,7 @@ turn={
 };
 const exactTrainingBoundaryIntent=applySceneMomentumTimeFloor({action:'4시간 동안 검술을 훈련한다.',saveState:exactTrainingBoundarySave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,240,'a completed pre-boundary action must retain its full exact duration');
-assert.equal(turn.state_delta.fatigue_delta,2,'fatigue produced by the completed pre-boundary training must survive');
+assert.equal(turn.state_delta.fatigue_delta,2,'fatigue from an exactly completed standalone action survives its coincident schedule start');
 assert.deepEqual(turn.state_delta.stat_progress,[trainingGroundProgress],'a single location-token overlap must not erase valid pre-boundary progress');
 assert.deepEqual(turn.state_delta.skill_experience,[trainingGrowth],'only growth attributable to the completed training may survive schedule-start reconciliation');
 assert.deepEqual(turn.state_delta.pc_knowledge_add,['검술 기본 자세 교정법'],'pre-boundary action knowledge must survive while premature class knowledge is removed');
@@ -245,7 +245,7 @@ const compoundBoundary={id:'compound-class',title:'기사과 필수 수업',date
 turn={scene_title:'훈련과 수면 완료',scene:[{kind:'narration',text:'한 시간 검술 훈련을 마치고 피로가 조금 쌓였으며 훈련 기록표와 검술 자세 교정법을 얻었다.'},{kind:'narration',text:'이어 여덟 시간 수면을 마치고 숙면 보상을 받았다.'}],choices:[],state_delta:{advance_minutes:540,fatigue_delta:2,skill_experience:[prefixSkill],items_add:['훈련 기록표','숙면 보상'],pc_knowledge_add:['검술 자세 교정법','꿈 내용']}};
 const compoundBoundaryIntent=applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잠을 잔다.',saveState:compoundBoundarySave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,120,'an unrelated schedule must truncate only the unfinished terminal sleep');
-assert.equal(turn.state_delta.fatigue_delta,2,'fatigue visibly earned by the completed prefix training must survive');
+assert.equal(turn.state_delta.fatigue_delta,0,'aggregate fatigue from prefix and suffix clauses must fail closed');
 assert.deepEqual(turn.state_delta.skill_experience,[prefixSkill],'growth visibly earned by the completed prefix training must survive');
 assert.deepEqual(turn.state_delta.items_add,['훈련 기록표'],'a prefix item must survive while a terminal sleep reward is cleared');
 assert.deepEqual(turn.state_delta.pc_knowledge_add,['검술 자세 교정법'],'prefix knowledge must survive while terminal sleep knowledge is cleared');
@@ -339,6 +339,7 @@ turn={scene_title:'질문 뒤 과잉 수면',scene:[{kind:'narration',text:'한 
 applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
 assert.deepEqual(turn.state_delta.skill_experience,[multiPrefixGrowth],'choice text binds evidence to its actual prompt instead of a later rhetorical question');
 assert.deepEqual(turn.state_delta.items_add,[],'terminal completion after the choice prompt is removed even when a later rhetorical question exists');
+assert.doesNotMatch(turn.scene.map(item=>item.text).join(' '),/대체 무엇을 망설이는가/,'post-choice rhetorical narration is not retained as the choice prompt');
 turn={scene_title:'수면 끝의 선택',scene:[{kind:'narration',text:'한 시간 검술 훈련을 마쳤다.'},{kind:'dialogue',speaker_key:'artemis',text:'눈을 뜬 지금 바로 경계 임무를 맡겠나?'}],choices:['경계 임무를 맡는다.','조금 더 잔다.','상황을 묻는다.'],state_delta:{advance_minutes:540,skill_experience:[multiPrefixGrowth],items_add:['숙면 보상']}};
 applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,540,'a choice exactly at the terminal maximum preserves the reported decision time');
@@ -353,6 +354,22 @@ turn={scene_title:'왕도 도착 뒤 선택',scene:[{kind:'narration',text:'왕�
 applySceneMomentumTimeFloor({action:'왕도로 이동하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'남부 도로'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
 assert.equal(turn.state_delta.new_location,'왕도','a verified short structured travel destination survives suffix reconciliation');
 assert.deepEqual(turn.state_delta.items_add,[],'short-destination preservation does not retain sleep rewards');
+const earlyDialogueBoundary={id:'early-dialogue-boundary',title:'기사과 점호',date:'1285-03-01',time:'09:05',kind:'academic',status:'scheduled'},earlyDialogueSave={pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'상담실'},scheduleContext:{due:[],upcoming:[earlyDialogueBoundary]},scheduledEvents:[earlyDialogueBoundary]};
+turn={scene_title:'점호 뒤 대화 완료',scene:[{kind:'narration',text:'5분 뒤 기사과 점호가 시작됐다.'},{kind:'narration',text:'그 뒤 한 시간 대화를 마쳤고 협상 기록을 받았다.'}],choices:[],event_progress:{event_instance_id:earlyDialogueBoundary.id,active_beat:'start',completed_beats:[]},state_delta:{advance_minutes:490,items_add:['협상 기록'],relationship_changes:[{npc_key:'emily',affinity_delta:1,reason:'대화를 마쳤다'}],active_events_add:[earlyDialogueBoundary.id],scheduled_events_remove:[earlyDialogueBoundary.id]}};
+applySceneMomentumTimeFloor({action:'대화하고 8시간 잔다',saveState:earlyDialogueSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,5,'an early required schedule truncates a ranged prefix before its minimum completion');
+assert.deepEqual(turn.state_delta.items_add,[],'completion narration after the schedule boundary cannot preserve prefix items');
+assert.deepEqual(turn.state_delta.relationship_changes,[],'post-boundary completion narration cannot preserve relationship effects');
+turn={scene_title:'훈련 뒤 선택',scene:[{kind:'narration',text:'한 시간 훈련을 마쳐 피로가 쌓였고 금화 보상을 받았다.'},{kind:'dialogue',speaker_key:'artemis',text:'이제 경계 임무를 맡겠나?'}],choices:['경계 임무를 맡는다.','예정대로 잔다.','상황을 묻는다.'],state_delta:{advance_minutes:60,fatigue_delta:-3,gold_delta:-5,items_add:['숙면 보상']}};
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
+assert.equal(turn.state_delta.fatigue_delta,0,'turn-wide fatigue cannot inherit prefix ownership from a matching word');
+assert.equal(turn.state_delta.gold_delta,0,'turn-wide gold cannot inherit prefix ownership from a matching word');
+const coincidentChoiceBoundary={id:'coincident-choice-class',title:'기사과 필수 수업',date:'1285-03-01',time:'10:00',kind:'academic',status:'scheduled'},coincidentChoiceSave={pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[coincidentChoiceBoundary]},scheduledEvents:[coincidentChoiceBoundary]},coincidentChoices=['수업에 참석한다.','경계 임무를 맡는다.','상황을 먼저 묻는다.'];
+turn={scene_title:'훈련 완료와 수업 시작',scene:[{kind:'narration',text:'한 시간 검술 훈련을 마쳤다.'},{kind:'dialogue',speaker_key:'artemis',text:'필수 수업이 시작되는 지금, 수업에 참석하겠나 아니면 경계 임무를 맡겠나?'}],choices:coincidentChoices,event_progress:{event_instance_id:coincidentChoiceBoundary.id,active_beat:'start',completed_beats:[]},state_delta:{advance_minutes:60,skill_experience:[multiPrefixGrowth],active_events_add:[coincidentChoiceBoundary.id],scheduled_events_remove:[coincidentChoiceBoundary.id]}};
+const coincidentChoiceIntent=applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:coincidentChoiceSave},turn,'game');
+assert.equal(coincidentChoiceIntent.reconciliationReason,'decision-boundary','a player decision owns visible reconciliation when schedule and choice times coincide');
+assert.deepEqual(turn.choices,coincidentChoices,'coincident schedule state cannot erase the player response choices');
+assert.deepEqual(turn.state_delta.active_events_add,[coincidentChoiceBoundary.id],'coincident choice reconciliation still preserves the started schedule state');
 turn={
   scene_title:'훈련 완료와 수업 종료',scene:[{kind:'narration',text:'네 시간의 검술 훈련을 마쳤다.'},{kind:'narration',text:'10시가 되자 기사과 기초 수업까지 수료하고 보상을 받았다.'}],choices:[],
   state_delta:{advance_minutes:240,skill_experience:[trainingGrowth,prematureClassGrowth],items_add:['훈련 기록표','수료 보상']},
