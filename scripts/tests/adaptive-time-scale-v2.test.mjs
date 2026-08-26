@@ -422,6 +422,16 @@ const negotiationThenSleep=classifySceneIntent('협상하고 8시간 동안 잠�
 assert.equal(negotiationThenSleep.kind,'downtime','a committed preceding negotiation must not eclipse terminal sleep intent');
 assert.deepEqual(negotiationThenSleep.precedingActivityRangeMinutes,[2,10],'a preceding negotiation must retain the bounded dialogue profile');
 assert.deepEqual(negotiationThenSleep.suggestedAdvanceMinutes,[482,490],'terminal sleep must include the bounded preceding negotiation and exact sleep duration');
+assert.deepEqual(classifySceneIntent('훈련하고 싶지만 8시간 잠을 잔다.').suggestedAdvanceMinutes,[480,480],'desiderative training text must not become completed preceding work');
+assert.deepEqual(classifySceneIntent('수업을 듣고 싶지만 8시간 잠을 잔다.').suggestedAdvanceMinutes,[480,480],'desiderative class text must not become completed preceding work');
+assert.deepEqual(classifySceneIntent('30분마다 2시간 훈련한다.').suggestedAdvanceMinutes,[120,120],'a cadence duration must not be added to the declared training total');
+assert.deepEqual(classifySceneIntent('30분 간격으로 2시간 훈련한다.').suggestedAdvanceMinutes,[120,120],'an interval duration must not be added to the declared training total');
+assert.deepEqual(classifySceneIntent('30분씩 2시간 훈련한다.').suggestedAdvanceMinutes,[120,120],'a per-set duration must not be added to the declared training total');
+
+assert.deepEqual(classifySceneIntent('오전 10시까지 잠을 잔다.',{currentTime:'08:00'}).suggestedAdvanceMinutes,[120,120],'a single end clock must define exact remaining sleep time');
+assert.deepEqual(classifySceneIntent('오전 10시까지 기다린다.',{currentTime:'08:00'}).suggestedAdvanceMinutes,[120,120],'a single end clock must define exact remaining wait time');
+assert.deepEqual(classifySceneIntent('자정까지 잠을 잔다.',{currentTime:'23:00'}).suggestedAdvanceMinutes,[60,60],'a named-midnight deadline must roll to the next boundary');
+assert.equal(classifySceneIntent('내일 오전 10시까지 잠을 잔다.',{currentTime:'08:00'}).turnLimitTruncated,true,'a deadline beyond one turn must preserve the 1440-minute incomplete cap');
 
 const boundarySave = {
   pc:{ department:'기사과' },
