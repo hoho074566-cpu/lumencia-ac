@@ -92,6 +92,23 @@ for (const negatedAction of ['나는 안 기다린다.', '못 기다린다.']) {
   assert.equal(classifySceneIntent(negatedAction, context).kind, 'generic', 'legacy negation suppression remains authoritative');
 }
 assert.equal(classifySceneIntent('안 1시간 훈련하자', context).kind, 'generic', 'a separated predicate negator prevents terminal action promotion');
+for (const incompleteAction of ['1시간 훈련하고', '1시간 훈련한 뒤']) {
+  const incompletePlan = parseTimePlan(incompleteAction, context), incompleteCandidate = deriveStructuredTimingCandidate(incompletePlan);
+  assert.equal(incompletePlan.clauses[0].incomplete_connector, true, 'a terminal connector is represented as an incomplete sequence');
+  assert.equal(incompleteCandidate.eligible, false, `${incompleteAction}: an incomplete sequence cannot enter structured execution`);
+  assert.equal(classifySceneIntent(incompleteAction, context).kind, 'generic', `${incompleteAction}: legacy fallback cannot double-execute the prefix`);
+}
+const completeSequence = parseTimePlan('1시간 훈련하고 8시간 잔다', context);
+assert.equal(completeSequence.clauses[0].incomplete_connector, false, 'a connector with a parsed successor remains an ordered prefix');
+assert.equal(completeSequence.clauses[0].committed, true, 'a completed prefix remains committed when its successor is present');
+const conditionalPlan = parseTimePlan('준비되면 1시간 훈련하자', context);
+assert.equal(conditionalPlan.clauses[0].conditional, true, 'an unresolved pre-action condition is represented in the structured clause');
+assert.equal(deriveStructuredTimingCandidate(conditionalPlan).eligible, false, 'a conditional proposal cannot enter structured execution');
+assert.equal(classifySceneIntent('준비되면 1시간 훈련하자', context).kind, 'generic', 'a conditional proposal remains on the non-committed legacy path');
+const ambiguousElapsed = classifySceneIntent('어제 밤 1시에 1시간 훈련한다', context);
+assert.equal(ambiguousElapsed.kind, 'decision-sensitive', 'a fixed past date remains elapsed even when its clock period is gated');
+assert.equal(ambiguousElapsed.elapsedScheduledStart, true, 'reliable past-date ownership survives uncertain clock normalization');
+assert.deepEqual(ambiguousElapsed.suggestedAdvanceMinutes, [0, 0], 'an elapsed fixed-date action cannot be rescheduled as a future clock action');
 for (const [nonCommittedAction, expectedKind] of [
   ['어제 1시간 훈련했다. 지금 공격한다', 'committed-consequence'],
   ['1시간 훈련한다고 들었다', 'generic'],
