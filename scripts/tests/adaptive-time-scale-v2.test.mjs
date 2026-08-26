@@ -255,6 +255,9 @@ assert.equal(capitalDepartureIntent.scheduledStartOffsetMinutes,120,'a requested
 assert.equal(isRequestedScheduledActivity(capitalDepartureSave,capitalDeparture,capitalDepartureAction,capitalDepartureIntent),true,'a destination-matched saved departure must be recognized as the requested travel');
 assert.equal(nextScheduleBoundaryMinutes(capitalDepartureSave,{futureOnly:true,action:capitalDepartureAction,intent:capitalDepartureIntent}),null,'the requested departure must not interrupt itself at its own start');
 assert.doesNotMatch(buildSceneMomentumDirective({action:capitalDepartureAction,saveState:capitalDepartureSave}),/SCHEDULE_BOUNDARY=/,'the requested departure must not emit its own start as a hard boundary');
+const destinationFirstCapitalAction='왕도로 오전 10시에 간다.',destinationFirstCapitalIntent=classifySceneIntent(destinationFirstCapitalAction,{location:'기숙사',currentTime:'08:00',actorName:'카인'});
+assert.equal(isRequestedScheduledActivity(capitalDepartureSave,capitalDeparture,destinationFirstCapitalAction,destinationFirstCapitalIntent),true,'a saved departure must remain requested when its clock follows the destination');
+assert.equal(nextScheduleBoundaryMinutes(capitalDepartureSave,{futureOnly:true,action:destinationFirstCapitalAction,intent:destinationFirstCapitalIntent}),null,'destination-first scheduled travel must not be interrupted by its own saved departure');
 const overrunClassAction='3시간 동안 훈련하고 오전 10시에 기사과 기초 수업을 듣는다.',overrunClassIntent=classifySceneIntent(overrunClassAction,{location:'훈련장',currentTime:'08:00',actorName:'카인'});
 assert.equal(overrunClassIntent.scheduledStartOverrun,true,'preceding work longer than the fixed start offset must be marked as an overrun');
 assert.equal(overrunClassIntent.minAdvanceMinutes,120,'an overrun compound must stop at its declared terminal start');
@@ -385,6 +388,11 @@ assert.deepEqual(scheduledTravel.suggestedAdvanceMinutes,[65,80],'scheduled trav
 const destinationFirstScheduledTravel=classifySceneIntent('도서관으로 10시에 간다.', { location:'A동 개인실',currentTime:'09:00' });
 assert.equal(destinationFirstScheduledTravel.semanticTarget,'도서관','a trailing scheduled-start clock must not leave either the clock or destination particle in the target');
 assert.deepEqual(destinationFirstScheduledTravel.suggestedAdvanceMinutes,[65,80],'travel timing must not depend on whether the destination or clock is stated first');
+const markedDestinationFirstTravel=classifySceneIntent('도서관으로 오전 10시에 간다.',{location:'A동 개인실',currentTime:'08:00'});
+assert.equal(markedDestinationFirstTravel.kind,'travel','a marked scheduled clock after the destination must retain travel intent');
+assert.equal(markedDestinationFirstTravel.semanticTarget,'도서관','a marked post-destination clock must not pollute the destination');
+assert.equal(markedDestinationFirstTravel.scheduledStartOffsetMinutes,120,'a marked post-destination clock must retain its departure offset');
+assert.deepEqual(markedDestinationFirstTravel.suggestedAdvanceMinutes,[125,140],'scheduled destination-first travel must include its departure wait and natural travel time');
 const nextDayTravel=classifySceneIntent('내일 10시에 도서관으로 간다.', { location:'A동 개인실',currentTime:'09:00' });
 assert.equal(nextDayTravel.semanticTarget,'도서관','a future date qualifier must not pollute the travel destination');
 assert.equal(nextDayTravel.compression,false,'next-day travel must not inherit a same-day deterministic travel floor');
@@ -410,6 +418,10 @@ assert.deepEqual(classifySceneIntent('에밀리가 “1시간 동안 훈련하�
 assert.deepEqual(classifySceneIntent('에밀리가 1시간 동안 훈련하고 돌아왔다. 나는 8시간 동안 잠을 잔다.',{actorName:'카인'}).suggestedAdvanceMinutes,[480,480],'an already-completed prior sentence must not be totaled into the current action');
 assert.deepEqual(classifySceneIntent('에밀리가 1시간 동안 훈련하고 나는 8시간 동안 잠을 잔다.',{actorName:'카인'}).suggestedAdvanceMinutes,[480,480],'a same-sentence third-party activity must not be attributed to the player');
 assert.deepEqual(classifySceneIntent('나는 1시간 동안 훈련하고 8시간 동안 잠을 잔다.',{actorName:'카인'}).suggestedAdvanceMinutes,[540,540],'a genuine first-person compound must retain its preceding activity');
+const negotiationThenSleep=classifySceneIntent('협상하고 8시간 동안 잠을 잔다.',{currentTime:'09:00'});
+assert.equal(negotiationThenSleep.kind,'downtime','a committed preceding negotiation must not eclipse terminal sleep intent');
+assert.deepEqual(negotiationThenSleep.precedingActivityRangeMinutes,[2,10],'a preceding negotiation must retain the bounded dialogue profile');
+assert.deepEqual(negotiationThenSleep.suggestedAdvanceMinutes,[482,490],'terminal sleep must include the bounded preceding negotiation and exact sleep duration');
 
 const boundarySave = {
   pc:{ department:'기사과' },
