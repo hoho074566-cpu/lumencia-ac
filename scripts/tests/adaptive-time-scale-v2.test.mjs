@@ -215,6 +215,17 @@ for(const action of ['다음 주 1시간 훈련한다.','다음주에 1시간 �
 }
 const nextWeekBoundaryDirective=buildSceneMomentumDirective({action:'다음 주 1시간 훈련한다.',saveState:{world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[{id:'tomorrow-class',title:'필수 수업',kind:'academic',date:'1285-03-02',time:'08:00'}]}}});
 assert.match(nextWeekBoundaryDirective,/SCHEDULE_BOUNDARY=1380min/,'a current-turn schedule must remain authoritative before a deferred next-week action');
+const thisWeekFriday=classifySceneIntent('이번 주 금요일 오전 10시에 1시간 훈련한다.',{location:'훈련장',currentDate:'1285-03-01',currentWeekday:'수요일',currentTime:'08:00'});
+assert.equal(thisWeekFriday.dateQualifiedStart,true,'a weekday inside the current week must retain its calendar date');
+assert.equal(thisWeekFriday.scheduledStartOffsetMinutes,null,'a weekday start beyond the turn window must not become a same-day clock');
+assert.deepEqual(thisWeekFriday.suggestedAdvanceMinutes,[0,1440],'a later weekday must use bounded deferred progression');
+assert.equal(thisWeekFriday.compression,false,'a later weekday activity must not execute several days early');
+const nextWeekFriday=classifySceneIntent('다음 주 금요일 오전 10시에 1시간 훈련한다.',{location:'훈련장',currentDate:'1285-03-01',currentWeekday:'수요일',currentTime:'08:00'});
+assert.equal(nextWeekFriday.dateQualifiedStart,true,'a next-week weekday must remain a future date');
+assert.deepEqual(nextWeekFriday.suggestedAdvanceMinutes,[0,1440],'a next-week weekday must remain outside the current turn window');
+assert.equal(classifySceneIntent('이번 주 월요일 오전 10시에 1시간 훈련한다.',{location:'훈련장',currentDate:'1285-03-01',currentWeekday:'수요일',currentTime:'08:00'}).kind,'decision-sensitive','an elapsed weekday in the explicitly current week must not execute now');
+const weekdayBoundaryDirective=buildSceneMomentumDirective({action:'이번 주 금요일 오전 10시에 1시간 훈련한다.',saveState:{world:{date:'1285-03-01',weekday:'수요일',time:'08:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[{id:'today-class',title:'필수 수업',kind:'academic',date:'1285-03-01',time:'09:00'}]}}});
+assert.match(weekdayBoundaryDirective,/SCHEDULE_BOUNDARY=60min/,'an intervening schedule must remain authoritative before a weekday-qualified action');
 const reachableNextDayClass=classifySceneIntent('내일 오전 1시에 수업을 듣는다.', { location:'여관',currentTime:'23:30' });
 assert.equal(reachableNextDayClass.scheduledStartOffsetMinutes,90,'a next-day start inside the turn window must retain its real offset');
 assert.deepEqual(reachableNextDayClass.suggestedAdvanceMinutes,[135,210],'a reachable next-day class must include its wait and natural class duration');
@@ -465,6 +476,14 @@ assert.deepEqual(intervalTravel.suggestedAdvanceMinutes,[120,120],'a travel cloc
 const regionalTravel = classifySceneIntent('왕도로 간다.', { location:'중앙광장' });
 assert.equal(regionalTravel.timeProfile, 'travel-regional');
 assert.deepEqual(regionalTravel.suggestedAdvanceMinutes, [15, 60]);
+const capitalExit=classifySceneIntent('왕도 밖으로 간다.',{location:'왕도 중앙광장'});
+assert.equal(capitalExit.kind,'travel','a named-area boundary must route through destination-aware travel');
+assert.equal(capitalExit.timeProfile,'travel-regional','leaving the capital must not use the building-exit profile');
+assert.equal(capitalExit.semanticTarget,'왕도 밖','the named area boundary must remain the travel destination');
+assert.equal(classifySceneIntent('기숙사 밖으로 간다.',{location:'기숙사 개인실'}).kind,'exit-exterior','an explicitly named building exit must retain ordinary exit compression');
+assert.equal(classifySceneIntent('다시 밖으로 나간다.',{location:'기숙사 개인실'}).kind,'exit-exterior','a movement adverb before outside must not be mistaken for a named area');
+const capitalExitDirective=buildSceneMomentumDirective({action:'왕도 밖으로 간다.',saveState:{world:{date:'1285-03-01',time:'09:00',location:'왕도 중앙광장'},scheduleContext:{due:[],upcoming:[{id:'briefing',title:'필수 브리핑',kind:'academic',date:'1285-03-01',time:'09:10'}]}}});
+assert.match(capitalExitDirective,/SCHEDULE_BOUNDARY=10min/,'a required schedule must interrupt named-area travel before its regional minimum');
 assert.equal(classifySceneIntent('북쪽 숲으로 간다.', { location:'중앙광장' }).timeProfile, 'travel-regional');
 const longRegionalTravel=classifySceneIntent('왕도 북부 제3 기사단 본부로 간다.',{location:'기숙사'});
 assert.equal(longRegionalTravel.semanticTarget,'제3 기사단 본부','a long destination may retain its bounded display target');

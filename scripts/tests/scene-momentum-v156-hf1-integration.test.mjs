@@ -30,6 +30,8 @@ assert.match(chat,/SCENE_MOMENTUM_VERSION/);
 assert.match(chat,/applySceneMomentumTimeFloor/);
 assert.match(chat,/const runtimeTurn=runtimeSynthesisTurn\(data\.turn,sceneIntent\)/,'time-shortened visible scenes must be filtered before runtime synthesis');
 assert.match(chat,/localSceneRuntime\([^;]+,runtimeTurn,/,'scene runtime synthesis must consume the filtered turn');
+assert.match(chat,/timed_action:timedAction/,'incomplete exact timed actions must persist a resumable runtime record');
+assert.match(chat,/localSceneRuntime\([^;]+sceneIntent\)/,'scene runtime persistence must receive the reconciled timed intent');
 assert.match(chat,/localNpcUpdates\(incoming0,runtimeTurn\)/,'NPC runtime synthesis must consume the filtered turn');
 assert.match(chat,/deriveSceneDelta/);
 assert.match(chat,/updateSceneMomentum/);
@@ -56,7 +58,7 @@ assert.doesNotMatch(chat,/hasMeaningfulStop[^;\n]*importance[^;\n]*critical/i,'c
 assert.match(chat,/growthAllowed=mode==='game'&&!zeroElapsedIntent/,'explicit zero-minute and non-game actions must share one deterministic growth freeze gate');
 assert.equal((chat.match(/allowProgress:growthAllowed/g)||[]).length,6,'initial validation and all three post-boundary persistence rebuilds must share the growth gate');
 assert.match(chat,/zeroElapsedRange=array\(growthIntent\.explicitDurationRangeMinutes\)[^;]+zeroElapsedIntent=mode==='game'&&\(growthIntent\.explicitDurationMinutes===0\|\|zeroElapsedRange\)&&Number\(growthIntent\.minAdvanceMinutes\|\|0\)<=0/,'zero-growth freeze must cover both scalar-zero and zero-length range requests');
-assert.match(chat,/growthIntent=classifySceneIntent\(incoming0\.action\|\|'',\{[^}]*actorName:incoming\.saveState\?\.pc\?\.name\|\|''\}\)/,'zero-growth classification must preserve the saved player as the first-party actor');
+assert.match(chat,/growthIntent=classifySceneIntent\(incoming0\.action\|\|'',\{[^}]*actorName:incoming\.saveState\?\.pc\?\.name\|\|'',resumeTimedAction:incoming\.saveState\?\.sceneRuntime\?\.timed_action\}\)/,'zero-growth classification must preserve the saved player and resumable timed action');
 const timeReconciliationIndex=chat.indexOf('const sceneIntent=applySceneMomentumTimeFloor');
 for(const marker of ['persistedCombatGrowthState=deriveCombatGrowthState','persistedSkillLearningState=deriveSkillLearningState','persistedAwakeningTalentState=deriveAwakeningTalentState']){
   assert.ok(timeReconciliationIndex>=0&&chat.lastIndexOf(marker)>timeReconciliationIndex,`${marker} must be recomputed after time-boundary reconciliation freezes rejected completion deltas`);

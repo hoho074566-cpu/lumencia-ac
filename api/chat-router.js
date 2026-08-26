@@ -542,7 +542,7 @@ function travelDestinationReachedForReconciliation(location='',target=''){
   const tokens=String(target||'').split(/[\s/·,()_-]+/).map(token=>compact(token).replace(/(?:으로|에게|에서|까지|부터|안으로|내부)$/u,'')).filter(token=>token.length>=2);return tokens.length>0&&tokens.every(token=>actual.includes(token));
 }
 function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecycle=null,consequenceVisibleScene=[]){
-  const intent=classifySceneIntent(incoming?.action||'',{location:incoming?.saveState?.world?.location||'',currentTime:incoming?.saveState?.world?.time||'',currentDate:incoming?.saveState?.world?.date||'',actorName:incoming?.saveState?.pc?.name||''});
+  const intent=classifySceneIntent(incoming?.action||'',{location:incoming?.saveState?.world?.location||'',currentTime:incoming?.saveState?.world?.time||'',currentDate:incoming?.saveState?.world?.date||'',currentWeekday:incoming?.saveState?.world?.weekday||'',actorName:incoming?.saveState?.pc?.name||'',resumeTimedAction:incoming?.saveState?.sceneRuntime?.timed_action});
   const boundaryLookahead=Math.min(1440,Math.max(0,Number(intent.boundaryLookaheadMinutes||0)));
   if(mode!=='game'||!turn?.state_delta||(!intent.compression&&boundaryLookahead<=0))return intent;
   const hasMeaningfulStop=array(turn?.choices).length>0;
@@ -593,6 +593,14 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   const raisedElapsedTime=applied>current,returnedSceneReconciled=Boolean(trimmedSurfacedScheduleScene||rewoundScheduleCompletion||!preserveSurfacedScheduleScene&&(reconcileTimedTurn||raisedElapsedTime)),reconciliationReason=appliedScheduleBoundary||unsurfacedScheduleCapsFloor||overrunStartBoundary||rewoundScheduleCompletion?'schedule-boundary':appliedConsequenceBoundary||unresolvedConsequenceCapsFloor||ambiguousAppliedConsequence?'consequence-boundary':turnLimitCompletion||startOnlyBoundary?'turn-limit':raisedElapsedTime?'profile-floor':'profile-cap',runtimeTrustedConsequenceScene=returnedSceneReconciled&&preserveAttributedConsequence?array(consequenceVisibleScene):[];
   if(returnedSceneReconciled&&!trimmedSurfacedScheduleScene){if(preserveAttributedConsequence&&array(consequenceVisibleScene).length)reconcileReturnedConsequenceTurn(turn,{elapsed:applied,scene:consequenceVisibleScene});else reconcileReturnedTimedTurn(turn,{reason:reconciliationReason,elapsed:applied});}
   return{...intent,runtimeSceneTrusted:preserveSurfacedScheduleScene||!returnedSceneReconciled,runtimeTrustedConsequenceScene,returnedSceneReconciled,reconciliationReason:returnedSceneReconciled?reconciliationReason:null};
+}
+function deriveTimedActionRuntime(previousRuntime={},intent={},action='',turn={},mode='game'){
+  const previous=object(previousRuntime?.timed_action);if(mode!=='game')return Object.keys(previous).length?previous:null;
+  const resumed=intent?.resumedTimedAction===true,declared=Math.max(0,Math.trunc(Number(intent?.explicitDurationMinutes)||0)),eligibleNew=!resumed&&declared>1440&&!intent?.dateQualifiedStart&&intent?.scheduledStartOffsetMinutes==null&&Number(intent?.precedingActivityMinutes||0)===0;
+  if((!resumed&&!eligibleNew)||intent?.reconciliationReason!=='turn-limit')return null;
+  const before=resumed?Math.max(0,Math.trunc(Number(intent?.resumeRemainingMinutes)||0)):declared,elapsed=Math.max(0,Math.trunc(Number(turn?.state_delta?.advance_minutes)||0)),remaining=Math.max(0,before-elapsed);if(remaining<=0)return null;
+  const total=resumed?Math.max(before,Math.trunc(Number(previous.total_minutes)||before)):declared,totalElapsed=Math.max(0,total-remaining);
+  return{version:'1.0',kind:String(intent.kind||previous.kind||''),original_action:String(previous.original_action||action||'').slice(0,240),semantic_target:String(intent.semanticTarget||previous.semantic_target||'').slice(0,120)||null,total_minutes:total,elapsed_minutes:totalElapsed,remaining_minutes:remaining,status:'active'};
 }
 function runtimeSynthesisTurn(turn,intent={}){
   if(intent?.runtimeSceneTrusted!==false)return turn;
@@ -801,7 +809,7 @@ function localNpcUpdates(incoming,turn){
   return out;
 }
 
-function localSceneRuntime(incoming,turn,directorTelemetry=null,mode='game',orchestrationPlan=null){
+function localSceneRuntime(incoming,turn,directorTelemetry=null,mode='game',orchestrationPlan=null,sceneIntent=null){
   const previous=object(incoming.saveState?.sceneRuntime);
   const scheduledEntries=actualScheduledEntrants({due:incoming.saveState?.scheduleContext?.due,turn,recentTurns:incoming.recentTurns,currentLocation:incoming.saveState?.world?.location,registry:CHARACTER_REGISTRY});
   const participants=reconcileParticipants({previous:previous.participants,action:incoming.action,turn,recentTurns:incoming.recentTurns,scheduledEntries,registry:CHARACTER_REGISTRY,currentLocation:incoming.saveState?.world?.location});
@@ -839,11 +847,12 @@ function localSceneRuntime(incoming,turn,directorTelemetry=null,mode='game',orch
     sourceEvent:turn?.event_progress?.event_instance_id||turn?.director?.callback_key||turn?.scene_title||'',
     registeredNpcKeys:Object.keys(CHARACTER_REGISTRY),
   }):null;
+  const timedAction=deriveTimedActionRuntime(previous,object(sceneIntent),incoming.action||'',turn,mode);
   return {
     scene_key:sceneKey,participants,objects:array(previous.objects).slice(0,10),
     positions:Object.fromEntries(Object.entries(object(previous.positions)).slice(0,10)),ongoing_topic:clampText(turn?.scene_summary||previous.ongoing_topic||'',280),
     unresolved_question:hasDecision?clampText(choices.join(' / '),300):'',immediate_pressure:clampText(previous.immediate_pressure||'',220),
-    tone:clampText(turn?.importance||previous.tone||'routine',80),remaining_beats:hasDecision?[]:array(previous.remaining_beats).slice(0,1),purpose,exit_condition:exitCondition,turn_hook:turnHook,goal_tick:goalTick,world_result_surface:worldResultSurface,orchestration:sceneOrchestration,momentum,novelty,scene_delta:sceneDelta,...(factionSocial?{faction_social:factionSocial}:{}),...progressState,
+    tone:clampText(turn?.importance||previous.tone||'routine',80),remaining_beats:hasDecision?[]:array(previous.remaining_beats).slice(0,1),purpose,exit_condition:exitCondition,turn_hook:turnHook,goal_tick:goalTick,world_result_surface:worldResultSurface,orchestration:sceneOrchestration,momentum,novelty,scene_delta:sceneDelta,timed_action:timedAction,...(factionSocial?{faction_social:factionSocial}:{}),...progressState,
   };
 }
 function clone(value){try{return structuredClone(value);}catch{return JSON.parse(JSON.stringify(value??null));}}
@@ -889,7 +898,7 @@ export default async function handler(req,res){
     if(mode==='meta'){if(data.turn?.state_delta){data.turn.state_delta.stat_progress=[];data.turn.state_delta.skill_experience=[];data.turn.state_delta.skill_learning=[];data.turn.state_delta.awakening_progress=[];data.turn.state_delta.talent_evolution=[];}const pipeline={pipeline:'meta-full-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,event_director_v3:telemetry?.event_director_v3||null,event_director_v3_enabled:true,world_result_surface:null,world_result_surfacing_v1:true,adaptive_time_scale_version:ADAPTIVE_TIME_SCALE_VERSION,adaptive_time_scale_v2:true,scene_orchestration:telemetry?.scene_orchestration||null,scene_orchestration_v1:true,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true,faction_social_v1:true,combat_growth_v2:true,skill_learning_v1:true,awakening_talent_v1:true};data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);}
     applyExtendedExpressions(data.turn,incoming0.saveState||{});
     data.turn.choices=filterTurnHookChoices(incoming.action,{...data.turn,choices:freshChoices(incoming.action,data.turn)});
-    const growthIntent=classifySceneIntent(incoming0.action||'',{location:incoming.saveState?.world?.location||'',currentTime:incoming.saveState?.world?.time||'',currentDate:incoming.saveState?.world?.date||'',actorName:incoming.saveState?.pc?.name||''}),zeroElapsedRange=array(growthIntent.explicitDurationRangeMinutes).length===2&&growthIntent.explicitDurationRangeMinutes.every(value=>Number(value)===0),zeroElapsedIntent=mode==='game'&&(growthIntent.explicitDurationMinutes===0||zeroElapsedRange)&&Number(growthIntent.minAdvanceMinutes||0)<=0,growthAllowed=mode==='game'&&!zeroElapsedIntent,growthValidationScene=data.turn?.scene;
+    const growthIntent=classifySceneIntent(incoming0.action||'',{location:incoming.saveState?.world?.location||'',currentTime:incoming.saveState?.world?.time||'',currentDate:incoming.saveState?.world?.date||'',currentWeekday:incoming.saveState?.world?.weekday||'',actorName:incoming.saveState?.pc?.name||'',resumeTimedAction:incoming.saveState?.sceneRuntime?.timed_action}),zeroElapsedRange=array(growthIntent.explicitDurationRangeMinutes).length===2&&growthIntent.explicitDurationRangeMinutes.every(value=>Number(value)===0),zeroElapsedIntent=mode==='game'&&(growthIntent.explicitDurationMinutes===0||zeroElapsedRange)&&Number(growthIntent.minAdvanceMinutes||0)<=0,growthAllowed=mode==='game'&&!zeroElapsedIntent,growthValidationScene=data.turn?.scene;
     if(data.turn?.state_delta)data.turn.state_delta.skill_experience=mode==='auto'?[]:filterExistingSkillExperience(data.turn.state_delta.skill_experience,incoming0.saveState?.pc?.skills);
     const combatGrowthState=deriveCombatGrowthState({
       pc:incoming0.saveState?.pc,
@@ -948,7 +957,7 @@ export default async function handler(req,res){
       data.turn.state_delta.awakening_progress=persistedAwakeningTalentState.accepted_awakening_changes;data.turn.state_delta.talent_evolution=persistedAwakeningTalentState.accepted_talent_evolution;
     }
     const runtimeTurn=runtimeSynthesisTurn(data.turn,sceneIntent);
-    const sceneRuntime=localSceneRuntime({...incoming0,saveState:incoming.saveState,action:incoming0.action||''},runtimeTurn,telemetry?.event_director_v2,mode,telemetry?.scene_orchestration);
+    const sceneRuntime=localSceneRuntime({...incoming0,saveState:incoming.saveState,action:incoming0.action||''},runtimeTurn,telemetry?.event_director_v2,mode,telemetry?.scene_orchestration,sceneIntent);
     const npcUpdates=incoming0.qualityPipeline===false?{}:localNpcUpdates(incoming0,runtimeTurn);
     const offscreenProgression=deriveBoundedOffscreenProgression({saveState:incoming.saveState,turn:runtimeTurn,participants:sceneRuntime.participants,enabled:incoming0.backgroundSim!==false});
     data.runtime_state={npc_updates:npcUpdates,scene_runtime:sceneRuntime,offscreen_npc_updates:offscreenProgression.npc_state_updates,skill_learning:persistedSkillLearningState,awakening_talent:persistedAwakeningTalentState};
