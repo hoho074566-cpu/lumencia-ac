@@ -280,12 +280,26 @@ assert.deepEqual(turn.state_delta.skill_experience,[multiPrefixGrowth],'effects 
 assert.deepEqual(turn.state_delta.pc_knowledge_add,['검술 자세 교정법'],'only prefix knowledge survives the decision stop');
 assert.deepEqual(turn.state_delta.items_add,[],'terminal sleep rewards cannot cross the player decision boundary');
 assert.match(turn.scene_summary,/선택 지점/,'visible narration and authoritative time agree on the decision stop');
+assert.match(turn.scene.map(item=>item.text).join(' '),/경계 임무를 맡겠나/,'decision reconciliation preserves the question that explains the retained choices');
 assert.equal(decisionBoundaryIntent.runtimeSceneTrusted,true,'the deterministic decision reconciliation remains authoritative for scene-purpose synthesis');
 assert.deepEqual(runtimeSynthesisTurn(turn,decisionBoundaryIntent).choices,turn.choices,'runtime synthesis preserves the player-owned decision choices');
 turn={scene_title:'훈련 뒤 수면 중 제안',scene:[{kind:'narration',text:'한 시간 검술 훈련을 마치고 검술 자세 교정법을 익혔다.'},{kind:'dialogue',speaker_key:'artemis',text:'잠든 지 얼마 안 됐지만 지금 깨워 경계 임무를 물을까?'}],choices:['지금 일어난다.','조금 더 잔다.','상황부터 묻는다.'],state_delta:{advance_minutes:90,skill_experience:[multiPrefixGrowth],pc_knowledge_add:['검술 자세 교정법']}};
 const partialDecisionIntent=applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,90,'a real choice during the next clause preserves elapsed partial-action time');
 assert.equal(partialDecisionIntent.reconciliationReason,'decision-boundary','partial compound interruption still uses the structured decision boundary');
+turn={scene_title:'가변 훈련 뒤 수면 중 제안',scene:[{kind:'narration',text:'한 시간 검술 훈련이 끝났고 검술 자세 교정법을 익혔다.'},{kind:'dialogue',speaker_key:'artemis',text:'지금 경계 임무를 맡겠나?'}],choices:['맡는다.','쉰다.','묻는다.'],state_delta:{advance_minutes:300,skill_experience:[multiPrefixGrowth],pc_knowledge_add:['검술 자세 교정법'],items_add:['숙면 보상']}};
+const rangedDecisionIntent=applySceneMomentumTimeFloor({action:'훈련하고 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
+assert.equal(rangedDecisionIntent.reconciliationReason,'decision-boundary','an unchanged timestamp inside a ranged plan still reconciles the decision boundary');
+assert.deepEqual(turn.state_delta.items_add,[],'ranged decision reconciliation removes unfinished sleep effects even without reducing elapsed time');
+assert.deepEqual(turn.state_delta.skill_experience,[multiPrefixGrowth],'passive prefix-completion wording preserves PC-owned growth');
+turn={scene_title:'장기 대기 뒤 제안',scene:[{kind:'narration',text:'스물세 시간의 대기를 마쳤다.'},{kind:'dialogue',speaker_key:'artemis',text:'이제 경계 임무를 맡겠나?'}],choices:['맡는다.','쉰다.','묻는다.'],state_delta:{advance_minutes:1500,items_add:['수면 보상']}};
+const cappedDecisionIntent=applySceneMomentumTimeFloor({action:'23시간 기다리고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'초소'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,1440,'a structured decision boundary cannot exceed the one-turn maximum');
+assert.equal(cappedDecisionIntent.reconciliationReason,'decision-boundary','the clamped choice remains the applied boundary');
+turn={scene_title:'훈련과 수면 완료',scene:[{kind:'narration',text:'에밀리가 한 시간 훈련을 마쳤다.'},{kind:'dialogue',speaker_key:'emily',text:'내 훈련은 끝났어.'}],choices:[],state_delta:{advance_minutes:540,skill_experience:[multiPrefixGrowth]}};
+const npcCompletionIntent=applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:compoundBoundarySave},turn,'game');
+assert.equal(npcCompletionIntent.structuredBoundaryReconciliationApplied,true,'the aligned plan still owns the boundary even when completion evidence is rejected');
+assert.deepEqual(turn.state_delta.skill_experience,[],'NPC narration or dialogue cannot establish PC prefix completion');
 turn={
   scene_title:'훈련 완료와 수업 종료',scene:[{kind:'narration',text:'네 시간의 검술 훈련을 마쳤다.'},{kind:'narration',text:'10시가 되자 기사과 기초 수업까지 수료하고 보상을 받았다.'}],choices:[],
   state_delta:{advance_minutes:240,skill_experience:[trainingGrowth,prematureClassGrowth],items_add:['훈련 기록표','수료 보상']},
