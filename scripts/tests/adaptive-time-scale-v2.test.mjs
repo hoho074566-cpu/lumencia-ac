@@ -441,6 +441,13 @@ assert.deepEqual(classifySceneIntent('오전 10시까지 잠을 잔다.',{curren
 assert.deepEqual(classifySceneIntent('오전 10시까지 기다린다.',{currentTime:'08:00'}).suggestedAdvanceMinutes,[120,120],'a single end clock must define exact remaining wait time');
 assert.deepEqual(classifySceneIntent('자정까지 잠을 잔다.',{currentTime:'23:00'}).suggestedAdvanceMinutes,[60,60],'a named-midnight deadline must roll to the next boundary');
 assert.equal(classifySceneIntent('내일 오전 10시까지 잠을 잔다.',{currentTime:'08:00'}).turnLimitTruncated,true,'a deadline beyond one turn must preserve the 1440-minute incomplete cap');
+const reachableDatedDeadline=classifySceneIntent('내일 오전 10시까지 기다린다.',{currentTime:'23:00'});
+assert.equal(reachableDatedDeadline.dateQualifiedStart,false,'a dated end clock must remain a deadline rather than becoming a scheduled start');
+assert.deepEqual(reachableDatedDeadline.suggestedAdvanceMinutes,[660,660],'a reachable dated deadline must use its exact elapsed interval');
+assert.equal(reachableDatedDeadline.turnLimitTruncated,false,'a reachable dated deadline must complete inside the current turn limit');
+const calendarClockTraining=classifySceneIntent('3월 1일 오전 10시에 훈련한다.',{currentTime:'09:00'});
+assert.equal(calendarClockTraining.explicitDurationMinutes,null,'a calendar day followed by a clock must not become an activity duration');
+assert.deepEqual(calendarClockTraining.suggestedAdvanceMinutes,[90,180],'the clock after a calendar date must retain normal scheduled-training timing');
 
 const boundarySave = {
   pc:{ department:'기사과' },

@@ -548,13 +548,14 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   if(reconcileTimedTurn){const prefixEffects=precedingActivityEffectsForShortening(turn,incoming?.action||'',intent,applied);reconcileShortenedTimedTurn(turn,{preserveConsequenceId:preserveAttributedConsequence||consequenceLifecycle?.evidence==='ambiguous-npc-effect'?consequenceLifecycle?.selected_id:'',preserveNpcStateUpdates:mergePreservedRows(prefixEffects.npc_state_updates,preserveAttributedConsequence?consequenceLifecycle?.npc_state_updates:[]),preserveNpcScheduleUpdates:preserveAttributedConsequence?consequenceLifecycle?.npc_schedule_updates:[],preserveDelta:mergePreservedDeltas(prefixEffects.preserved_delta,preserveAttributedConsequence?consequenceLifecycle?.preserved_delta:{}),preserveIntermediateLocation:(preserveAttributedConsequence?consequenceLifecycle?.new_location:'')||prefixEffects.new_location||preserveIntermediateLocation,preservePcStatus:(preserveAttributedConsequence?consequenceLifecycle?.pc_status:'')||prefixEffects.pc_status});}
   else if(appliedScheduleBoundary)rewoundScheduleCompletion=reconcileReachedScheduleStart(turn,boundaryRows);
   turn.state_delta.advance_minutes=applied;
-  const raisedElapsedTime=applied>current,returnedSceneReconciled=Boolean(reconcileTimedTurn||rewoundScheduleCompletion||raisedElapsedTime),reconciliationReason=appliedScheduleBoundary||unsurfacedScheduleCapsFloor||overrunStartBoundary||rewoundScheduleCompletion?'schedule-boundary':appliedConsequenceBoundary||unresolvedConsequenceCapsFloor||ambiguousAppliedConsequence?'consequence-boundary':turnLimitCompletion||startOnlyBoundary?'turn-limit':raisedElapsedTime?'profile-floor':'profile-cap';
+  const raisedElapsedTime=applied>current,returnedSceneReconciled=Boolean(reconcileTimedTurn||rewoundScheduleCompletion||raisedElapsedTime),reconciliationReason=appliedScheduleBoundary||unsurfacedScheduleCapsFloor||overrunStartBoundary||rewoundScheduleCompletion?'schedule-boundary':appliedConsequenceBoundary||unresolvedConsequenceCapsFloor||ambiguousAppliedConsequence?'consequence-boundary':turnLimitCompletion||startOnlyBoundary?'turn-limit':raisedElapsedTime?'profile-floor':'profile-cap',runtimeTrustedConsequenceScene=returnedSceneReconciled&&preserveAttributedConsequence?array(consequenceVisibleScene):[];
   if(returnedSceneReconciled){if(preserveAttributedConsequence&&array(consequenceVisibleScene).length)reconcileReturnedConsequenceTurn(turn,{elapsed:applied,scene:consequenceVisibleScene});else reconcileReturnedTimedTurn(turn,{reason:reconciliationReason,elapsed:applied});}
-  return{...intent,runtimeSceneTrusted:!returnedSceneReconciled,returnedSceneReconciled,reconciliationReason:returnedSceneReconciled?reconciliationReason:null};
+  return{...intent,runtimeSceneTrusted:!returnedSceneReconciled,runtimeTrustedConsequenceScene,returnedSceneReconciled,reconciliationReason:returnedSceneReconciled?reconciliationReason:null};
 }
 function runtimeSynthesisTurn(turn,intent={}){
   if(intent?.runtimeSceneTrusted!==false)return turn;
-  return{...object(turn),scene:[],scene_title:'',scene_summary:'',choices:[],emotion_updates:[],director:null,runtime_incomplete_boundary:true};
+  const trustedConsequenceScene=array(intent?.runtimeTrustedConsequenceScene).filter(item=>String(item?.text||'').trim());
+  return{...object(turn),scene:trustedConsequenceScene,scene_title:'',scene_summary:'',choices:[],emotion_updates:[],director:null,runtime_incomplete_boundary:true};
 }
 function reconcileReturnedTimedTurn(turn,{reason='profile-cap',elapsed=0}={}){
   if(!turn||typeof turn!=='object')return false;
@@ -846,16 +847,16 @@ export default async function handler(req,res){
     if(mode==='meta'){if(data.turn?.state_delta){data.turn.state_delta.stat_progress=[];data.turn.state_delta.skill_experience=[];data.turn.state_delta.skill_learning=[];data.turn.state_delta.awakening_progress=[];data.turn.state_delta.talent_evolution=[];}const pipeline={pipeline:'meta-full-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,event_director_v3:telemetry?.event_director_v3||null,event_director_v3_enabled:true,world_result_surface:null,world_result_surfacing_v1:true,adaptive_time_scale_version:ADAPTIVE_TIME_SCALE_VERSION,adaptive_time_scale_v2:true,scene_orchestration:telemetry?.scene_orchestration||null,scene_orchestration_v1:true,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true,faction_social_v1:true,combat_growth_v2:true,skill_learning_v1:true,awakening_talent_v1:true};data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);}
     applyExtendedExpressions(data.turn,incoming0.saveState||{});
     data.turn.choices=filterTurnHookChoices(incoming.action,{...data.turn,choices:freshChoices(incoming.action,data.turn)});
-    const growthIntent=classifySceneIntent(incoming0.action||'',{location:incoming.saveState?.world?.location||'',currentTime:incoming.saveState?.world?.time||'',actorName:incoming.saveState?.pc?.name||''}),zeroElapsedRange=array(growthIntent.explicitDurationRangeMinutes).length===2&&growthIntent.explicitDurationRangeMinutes.every(value=>Number(value)===0),zeroElapsedIntent=mode==='game'&&(growthIntent.explicitDurationMinutes===0||zeroElapsedRange)&&Number(growthIntent.minAdvanceMinutes||0)<=0;
+    const growthIntent=classifySceneIntent(incoming0.action||'',{location:incoming.saveState?.world?.location||'',currentTime:incoming.saveState?.world?.time||'',actorName:incoming.saveState?.pc?.name||''}),zeroElapsedRange=array(growthIntent.explicitDurationRangeMinutes).length===2&&growthIntent.explicitDurationRangeMinutes.every(value=>Number(value)===0),zeroElapsedIntent=mode==='game'&&(growthIntent.explicitDurationMinutes===0||zeroElapsedRange)&&Number(growthIntent.minAdvanceMinutes||0)<=0,growthAllowed=mode==='game'&&!zeroElapsedIntent,growthValidationScene=data.turn?.scene;
     if(data.turn?.state_delta)data.turn.state_delta.skill_experience=mode==='auto'?[]:filterExistingSkillExperience(data.turn.state_delta.skill_experience,incoming0.saveState?.pc?.skills);
     const combatGrowthState=deriveCombatGrowthState({
       pc:incoming0.saveState?.pc,
       statChanges:data.turn?.state_delta?.stat_progress,
       skillChanges:data.turn?.state_delta?.skill_experience,
       action:incoming0.action||'',
-      scene:data.turn?.scene,
+      scene:growthValidationScene,
       resolutionLog:data.turn?.resolution_log,
-      allowProgress:mode==='game'&&!zeroElapsedIntent,
+      allowProgress:growthAllowed,
     });
     if(data.turn?.state_delta){data.turn.state_delta.stat_progress=combatGrowthState.accepted_stat_progress;data.turn.state_delta.skill_experience=combatGrowthState.accepted_skill_experience;}
     const skillLearningState=deriveSkillLearningState({
@@ -863,9 +864,9 @@ export default async function handler(req,res){
       previousCandidates:incoming0.saveState?.pc?.skillCandidates,
       changes:data.turn?.state_delta?.skill_learning,
       action:incoming0.action||'',
-      scene:data.turn?.scene,
+      scene:growthValidationScene,
       turnNumber:Number(incoming0.saveState?.turnNumber||0)+1,
-      allowProgress:mode==='game'&&!zeroElapsedIntent,
+      allowProgress:growthAllowed,
     });
     if(data.turn?.state_delta)data.turn.state_delta.skill_learning=skillLearningState.accepted_changes;
     const awakeningTalentState=deriveAwakeningTalentState({
@@ -878,9 +879,9 @@ export default async function handler(req,res){
       talentEvolutionChanges:data.turn?.state_delta?.talent_evolution,
       action:incoming0.action||'',
       saveState:incoming0.saveState||{},
-      scene:data.turn?.scene,
+      scene:growthValidationScene,
       turnNumber:Number(incoming0.saveState?.turnNumber||0)+1,
-      allowProgress:mode==='game'&&!zeroElapsedIntent,
+      allowProgress:growthAllowed,
     });
     if(data.turn?.state_delta){
       data.turn.state_delta.awakening_progress=awakeningTalentState.accepted_awakening_changes;
@@ -893,15 +894,15 @@ export default async function handler(req,res){
     const sceneIntent=applySceneMomentumTimeFloor({...incoming0,saveState:incoming.saveState,action:incoming0.action||''},data.turn,mode,consequenceLifecycle,consequenceVisibleScene);
     let persistedCombatGrowthState=combatGrowthState,persistedSkillLearningState=skillLearningState,persistedAwakeningTalentState=awakeningTalentState;
     if(data.turn?.state_delta&&(data.turn.state_delta.stat_progress!==combatGrowthState.accepted_stat_progress||data.turn.state_delta.skill_experience!==combatGrowthState.accepted_skill_experience)){
-      persistedCombatGrowthState=deriveCombatGrowthState({pc:incoming0.saveState?.pc,statChanges:data.turn.state_delta.stat_progress,skillChanges:data.turn.state_delta.skill_experience,action:incoming0.action||'',scene:data.turn?.scene,resolutionLog:data.turn?.resolution_log,allowProgress:false});
+      persistedCombatGrowthState=deriveCombatGrowthState({pc:incoming0.saveState?.pc,statChanges:data.turn.state_delta.stat_progress,skillChanges:data.turn.state_delta.skill_experience,action:incoming0.action||'',scene:growthValidationScene,resolutionLog:data.turn?.resolution_log,allowProgress:growthAllowed});
       data.turn.state_delta.stat_progress=persistedCombatGrowthState.accepted_stat_progress;data.turn.state_delta.skill_experience=persistedCombatGrowthState.accepted_skill_experience;
     }
     if(data.turn?.state_delta&&data.turn.state_delta.skill_learning!==skillLearningState.accepted_changes){
-      persistedSkillLearningState=deriveSkillLearningState({existingSkills:incoming0.saveState?.pc?.skills,previousCandidates:incoming0.saveState?.pc?.skillCandidates,changes:data.turn.state_delta.skill_learning,action:incoming0.action||'',scene:data.turn?.scene,turnNumber:Number(incoming0.saveState?.turnNumber||0)+1,allowProgress:false});
+      persistedSkillLearningState=deriveSkillLearningState({existingSkills:incoming0.saveState?.pc?.skills,previousCandidates:incoming0.saveState?.pc?.skillCandidates,changes:data.turn.state_delta.skill_learning,action:incoming0.action||'',scene:growthValidationScene,turnNumber:Number(incoming0.saveState?.turnNumber||0)+1,allowProgress:growthAllowed});
       data.turn.state_delta.skill_learning=persistedSkillLearningState.accepted_changes;
     }
     if(data.turn?.state_delta&&(data.turn.state_delta.awakening_progress!==awakeningTalentState.accepted_awakening_changes||data.turn.state_delta.talent_evolution!==awakeningTalentState.accepted_talent_evolution)){
-      persistedAwakeningTalentState=deriveAwakeningTalentState({existingTraits:incoming0.saveState?.pc?.traits,existingAuthorities:incoming0.saveState?.pc?.authorities,talents:incoming0.saveState?.pc?.talents,previousCandidates:incoming0.saveState?.pc?.awakeningCandidates,previousTalentHistory:incoming0.saveState?.pc?.talentEvolutionHistory,awakeningChanges:data.turn.state_delta.awakening_progress,talentEvolutionChanges:data.turn.state_delta.talent_evolution,action:incoming0.action||'',saveState:incoming0.saveState||{},scene:data.turn?.scene,turnNumber:Number(incoming0.saveState?.turnNumber||0)+1,allowProgress:false});
+      persistedAwakeningTalentState=deriveAwakeningTalentState({existingTraits:incoming0.saveState?.pc?.traits,existingAuthorities:incoming0.saveState?.pc?.authorities,talents:incoming0.saveState?.pc?.talents,previousCandidates:incoming0.saveState?.pc?.awakeningCandidates,previousTalentHistory:incoming0.saveState?.pc?.talentEvolutionHistory,awakeningChanges:data.turn.state_delta.awakening_progress,talentEvolutionChanges:data.turn.state_delta.talent_evolution,action:incoming0.action||'',saveState:incoming0.saveState||{},scene:growthValidationScene,turnNumber:Number(incoming0.saveState?.turnNumber||0)+1,allowProgress:growthAllowed});
       data.turn.state_delta.awakening_progress=persistedAwakeningTalentState.accepted_awakening_changes;data.turn.state_delta.talent_evolution=persistedAwakeningTalentState.accepted_talent_evolution;
     }
     const runtimeTurn=runtimeSynthesisTurn(data.turn,sceneIntent);

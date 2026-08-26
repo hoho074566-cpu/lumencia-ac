@@ -351,7 +351,7 @@ assert.equal(firstRuntimeNotices.length, 2, 'first application must report one T
 const replayNotices = applyRuntimePacket({ awakening_talent:{ ...evolvedTalent, awakened_traits:awakenedTrait.awakened_traits } });
 assert.equal(runtimeSave.pc.talents.martial, 6, 'replaying the same packet must not apply talent evolution twice');
 assert.deepEqual(replayNotices, [], 'replaying the same packet must be notice-idempotent');
-assert.match(routerSource, /allowProgress:mode==='game'/, 'AUTO must pass through the deterministic freeze gate');
+assert.match(routerSource, /growthAllowed=mode==='game'&&!zeroElapsedIntent/, 'AUTO must pass through the deterministic freeze gate');
 assert.match(routerSource, /state_delta\.awakening_progress=\[\].*state_delta\.talent_evolution=\[\]/s, 'META must clear both growth fields');
 assert.match(runtimeSource, /applyAwakeningTalentRuntimeStable/, 'stable runtime must persist server-validated awakening and talent state');
 assert.match(runtimeSource, /current === before[\s\S]*save\.pc\.talents\[talent\] = after/, 'talent application must be exact-state and replay safe');

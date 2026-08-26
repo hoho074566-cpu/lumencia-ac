@@ -632,7 +632,7 @@ const schemaSource = readFileSync(new URL('../../api/lib/schema.js', import.meta
 assert.match(routerSource, /deriveCombatGrowthState/);
 assert.match(routerSource, /\[COMBAT GROWTH V2\]/, 'the single canonical request must receive the growth contract');
 assert.match(routerSource, /state_delta\.stat_progress=\[\];data\.turn\.state_delta\.skill_experience=\[\]/, 'META must clear both legacy growth arrays');
-assert.match(routerSource, /allowProgress:mode==='game'/, 'AUTO and every frozen mode must fail closed');
+assert.match(routerSource, /growthAllowed=mode==='game'&&!zeroElapsedIntent/, 'AUTO and every frozen mode must fail closed');
 assert.match(routerSource, /stat_progress=combatGrowthState\.accepted_stat_progress.*skill_experience=combatGrowthState\.accepted_skill_experience/s, 'only accepted rows may reach the stable runtime');
 assert.ok(routerSource.indexOf('const combatGrowthState=deriveCombatGrowthState({') < routerSource.indexOf('const sceneRuntime=localSceneRuntime('), 'growth filtering must run before deterministic State Delta/momentum measurement');
 assert.equal((routerSource.match(/await runCore\(req,incoming,mode\)/g) || []).length, 1, 'Combat Growth V2 must preserve one canonical core call');

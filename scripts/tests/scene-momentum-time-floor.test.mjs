@@ -344,7 +344,7 @@ turn={scene:[{kind:'narration',text:'약속 시각이 되자 에밀리가 중앙
 const consequenceNpcKeys=consequenceNpcKeysForShortening(turn,{event_name:'약속 상대의 도착',reason:'약속 장소에 도착한다',secret_level:0},[],{emily:'에밀리',artemis:'아르테미스'});
 assert.deepEqual(consequenceNpcKeys,['emily'],'a visible NPC named in the consequence-bearing sentence must be attributed even when the queued title did not name them');
 const {visible_scene:arrivalVisibleScene,...consequenceEffects}=consequenceNpcEffectsForShortening(turn,{event_name:'약속 상대의 도착',reason:'약속 장소에 도착한다',secret_level:0},[],{emily:'에밀리',artemis:'아르테미스'});
-applySceneMomentumTimeFloor({action:'40분 기다린다.',saveState:consequenceSave},turn,'game',{selected_id:consequenceHook.id,status:'resolved',...consequenceEffects},arrivalVisibleScene);
+const manifestedConsequenceIntent=applySceneMomentumTimeFloor({action:'40분 기다린다.',saveState:consequenceSave},turn,'game',{selected_id:consequenceHook.id,status:'resolved',...consequenceEffects},arrivalVisibleScene);
 assert.equal(turn.state_delta.advance_minutes,20,'a due consequence inside a longer wait must stop at its exact trigger');
 assert.deepEqual(turn.state_delta.npc_state_updates,[{npc_key:'emily',location:'중앙광장',status:'도착'}],'NPC state attributable to the resolved consequence must survive shortening');
 assert.deepEqual(turn.state_delta.npc_schedule_updates,[],'relative NPC schedules must fail closed because their delay cannot be safely rebased to the shortened boundary');
@@ -354,6 +354,7 @@ assert.deepEqual(turn.state_delta.memories_add,[arrivalMemory],'a memory visibly
 assert.deepEqual(turn.state_delta.hooks_update,[{id:consequenceHook.id,status:'resolved'}],'the preserved consequence state and its resolved lifecycle must remain aligned');
 assert.equal(turn.scene_title,'후속 상황','a safely manifested consequence must remain visible after boundary reconciliation');
 assert.match(turn.scene.map(item=>item.text).join(' '),/에밀리가 중앙광장에 도착/,'the one-shot consequence outcome must remain in the returned scene');
+assert.deepEqual(runtimeSynthesisTurn(turn,manifestedConsequenceIntent).scene,arrivalVisibleScene,'runtime synthesis must retain only the attributed consequence scene for next-turn participants');
 turn={scene:[{kind:'narration',text:'마법진이 발동해 PC를 지하 의무실로 옮기고 부상을 입혔다.'}],state_delta:{advance_minutes:40,new_location:'지하 의무실',pc_status:'부상',hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
 const pcStateEffects=consequenceNpcEffectsForShortening(turn,{event_name:'마법진 강제 전이',reason:'마법진이 발동해 PC를 지하 의무실로 옮기고 부상을 입힌다',secret_level:0},[],{});
 assert.equal(pcStateEffects.attribution_safe,true,'visible consequence-owned PC location and status must be attributable at the boundary');
