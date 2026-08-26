@@ -93,6 +93,16 @@ const inventedBoundary=structuredClone(structuralTurn);
 inventedBoundary.time_execution.boundary_event_id='schedule:invented';
 assert.equal(validateStructuredTimeExecution(inventedBoundary,exact,scheduleRuntime).reason,'unverified-boundary-event','a model-declared boundary owner must match a real runtime boundary');
 
+const activeChoiceTurn={
+  scene:[{text:'동문과 서문 중 어느 길로 갈까?'}],choices:['동문','서문'],
+  event_progress:{event_instance_id:'quest:escort',active_beat:'route-choice',completed_beats:['briefing']},
+  state_delta:{advance_minutes:120,fatigue_delta:0,gold_delta:0},
+  time_execution:{version:'1.0',plan_used:true,boundary_kind:'choice',boundary_minutes:120,completed_clause_ids:['action_1'],interrupted_clause_id:'action_2',decision_scene_index:0,boundary_event_id:'quest:escort',effect_owners:[{scope:'turn',field:'event_progress',effect_index:null,owner_kind:'boundary-event',owner_id:'quest:escort'}],scalar_contributions:[]},
+};
+const activeChoiceAuthority=validateStructuredTimeExecution(activeChoiceTurn,exact,{boundaries:{choice:{minutes:120,event_ids:['quest:escort']}}});
+assert.equal(activeChoiceAuthority.valid,true,'an externally authenticated active event can own its returned turn progress');
+assert.deepEqual(projectStructuredOwnedEffects(activeChoiceTurn,activeChoiceAuthority,120).preserved_turn.event_progress,activeChoiceTurn.event_progress,'projection returns the validated turn-owned value, not only its field name');
+
 const mixedScalar=structuredClone(structuralTurn);
 mixedScalar.state_delta.fatigue_delta=2;
 mixedScalar.time_execution.scalar_contributions=[

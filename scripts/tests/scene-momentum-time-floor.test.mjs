@@ -397,12 +397,12 @@ assert.equal(turn.state_delta.advance_minutes,540,'a choice exactly at the termi
 assert.deepEqual(turn.state_delta.items_add,[],'terminal effects without completion evidence remain removed at the maximum');
 const directorEventId='director:warehouse-fire',directorMetadata={intervention:'event',beat:'warehouse-fire',event_kind:'world',spotlight_keys:['artemis'],callback_key:null,callback_phase:'none',callback_note:null,reason:'창고에서 불길이 치솟았다'};
 turn={scene_title:'훈련 뒤 창고 화재',scene:[{kind:'narration',text:'한 시간 검술 훈련을 마쳤다.'},{kind:'narration',text:'수면에 들려던 순간 창고에서 불길이 치솟았다.'},{kind:'dialogue',speaker_key:'artemis',text:'불을 끌까, 사람들을 대피시킬까?'}],choices:['불을 끈다.','사람들을 대피시킨다.','상황을 살핀다.'],director:directorMetadata,event_progress:{event_instance_id:directorEventId,active_beat:'response-choice',completed_beats:[]},state_delta:{advance_minutes:90,skill_experience:[multiPrefixGrowth],items_add:['숙면 보상'],active_events_add:[directorEventId]}};
-applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},sceneRuntime:{eventProgress:null},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},sceneRuntime:{eventProgress:null},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game',null,[],{director_occurrence_id:directorEventId});
 assert.deepEqual(turn.state_delta.active_events_add,[directorEventId],'a choice-bearing Director interruption remains active after suffix reconciliation');
 assert.equal(turn.event_progress.event_instance_id,directorEventId,'the Director event progress remains attached to its response choices');
 assert.deepEqual(turn.director,directorMetadata,'Director metadata survives only for the choice-bearing interruption');
 turn={scene_title:'질문 뒤 창고 화재',scene:[{kind:'dialogue',speaker_key:'artemis',text:'지금 경계 임무를 맡겠나?'},{kind:'narration',text:'대답을 기다리는 사이 창고에서 불길이 치솟았다.'}],choices:['경계 임무를 맡는다.','예정대로 잔다.','상황을 묻는다.'],director:directorMetadata,event_progress:{event_instance_id:directorEventId,active_beat:'response-choice',completed_beats:[]},state_delta:{advance_minutes:90,items_add:['숙면 보상'],active_events_add:[directorEventId]}};
-applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},sceneRuntime:{eventProgress:null},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},sceneRuntime:{eventProgress:null},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game',null,[],{director_occurrence_id:directorEventId});
 assert.deepEqual(turn.state_delta.active_events_add,[],'a Director event narrated only after an unrelated prompt is not restored');
 assert.equal(turn.event_progress,null,'hidden post-choice Director progress is removed');
 assert.equal(turn.director,null,'post-choice Director metadata cannot attach to unrelated choices');
@@ -495,6 +495,19 @@ turn.time_execution=choiceExecution(turn,{boundaryEventId:'director:ongoing-fire
 applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{...structuralCompoundSave,sceneRuntime:{eventProgress:{eventInstanceId:'director:ongoing-fire'}}}},turn,'game');
 assert.equal(turn.event_progress?.event_instance_id,'director:ongoing-fire','an owned nonterminal active Director event survives its resumed choice boundary');
 assert.deepEqual(turn.director,ongoingDirector,'owned active Director metadata remains attached to its choices');
+
+const ongoingQuestProgress={event_instance_id:'quest:escort',active_beat:'route-choice',completed_beats:['briefing']};
+turn={scene_title:'훈련 뒤 호위 경로 선택',scene:[{kind:'narration',text:'한 시간 훈련을 마친 뒤 진행 중인 호위 임무의 갈림길에 도착했다.'},{kind:'dialogue',speaker_key:'emily',text:'동문과 서문 중 어느 길로 갈까?'}],choices:['동문으로 간다.','서문으로 간다.','상황을 확인한다.'],event_progress:ongoingQuestProgress,state_delta:{advance_minutes:60,active_events_add:[]}};
+turn.time_execution=choiceExecution(turn,{boundaryEventId:'quest:escort',owners:[effectOwner('event_progress',null,'quest:escort','boundary-event','turn')]});
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{...structuralCompoundSave,activeEvents:['quest:escort'],sceneRuntime:{eventProgress:{eventInstanceId:'quest:escort',activeBeat:'briefing'}}}},turn,'game');
+assert.deepEqual(turn.event_progress,ongoingQuestProgress,'validated turn-owned progress is restored for an active non-Director choice event');
+
+turn={scene_title:'수면 중 가짜 화재',scene:[{kind:'dialogue',speaker_key:'artemis',text:'불을 끌까?'}],choices:['끈다.','대피한다.','살핀다.'],director:ongoingDirector,event_progress:{event_instance_id:'director:invented-fire',active_beat:'choice',completed_beats:[]},state_delta:{advance_minutes:60,items_add:['화재 보상'],active_events_add:['director:invented-fire']}};
+turn.time_execution=choiceExecution(turn,{completed:[],interrupted:'action_1',boundaryEventId:'director:invented-fire',owners:[effectOwner('items_add',0,'director:invented-fire','boundary-event'),effectOwner('event_progress',null,'director:invented-fire','boundary-event','turn'),effectOwner('director',null,'director:invented-fire','boundary-event','turn')]});
+applySceneMomentumTimeFloor({action:'8시간 잔다',saveState:structuralCompoundSave},turn,'game');
+assert.deepEqual(turn.state_delta.items_add,[],'a model-invented choice event cannot authenticate a premature boundary reward');
+assert.equal(turn.event_progress,null,'a model-invented choice event cannot restore its own progress claim');
+assert.equal(turn.director,null,'a model-invented choice event cannot restore its own Director metadata');
 
 turn={scene_title:'0분 상한 훈련 선택',scene:[{kind:'narration',text:'훈련을 모두 마치고 기록표를 받았다.'},{kind:'dialogue',speaker_key:'artemis',text:'이제 잠들겠나?'}],choices:['잔다.','기다린다.','묻는다.'],state_delta:{advance_minutes:0,items_add:['훈련 기록표']}};
 turn.time_execution=choiceExecution(turn,{minutes:0,owners:[effectOwner('items_add',0)]});

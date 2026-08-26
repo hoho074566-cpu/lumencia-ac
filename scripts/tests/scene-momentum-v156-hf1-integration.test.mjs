@@ -54,7 +54,7 @@ assert.equal((chat.match(/coreHandler\(/g)||[]).length,1,'stable adapter must ke
 assert.match(chat,/const modelHasMeaningfulStop=array\(turn\?\.choices\)\.length>0/,'time-floor stop evidence must originate in an explicit player decision');
 assert.match(chat,/hasMeaningfulStop=Boolean\(modelHasMeaningfulStop&&!turnLimitPreemptsChoice\)/,'the canonical one-turn cap must defer choices on an incomplete long action');
 assert.match(chat,/const reachedConsequenceBoundary=/,'manifested delayed results must be recognized as compression boundaries');
-assert.match(chat,/applySceneMomentumTimeFloor\([^;]+consequenceLifecycle,consequenceVisibleScene\)/,'the selected consequence lifecycle and attributable narration must reach the elapsed-time guard');
+assert.match(chat,/applySceneMomentumTimeFloor\([^;]+consequenceLifecycle,consequenceVisibleScene,\{director_occurrence_id:[^}]+choice_event_ids:resumableIds\}\)/,'the selected consequence lifecycle and externally routed event authority must reach the elapsed-time guard');
 assert.doesNotMatch(chat,/hasMeaningfulStop[^;\n]*importance[^;\n]*critical/i,'critical scene severity must not suppress deterministic elapsed time');
 assert.match(chat,/growthAllowed=mode==='game'&&!zeroElapsedIntent/,'explicit zero-minute and non-game actions must share one deterministic growth freeze gate');
 assert.equal((chat.match(/allowProgress:growthAllowed/g)||[]).length,6,'initial validation and all three post-boundary persistence rebuilds must share the growth gate');
