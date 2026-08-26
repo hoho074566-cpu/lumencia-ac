@@ -29,6 +29,8 @@ const irrelevantScheduleSave={
   ]},
 };
 assert.equal(isPcRelevantScheduleEvent(irrelevantScheduleSave,irrelevantScheduleSave.scheduleContext.upcoming[0]),false,'an NPC-only legacy row must not constrain the PC clock');
+assert.equal(isPcRelevantScheduleEvent(irrelevantScheduleSave,{id:'npc-owned-briefing',title:'레나 개인 일정',owner:'npc:lena',participants:['lena']}),false,'an NPC owner namespace containing the letters pc must not become a PC schedule boundary');
+assert.equal(isPcRelevantScheduleEvent(irrelevantScheduleSave,{id:'pc-owned-briefing',title:'카인 개인 일정',owner:'pc:cain'}),true,'a delimited PC owner identity remains authoritative');
 assert.equal(isPcRelevantScheduleEvent(irrelevantScheduleSave,irrelevantScheduleSave.scheduleContext.upcoming[1]),false,'a world-only event must progress independently');
 assert.equal(isPcRelevantScheduleEvent(irrelevantScheduleSave,irrelevantScheduleSave.scheduleContext.upcoming[2]),false,'another department schedule must not constrain this PC');
 assert.equal(isPcRelevantScheduleEvent(irrelevantScheduleSave,irrelevantScheduleSave.scheduleContext.upcoming[3]),true,'the PC department schedule remains authoritative');
