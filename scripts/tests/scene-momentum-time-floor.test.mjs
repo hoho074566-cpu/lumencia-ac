@@ -300,6 +300,18 @@ turn={scene_title:'훈련과 수면 완료',scene:[{kind:'narration',text:'에�
 const npcCompletionIntent=applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:compoundBoundarySave},turn,'game');
 assert.equal(npcCompletionIntent.structuredBoundaryReconciliationApplied,true,'the aligned plan still owns the boundary even when completion evidence is rejected');
 assert.deepEqual(turn.state_delta.skill_experience,[],'NPC narration or dialogue cannot establish PC prefix completion');
+turn={scene_title:'수면 중 호출',scene:[{kind:'dialogue',speaker_key:'artemis',text:'지금 일어나 경계 임무를 맡겠나?'}],choices:['일어난다.','계속 잔다.','상황을 묻는다.'],state_delta:{advance_minutes:90,skill_experience:[multiPrefixGrowth],items_add:['숙면 보상']}};
+const evidenceFreeDecision=applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:compoundBoundarySave},turn,'game');
+assert.equal(evidenceFreeDecision.reconciliationReason,'decision-boundary','a meaningful choice remains a boundary without prefix-completion prose');
+assert.deepEqual(turn.state_delta.skill_experience,[],'unproven prefix effects fail closed at the choice');
+assert.deepEqual(turn.state_delta.items_add,[],'terminal effects fail closed at the choice');
+turn={scene_title:'훈련 중 준비',scene:[{kind:'narration',text:'훈련을 계속하던 중 경계 임무 준비를 완료했다.'}],choices:[],state_delta:{advance_minutes:540,skill_experience:[multiPrefixGrowth]}};
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:compoundBoundarySave},turn,'game');
+assert.deepEqual(turn.state_delta.skill_experience,[],'an unrelated completion cue cannot prove the training action complete');
+turn={scene_title:'질문 뒤 과잉 진행',scene:[{kind:'narration',text:'한 시간 훈련을 마쳤다.'},{kind:'dialogue',speaker_key:'artemis',text:'지금 경계 임무를 맡겠나?'},{kind:'narration',text:'대답을 기다리지 않고 수면까지 마쳤다.'}],choices:['맡는다.','쉰다.','묻는다.'],state_delta:{advance_minutes:540,skill_experience:[multiPrefixGrowth],items_add:['숙면 보상']}};
+const postChoiceCompletion=applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:compoundBoundarySave},turn,'game');
+assert.equal(postChoiceCompletion.reconciliationReason,'decision-boundary','terminal completion after the visible question cannot cross the choice');
+assert.deepEqual(turn.state_delta.items_add,[],'post-choice terminal effects are removed');
 turn={
   scene_title:'훈련 완료와 수업 종료',scene:[{kind:'narration',text:'네 시간의 검술 훈련을 마쳤다.'},{kind:'narration',text:'10시가 되자 기사과 기초 수업까지 수료하고 보상을 받았다.'}],choices:[],
   state_delta:{advance_minutes:240,skill_experience:[trainingGrowth,prematureClassGrowth],items_add:['훈련 기록표','수료 보상']},
