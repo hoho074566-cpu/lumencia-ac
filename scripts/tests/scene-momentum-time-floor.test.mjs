@@ -160,6 +160,12 @@ assert.equal(turn.state_delta.advance_minutes,10,'an eligible single-action plan
 assert.deepEqual(turn.state_delta.items_add,[],'a missing single-action receipt removes unowned completion rewards at the returned choice minute');
 assert.equal(missingSingleCompletion.returnedSceneReconciled,true,'a missing single-action receipt enters deterministic decision reconciliation');
 assert.doesNotMatch(JSON.stringify(turn.scene),/보상을 챙겼다/,'unverified post-completion narration is removed with its effects');
+turn={scene:[{kind:'dialogue',speaker_key:'artemis',text:'훈련을 마쳤으니 이제 무엇을 하겠나?'}],state_delta:{advance_minutes:10,items_add:['미검증 훈련 배지']},choices:['대련한다','쉰다','돌아간다']};
+const untrustedSinglePrompt=applySceneMomentumTimeFloor({action:'1시간 동안 훈련한다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-01',time:'09:00'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.deepEqual(turn.choices,['대련한다','쉰다','돌아간다'],'missing-receipt reconciliation preserves the actual player choices');
+assert.doesNotMatch(JSON.stringify(turn.scene),/훈련을 마쳤으니/,'an unverified same-sentence completion prompt is replaced structurally instead of parsed for wording');
+assert.deepEqual(turn.state_delta.items_add,[],'effects attached to the unverified same-sentence completion prompt fail closed');
+assert.equal(untrustedSinglePrompt.runtimeSceneTrusted,false,'the deterministic replacement for an unverified single-action prompt is excluded from runtime synthesis');
 turn={scene:[{kind:'narration',text:'카인은 훈련을 마쳤다.'}],state_delta:{advance_minutes:60,items_add:['훈련 완료 증표']},choices:['다음 훈련을 고른다']};
 turn.time_execution=choiceExecution(turn,{minutes:60,completed:['action_1'],interrupted:null,owners:[effectOwner('items_add',0,'action_1')]});
 const ownedSingleCompletion=applySceneMomentumTimeFloor({action:'1시간 동안 훈련한다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-01',time:'09:00'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
@@ -254,8 +260,18 @@ turn={scene_title:'수업 시작',scene:[{kind:'narration',text:'기초 수업�
 const ordinaryBoundaryStartIntent=applySceneMomentumTimeFloor({action:'10분 기다린다.',saveState:boundaryChoiceSave},turn,'game');
 assert.deepEqual(turn.state_delta.active_events_add,['class'],'a legitimately started schedule must enter the active bucket at its boundary');
 assert.deepEqual(turn.state_delta.scheduled_events_remove,['class'],'a legitimately activated schedule must leave the pending bucket without being marked complete');
-assert.deepEqual(turn.state_delta.pc_knowledge_add,['기다리는 동안 확인한 복도 공지'],'ordinary pre-boundary effects must survive a nonterminal schedule start');
-assert.equal(ordinaryBoundaryStartIntent.runtimeSceneTrusted,true,'a nonterminal schedule start must not be treated as premature completion');
+assert.deepEqual(turn.state_delta.pc_knowledge_add,[],'a missing single-action receipt cannot preserve an unowned pre-boundary effect at a coincident schedule start');
+assert.equal(ordinaryBoundaryStartIntent.runtimeSceneTrusted,false,'a missing receipt keeps the verified schedule state but does not trust its unverified returned narration for runtime synthesis');
+turn={scene_title:'대기 완료와 수업 시작',scene:[{kind:'narration',text:'10분 기다림을 마쳤다.'},{kind:'dialogue',text:'기초 수업이 막 시작되었다. 지금 참석하겠나?'}],choices:['참석한다','남는다','다른 곳으로 간다'],event_progress:{event_instance_id:'class',active_beat:'start',completed_beats:[]},state_delta:{advance_minutes:10,items_add:['미검증 대기 보상'],active_events_add:['class'],scheduled_events_remove:['class']}};
+turn.time_execution=choiceExecution(turn,{minutes:10,completed:['action_2'],interrupted:null});
+const invalidCoincidentSchedule=applySceneMomentumTimeFloor({action:'10분 기다린다.',saveState:boundaryChoiceSave},turn,'game');
+assert.equal(invalidCoincidentSchedule.reconciliationReason,'schedule-boundary','a verified schedule outranks an invalid single-action receipt at the same minute');
+assert.deepEqual(turn.state_delta.items_add,[],'an invalid receipt cannot retain an unowned action reward at the coincident schedule');
+assert.deepEqual(turn.state_delta.active_events_add,['class'],'the verified schedule remains active while invalid action effects are cleared');
+assert.deepEqual(turn.state_delta.scheduled_events_remove,['class'],'the verified schedule still leaves the pending bucket');
+assert.equal(turn.event_progress.event_instance_id,'class','verified nonterminal schedule progress survives invalid-receipt sanitization');
+assert.deepEqual(turn.choices,['참석한다','남는다','다른 곳으로 간다'],'schedule-priority sanitization preserves the player choices shown at the boundary');
+assert.doesNotMatch(JSON.stringify(turn.scene),/기다림을 마쳤다/,'invalid action completion prose is replaced without removing the verified schedule decision');
 const exactTrainingBoundary={id:'next-class',title:'기사과 기초 수업',date:'1285-03-01',time:'10:00',location:'훈련장',kind:'academic',status:'scheduled'};
 const exactTrainingBoundarySave={pc:knightPc,world:{date:'1285-03-01',time:'06:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[exactTrainingBoundary]},scheduledEvents:[exactTrainingBoundary]};
 const trainingGrowth={skill:'검술',amount:1,reason:'네 시간 동안 기초 검술 훈련을 완료했다'};
@@ -818,7 +834,7 @@ const coincidentConsequenceHook={id:'consequence:coincident',status:'deferred',e
 turn={scene:[{kind:'narration',text:'한 시간을 모두 기다렸다.'}],state_delta:{advance_minutes:60,pc_knowledge_add:['대기 중 확인한 공개 공지']},choices:[],event_progress:null};
 const coincidentConsequenceIntent=applySceneMomentumTimeFloor({action:'1시간 동안 기다린다.',saveState:{world:{date:'1285-03-01',time:'09:00'},hooks:[coincidentConsequenceHook],scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game',coincidentConsequenceLifecycle);
 assert.equal(turn.state_delta.advance_minutes,60,'an action may complete exactly when an open consequence becomes due');
-assert.deepEqual(turn.state_delta.pc_knowledge_add,['대기 중 확인한 공개 공지'],'legitimate action effects must survive a coincident consequence boundary');
+assert.deepEqual(turn.state_delta.pc_knowledge_add,[],'a missing single-action receipt cannot preserve an unowned action effect at a coincident consequence boundary');
 assert.match(turn.scene_summary,/후속 상황이 발현할 시점/,'a coincident open consequence must become visible instead of being skipped');
 assert.equal(coincidentConsequenceIntent.reconciliationReason,'consequence-boundary','coincident consequence reconciliation must report its boundary');
 const arrivalRelationship={npc_key:'emily',affinity_delta:-1,trust_delta:1,status:'경계 중',reason:'에밀리가 약속 시각에 중앙광장에 도착해 함께 후문을 경계했다'};
@@ -1063,7 +1079,7 @@ assert.deepEqual(turn.state_delta.scheduled_events_complete,[],'the rewound occu
 turn={scene_title:'진행 중인 의뢰와 정오',scene:[{kind:'narration',text:'기사과 필수 오리엔테이션이 정오에 시작되었다.'}],state_delta:{advance_minutes:40},choices:['참석한다','의뢰를 계속한다','다른 곳으로 간다'],event_progress:{event_instance_id:'active:quest',active_beat:'investigate'}};
 applySceneMomentumTimeFloor({action:'기본 검술 자세와 발놀림을 충분히 훈련한다.',saveState:underreportedScheduleSave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,60,'a visibly started schedule must align even while an unrelated event remains active');
-assert.equal(turn.event_progress.event_instance_id,'active:quest','the unrelated active event must remain intact at the schedule boundary');
+assert.equal(turn.event_progress,null,'an unowned returned event cannot survive missing-receipt reconciliation at the schedule boundary');
 
 turn={scene_title:'훈련장의 기본기',scene:[{kind:'narration',text:'기사과 필수 오리엔테이션은 10시에 예정되어 있다.'},{kind:'narration',text:'10시 30분을 알리는 종이 울렸다.'}],state_delta:{advance_minutes:40},choices:[],event_progress:null};
 applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:rangedScheduleSave},turn,'game');
