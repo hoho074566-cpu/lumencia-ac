@@ -370,6 +370,19 @@ const coincidentChoiceIntent=applySceneMomentumTimeFloor({action:'1시간 훈련
 assert.equal(coincidentChoiceIntent.reconciliationReason,'decision-boundary','a player decision owns visible reconciliation when schedule and choice times coincide');
 assert.deepEqual(turn.choices,coincidentChoices,'coincident schedule state cannot erase the player response choices');
 assert.deepEqual(turn.state_delta.active_events_add,[coincidentChoiceBoundary.id],'coincident choice reconciliation still preserves the started schedule state');
+turn={scene_title:'훈련 직후 수업 시작',scene:[{kind:'narration',text:'한 시간 검술 훈련을 마치자 기사과 필수 수업이 시작됐다.'}],choices:[],event_progress:{event_instance_id:coincidentChoiceBoundary.id,active_beat:'start',completed_beats:[]},state_delta:{advance_minutes:540,skill_experience:[multiPrefixGrowth],active_events_add:[coincidentChoiceBoundary.id],scheduled_events_remove:[coincidentChoiceBoundary.id]}};
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:coincidentChoiceSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,60,'a same-sentence schedule start still applies at the exact prefix boundary');
+assert.deepEqual(turn.state_delta.skill_experience,[multiPrefixGrowth],'completion text before a same-sentence schedule cue remains prefix evidence');
+turn={scene_title:'점호 뒤 늦은 질문',scene:[{kind:'narration',text:'5분 뒤 기사과 점호가 시작됐다.'},{kind:'narration',text:'그 뒤 한 시간 대화를 마쳤고 협상 기록을 받았다.'},{kind:'dialogue',speaker_key:'emily',text:'이제 대화를 계속할까?'}],choices:['계속한다.','점호에 간다.','상황을 묻는다.'],event_progress:{event_instance_id:earlyDialogueBoundary.id,active_beat:'start',completed_beats:[]},state_delta:{advance_minutes:490,items_add:['협상 기록'],relationship_changes:[{npc_key:'emily',affinity_delta:1,reason:'대화를 마쳤다'}],active_events_add:[earlyDialogueBoundary.id],scheduled_events_remove:[earlyDialogueBoundary.id]}};
+applySceneMomentumTimeFloor({action:'대화하고 8시간 잔다',saveState:earlyDialogueSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,5,'an earlier required schedule wins over a later model-provided choice');
+assert.deepEqual(turn.state_delta.relationship_changes,[],'the later choice slice cannot preserve effects narrated after the applied schedule boundary');
+assert.deepEqual(turn.state_delta.items_add,[],'post-schedule rewards remain removed when a later question exists');
+turn={scene_title:'조건부 훈련 보상',scene:[{kind:'narration',text:'훈련이 완료되면 보상을 받을 수 있다.'},{kind:'dialogue',speaker_key:'artemis',text:'지금 경계 임무를 맡겠나?'}],choices:['맡는다.','훈련한다.','상황을 묻는다.'],state_delta:{advance_minutes:60,skill_experience:[multiPrefixGrowth],items_add:['훈련 보상']}};
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
+assert.deepEqual(turn.state_delta.skill_experience,[],'conditional passive completion cannot preserve prefix growth');
+assert.deepEqual(turn.state_delta.items_add,[],'conditional passive completion cannot preserve a hypothetical reward');
 turn={
   scene_title:'훈련 완료와 수업 종료',scene:[{kind:'narration',text:'네 시간의 검술 훈련을 마쳤다.'},{kind:'narration',text:'10시가 되자 기사과 기초 수업까지 수료하고 보상을 받았다.'}],choices:[],
   state_delta:{advance_minutes:240,skill_experience:[trainingGrowth,prematureClassGrowth],items_add:['훈련 기록표','수료 보상']},
