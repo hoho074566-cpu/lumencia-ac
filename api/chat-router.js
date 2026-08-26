@@ -343,9 +343,10 @@ function scheduleTimeMentioned(text,row={}){
 function scheduleBoundaryOccurred(turn,row={}){
   if(!scheduleRowMentioned(turn,row))return false;
   const segments=[turn?.scene_title,...array(turn?.scene).map(item=>item?.text)].filter(Boolean).flatMap(value=>String(value).split(/(?<=[.!?。！？])|\n+/)).map(value=>value.trim()).filter(Boolean);
-  const started=segments.some(text=>scheduleRowMentioned({scene:[{text}]},row)&&/(?:시작(?:되어(?!야)|되었|됐다|되었다|했으며|했다)|개막(?:하여(?!야)|했|했다)|개시(?:되어(?!야)|되었|됐다|되었다|했다))/.test(text));
+  const nonCurrent=/(?:예정|계획|하려|할\s*(?:예정|계획)|아직|않았|못했|미완료|어제|지난\s*(?:날|주|달|해|학기|번|수업|강의|세미나|실습|오리엔테이션|교육|입학식|일정|행사)|예전에|과거|앞서|이전에|[?？])/;
+  const started=segments.some(text=>!nonCurrent.test(text)&&scheduleRowMentioned({scene:[{text}]},row)&&/(?:시작(?:되어(?!야)|되었|됐다|되었다|했으며|했다)|개막(?:하여(?!야)|했|했다)|개시(?:되어(?!야)|되었|됐다|되었다|했다))/.test(text));
   if(started)return true;
-  const bellCue=/(?:종(?:이|소리가|소리도)?\s*(?:울렸다|울렸(?:다|고|으며|지만|는데)|울리기\s*시작했(?:다|고|으며)|들렸다|들렸(?:다|고|으며))|종소리가\s*(?:퍼졌다|퍼졌(?:다|고|으며)|들려왔다|들려왔(?:다|고|으며)|들렸다))/,bellSegments=segments.filter(text=>bellCue.test(text));
+  const bellCue=/(?:종(?:이|소리가|소리도)?\s*(?:울렸다|울렸(?:다|고|으며|지만|는데)|울리기\s*시작했(?:다|고|으며)|들렸다|들렸(?:다|고|으며))|종소리가\s*(?:퍼졌다|퍼졌(?:다|고|으며)|들려왔다|들려왔(?:다|고|으며)|들렸다))/,bellSegments=segments.filter(text=>!nonCurrent.test(text)&&bellCue.test(text));
   if(bellSegments.some(text=>scheduleTimeMentioned(text,row)))return true;
   const title=String(turn?.scene_title||'');return bellSegments.length>0&&/종/.test(title)&&scheduleTimeMentioned(title,row);
 }
@@ -590,9 +591,10 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   else if(appliedScheduleBoundary)rewoundScheduleCompletion=reconcileReachedScheduleStart(turn,boundaryRows);
   turn.state_delta.advance_minutes=applied;
   const trimmedSurfacedScheduleScene=Boolean(preserveSurfacedScheduleScene&&reconcileReturnedScheduleBoundary(turn,boundaryRows,applied));
-  const raisedElapsedTime=applied>current,returnedSceneReconciled=Boolean(trimmedSurfacedScheduleScene||rewoundScheduleCompletion||coincidentScheduleBoundary||coincidentConsequenceBoundary||!preserveSurfacedScheduleScene&&(reconcileTimedTurn||raisedElapsedTime)),reconciliationReason=appliedScheduleBoundary||unsurfacedScheduleCapsFloor||coincidentScheduleBoundary||overrunStartBoundary||rewoundScheduleCompletion?'schedule-boundary':appliedConsequenceBoundary||unresolvedConsequenceCapsFloor||coincidentConsequenceBoundary||ambiguousAppliedConsequence?'consequence-boundary':turnLimitCompletion||startOnlyBoundary?'turn-limit':raisedElapsedTime?'profile-floor':'profile-cap',runtimeTrustedConsequenceScene=returnedSceneReconciled&&preserveAttributedConsequence?array(consequenceVisibleScene):[];
-  if(returnedSceneReconciled&&!trimmedSurfacedScheduleScene){if(preserveAttributedConsequence&&array(consequenceVisibleScene).length)reconcileReturnedConsequenceTurn(turn,{elapsed:applied,scene:consequenceVisibleScene});else reconcileReturnedTimedTurn(turn,{reason:reconciliationReason,elapsed:applied,boundaryTitle:coincidentScheduleBoundary?boundaryRows[0]?.title:''});}
-  return{...intent,runtimeSceneTrusted:preserveSurfacedScheduleScene||!returnedSceneReconciled,runtimeTrustedConsequenceScene,returnedSceneReconciled,reconciliationReason:returnedSceneReconciled?reconciliationReason:null};
+  const raisedElapsedTime=applied>current,pureRaisedFloor=Boolean(raisedElapsedTime&&!reconcileTimedTurn&&!coincidentScheduleBoundary&&!coincidentConsequenceBoundary&&!trimmedSurfacedScheduleScene&&!rewoundScheduleCompletion),hasRaisedFloorEvidenceScene=array(turn.scene).some(item=>String(item?.text||'').trim()),preserveRaisedFloorScene=Boolean(pureRaisedFloor&&!completionEvidence&&hasRaisedFloorEvidenceScene),raisedFloorSceneRuntimeTrusted=Boolean(preserveRaisedFloorScene&&!boundaryRows.some(row=>scheduleRowMentioned(turn,row))),sanitizeReplacedRaisedFloorScene=Boolean(pureRaisedFloor&&!preserveRaisedFloorScene),returnedSceneReconciled=Boolean(trimmedSurfacedScheduleScene||rewoundScheduleCompletion||coincidentScheduleBoundary||coincidentConsequenceBoundary||!preserveSurfacedScheduleScene&&(reconcileTimedTurn||raisedElapsedTime)),reconciliationReason=appliedScheduleBoundary||unsurfacedScheduleCapsFloor||coincidentScheduleBoundary||overrunStartBoundary||rewoundScheduleCompletion?'schedule-boundary':appliedConsequenceBoundary||unresolvedConsequenceCapsFloor||coincidentConsequenceBoundary||ambiguousAppliedConsequence?'consequence-boundary':turnLimitCompletion||startOnlyBoundary?'turn-limit':raisedElapsedTime?'profile-floor':'profile-cap',runtimeTrustedConsequenceScene=returnedSceneReconciled&&preserveAttributedConsequence?array(consequenceVisibleScene):[];
+  if(sanitizeReplacedRaisedFloorScene){const delta=object(turn.state_delta);reconcileShortenedTimedTurn(turn,{preserveDelta:{fatigue_delta:Number(delta.fatigue_delta||0),gold_delta:Number(delta.gold_delta||0)}});turn.state_delta.advance_minutes=applied;}
+  if(returnedSceneReconciled&&!trimmedSurfacedScheduleScene){if(preserveRaisedFloorScene)reconcileReturnedRaisedFloorContinuation(turn,{elapsed:applied});else if(preserveAttributedConsequence&&array(consequenceVisibleScene).length)reconcileReturnedConsequenceTurn(turn,{elapsed:applied,scene:consequenceVisibleScene});else reconcileReturnedTimedTurn(turn,{reason:reconciliationReason,elapsed:applied,boundaryTitle:coincidentScheduleBoundary?boundaryRows[0]?.title:''});}
+  return{...intent,runtimeSceneTrusted:preserveSurfacedScheduleScene||raisedFloorSceneRuntimeTrusted||!returnedSceneReconciled,runtimeTrustedConsequenceScene,returnedSceneReconciled,reconciliationReason:returnedSceneReconciled?reconciliationReason:null};
 }
 function deriveTimedActionRuntime(previousRuntime={},intent={},action='',turn={},mode='game'){
   const previous=object(previousRuntime?.timed_action);if(mode!=='game')return Object.keys(previous).length?previous:null;
@@ -614,6 +616,12 @@ function reconcileReturnedTimedTurn(turn,{reason='profile-cap',elapsed=0,boundar
   const text=`${prefix}${detail}${completedAtRaisedFloor?'':' 그 이후 과정은 아직 확정되지 않았다.'}`;
   turn.scene_title=reason==='schedule-boundary'?'일정 경계':reason==='consequence-boundary'?'후속 상황 경계':reason==='turn-limit'?'진행 중':reason==='explicit-zero'?'행동 보류':completedAtRaisedFloor?'행동 완료':'행동 진행 중';
   turn.scene_summary=text;turn.scene=[{kind:'narration',text}];turn.choices=[];turn.emotion_updates=[];turn.director=null;
+  return true;
+}
+function reconcileReturnedRaisedFloorContinuation(turn,{elapsed=0}={}){
+  if(!turn||typeof turn!=='object')return false;
+  const minutes=Math.max(0,Math.trunc(Number(elapsed)||0)),text=`기존에 드러난 변화 뒤에도 요청한 행동을 이어 ${minutes}분의 최소 진행 시간을 채웠다.`;
+  turn.scene_title='행동 완료';turn.scene_summary=`${minutes}분 동안의 진행과 그 사이 발생한 변화가 함께 반영되었다.`;turn.scene=[...array(turn.scene),{kind:'narration',text}];
   return true;
 }
 function reconcileReturnedConsequenceTurn(turn,{elapsed=0,scene=[]}={}){

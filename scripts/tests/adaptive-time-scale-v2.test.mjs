@@ -29,6 +29,8 @@ assert.equal(classifySceneIntent('에밀리가 한 시간 훈련하고 잠을 �
 assert.equal(classifySceneIntent('에밀리가 한 시간 훈련하고 나는 잠을 잔다.').kind,'downtime','an explicit terminal first-person subject must override an earlier NPC subject');
 assert.equal(classifySceneIntent('누군가 “죽이겠다”고 외치는 소리를 듣고 에밀리가 잠을 잔다.').kind,'generic','an attributed report must not hide an explicit third-party terminal subject');
 assert.equal(classifySceneIntent('카인이 잠을 잔다.',{actorName:'카인'}).kind,'downtime','the actual player name must remain a valid explicit subject');
+assert.deepEqual(classifySceneIntent('검술은 1시간 동안 훈련한다.').suggestedAdvanceMinutes,[60,60],'a training discipline topic must not be mistaken for a third-party actor');
+assert.deepEqual(classifySceneIntent('체력은 1시간 동안 단련한다.').suggestedAdvanceMinutes,[60,60],'a player attribute topic must not be mistaken for a third-party actor');
 assert.deepEqual(classifySceneIntent('리나가 나와 함께 1시간 훈련한다.').suggestedAdvanceMinutes,[60,60],'an explicit first-person co-participant must preserve joint PC timed intent');
 assert.deepEqual(classifySceneIntent('리나가 카인과 함께 1시간 훈련한다.',{actorName:'카인'}).suggestedAdvanceMinutes,[60,60],'the saved actor name must preserve joint PC timed intent');
 assert.equal(classifySceneIntent('리나가 나와 함께하지 않고 1시간 훈련한다.').kind,'generic','negated joint participation must remain NPC-only');

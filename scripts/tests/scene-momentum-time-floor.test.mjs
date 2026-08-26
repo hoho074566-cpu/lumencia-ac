@@ -254,6 +254,17 @@ assert.equal(turn.state_delta.advance_minutes,240,'a future completion plan must
 assert.deepEqual(turn.state_delta.pc_knowledge_add,['복도 공지 확인'],'a speculative completion mention must not trigger boundary-owned cleanup');
 assert.equal(hypotheticalCompletionIntent.runtimeSceneTrusted,false,'raising an underreported clock must reconcile visible timing without treating speculative schedule prose as completion');
 assert.equal(hypotheticalCompletionIntent.reconciliationReason,'profile-floor','a speculative schedule mention must remain distinct from a real schedule boundary');
+turn={scene_title:'과거 수업 회상',scene:[{kind:'narration',text:'10분쯤 훈련했을 때 어제 기사과 기초 수업은 이미 시작됐다는 이야기를 들었다.'}],choices:['훈련을 계속한다','이야기를 확인한다','그만둔다'],state_delta:{advance_minutes:10,pc_knowledge_add:['어제 수업 시작 소식']}};
+const historicalScheduleIntent=applySceneMomentumTimeFloor({action:'4시간 동안 검술을 훈련한다.',saveState:exactTrainingBoundarySave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,10,'historical schedule-start narration must not trigger the upcoming occurrence');
+assert.deepEqual(turn.choices,['훈련을 계속한다','이야기를 확인한다','그만둔다'],'a legitimate choice must survive a historical schedule mention');
+assert.equal(historicalScheduleIntent.returnedSceneReconciled,false,'historical schedule narration must remain distinct from current boundary reconciliation');
+turn={scene_title:'과거 종소리 회상',scene:[{kind:'narration',text:'어제 10시에 종이 울렸을 때 기사과 기초 수업이 시작됐다.'}],choices:['훈련을 계속한다','이야기를 확인한다','그만둔다'],state_delta:{advance_minutes:10}};
+applySceneMomentumTimeFloor({action:'4시간 동안 검술을 훈련한다.',saveState:exactTrainingBoundarySave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,10,'a historical exact-time bell must not trigger the upcoming schedule boundary');
+turn={scene_title:'현재 수업 시작',scene:[{kind:'narration',text:'네 시간이 지난 뒤 기사과 기초 수업이 시작됐다.'}],choices:['수업에 참석한다','훈련을 정리한다','상황을 확인한다'],state_delta:{advance_minutes:240}};
+applySceneMomentumTimeFloor({action:'4시간 동안 검술을 훈련한다.',saveState:exactTrainingBoundarySave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,240,'an elapsed-time phrase must not be mistaken for a historical marker');
 const omittedBoundaryClass={id:'omitted-class',title:'기사과 필수 수업',date:'1285-03-01',time:'10:00',kind:'academic',status:'scheduled'};
 const omittedBoundarySave={pc:knightPc,world:{date:'1285-03-01',time:'09:30',location:'훈련장'},scheduleContext:{due:[],upcoming:[omittedBoundaryClass]},scheduledEvents:[omittedBoundaryClass]};
 turn={scene_title:'두 시간 훈련 완료',scene:[{kind:'narration',text:'두 시간의 검술 훈련을 모두 마치고 자세를 바로잡았다.'}],choices:[],state_delta:{advance_minutes:10,fatigue_delta:2,skill_experience:[{skill:'검술',amount:1,reason:'두 시간 훈련 완료'}],pc_knowledge_add:['두 시간 훈련의 교정법']}};
@@ -838,6 +849,25 @@ assert.match(turn.scene_summary,/240분.*최소 시간/,'raised-floor narration 
 assert.equal(turn.scene_title,'행동 완료','raised-floor reconciliation must visibly retain completion semantics for preserved effects');
 assert.match(turn.scene_summary,/행동을 마쳤다/,'preserved completion effects must remain grounded in the replacement narration');
 assert.doesNotMatch(JSON.stringify(turn.scene),/한 시간|60분/,'raised-floor narration must remove the underreported model duration');
+
+const npcDeparture={npc_key:'artemis',location:'교관실',status:'퇴장'},departureRelationship={npc_key:'artemis',affinity_delta:1,reason:'훈련을 지켜본 뒤 조언을 남겼다'},departureMemory={owner:'pc',fact:'아르테미스가 조언을 남기고 먼저 떠났다.',importance:1};
+turn={scene_title:'교관의 퇴장',scene_summary:'10분쯤 훈련하자 아르테미스가 조언을 남기고 떠났다.',scene:[{kind:'narration',text:'10분쯤 훈련하자 아르테미스가 조언을 남기고 교관실로 떠났다.'}],state_delta:{advance_minutes:10,npc_state_updates:[npcDeparture],relationship_changes:[departureRelationship],memories_add:[departureMemory]},choices:[],event_progress:null};
+const preservedRaisedFloorIntent=applySceneMomentumTimeFloor({action:'1시간 동안 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,60,'a pure floor raise must still enforce the requested training duration');
+assert.deepEqual(turn.state_delta.npc_state_updates,[npcDeparture],'visible NPC effects must remain grounded by their retained scene');
+assert.deepEqual(turn.state_delta.relationship_changes,[departureRelationship],'visible relationship effects must remain grounded by their retained scene');
+assert.deepEqual(turn.state_delta.memories_add,[departureMemory],'visible memories must remain grounded by their retained scene');
+assert.match(turn.scene.map(item=>item.text).join(' '),/아르테미스.*떠났다/,'the evidence-bearing scene must survive a pure floor raise');
+assert.match(turn.scene_summary,/60분/,'the retained scene must receive an authoritative elapsed-time summary');
+assert.equal(preservedRaisedFloorIntent.runtimeSceneTrusted,true,'retained evidence-bearing narration must remain safe for runtime synthesis');
+
+turn={scene_title:'훈련 완료',scene_summary:'10분 만에 훈련을 마쳤고 아르테미스가 떠났다.',scene:[{kind:'narration',text:'10분 만에 훈련을 마쳤고 아르테미스가 교관실로 떠났다.'}],state_delta:{advance_minutes:10,fatigue_delta:2,npc_state_updates:[npcDeparture],relationship_changes:[departureRelationship],memories_add:[departureMemory]},choices:[],event_progress:null};
+applySceneMomentumTimeFloor({action:'1시간 동안 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,60,'an underreported completed action must still use its authoritative floor');
+assert.equal(turn.state_delta.fatigue_delta,2,'a scalar completion effect may remain grounded by deterministic completion narration');
+assert.deepEqual(turn.state_delta.npc_state_updates,[],'NPC effects must be removed when their evidence-bearing completion scene is replaced');
+assert.deepEqual(turn.state_delta.relationship_changes,[],'relationship effects must be removed when their evidence-bearing completion scene is replaced');
+assert.deepEqual(turn.state_delta.memories_add,[],'memories must be removed when their evidence-bearing completion scene is replaced');
 
 turn={state_delta:{advance_minutes:60,skill_experience:[{skill:'검술',amount:1}]},choices:[]};
 applySceneMomentumTimeFloor({action:'1시간 동안 훈련을 하고 0분 동안 잠을 잔다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
