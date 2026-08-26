@@ -596,6 +596,17 @@ assert.equal(rangedCadenceTraining.explicitDurationRangeMinutes,null,'a cadence-
 assert.deepEqual(rangedCadenceTraining.suggestedAdvanceMinutes,[180,180],'a cadence-qualified range must leave the declared total training duration authoritative');
 assert.deepEqual(classifySceneIntent('10분짜리 루틴을 1시간 동안 연습한다.').suggestedAdvanceMinutes,[60,60],'an object duration modifier must not be added to the activity duration');
 assert.deepEqual(classifySceneIntent('10분에서 20분짜리 루틴을 1시간 동안 연습한다.').suggestedAdvanceMinutes,[60,60],'a ranged object duration modifier must not be added to the activity duration');
+assert.deepEqual(classifySceneIntent('30분짜리 회의를 한다.').suggestedAdvanceMinutes,[30,30],'a 짜리 duration directly modifying a timed activity must remain authoritative');
+assert.deepEqual(classifySceneIntent('1시간짜리 수업을 듣는다.').suggestedAdvanceMinutes,[60,60],'a direct class duration modifier must not be discarded as an unrelated object modifier');
+const historicalContextTraining=classifySceneIntent('지난주에 2시간 수업을 들었고 오늘 30분 훈련한다.');
+assert.equal(historicalContextTraining.explicitDurationMinutes,30,'a completed historical clause must not be added to the current committed activity');
+assert.deepEqual(historicalContextTraining.suggestedAdvanceMinutes,[30,30],'only the current clause duration may control the turn clock');
+const compoundNativeTraining=classifySceneIntent('열다섯 분 훈련한다.',{location:'훈련장',currentTime:'09:00'});
+assert.equal(compoundNativeTraining.explicitDurationMinutes,15,'a compound native Korean numeral must be parsed atomically rather than by a suffix');
+assert.deepEqual(compoundNativeTraining.suggestedAdvanceMinutes,[15,15],'the complete compound numeral must control the exact duration');
+assert.equal(classifySceneIntent('스물한 분 훈련한다.').explicitDurationMinutes,21,'native Korean tens plus ones must normalize without enumerating each wording');
+const compoundNativeBoundary={id:'compound-native-class',title:'기사과 필수 수업',date:'1285-03-01',time:'09:10',kind:'academic',status:'scheduled'},compoundNativeBoundarySave={pc:{department:'기사과'},world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduledEvents:[compoundNativeBoundary],scheduleContext:{due:[],upcoming:[compoundNativeBoundary]}};
+assert.match(buildSceneMomentumDirective({action:'열다섯 분 훈련한다.',saveState:compoundNativeBoundarySave}),/SCHEDULE_BOUNDARY=10min/,'a required schedule inside a compound-native duration must remain authoritative');
 const compactHourRange=classifySceneIntent('한두 시간 동안 훈련한다.');
 assert.deepEqual(compactHourRange.explicitDurationRangeMinutes,[60,120],'a colloquial compact hour range must retain both endpoints');
 assert.deepEqual(compactHourRange.suggestedAdvanceMinutes,[60,120],'a colloquial compact hour range must drive the activity bounds');

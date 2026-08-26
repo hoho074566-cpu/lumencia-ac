@@ -511,8 +511,11 @@ function completionSegmentAttributedToPc(segment='',matchIndex=0,kind='',actorNa
   const activitySubjects={downtime:new Set(['잠','수면','휴식']),wait:new Set(['기다림','대기']),meal:new Set(['식사','밥','아침','점심','저녁']),training:new Set(['훈련','연습','수련','단련']),'class-attendance':new Set(['수업','강의','세미나','실습','오리엔테이션','교육','입학식']),dialogue:new Set(['대화','이야기','질문','답변','설명','상담','논의','면담','회의','브리핑'])}[kind]||new Set();
   let prefix=String(segment||'').slice(0,Math.max(0,Number(matchIndex)||0)).toLowerCase();
   const clauseBreaks=[...prefix.matchAll(/(?:해서|하여|하니|라서|어서|아서|기에|때문에|지만|는데|더니|고서)\s+/gu)],lastBreak=clauseBreaks.at(-1);if(lastBreak)prefix=prefix.slice((lastBreak.index||0)+lastBreak[0].length);
-  const subjects=[...prefix.matchAll(/(?:^|[\s,])([^\s,]{1,32}?)(?:가|이|은|는|께서)\s+/gu)].map(match=>String(match[1]||'').trim().toLowerCase()),subject=subjects.at(-1);
-  return !subject||allowedSubjects.has(subject)||activitySubjects.has(subject);
+  const attributions=[...prefix.matchAll(/(?:^|[\s,;:])([^\s,;:]{1,32}?)(?:가|이|은|는|께서)(?=\s|[,;:])(?:\s*[,;:]\s*|\s+)/gu)].map(match=>({index:match.index??-1,owner:String(match[1]||'').trim().toLowerCase(),possessive:false}));
+  const temporalPossessives=new Set(['분','시간','기간','날','하루','이틀','사흘','나흘','주','달','개월','해','년']);
+  for(const match of prefix.matchAll(/(?:^|[\s,;:])([^\s,;:]{1,32}?)의(?=\s|[,;:])/gu)){const owner=String(match[1]||'').trim().toLowerCase();if(!temporalPossessives.has(owner))attributions.push({index:match.index??-1,owner,possessive:true});}
+  const attribution=attributions.sort((a,b)=>a.index-b.index).at(-1);if(!attribution)return true;
+  return allowedSubjects.has(attribution.owner)||!attribution.possessive&&activitySubjects.has(attribution.owner);
 }
 function timedActionCompletionEvidence(turn,intent={},action='',actorName=''){
   const segments=[turn?.scene_title,turn?.scene_summary,...array(turn?.scene).filter(item=>String(item?.kind||'')!=='dialogue').map(item=>item?.text)].filter(Boolean).flatMap(value=>String(value).split(/(?<=[.!?。！？])|\n+/)).map(value=>value.trim()).filter(Boolean),kind=String(intent?.kind||'');if(!segments.length)return false;

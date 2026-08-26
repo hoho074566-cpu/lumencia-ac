@@ -391,6 +391,16 @@ assert.equal(turn.state_delta.advance_minutes,240,'post-sleep choices must not l
 turn={scene:[{kind:'narration',text:'훈련이 끝났다.'}],state_delta:{advance_minutes:10},choices:['결과를 확인한다','교관에게 묻는다','자리를 뜬다']};
 applySceneMomentumTimeFloor({action:'1시간 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20',location:'훈련장'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,60,'a subject-form training completion must enforce the declared duration before post-training choices');
+turn={scene:[{kind:'narration',text:'리나의 훈련이 끝났다.'}],state_delta:{advance_minutes:10},choices:['내 훈련을 계속한다','리나에게 묻는다','자리를 뜬다']};
+applySceneMomentumTimeFloor({action:'1시간 훈련한다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-02',time:'07:20',location:'훈련장'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,10,'an NPC possessive completion must not complete the player training action');
+assert.deepEqual(turn.choices,['내 훈련을 계속한다','리나에게 묻는다','자리를 뜬다'],'an NPC possessive completion must preserve the real player decision');
+turn={scene:[{kind:'narration',text:'리나는, 훈련이 끝났다고 말했다.'}],state_delta:{advance_minutes:10},choices:['내 훈련을 계속한다','리나에게 묻는다','자리를 뜬다']};
+applySceneMomentumTimeFloor({action:'1시간 훈련한다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-02',time:'07:20',location:'훈련장'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,10,'an NPC subject followed by punctuation must not be treated as player completion');
+turn={scene:[{kind:'narration',text:'카인의 훈련이 끝났다.'}],state_delta:{advance_minutes:10},choices:['결과를 확인한다','교관에게 묻는다','자리를 뜬다']};
+applySceneMomentumTimeFloor({action:'1시간 훈련한다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-02',time:'07:20',location:'훈련장'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,60,'the saved player name in possessive form must remain valid completion evidence');
 turn={state_delta:{advance_minutes:960},choices:[]};
 applySceneMomentumTimeFloor({action:'잠을 잔다.',saveState:{world:{date:'1285-03-01',time:'15:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,480,'a completed sleep action must not jump to a convenient next morning beyond its profile maximum');
