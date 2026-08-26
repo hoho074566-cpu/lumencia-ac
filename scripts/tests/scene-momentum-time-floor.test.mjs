@@ -733,7 +733,7 @@ assert.equal(longSleepRuntime.total_minutes,2880,'the resumable record must reta
 assert.deepEqual(deriveTimedActionRuntime({timed_action:longSleepRuntime},{},'',{},'auto'),longSleepRuntime,'AUTO must freeze an incomplete timed action');
 assert.deepEqual(deriveTimedActionRuntime({timed_action:longSleepRuntime},{},'',{},'continue'),longSleepRuntime,'CONTINUE must freeze an incomplete timed action');
 assert.deepEqual(deriveTimedActionRuntime({timed_action:longSleepRuntime},{},'',{},'meta'),longSleepRuntime,'META must freeze an incomplete timed action');
-for(const [action,total] of [['이틀에서 사흘 동안 잠을 잔다.',2880],['이틀 넘게 잠을 잔다.',2881],['1시간 훈련하고 이틀 동안 잠을 잔다.',2940]]){
+for(const [action,total] of [['이틀에서 사흘 동안 잠을 잔다.',2880],['이틀 넘게 잠을 잔다.',2881],['이틀 이상 잠을 잔다.',2880],['1시간 훈련하고 이틀 동안 잠을 잔다.',2940]]){
   turn={scene:[{kind:'narration',text:'하루 동안 요청한 행동을 진행했지만 아직 끝나지 않았다.'}],state_delta:{advance_minutes:1440},choices:[]};
   const cappedIntent=applySceneMomentumTimeFloor({action,saveState:{world:{date:'1285-03-02',time:'07:20',location:'개인실'},sceneRuntime:{},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
   const runtime=deriveTimedActionRuntime({},cappedIntent,action,turn,'game');

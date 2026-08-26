@@ -161,6 +161,13 @@ assert.deepEqual(approximateFutureRange.suggestedAdvanceMinutes,[150,240],'an ap
 assert.equal(classifySceneIntent('한 시간 후에 검술을 훈련한다.').explicitDurationMinutes, null, 'future start time must not become a training duration');
 assert.equal(classifySceneIntent('10분 전에 배운 동작을 한 시간 동안 훈련한다.').explicitDurationMinutes, 60, 'a historical reference must not hide a separate explicit activity duration');
 assert.equal(classifySceneIntent('한 시간 훈련하고 20분 쉰다.').explicitDurationMinutes, 20, 'a terminal rest must use only the duration attached to that rest clause');
+const sentenceSeparatedRest=classifySceneIntent('1시간 훈련한다. 그리고 30분 쉰다.');
+assert.equal(sentenceSeparatedRest.kind,'downtime','sentence-separated sequential commands must preserve the terminal action');
+assert.equal(sentenceSeparatedRest.precedingActivityMinutes,60,'an earlier committed action sentence must remain in the compound timeline');
+assert.deepEqual(sentenceSeparatedRest.suggestedAdvanceMinutes,[90,90],'sentence punctuation must not discard the preceding requested duration');
+const sentenceBoundary={id:'sentence-class',title:'기사과 필수 수업',date:'1285-03-01',time:'09:30',kind:'academic',status:'scheduled'},sentenceBoundarySave={pc:{department:'기사과'},world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduledEvents:[sentenceBoundary],scheduleContext:{due:[],upcoming:[sentenceBoundary]}};
+assert.match(buildSceneMomentumDirective({action:'1시간 훈련한다. 그리고 30분 쉰다.',saveState:sentenceBoundarySave}),/SCHEDULE_BOUNDARY=30min/,'an earlier schedule must interrupt the retained first action sentence');
+assert.deepEqual(classifySceneIntent('1.5시간 훈련한다.').suggestedAdvanceMinutes,[90,90],'sentence scoping must not split a decimal duration at its decimal point');
 assert.deepEqual(classifySceneIntent('30분 동안 훈련한 뒤 잠을 잔다.').suggestedAdvanceMinutes, [270, 510], 'an explicit preceding training duration must be added to the terminal sleep range');
 const compoundExplicitSleep=classifySceneIntent('1시간 동안 훈련을 하고 8시간 동안 잠을 잔다.');
 assert.equal(compoundExplicitSleep.explicitDurationMinutes,480,'the terminal explicit sleep duration must remain separately identifiable');
@@ -179,6 +186,15 @@ const rangedCompoundSleep=classifySceneIntent('1시간에서 2시간 동안 훈�
 assert.deepEqual(rangedCompoundSleep.precedingActivityRangeMinutes,[60,120],'a preceding activity range must retain both endpoints');
 assert.deepEqual(rangedCompoundSleep.suggestedAdvanceMinutes,[540,600],'a preceding activity range must offset the terminal activity with separate lower and upper bounds');
 assert.deepEqual(classifySceneIntent('훈련을 1시간에서 2시간 동안 하고 8시간 동안 잠을 잔다.').suggestedAdvanceMinutes,[540,600],'a duration between the preceding activity object and connector must remain scoped to that activity');
+for(const action of ['1시간이나 2시간 훈련한다.','1시간 내지 2시간 훈련한다.']){
+  const alternativeTraining=classifySceneIntent(action);
+  assert.deepEqual(alternativeTraining.explicitDurationRangeMinutes,[60,120],`alternative durations must form a range: ${action}`);
+  assert.deepEqual(alternativeTraining.suggestedAdvanceMinutes,[60,120],`alternative durations must not be summed: ${action}`);
+}
+const weeklyTraining=classifySceneIntent('일주일에 1시간 훈련한다.');
+assert.equal(weeklyTraining.explicitDurationMinutes,60,'a weekly recurrence anchor must not become continuous elapsed time');
+assert.deepEqual(weeklyTraining.suggestedAdvanceMinutes,[60,60],'only the per-session duration should advance in a weekly cadence');
+assert.equal(weeklyTraining.turnLimitTruncated,false,'a weekly cadence must not create a multi-day resumable action');
 const compoundZeroSleep=classifySceneIntent('1시간 동안 훈련을 하고 0분 동안 잠을 잔다.');
 assert.equal(compoundZeroSleep.explicitDurationMinutes,0,'the terminal zero duration must remain visible');
 assert.equal(compoundZeroSleep.minAdvanceMinutes,60,'the full turn duration must retain the completed preceding hour');
