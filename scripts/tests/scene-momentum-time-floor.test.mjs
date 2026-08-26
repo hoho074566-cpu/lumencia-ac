@@ -156,7 +156,18 @@ for(const [action,prose,elapsed] of [
 }
 turn={scene:[{kind:'narration',text:'카인은 훈련을 마쳤다.'}],state_delta:{advance_minutes:10},choices:['다음 훈련을 고른다']};
 applySceneMomentumTimeFloor({action:'1시간 동안 훈련한다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-01',time:'09:00'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
-assert.equal(turn.state_delta.advance_minutes,60,'the saved player subject must remain valid completion evidence');
+assert.equal(turn.state_delta.advance_minutes,10,'an eligible single-action plan cannot use player-subject narration as completion authority without a structural receipt');
+turn={scene:[{kind:'narration',text:'카인은 훈련을 마쳤다.'}],state_delta:{advance_minutes:60,items_add:['훈련 완료 증표']},choices:['다음 훈련을 고른다']};
+turn.time_execution=choiceExecution(turn,{minutes:60,completed:['action_1'],interrupted:null,owners:[effectOwner('items_add',0,'action_1')]});
+const ownedSingleCompletion=applySceneMomentumTimeFloor({action:'1시간 동안 훈련한다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-01',time:'09:00'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(ownedSingleCompletion.returnedSceneReconciled,false,'a valid single-action receipt remains authoritative after narration completion fallback removal');
+assert.equal(turn.state_delta.advance_minutes,60,'the valid single-action receipt preserves the completed duration');
+assert.deepEqual(turn.state_delta.items_add,['훈련 완료 증표'],'the valid clause owner preserves its completed single-action effect');
+const ineligibleConcurrentAction='1시간 훈련하면서 1시간 대화한다';
+assert.equal(classifySceneIntent(ineligibleConcurrentAction,{location:'훈련장',currentTime:'09:00'}).structuredExecutionPlan,null,'the concurrent action remains outside exact structured execution authority');
+turn={scene:[{kind:'narration',text:'카인은 대화를 마쳤다.'}],state_delta:{advance_minutes:10},choices:['다음 행동을 고른다']};
+applySceneMomentumTimeFloor({action:ineligibleConcurrentAction,saveState:{pc:{name:'카인'},world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,60,'TPP-ineligible uncertain timing retains the legacy completion fallback for a later cleanup');
 
 const ownClass={id:'basic-class',title:'기사과 기초 수업',date:'1285-03-01',time:'10:00',kind:'academic',status:'scheduled'};
 const ownClassSave={pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'기숙사'},scheduleContext:{due:[],upcoming:[ownClass]},scheduledEvents:[ownClass]};
@@ -752,12 +763,13 @@ assert.equal(turn.scene_title,'일정 경계','the returned title must expose th
 assert.match(turn.scene_summary,/300분 동안 행동을 진행한 뒤, 예정된 일정의 시작 시점에 도달했다/,'the returned narration must agree with the exact schedule boundary');
 assert.doesNotMatch(turn.scene_summary,/여섯 시간|모두 쉬고/,'post-boundary completion prose must not remain user-visible');
 
-turn={scene:[{kind:'narration',text:'잠에서 깨어나 몸을 일으켰다.'}],state_delta:{advance_minutes:60},choices:['일어난다','일정을 확인한다','더 쉰다']};
+turn={scene:[{kind:'narration',text:'잠에서 깨어나 몸을 일으켰다.'}],state_delta:{advance_minutes:240},choices:['일어난다','일정을 확인한다','더 쉰다']};
+turn.time_execution=choiceExecution(turn,{minutes:240,completed:['action_1'],interrupted:null});
 applySceneMomentumTimeFloor({action:'잠을 잔다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
-assert.equal(turn.state_delta.advance_minutes,240,'post-sleep choices must not let a completed sleep action undercut its profile minimum');
+assert.equal(turn.state_delta.advance_minutes,240,'a valid single-action receipt preserves completed sleep before post-sleep choices');
 turn={scene:[{kind:'narration',text:'훈련이 끝났다.'}],state_delta:{advance_minutes:10},choices:['결과를 확인한다','교관에게 묻는다','자리를 뜬다']};
 applySceneMomentumTimeFloor({action:'1시간 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20',location:'훈련장'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
-assert.equal(turn.state_delta.advance_minutes,60,'a subject-form training completion must enforce the declared duration before post-training choices');
+assert.equal(turn.state_delta.advance_minutes,10,'subject-form narration cannot enforce a declared duration before post-training choices without a structural receipt');
 turn={scene:[{kind:'narration',text:'리나의 훈련이 끝났다.'}],state_delta:{advance_minutes:10},choices:['내 훈련을 계속한다','리나에게 묻는다','자리를 뜬다']};
 applySceneMomentumTimeFloor({action:'1시간 훈련한다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-02',time:'07:20',location:'훈련장'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'an NPC possessive completion must not complete the player training action');
@@ -767,7 +779,7 @@ applySceneMomentumTimeFloor({action:'1시간 훈련한다.',saveState:{pc:{name:
 assert.equal(turn.state_delta.advance_minutes,10,'an NPC subject followed by punctuation must not be treated as player completion');
 turn={scene:[{kind:'narration',text:'카인의 훈련이 끝났다.'}],state_delta:{advance_minutes:10},choices:['결과를 확인한다','교관에게 묻는다','자리를 뜬다']};
 applySceneMomentumTimeFloor({action:'1시간 훈련한다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-02',time:'07:20',location:'훈련장'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
-assert.equal(turn.state_delta.advance_minutes,60,'the saved player name in possessive form must remain valid completion evidence');
+assert.equal(turn.state_delta.advance_minutes,10,'the saved player name in possessive form cannot replace structural completion authority');
 turn={state_delta:{advance_minutes:960},choices:[]};
 applySceneMomentumTimeFloor({action:'잠을 잔다.',saveState:{world:{date:'1285-03-01',time:'15:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,480,'a completed sleep action must not jump to a convenient next morning beyond its profile maximum');
@@ -1199,18 +1211,17 @@ applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:{world:{
 assert.equal(turn.state_delta.advance_minutes,5,'hypothetical completion in narration must not raise an unfinished decision to the training floor');
 turn={scene:[{kind:'narration',text:'훈련을 마쳤고 교관이 다음 과정을 고르라고 했다.'}],state_delta:{advance_minutes:10},choices:['대련한다','쉰다','돌아간다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
-assert.equal(turn.state_delta.advance_minutes,30,'a clearly completed activity may still raise an underreported clock before post-completion choices');
+assert.equal(turn.state_delta.advance_minutes,10,'completion narration cannot raise an underreported clock before post-completion choices without a structural receipt');
 turn={scene:[{kind:'narration',text:'어제 훈련을 마쳤다는 기록을 확인했다.'}],state_delta:{advance_minutes:10},choices:['훈련을 계속한다','기록을 읽는다','자리를 뜬다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'1시간 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'historical completion narration must not complete the current timed action');
 assert.deepEqual(turn.choices,['훈련을 계속한다','기록을 읽는다','자리를 뜬다'],'a historical record must preserve the current interruption choices');
 turn={scene:[{kind:'narration',text:'지난 한 시간의 훈련을 마쳤다.'}],state_delta:{advance_minutes:10},choices:['대련한다','쉰다','돌아간다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'1시간 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
-assert.equal(turn.state_delta.advance_minutes,60,'a current completion must remain valid when 지난 modifies the elapsed duration rather than a historical date');
+assert.equal(turn.state_delta.advance_minutes,10,'current-looking elapsed narration still cannot replace structural completion authority');
 turn={scene:[{kind:'narration',text:'한 시간이 흘렀다. 기다리던 복도에 새로운 공지가 붙었다.'}],state_delta:{advance_minutes:10},choices:['공지를 본다','자리를 뜬다','조금 더 기다린다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'1시간 동안 기다린다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
-assert.equal(turn.state_delta.advance_minutes,60,'ordinary elapsed-wait completion prose must enforce the declared wait duration before choices');
-assert.match(turn.scene_summary,/60분.*행동을 마쳤다/,'reconciled wait narration must agree that the declared wait completed');
+assert.equal(turn.state_delta.advance_minutes,10,'ordinary elapsed-wait prose cannot enforce the declared wait duration before choices without a structural receipt');
 turn={scene:[{kind:'narration',text:'한 시간이 흘렀을 때 복도 끝에서 경보가 울렸다.'}],state_delta:{advance_minutes:60},choices:['경보를 확인한다','계속 기다린다','자리를 뜬다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'2시간 동안 기다린다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,60,'a shorter elapsed cue must not complete a longer declared wait');
@@ -1225,7 +1236,7 @@ assert.equal(turn.state_delta.advance_minutes,10,'an NPC-owned wait completion m
 assert.deepEqual(turn.choices,['리나에게 묻는다','계속 기다린다','자리를 뜬다'],'an NPC wait completion must preserve the legitimate player interruption');
 turn={scene:[{kind:'narration',text:'카인이 기다림을 마쳤다.'}],state_delta:{advance_minutes:10},choices:['주변을 본다','자리를 뜬다','다시 기다린다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'1시간 동안 기다린다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
-assert.equal(turn.state_delta.advance_minutes,60,'a saved player subject must remain valid wait completion evidence');
+assert.equal(turn.state_delta.advance_minutes,10,'a saved player subject cannot replace the single-action execution receipt');
 turn={scene:[{kind:'narration',text:'20분 뒤 기다림을 마쳤다.'}],state_delta:{advance_minutes:20},choices:['주변을 본다','자리를 뜬다','다시 기다린다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'30분 미만 기다린다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,20,'completion before an explicit upper bound must preserve the returned elapsed time');
@@ -1239,19 +1250,19 @@ applySceneMomentumTimeFloor({action:'1시간 동안 왕도로 간다.',saveState
 assert.equal(turn.state_delta.advance_minutes,10,'a third-party arrival at the destination must not complete the player travel');
 turn={scene:[{kind:'narration',text:'왕도에 도착했다.'}],state_delta:{advance_minutes:10,new_location:'왕도'},choices:['성문으로 간다','주변을 본다','쉰다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'1시간 동안 왕도로 간다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-02',time:'07:20',location:'남부 도로'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
-assert.equal(turn.state_delta.advance_minutes,60,'a player location change plus subjectless arrival may prove requested travel completion');
+assert.equal(turn.state_delta.advance_minutes,10,'a returned location claim cannot replace the single-action execution receipt');
 turn={scene:[{kind:'narration',text:'회의를 마쳤고 다음 의제를 고르라고 했다.'}],state_delta:{advance_minutes:10},choices:['조사를 계속한다','휴식한다','자리를 뜬다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'1시간 동안 회의를 한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
-assert.equal(turn.state_delta.advance_minutes,60,'all dialogue activity vocabulary must share the same completion evidence');
+assert.equal(turn.state_delta.advance_minutes,10,'dialogue-activity completion wording cannot replace structural completion authority');
 turn={scene:[{kind:'narration',text:'오리엔테이션을 마쳤고 다음 일정을 고르라고 했다.'}],state_delta:{advance_minutes:10},choices:['기숙사로 간다','교관에게 묻는다','광장으로 간다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'1시간 동안 오리엔테이션에 참석한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
-assert.equal(turn.state_delta.advance_minutes,60,'scheduled academic vocabulary must share completion evidence with ordinary classes');
+assert.equal(turn.state_delta.advance_minutes,10,'scheduled-academic completion wording cannot replace structural completion authority');
 turn={scene:[{kind:'narration',text:'잠에서 깨어나 몸을 일으켰다.'}],state_delta:{advance_minutes:60},choices:['일어난다','일정을 확인한다','더 쉰다'],event_progress:{event_instance_id:'active:rest'}};
 applySceneMomentumTimeFloor({action:'잠을 잔다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]},sceneRuntime:{eventProgress:{eventInstanceId:'active:rest'}}}},turn,'game');
-assert.equal(turn.state_delta.advance_minutes,240,'continuing the same structured scene is not a new interruption and must retain the sleep floor');
+assert.equal(turn.state_delta.advance_minutes,60,'a matching returned scene event cannot replace the missing single-action execution receipt');
 turn={scene:[{kind:'narration',text:'잠에서 깨어나 몸을 일으켰다.'}],state_delta:{advance_minutes:60},choices:['일어난다','일정을 확인한다','더 쉰다'],event_progress:{event_instance_id:'started:rest'}};
 applySceneMomentumTimeFloor({action:'잠을 잔다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
-assert.equal(turn.state_delta.advance_minutes,240,'a normal newly structured scene must not be mistaken for a Director interruption');
+assert.equal(turn.state_delta.advance_minutes,60,'a newly returned scene event cannot replace the missing single-action execution receipt');
 
 turn={scene_title:'훈련 완료',scene_summary:'훈련을 끝내고 검술이 늘었다.',scene:[{kind:'narration',text:'훈련을 마치고 증표를 챙겼다.'}],event_progress:{event_instance_id:'active:training',active_beat:'complete',completed_beats:['drill','complete']},state_delta:{advance_minutes:60,new_location:'훈련장',pc_status:'훈련 완료',fatigue_delta:3,gold_delta:-10,relationship_changes:[{npc_key:'artemis',affinity_delta:1}],stat_progress:[{stat:'신체',amount:1}],skill_experience:[{skill:'검술',amount:1}],items_add:['훈련 증표'],items_remove:['낡은 목검'],npc_state_updates:[{npc_key:'artemis',location:'훈련장'}],hooks_update:[{id:'future',status:'resolved'}]},choices:['증표를 확인한다']};
 const explicitZeroIntent=applySceneMomentumTimeFloor({action:'0분 동안 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
@@ -1276,16 +1287,12 @@ assert.equal(zeroProgressState.eventProgress?.activeBeat,priorZeroProgress.activ
 assert.deepEqual(zeroProgressState.eventProgress?.completedBeats,priorZeroProgress.completedBeats,'rejected zero-minute progress must preserve authoritative completed beats');
 assert.equal(mergeRoutedEventProgressState(null,{},turn.event_progress).eventProgress,null,'rejected zero-minute progress must not start a new event');
 
-turn={scene_title:'한 시간 뒤',scene_summary:'한 시간 잠을 잤다.',scene:[{kind:'narration',text:'60분 뒤 잠에서 깨어났다.'}],state_delta:{advance_minutes:60,fatigue_delta:-2},choices:['일어난다']};
+turn={scene_title:'네 시간 뒤',scene_summary:'네 시간 잠을 잤다.',scene:[{kind:'narration',text:'240분 뒤 잠에서 깨어났다.'}],state_delta:{advance_minutes:240,fatigue_delta:-2},choices:['일어난다']};
+turn.time_execution=choiceExecution(turn,{minutes:240,completed:['action_1'],interrupted:null,scalarContributions:[scalarContribution('fatigue_delta',-2)]});
 const raisedFloorIntent=applySceneMomentumTimeFloor({action:'잠을 잔다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
-assert.equal(turn.state_delta.advance_minutes,240,'a completed sleep must still rise to its deterministic minimum');
-assert.equal(turn.state_delta.fatigue_delta,-2,'raising elapsed time must preserve completion effects that remain in scope');
-assert.equal(raisedFloorIntent.returnedSceneReconciled,true,'raising elapsed time must reconcile contradictory visible timing');
-assert.equal(raisedFloorIntent.runtimeSceneTrusted,false,'underreported completion prose must not enter runtime synthesis');
-assert.match(turn.scene_summary,/240분.*최소 시간/,'raised-floor narration must state the authoritative elapsed time');
-assert.equal(turn.scene_title,'행동 완료','raised-floor reconciliation must visibly retain completion semantics for preserved effects');
-assert.match(turn.scene_summary,/행동을 마쳤다/,'preserved completion effects must remain grounded in the replacement narration');
-assert.doesNotMatch(JSON.stringify(turn.scene),/한 시간|60분/,'raised-floor narration must remove the underreported model duration');
+assert.equal(turn.state_delta.advance_minutes,240,'a valid single-action receipt preserves completed sleep at its deterministic minimum');
+assert.equal(turn.state_delta.fatigue_delta,-2,'a completed-clause scalar contribution preserves the sleep effect');
+assert.equal(raisedFloorIntent.returnedSceneReconciled,false,'an internally aligned single-action receipt needs no legacy narration reconciliation');
 
 const npcDeparture={npc_key:'artemis',location:'교관실',status:'퇴장'},departureRelationship={npc_key:'artemis',affinity_delta:1,reason:'훈련을 지켜본 뒤 조언을 남겼다'},departureMemory={owner:'pc',fact:'아르테미스가 조언을 남기고 먼저 떠났다.',importance:1};
 turn={scene_title:'교관의 퇴장',scene_summary:'10분쯤 훈련하자 아르테미스가 조언을 남기고 떠났다.',scene:[{kind:'narration',text:'10분쯤 훈련하자 아르테미스가 조언을 남기고 교관실로 떠났다.'}],state_delta:{advance_minutes:10,npc_state_updates:[npcDeparture],relationship_changes:[departureRelationship],memories_add:[departureMemory]},choices:[],event_progress:null};
