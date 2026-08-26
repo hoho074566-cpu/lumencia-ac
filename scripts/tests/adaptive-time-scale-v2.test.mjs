@@ -111,6 +111,11 @@ const rangedFutureStart=classifySceneIntent('1시간에서 2시간 후에 훈련
 assert.equal(rangedFutureStart.explicitDurationRangeMinutes,null,'a future start window must not become an activity duration range');
 assert.equal(rangedFutureStart.scheduledStartOffsetMinutes,120,'the terminal relative start qualifier must remain the selected start offset');
 assert.equal(classifySceneIntent('10분 전에 배운 동작을 훈련한다.').explicitDurationMinutes, null, 'historical time must not become a training duration');
+assert.equal(classifySceneIntent('10분 정도 전에 시작한 훈련을 계속한다.').explicitDurationMinutes,null,'an approximately qualified historical offset must not become training duration');
+assert.deepEqual(classifySceneIntent('한 시간 가량 후에 검술을 훈련한다.',{currentTime:'09:00'}).suggestedAdvanceMinutes,[90,180],'an approximately qualified future offset must remain a start delay plus the natural training range');
+const approximateFutureRange=classifySceneIntent('1시간에서 2시간 정도 후에 검술을 훈련한다.',{currentTime:'09:00'});
+assert.equal(approximateFutureRange.explicitDurationMinutes,null,'an approximate future start range must not leak its lower bound into activity duration');
+assert.deepEqual(approximateFutureRange.suggestedAdvanceMinutes,[150,240],'an approximate future start range must use its upper start offset plus the natural training range');
 assert.equal(classifySceneIntent('한 시간 후에 검술을 훈련한다.').explicitDurationMinutes, null, 'future start time must not become a training duration');
 assert.equal(classifySceneIntent('10분 전에 배운 동작을 한 시간 동안 훈련한다.').explicitDurationMinutes, 60, 'a historical reference must not hide a separate explicit activity duration');
 assert.equal(classifySceneIntent('한 시간 훈련하고 20분 쉰다.').explicitDurationMinutes, 20, 'a terminal rest must use only the duration attached to that rest clause');
