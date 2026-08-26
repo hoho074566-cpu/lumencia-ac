@@ -20,7 +20,8 @@ const testRegistry={artemis:'아르테미스',emily:'에밀리',lena:'레나'};
 const {applySceneMomentumTimeFloor,consequenceNpcKeysForShortening,consequenceNpcEffectsForShortening,deriveTimedActionRuntime,runtimeSynthesisTurn,prefixNpcStateUpdate}=makeHelpers(array,object,classifySceneIntent,isPcRelevantScheduleEvent,nextScheduleBoundaryMinutes,scheduleBoundaryLimitMinutes,scheduledIdsDueByTurnEnd,minutesUntilEventConsequence,testRegistry,isAdditiveAdverbialStem,projectStructuredOwnedEffects,validateStructuredTimeExecution);
 
 const effectOwner=(field,effectIndex=null,ownerId='action_1',ownerKind='clause',scope='state_delta')=>({scope,field,effect_index:effectIndex,owner_kind:ownerKind,owner_id:ownerId});
-const choiceExecution=(turn,{minutes=Number(turn?.state_delta?.advance_minutes||0),completed=['action_1'],interrupted='action_2',owners=[],boundaryEventId=null}={})=>({version:'1.0',plan_used:true,boundary_kind:'choice',boundary_minutes:minutes,completed_clause_ids:completed,interrupted_clause_id:interrupted,decision_scene_index:turn.scene.length-1,boundary_event_id:boundaryEventId,effect_owners:owners});
+const choiceExecution=(turn,{minutes=Number(turn?.state_delta?.advance_minutes||0),completed=['action_1'],interrupted='action_2',owners=[],scalarContributions=[],boundaryEventId=null,boundaryKind='choice'}={})=>({version:'1.0',plan_used:true,boundary_kind:boundaryKind,boundary_minutes:minutes,completed_clause_ids:completed,interrupted_clause_id:interrupted,decision_scene_index:turn.choices?.length?turn.scene.length-1:null,boundary_event_id:boundaryEventId,effect_owners:owners,scalar_contributions:scalarContributions});
+const scalarContribution=(field,amount,ownerId='action_1',ownerKind='clause')=>({field,amount,owner_kind:ownerKind,owner_id:ownerId});
 
 const knightPc={name:'카인',department:'기사과'};
 const irrelevantScheduleSave={
@@ -325,6 +326,13 @@ const overCapPrefixIntent=applySceneMomentumTimeFloor({action:'25시간 기다�
 assert.equal(overCapPrefixIntent.reconciliationReason,'turn-limit','a prefix that completes beyond the cap remains unfinished at the current stop');
 assert.deepEqual(turn.state_delta.items_add,[],'post-cap prefix and suffix rewards cannot survive the turn-limit stop');
 assert.equal(deriveTimedActionRuntime({},overCapPrefixIntent,'25시간 기다리고 8시간 잔다',turn,'game').remaining_minutes,540,'the over-cap prefix remains resumable instead of being falsely completed');
+turn={scene_title:'상한에서 제안',scene:[{kind:'narration',text:'하루를 기다렸지만 아직 대기는 끝나지 않았다.'},{kind:'dialogue',speaker_key:'artemis',text:'지금 편지를 열겠나?'}],choices:['연다.','계속 기다린다.','묻는다.'],state_delta:{advance_minutes:1440,items_add:['전령의 편지']}};
+turn.time_execution=choiceExecution(turn,{minutes:1440,completed:[],interrupted:'action_1',owners:[effectOwner('items_add',0)]});
+const receiptAtCapIntent=applySceneMomentumTimeFloor({action:'25시간 기다리고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'초소'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
+assert.equal(receiptAtCapIntent.reconciliationReason,'turn-limit','the canonical one-turn cap outranks a model-declared choice on an incomplete clause');
+assert.deepEqual(turn.choices,[],'a model choice at the cap is deferred until the incomplete action resumes');
+assert.deepEqual(turn.state_delta.items_add,[],'the interrupted action cannot retain a cap-time reward');
+assert.equal(deriveTimedActionRuntime({},receiptAtCapIntent,'25시간 기다리고 8시간 잔다',turn,'game').remaining_minutes,540,'turn-limit precedence preserves the same resumable remainder');
 turn={scene_title:'훈련과 수면 완료',scene:[{kind:'narration',text:'에밀리가 한 시간 훈련을 마쳤다.'},{kind:'dialogue',speaker_key:'emily',text:'내 훈련은 끝났어.'}],choices:[],state_delta:{advance_minutes:540,skill_experience:[multiPrefixGrowth]}};
 const npcCompletionIntent=applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:compoundBoundarySave},turn,'game');
 assert.equal(npcCompletionIntent.structuredBoundaryReconciliationApplied,true,'the aligned plan still owns the boundary even when completion evidence is rejected');
@@ -447,6 +455,12 @@ assert.deepEqual(turn.state_delta.items_add,[],'a string-array effect named afte
 
 // Phase 3 structural ownership corpus: narration wording is not keep/drop authority.
 const structuralCompoundSave={pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]};
+turn={scene_title:'수면 중 선택',scene:[{kind:'dialogue',speaker_key:'artemis',text:'지금 바로 일어나겠나?'}],choices:['일어난다.','계속 잔다.','상황을 묻는다.'],state_delta:{advance_minutes:60,items_add:['숙면 보상']}};
+turn.time_execution=choiceExecution(turn,{completed:[],interrupted:'action_1',owners:[effectOwner('items_add',0,'action_1')]});
+const singleClauseDecision=applySceneMomentumTimeFloor({action:'8시간 잔다',saveState:structuralCompoundSave},turn,'game');
+assert.equal(singleClauseDecision.reconciliationReason,'decision-boundary','a single structured action honors a real interruption instead of requiring a compound plan');
+assert.deepEqual(turn.state_delta.items_add,[],'an interrupted single action cannot retain its completion reward');
+
 turn={scene_title:'PC 훈련 뒤 선택',scene:[{kind:'narration',text:'한 시간 훈련을 마쳤고 훈련 완료 상태가 되었다.'},{kind:'dialogue',speaker_key:'artemis',text:'지금 임무를 맡겠나?'}],choices:['맡는다.','잔다.','묻는다.'],state_delta:{advance_minutes:60,npc_state_updates:[{npc_key:'emily',status:'훈련 완료'}]}};
 turn.time_execution=choiceExecution(turn,{owners:[]});
 applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:structuralCompoundSave},turn,'game');
@@ -465,7 +479,7 @@ applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveSt
 assert.deepEqual(turn.state_delta.items_add,['훈련 기록표'],'clause ownership preserves an earned item without punctuation-based sentence slicing');
 
 turn={scene_title:'훈련 자원 변화 뒤 선택',scene:[{kind:'narration',text:'한 시간 훈련을 마쳐 피로가 3 늘고 금화 5개를 받았다.'},{kind:'dialogue',speaker_key:'artemis',text:'이제 임무를 맡겠나?'}],choices:['맡는다.','잔다.','묻는다.'],state_delta:{advance_minutes:60,fatigue_delta:3,gold_delta:5}};
-turn.time_execution=choiceExecution(turn,{owners:[effectOwner('fatigue_delta'),effectOwner('gold_delta')]});
+turn.time_execution=choiceExecution(turn,{scalarContributions:[scalarContribution('fatigue_delta',3),scalarContribution('gold_delta',5)]});
 applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:structuralCompoundSave},turn,'game');
 assert.equal(turn.state_delta.fatigue_delta,3,'completed-clause ownership preserves evidenced scalar fatigue');
 assert.equal(turn.state_delta.gold_delta,5,'completed-clause ownership preserves evidenced scalar currency');

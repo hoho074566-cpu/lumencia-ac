@@ -83,7 +83,7 @@ test('structured format requires and preserves the TPP execution ownership recei
     },
     $parseRaw:(content)=>{const raw=JSON.parse(content);return{scene:raw.scene,choices:raw.choices,state_delta:raw.state_delta};},
   };
-  const patched=patchGoalV2StructuredFormat({instructions:'base',text:{format}}),receipt={version:'1.0',plan_used:true,boundary_kind:'choice',boundary_minutes:60,completed_clause_ids:['action_1'],interrupted_clause_id:'action_2',decision_scene_index:0,boundary_event_id:null,effect_owners:[]};
+  const patched=patchGoalV2StructuredFormat({instructions:'base',text:{format}}),receipt={version:'1.0',plan_used:true,boundary_kind:'choice',boundary_minutes:60,completed_clause_ids:['action_1'],interrupted_clause_id:'action_2',decision_scene_index:0,boundary_event_id:null,effect_owners:[],scalar_contributions:[]};
   assert.ok(patched.text.format.schema.properties.time_execution,'the canonical response schema contains the ownership receipt');
   assert.ok(patched.text.format.schema.required.includes('time_execution'),'strict output requires the ownership receipt on every turn');
   const parsed=patched.text.format.$parseRaw(JSON.stringify({scene:[{kind:'narration',text:'선택한다.'}],choices:['계속'],state_delta:{advance_minutes:60,npc_state_updates:[]},time_execution:receipt}));

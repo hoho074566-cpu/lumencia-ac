@@ -11,7 +11,7 @@ import { routeOpenAIParams, routerVersion, array, object, clampText } from './li
 import { actualScheduledEntrants, freshChoices, reconcileParticipants } from '../lib/scene-continuity.js';
 import { ADAPTIVE_TIME_SCALE_VERSION, SCENE_MOMENTUM_VERSION, classifySceneIntent, deriveSceneDelta, isPcRelevantScheduleEvent, nextScheduleBoundaryMinutes, updateSceneMomentum } from '../lib/scene-momentum.js';
 import { TIME_PLAN_PARSER_VERSION, isAdditiveAdverbialStem, parseTimePlan, summarizeTimePlan } from '../lib/time-plan-parser.js';
-import { projectStructuredOwnedEffects, validateStructuredTimeExecution } from '../lib/time-plan-reconciliation.js';
+import { projectStructuredOwnedEffects, replaceStructuredEffectRows, validateStructuredTimeExecution } from '../lib/time-plan-reconciliation.js';
 import { SCENE_NOVELTY_VERSION, deriveSceneNovelty } from '../lib/scene-novelty.js';
 import { deriveScenePurpose } from '../lib/scene-purpose.js';
 import { deriveSceneExitCondition, evaluateSceneExitCondition } from '../lib/scene-exit.js';
@@ -52,10 +52,11 @@ npc_state_updates의 Goal V2 필드는 실제 턴 근거가 있을 때만 쓴다
 
 const TIME_EXECUTION_RULES = String.raw`[TPP PHASE 3 — STRUCTURED EXECUTION OWNERSHIP]
 time_execution은 사용자에게 보이는 서술이 아니라 이번 응답의 구조화된 실행 영수증이다.
-입력에 STRUCTURED_TIME_PLAN이 있으면 plan_used=true로 하고, 제공된 action_N ID만 사용한다. 없으면 plan_used=false, boundary_kind=none, boundary_minutes=state_delta.advance_minutes, completed_clause_ids/effect_owners는 빈 배열, 나머지는 null로 둔다.
+입력에 STRUCTURED_TIME_PLAN이 있으면 plan_used=true로 하고, 제공된 action_N ID만 사용한다. 없으면 plan_used=false, boundary_kind=none, boundary_minutes=state_delta.advance_minutes, completed_clause_ids/effect_owners/scalar_contributions는 빈 배열, 나머지는 null로 둔다.
 completed_clause_ids에는 실제 완료된 연속 prefix action만 넣고, 중간에 멈춘 첫 action은 interrupted_clause_id에 넣는다. 0분 동안 양의 최대시간을 가진 action을 완료했다고 보고하지 않는다.
 choices가 있으면 실제 선택 질문을 scene의 마지막 항목에 두고 decision_scene_index를 그 0-based index로 보고한다. choices가 없으면 decision_scene_index=null이다.
-state_delta의 0이 아닌 scalar와 각 array 원소에는 effect_owners 한 개를 둔다. scope=state_delta, field는 실제 필드명, array는 effect_index, scalar는 null이다. 완료한 사용자 action에서 생긴 효과는 owner_kind=clause/owner_id=action_N이다. 일정·인과·Director 경계 자체의 효과는 owner_kind=boundary-event와 동일한 boundary_event_id를 쓴다. 서로 다른 action의 효과를 한 array row에 섞지 않는다.
+state_delta의 각 array 원소와 숫자가 아닌 scalar에는 effect_owners 한 개를 둔다. scope=state_delta, field는 실제 필드명, array는 effect_index, scalar는 null이다. fatigue_delta/gold_delta는 합계 소유자를 쓰지 말고 scalar_contributions에 action/event별 실제 기여량을 각각 보고하며, 기여량 합계는 state_delta 값과 정확히 같아야 한다. 완료한 사용자 action에서 생긴 효과는 owner_kind=clause/owner_id=action_N이다. 일정·인과·Director 경계 자체의 효과는 owner_kind=boundary-event와 실제 boundary_event_id를 쓴다. 서로 다른 action의 효과를 한 array row에 섞지 않는다.
+1440분 턴 상한에서 아직 plan이 끝나지 않았다면 boundary_kind=turn-limit가 다른 choice보다 우선한다. choices는 다음 턴으로 미루고 남은 action을 완료했다고 보고하지 않는다.
 event_progress나 director가 실제 선택 경계 사건에 속하면 scope=turn, field=event_progress 또는 director, effect_index=null, owner_kind=boundary-event로 귀속한다. 서술 표현을 근거로 미래 action 효과를 앞선 action에 귀속하지 않는다.`;
 
 const SKILL_LEARNING_RULES = String.raw`[SKILL LEARNING V1]
@@ -106,8 +107,9 @@ function timeExecutionFieldSchema(){
       decision_scene_index:{anyOf:[{type:'integer',minimum:0,maximum:17},{type:'null'}]},
       boundary_event_id:{anyOf:[{type:'string',minLength:1,maxLength:120},{type:'null'}]},
       effect_owners:{type:'array',maxItems:80,items:{type:'object',additionalProperties:false,properties:{scope:{type:'string',enum:['state_delta','turn']},field:{type:'string',minLength:1,maxLength:80},effect_index:{anyOf:[{type:'integer',minimum:0,maximum:31},{type:'null'}]},owner_kind:{type:'string',enum:['clause','boundary-event','world']},owner_id:{type:'string',minLength:1,maxLength:120}},required:['scope','field','effect_index','owner_kind','owner_id']}},
+      scalar_contributions:{type:'array',maxItems:16,items:{type:'object',additionalProperties:false,properties:{field:{type:'string',enum:['fatigue_delta','gold_delta']},amount:{type:'integer',minimum:-10000,maximum:10000},owner_kind:{type:'string',enum:['clause','boundary-event','world']},owner_id:{type:'string',minLength:1,maxLength:120}},required:['field','amount','owner_kind','owner_id']}},
     },
-    required:['version','plan_used','boundary_kind','boundary_minutes','completed_clause_ids','interrupted_clause_id','decision_scene_index','boundary_event_id','effect_owners'],
+    required:['version','plan_used','boundary_kind','boundary_minutes','completed_clause_ids','interrupted_clause_id','decision_scene_index','boundary_event_id','effect_owners','scalar_contributions'],
   };
 }
 function skillLearningFieldSchema(){
@@ -550,7 +552,7 @@ function prefixEffectsFromSegments(turn,prefixSegments=[],{travelPrefix=false,tr
   return{preserved_delta:preservedDelta,npc_state_updates:npcStateUpdates,npc_schedule_updates:npcScheduleUpdates,new_location:newLocation,pc_status:pcStatus,completed_prefix_action_types:completedPrefixActionTypes,completed_prefix_clause_indexes:completedPrefixClauseIndexes,structured_execution:structuredExecution};
 }
 function structuredPrefixEffectsForShortening(turn,plan={},applied=0,executionAuthority=null){
-  if(!plan?.eligible||!Array.isArray(plan.clauses)||plan.clauses.length<2)return null;
+  if(!plan?.eligible||!Array.isArray(plan.clauses)||plan.clauses.length<1)return null;
   if(executionAuthority?.applicable&&executionAuthority?.reason!=='missing-contract')return projectStructuredOwnedEffects(turn,executionAuthority,applied);
   const elapsed=Math.max(0,Number(applied)||0),requireUpperCompletion=turn?._boundary_evidence_unordered===true,allowUnderreportedCompletion=turn?._decision_evidence_ordered===true,prefix=array(plan.clauses).slice(0,-1).filter(clause=>{const startMin=Number(clause?.start_min_minutes),rawStartMax=clause?.start_max_minutes,rawCompleteMax=clause?.complete_max_minutes,startMax=rawStartMax==null?null:Number(rawStartMax),completeMin=Number(clause?.complete_min_minutes),completeMax=rawCompleteMax==null?null:Number(rawCompleteMax),positiveMinimum=Number.isFinite(startMin)&&Number.isFinite(completeMin)&&completeMin>startMin,positiveMaximum=Number.isFinite(startMax)&&Number.isFinite(completeMax)&&completeMax>startMax,exactCompletion=Number.isFinite(completeMin)&&Number.isFinite(completeMax)&&completeMin===completeMax;if(!positiveMinimum&&!positiveMaximum)return false;return requireUpperCompletion?positiveMaximum&&completeMax<=elapsed:allowUnderreportedCompletion&&exactCompletion||Number.isFinite(completeMin)&&completeMin<=elapsed;});
   if(!prefix.length)return prefixEffectsFromSegments(turn,[],{structuredExecution:true});
@@ -565,8 +567,9 @@ function structuredPrefixEffectsForShortening(turn,plan={},applied=0,executionAu
   return prefixEffectsFromSegments(turn,uniqueSegments,{travelPrefix,travelDestination,completedPrefixActionTypes:[...new Set(matchedTypes)],completedPrefixClauseIndexes:matchedIndexes,structuredExecution:true});
 }
 function structuredDecisionBoundaryMinutes(turn,plan={},current=0,hasMeaningfulStop=false,terminalCompletion=false,executionAuthority=null){
-  if(!hasMeaningfulStop||terminalCompletion||!plan?.eligible||!Array.isArray(plan.clauses)||plan.clauses.length<2)return null;
+  if(!hasMeaningfulStop||terminalCompletion||!plan?.eligible||!Array.isArray(plan.clauses)||plan.clauses.length<1)return null;
   if(executionAuthority?.applicable&&executionAuthority?.reason!=='missing-contract')return executionAuthority.valid&&executionAuthority.boundary_kind==='choice'?executionAuthority.boundary_minutes:Math.max(0,Number(current)||0);
+  if(plan.clauses.length<2)return null;
   const effects=structuredPrefixEffectsForShortening(turn,plan,current,executionAuthority);if(!effects)return null;const matched=new Set(array(effects.completed_prefix_clause_indexes).map(Number)),prefix=array(plan.clauses).slice(0,-1);let completed=null;
   for(const clause of prefix){if(!matched.has(Number(clause?.index)))break;completed=clause;}
   const clauses=array(plan.clauses),completedPosition=completed?clauses.findIndex(clause=>Number(clause?.index)===Number(completed?.index)):-1,next=clauses[completedPosition+1],elapsed=Math.max(0,Number(current)||0),nextLatest=Number(next?.complete_max_minutes),prompt=String(turn?._choice_prompt_text||''),terminalChoiceCue={sleep:/(?:눈을\s*뜬|깨어|일어났|잠에서|수면\s*(?:후|뒤|끝))/u,rest:/(?:휴식|쉬기)\s*(?:후|뒤|끝)|충분히\s*쉰/u,training:/(?:훈련|연습|수련|단련)\s*(?:후|뒤|끝)|(?:훈련|연습|수련|단련)(?:을|를)?\s*(?:마친|끝낸|완료한)/u,'class-attendance':/(?:수업|강의|세미나|실습|교육)\s*(?:후|뒤|끝)|(?:수업|강의|세미나|실습|교육)(?:을|를)?\s*(?:마친|끝낸|수료한)/u,meal:/(?:식사|아침|점심|저녁|밥)\s*(?:후|뒤|끝)|(?:식사|밥)(?:을|를)?\s*(?:마친|끝낸|다\s*먹은)/u,dialogue:/(?:대화|이야기|상담|논의|면담|회의)\s*(?:후|뒤|끝)|(?:대화|이야기|상담|논의|면담|회의)(?:을|를)?\s*(?:마친|끝낸)/u,wait:/(?:기다림|대기)\s*(?:후|뒤|끝)|(?:기다림|대기)(?:을|를)?\s*(?:마친|끝낸)/u,travel:/(?:도착한|도착했|다다른|닿은|이동\s*(?:후|뒤|끝))/u}[String(next?.action_type||'')],terminalMaximumGrounded=Boolean(terminalChoiceCue?.test(prompt));
@@ -583,7 +586,7 @@ function choicePromptScore(text='',choices=[]){
 }
 function turnBeforePlayerChoice(turn,executionAuthority=null){
   if(executionAuthority?.applicable&&executionAuthority?.reason!=='missing-contract'){
-    const scene=array(turn?.scene),decisionIndex=executionAuthority.valid&&executionAuthority.boundary_kind==='choice'?Number(executionAuthority.decision_scene_index):Math.max(0,scene.length-1),item=object(scene[decisionIndex]),prompt=String(item.text||'').trim();
+    const scene=array(turn?.scene),decisionIndex=executionAuthority.valid&&executionAuthority.decision_scene_index!=null?Number(executionAuthority.decision_scene_index):Math.max(0,scene.length-1),item=object(scene[decisionIndex]),prompt=String(item.text||'').trim();
     return{...turn,scene_title:'',scene_summary:'',scene:scene.slice(0,decisionIndex),choices:[],_choice_prompt_text:prompt,_decision_evidence_ordered:true,_structured_choice_authority:true};
   }
   const scene=array(turn?.scene),choices=array(turn?.choices),candidates=scene.map((item,index)=>({index,question:/[?？]/.test(String(item?.text||'')),dialogue:String(item?.kind||'')==='dialogue',score:choicePromptScore(item?.text,choices)})).filter(row=>row.question||row.dialogue),scored=[...candidates].sort((left,right)=>right.score-left.score||right.index-left.index),questionIndexes=candidates.filter(row=>row.question).map(row=>row.index),dialogueIndexes=candidates.filter(row=>row.dialogue).map(row=>row.index),decisionIndex=scored[0]?.score>0?scored[0].index:questionIndexes.at(-1)??dialogueIndexes.at(-1)??scene.length;
@@ -686,8 +689,9 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   const intent=classifySceneIntent(incoming?.action||'',{location:incoming?.saveState?.world?.location||'',currentTime:incoming?.saveState?.world?.time||'',currentDate:incoming?.saveState?.world?.date||'',currentWeekday:incoming?.saveState?.world?.weekday||'',actorName:incoming?.saveState?.pc?.name||'',resumeTimedAction:incoming?.saveState?.sceneRuntime?.timed_action});
   const boundaryLookahead=Math.min(1440,Math.max(0,Number(intent.boundaryLookaheadMinutes||0)));
   if(mode!=='game'||!turn?.state_delta||(!intent.compression&&boundaryLookahead<=0))return intent;
-  const hasMeaningfulStop=array(turn?.choices).length>0;
+  const modelHasMeaningfulStop=array(turn?.choices).length>0;
   const current=Math.max(0,Number(turn.state_delta.advance_minutes||0));
+  const turnLimitPreemptsChoice=Boolean(intent.turnLimitTruncated&&current>=1440),hasMeaningfulStop=Boolean(modelHasMeaningfulStop&&!turnLimitPreemptsChoice);
   const requestedFloor=Math.min(1440,Math.max(0,Number(intent.minAdvanceMinutes||0)));
   const explicitZeroRange=array(intent.explicitDurationRangeMinutes).length===2&&intent.explicitDurationRangeMinutes.every(value=>Number(value)===0);
   if((intent.explicitDurationMinutes===0||explicitZeroRange)&&requestedFloor<=0&&boundaryLookahead<=0&&Number(intent.scheduledStartOffsetMinutes||0)<=0){reconcileExplicitZeroTurn(turn);reconcileReturnedTimedTurn(turn,{reason:'explicit-zero',elapsed:0});return{...intent,runtimeSceneTrusted:false,returnedSceneReconciled:true,reconciliationReason:'explicit-zero'};}
@@ -709,7 +713,7 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   const reachedScheduledBoundary=surfacedScheduledBoundary||crossedScheduledBoundary;
   const previousEventId=String(incoming?.saveState?.sceneRuntime?.eventProgress?.eventInstanceId||incoming?.saveState?.sceneRuntime?.eventProgress?.event_instance_id||'').trim().toLowerCase();
   const structuredInterruption=Boolean(eventId.startsWith('director:')&&eventId!==previousEventId&&!structuredBoundary&&eventId!==String(consequenceLifecycle?.selected_id||'').trim().toLowerCase());
-  const decisionPlan=intent?.structuredExecutionPlan||intent?.structuredDecisionPlan,executionAuthority=validateStructuredTimeExecution(turn,decisionPlan),terminalClause=array(decisionPlan?.clauses).at(-1),terminalClauseId=String(terminalClause?.clause_id||`action_${Number(terminalClause?.index||0)}`),completionIntent=terminalClause?{...intent,completionActionType:String(terminalClause.action_type||'')}:intent,completionEvidence=timedActionCompletionEvidence(turn,completionIntent,incoming?.action||'',incoming?.saveState?.pc?.name||''),decisionEvidenceTurn=hasMeaningfulStop?turnBeforePlayerChoice(turn,executionAuthority):turn,legacyCompletionBeforeDecision=hasMeaningfulStop?timedActionCompletionEvidence(decisionEvidenceTurn,completionIntent,incoming?.action||'',incoming?.saveState?.pc?.name||''):completionEvidence,completionBeforeDecision=executionAuthority.valid?executionAuthority.completed_clause_set.has(terminalClauseId):legacyCompletionBeforeDecision,completedBeforeChoice=!hasMeaningfulStop||completionBeforeDecision,rawDecisionBoundary=structuredDecisionBoundaryMinutes(decisionEvidenceTurn,decisionPlan,current,hasMeaningfulStop,completionBeforeDecision,executionAuthority),decisionBoundary=rawDecisionBoundary==null||Number(rawDecisionBoundary)>profileMax?null:Math.max(0,Number(rawDecisionBoundary)||0),earlierInterruptionBeforeConsequence=Boolean(consequenceWithinProfile&&current<consequenceBoundary&&(structuredInterruption||(hasMeaningfulStop&&!completedBeforeChoice)));
+  const decisionPlan=intent?.structuredExecutionPlan||intent?.structuredDecisionPlan,boundaryRuntime={required_boundary_kind:turnLimitPreemptsChoice?'turn-limit':'',boundaries:{schedule:scheduleBoundary==null?{}:{minutes:scheduleBoundary,event_ids:[...boundaryIds]},consequence:consequenceWithinProfile?{minutes:Number(consequenceBoundary),event_ids:[consequenceLifecycle?.selected_id].filter(Boolean)}:{},choice:modelHasMeaningfulStop?{minutes:current,event_ids:eventId?[eventId]:[]}:{},'turn-limit':intent.turnLimitTruncated?{minutes:1440,event_ids:[]}:{}}},executionAuthority=validateStructuredTimeExecution(turn,decisionPlan,boundaryRuntime),terminalClause=array(decisionPlan?.clauses).at(-1),terminalClauseId=String(terminalClause?.clause_id||`action_${Number(terminalClause?.index||0)}`),completionIntent=terminalClause?{...intent,completionActionType:String(terminalClause.action_type||'')}:intent,completionEvidence=timedActionCompletionEvidence(turn,completionIntent,incoming?.action||'',incoming?.saveState?.pc?.name||''),decisionEvidenceTurn=hasMeaningfulStop?turnBeforePlayerChoice(turn,executionAuthority):turn,legacyCompletionBeforeDecision=hasMeaningfulStop?timedActionCompletionEvidence(decisionEvidenceTurn,completionIntent,incoming?.action||'',incoming?.saveState?.pc?.name||''):completionEvidence,completionBeforeDecision=executionAuthority.valid?executionAuthority.completed_clause_set.has(terminalClauseId):legacyCompletionBeforeDecision,completedBeforeChoice=!hasMeaningfulStop||completionBeforeDecision,rawDecisionBoundary=structuredDecisionBoundaryMinutes(decisionEvidenceTurn,decisionPlan,current,hasMeaningfulStop,completionBeforeDecision,executionAuthority),decisionBoundary=rawDecisionBoundary==null||Number(rawDecisionBoundary)>profileMax?null:Math.max(0,Number(rawDecisionBoundary)||0),earlierInterruptionBeforeConsequence=Boolean(consequenceWithinProfile&&current<consequenceBoundary&&(structuredInterruption||(hasMeaningfulStop&&!completedBeforeChoice)));
   const reachedConsequenceBoundary=consequenceWithinProfile&&!earlierInterruptionBeforeConsequence&&(current>=consequenceBoundary||consequenceLifecycle?.status==='resolved'),manifestedConsequenceBoundary=Boolean(reachedConsequenceBoundary&&consequenceLifecycle?.status==='resolved');
   const reachedBoundaries=[reachedScheduledBoundary?scheduleBoundary:null,reachedConsequenceBoundary?consequenceBoundary:null,decisionBoundary].filter(value=>value!=null&&Number.isFinite(Number(value))).map(Number),reachedBoundary=reachedBoundaries.length?Math.min(...reachedBoundaries):null;
   const appliedScheduleBoundary=reachedScheduledBoundary&&scheduleBoundary===reachedBoundary,appliedConsequenceBoundary=manifestedConsequenceBoundary&&consequenceBoundary===reachedBoundary,appliedConsequenceTimeBoundary=reachedConsequenceBoundary&&consequenceBoundary===reachedBoundary,appliedDecisionBoundary=decisionBoundary!=null&&decisionBoundary===reachedBoundary;
@@ -1049,7 +1053,7 @@ export default async function handler(req,res){
     applyExtendedExpressions(data.turn,incoming0.saveState||{});
     data.turn.choices=filterTurnHookChoices(incoming.action,{...data.turn,choices:freshChoices(incoming.action,data.turn)});
     const growthIntent=classifySceneIntent(incoming0.action||'',{location:incoming.saveState?.world?.location||'',currentTime:incoming.saveState?.world?.time||'',currentDate:incoming.saveState?.world?.date||'',currentWeekday:incoming.saveState?.world?.weekday||'',actorName:incoming.saveState?.pc?.name||'',resumeTimedAction:incoming.saveState?.sceneRuntime?.timed_action}),zeroElapsedRange=array(growthIntent.explicitDurationRangeMinutes).length===2&&growthIntent.explicitDurationRangeMinutes.every(value=>Number(value)===0),zeroElapsedIntent=mode==='game'&&(growthIntent.explicitDurationMinutes===0||zeroElapsedRange)&&Number(growthIntent.minAdvanceMinutes||0)<=0,growthAllowed=mode==='game'&&!zeroElapsedIntent,growthValidationScene=data.turn?.scene;
-    if(data.turn?.state_delta)data.turn.state_delta.skill_experience=mode==='auto'?[]:filterExistingSkillExperience(data.turn.state_delta.skill_experience,incoming0.saveState?.pc?.skills);
+    if(data.turn?.state_delta)replaceStructuredEffectRows(data.turn,'skill_experience',mode==='auto'?[]:filterExistingSkillExperience(data.turn.state_delta.skill_experience,incoming0.saveState?.pc?.skills));
     const combatGrowthState=deriveCombatGrowthState({
       pc:incoming0.saveState?.pc,
       statChanges:data.turn?.state_delta?.stat_progress,
@@ -1059,7 +1063,7 @@ export default async function handler(req,res){
       resolutionLog:data.turn?.resolution_log,
       allowProgress:growthAllowed,
     });
-    if(data.turn?.state_delta){data.turn.state_delta.stat_progress=combatGrowthState.accepted_stat_progress;data.turn.state_delta.skill_experience=combatGrowthState.accepted_skill_experience;}
+    if(data.turn?.state_delta){replaceStructuredEffectRows(data.turn,'stat_progress',combatGrowthState.accepted_stat_progress);replaceStructuredEffectRows(data.turn,'skill_experience',combatGrowthState.accepted_skill_experience);}
     const skillLearningState=deriveSkillLearningState({
       existingSkills:incoming0.saveState?.pc?.skills,
       previousCandidates:incoming0.saveState?.pc?.skillCandidates,
@@ -1069,7 +1073,7 @@ export default async function handler(req,res){
       turnNumber:Number(incoming0.saveState?.turnNumber||0)+1,
       allowProgress:growthAllowed,
     });
-    if(data.turn?.state_delta)data.turn.state_delta.skill_learning=skillLearningState.accepted_changes;
+    if(data.turn?.state_delta)replaceStructuredEffectRows(data.turn,'skill_learning',skillLearningState.accepted_changes);
     const awakeningTalentState=deriveAwakeningTalentState({
       existingTraits:incoming0.saveState?.pc?.traits,
       existingAuthorities:incoming0.saveState?.pc?.authorities,
@@ -1085,8 +1089,8 @@ export default async function handler(req,res){
       allowProgress:growthAllowed,
     });
     if(data.turn?.state_delta){
-      data.turn.state_delta.awakening_progress=awakeningTalentState.accepted_awakening_changes;
-      data.turn.state_delta.talent_evolution=awakeningTalentState.accepted_talent_evolution;
+      replaceStructuredEffectRows(data.turn,'awakening_progress',awakeningTalentState.accepted_awakening_changes);
+      replaceStructuredEffectRows(data.turn,'talent_evolution',awakeningTalentState.accepted_talent_evolution);
     }
     const consequenceId=String(telemetry?.event_director_v2?.event_consequence_id||'');
     const selectedConsequence=findEventConsequence(incoming.saveState,consequenceId);
@@ -1097,15 +1101,15 @@ export default async function handler(req,res){
     let persistedCombatGrowthState=combatGrowthState,persistedSkillLearningState=skillLearningState,persistedAwakeningTalentState=awakeningTalentState;
     if(data.turn?.state_delta&&(data.turn.state_delta.stat_progress!==combatGrowthState.accepted_stat_progress||data.turn.state_delta.skill_experience!==combatGrowthState.accepted_skill_experience)){
       persistedCombatGrowthState=deriveCombatGrowthState({pc:incoming0.saveState?.pc,statChanges:data.turn.state_delta.stat_progress,skillChanges:data.turn.state_delta.skill_experience,action:incoming0.action||'',scene:growthValidationScene,resolutionLog:data.turn?.resolution_log,allowProgress:growthAllowed});
-      data.turn.state_delta.stat_progress=persistedCombatGrowthState.accepted_stat_progress;data.turn.state_delta.skill_experience=persistedCombatGrowthState.accepted_skill_experience;
+      replaceStructuredEffectRows(data.turn,'stat_progress',persistedCombatGrowthState.accepted_stat_progress);replaceStructuredEffectRows(data.turn,'skill_experience',persistedCombatGrowthState.accepted_skill_experience);
     }
     if(data.turn?.state_delta&&data.turn.state_delta.skill_learning!==skillLearningState.accepted_changes){
       persistedSkillLearningState=deriveSkillLearningState({existingSkills:incoming0.saveState?.pc?.skills,previousCandidates:incoming0.saveState?.pc?.skillCandidates,changes:data.turn.state_delta.skill_learning,action:incoming0.action||'',scene:growthValidationScene,turnNumber:Number(incoming0.saveState?.turnNumber||0)+1,allowProgress:growthAllowed});
-      data.turn.state_delta.skill_learning=persistedSkillLearningState.accepted_changes;
+      replaceStructuredEffectRows(data.turn,'skill_learning',persistedSkillLearningState.accepted_changes);
     }
     if(data.turn?.state_delta&&(data.turn.state_delta.awakening_progress!==awakeningTalentState.accepted_awakening_changes||data.turn.state_delta.talent_evolution!==awakeningTalentState.accepted_talent_evolution)){
       persistedAwakeningTalentState=deriveAwakeningTalentState({existingTraits:incoming0.saveState?.pc?.traits,existingAuthorities:incoming0.saveState?.pc?.authorities,talents:incoming0.saveState?.pc?.talents,previousCandidates:incoming0.saveState?.pc?.awakeningCandidates,previousTalentHistory:incoming0.saveState?.pc?.talentEvolutionHistory,awakeningChanges:data.turn.state_delta.awakening_progress,talentEvolutionChanges:data.turn.state_delta.talent_evolution,action:incoming0.action||'',saveState:incoming0.saveState||{},scene:growthValidationScene,turnNumber:Number(incoming0.saveState?.turnNumber||0)+1,allowProgress:growthAllowed});
-      data.turn.state_delta.awakening_progress=persistedAwakeningTalentState.accepted_awakening_changes;data.turn.state_delta.talent_evolution=persistedAwakeningTalentState.accepted_talent_evolution;
+      replaceStructuredEffectRows(data.turn,'awakening_progress',persistedAwakeningTalentState.accepted_awakening_changes);replaceStructuredEffectRows(data.turn,'talent_evolution',persistedAwakeningTalentState.accepted_talent_evolution);
     }
     const runtimeTurn=runtimeSynthesisTurn(data.turn,sceneIntent);
     const sceneRuntime=localSceneRuntime({...incoming0,saveState:incoming.saveState,action:incoming0.action||''},runtimeTurn,telemetry?.event_director_v2,mode,telemetry?.scene_orchestration,sceneIntent);

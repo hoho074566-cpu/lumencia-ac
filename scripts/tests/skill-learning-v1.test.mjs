@@ -273,7 +273,7 @@ assert.equal(growthDelta.flags.growthChanged, true, 'an accepted learning mutati
 
 assert.match(router, /maxItems:2[\s\S]*skill:\{type:'string',minLength:2,maxLength:48\}[\s\S]*amount:\{type:'integer',minimum:1,maximum:15\}/, 'patched structured schema must bound candidate rows and per-turn progress');
 assert.match(router, /basis 없는 진척은 금지/, 'model instructions must preserve the evidence gate');
-assert.match(router, /state_delta\.skill_experience=mode==='auto'\?\[\]:filterExistingSkillExperience/, 'adapter must freeze AUTO experience and block legacy experience from creating unfinished candidate skills');
+assert.match(router, /replaceStructuredEffectRows\(data\.turn,'skill_experience',mode==='auto'\?\[\]:filterExistingSkillExperience/, 'adapter must freeze AUTO experience, block legacy candidate leakage, and keep accepted ownership row-aligned');
 
 const divider = '='.repeat(20);
 const instructions = `===== CHARACTER REGISTRY =====

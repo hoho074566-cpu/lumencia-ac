@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { buildSceneMomentumDirective, classifySceneIntent } from '../../lib/scene-momentum.js';
 import { deriveStructuredDecisionPlan, deriveStructuredExecutionPlan, parseTimePlan } from '../../lib/time-plan-parser.js';
-import { projectStructuredOwnedEffects, validateStructuredTimeExecution } from '../../lib/time-plan-reconciliation.js';
+import { projectStructuredOwnedEffects, replaceStructuredEffectRows, validateStructuredTimeExecution } from '../../lib/time-plan-reconciliation.js';
 
 const context={location:'기숙사',currentTime:'08:00',currentDate:'1285-03-01',currentWeekday:'수요일',actorName:'아리아'};
 
@@ -63,29 +63,55 @@ assert.match(directive,/effect_owners/,'the canonical call is instructed to retu
 const structuralTurn={
   scene:[{text:'훈련은 끝났고, 잠든 지 한 시간이 지났다.'}],
   choices:[],
-  state_delta:{advance_minutes:120,fatigue:-3,items_add:['미완료 수면 보상']},
+  state_delta:{advance_minutes:120,fatigue_delta:-3,gold_delta:0,items_add:['미완료 수면 보상']},
   time_execution:{
     version:'1.0',plan_used:true,boundary_kind:'schedule',boundary_minutes:120,
     completed_clause_ids:['action_1'],interrupted_clause_id:'action_2',decision_scene_index:null,
     boundary_event_id:'schedule:morning-roll-call',
     effect_owners:[
-      {scope:'state_delta',field:'fatigue',effect_index:null,owner_kind:'clause',owner_id:'action_1'},
       {scope:'state_delta',field:'items_add',effect_index:0,owner_kind:'clause',owner_id:'action_2'},
     ],
+    scalar_contributions:[{field:'fatigue_delta',amount:-3,owner_kind:'clause',owner_id:'action_1'}],
   },
 };
-const structuralAuthority=validateStructuredTimeExecution(structuralTurn,exact);
+const scheduleRuntime={boundaries:{schedule:{minutes:120,event_ids:['schedule:morning-roll-call']}}};
+const structuralAuthority=validateStructuredTimeExecution(structuralTurn,exact,scheduleRuntime);
 assert.equal(structuralAuthority.valid,true,'a started incomplete action is explicitly identified by clause ID');
-assert.deepEqual(projectStructuredOwnedEffects(structuralTurn,structuralAuthority,120).preserved_delta,{fatigue:-3},'projection keeps completed-clause effects and drops interrupted-clause effects');
+assert.deepEqual(projectStructuredOwnedEffects(structuralTurn,structuralAuthority,120).preserved_delta,{fatigue_delta:-3},'projection keeps completed-clause effects and drops interrupted-clause effects');
 const missingInterrupted=structuredClone(structuralTurn);
 missingInterrupted.time_execution.interrupted_clause_id=null;
-assert.equal(validateStructuredTimeExecution(missingInterrupted,exact).reason,'missing-interrupted-clause','a started incomplete action cannot disappear from the execution receipt');
+assert.equal(validateStructuredTimeExecution(missingInterrupted,exact,scheduleRuntime).reason,'missing-interrupted-clause','a started incomplete action cannot disappear from the execution receipt');
 assert.equal(projectStructuredOwnedEffects(structuralTurn,structuralAuthority,90).reason,'boundary-rebased','a receipt from a longer model timeline cannot authorize effects after a locally earlier boundary');
 const wholeArrayClaim=structuredClone(structuralTurn);
-wholeArrayClaim.time_execution.effect_owners[1].effect_index=null;
-assert.equal(validateStructuredTimeExecution(wholeArrayClaim,exact).reason,'invalid-array-effect-index','an array cannot be preserved wholesale through a scalar ownership claim');
+wholeArrayClaim.time_execution.effect_owners[0].effect_index=null;
+assert.equal(validateStructuredTimeExecution(wholeArrayClaim,exact,scheduleRuntime).reason,'invalid-array-effect-index','an array cannot be preserved wholesale through a scalar ownership claim');
 const outOfRangeClaim=structuredClone(structuralTurn);
-outOfRangeClaim.time_execution.effect_owners[1].effect_index=1;
-assert.equal(validateStructuredTimeExecution(outOfRangeClaim,exact).reason,'invalid-array-effect-index','an ownership claim cannot point beyond the returned effect rows');
+outOfRangeClaim.time_execution.effect_owners[0].effect_index=1;
+assert.equal(validateStructuredTimeExecution(outOfRangeClaim,exact,scheduleRuntime).reason,'invalid-array-effect-index','an ownership claim cannot point beyond the returned effect rows');
+
+const inventedBoundary=structuredClone(structuralTurn);
+inventedBoundary.time_execution.boundary_event_id='schedule:invented';
+assert.equal(validateStructuredTimeExecution(inventedBoundary,exact,scheduleRuntime).reason,'unverified-boundary-event','a model-declared boundary owner must match a real runtime boundary');
+
+const mixedScalar=structuredClone(structuralTurn);
+mixedScalar.state_delta.fatigue_delta=2;
+mixedScalar.time_execution.scalar_contributions=[
+  {field:'fatigue_delta',amount:3,owner_kind:'clause',owner_id:'action_1'},
+  {field:'fatigue_delta',amount:-1,owner_kind:'clause',owner_id:'action_2'},
+];
+const mixedAuthority=validateStructuredTimeExecution(mixedScalar,exact,scheduleRuntime);
+assert.equal(mixedAuthority.valid,true,'aggregate scalars retain per-clause contributions');
+assert.equal(projectStructuredOwnedEffects(mixedScalar,mixedAuthority,120).preserved_delta.fatigue_delta,3,'projection keeps only the completed clause contribution');
+const oversizedScalar=structuredClone(mixedScalar);
+oversizedScalar.time_execution.scalar_contributions=[{field:'fatigue_delta',amount:12,owner_kind:'clause',owner_id:'action_1'},{field:'fatigue_delta',amount:-10,owner_kind:'clause',owner_id:'action_2'}];
+assert.equal(validateStructuredTimeExecution(oversizedScalar,exact,scheduleRuntime).reason,'invalid-scalar-contribution','per-clause contributions cannot bypass the canonical scalar limit');
+
+const filteredTurn={state_delta:{skill_experience:[{skill:'없는 기술',amount:1},{skill:'검술',amount:2}]},time_execution:{effect_owners:[{scope:'state_delta',field:'skill_experience',effect_index:1,owner_kind:'clause',owner_id:'action_1'}]}};
+replaceStructuredEffectRows(filteredTurn,'skill_experience',[{skill:'검술',amount:2}]);
+assert.equal(filteredTurn.time_execution.effect_owners[0].effect_index,0,'effect ownership follows an accepted row when validation compacts its array');
+
+const overLimitPlan=deriveStructuredExecutionPlan(parseTimePlan('25시간 기다리고 8시간 잔다',context));
+const overLimitTurn={scene:[{text:'계속 기다릴까?'}],choices:['계속한다.'],state_delta:{advance_minutes:1440,fatigue_delta:0,gold_delta:0},time_execution:{version:'1.0',plan_used:true,boundary_kind:'choice',boundary_minutes:1440,completed_clause_ids:[],interrupted_clause_id:'action_1',decision_scene_index:0,boundary_event_id:null,effect_owners:[],scalar_contributions:[]}};
+assert.equal(validateStructuredTimeExecution(overLimitTurn,overLimitPlan,{required_boundary_kind:'turn-limit',boundaries:{choice:{minutes:1440,event_ids:[]},'turn-limit':{minutes:1440,event_ids:[]}}}).reason,'required-boundary-kind','an incomplete plan at the one-turn cap cannot be converted into a model choice boundary');
 
 console.log('PASS Time Plan Parser Phase 3 ordered execution timeline, range, alignment, and fail-closed boundaries');
