@@ -88,6 +88,18 @@ assert.deepEqual(training.suggestedAdvanceMinutes, [30, 120]);
 const explicitTraining = classifySceneIntent('45분 동안 마법을 연습한다.', { location:'훈련장' });
 assert.equal(explicitTraining.explicitDurationMinutes, 45);
 assert.deepEqual(explicitTraining.suggestedAdvanceMinutes, [45, 45]);
+for(const action of ['3일치 전투 기록을 분석하며 1시간 훈련한다.','3일분 전투 기록을 분석하며 1시간 훈련한다.']){
+  const nounModifiedDuration=classifySceneIntent(action,{location:'훈련장'});
+  assert.equal(nounModifiedDuration.explicitDurationMinutes,60,`a noun-modifying day quantity must not become elapsed activity time: ${action}`);
+  assert.deepEqual(nounModifiedDuration.suggestedAdvanceMinutes,[60,60],`only the declared training hour may advance time: ${action}`);
+}
+const concurrentDialogue=classifySceneIntent('1시간 훈련하면서 리나와 1시간 대화한다.',{location:'훈련장'});
+assert.equal(concurrentDialogue.kind,'dialogue','the terminal simultaneous dialogue must remain the selected activity');
+assert.equal(concurrentDialogue.explicitDurationMinutes,60,'overlapping activity durations must use elapsed wall-clock time instead of summing both clauses');
+assert.deepEqual(concurrentDialogue.suggestedAdvanceMinutes,[60,60],'two simultaneous one-hour activities must finish after one hour');
+const postConcurrentSchedule={id:'late-class',title:'기사과 필수 수업',date:'1285-03-01',time:'10:30',kind:'academic',status:'scheduled'},postConcurrentSave={pc:{department:'기사과'},world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduledEvents:[postConcurrentSchedule],scheduleContext:{due:[],upcoming:[postConcurrentSchedule]}};
+assert.doesNotMatch(buildSceneMomentumDirective({action:'1시간 훈련하면서 리나와 1시간 대화한다.',saveState:postConcurrentSave}),/SCHEDULE_BOUNDARY=/,'a schedule after simultaneous activities finish must not become an interruption');
+assert.deepEqual(classifySceneIntent('1시간 훈련하고 리나와 1시간 대화한다.',{location:'훈련장'}).suggestedAdvanceMinutes,[120,120],'sequential activities must continue to add their durations');
 for(const suffix of ['간','가량','정도','쯤']){
   const suffixedTraining=classifySceneIntent(`훈련을 90분${suffix} 한다.`,{location:'훈련장'});
   assert.equal(suffixedTraining.kind,'training',`${suffix} must preserve object-first training intent`);
@@ -270,6 +282,9 @@ assert.equal(classifySceneIntent('자정에 훈련한다.', { location:'훈련�
 assert.equal(classifySceneIntent('12시에 기사과 오리엔테이션에 참석한다.', { location:'기숙사',currentTime:'09:00' }).kind,'class-attendance','orientation attendance must use the scheduled academic profile');
 const namedPcOrientation={id:'newcomer-orientation',title:'신입생 오리엔테이션',date:'1285-03-01',time:'12:00',kind:'academic',status:'scheduled'},namedPcScheduleSave={pc:{name:'카인',department:'기사과'},world:{date:'1285-03-01',time:'09:00',location:'기숙사'},scheduledEvents:[namedPcOrientation],scheduleContext:{due:[],upcoming:[namedPcOrientation]}},namedPcOrientationAction='카인이 오늘 12시에 신입생 오리엔테이션에 참석한다.';
 assert.equal(isRequestedScheduledActivity(namedPcScheduleSave,namedPcOrientation,namedPcOrientationAction),true,'the saved PC subject must not prevent matching their requested schedule');
+const lunchMeeting={id:'lunch-meeting',title:'점심 회의',date:'1285-03-01',time:'12:00',kind:'meeting',status:'scheduled'},lunchMeetingSave={pc:{name:'카인'},world:{date:'1285-03-01',time:'09:00',location:'회의실'},scheduledEvents:[lunchMeeting],scheduleContext:{due:[],upcoming:[lunchMeeting]}},lunchMeetingAction='오후 12시에 1시간 회의한다.',lunchMeetingIntent=classifySceneIntent(lunchMeetingAction,{location:'회의실',currentTime:'09:00',actorName:'카인'});
+assert.equal(isRequestedScheduledActivity(lunchMeetingSave,lunchMeeting,lunchMeetingAction,lunchMeetingIntent),true,'an explicit meeting kind must outrank a meal keyword in the title');
+assert.equal(nextScheduleBoundaryMinutes(lunchMeetingSave,{futureOnly:true,action:lunchMeetingAction,intent:lunchMeetingIntent}),null,'a requested mixed-title meeting must not interrupt itself');
 const precedingClass={id:'preceding-class',title:'기사과 기초 수업',date:'1285-03-01',time:'10:00',kind:'academic',status:'scheduled'},precedingClassSave={pc:{name:'카인',department:'기사과'},world:{date:'1285-03-01',time:'08:00',location:'기숙사'},scheduledEvents:[precedingClass],scheduleContext:{due:[],upcoming:[precedingClass]}},classThenSleep='오전 10시에 기사과 기초 수업을 듣고 8시간 동안 잠을 잔다.';
 assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,classThenSleep),true,'an explicitly requested schedule in a preceding compound clause must not become an unrelated boundary');
 assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,'오전 10시에 기사과 기초 수업을 듣고, 8시간 동안 잠을 잔다.'),true,'punctuation after a preceding connector must not break requested-schedule identity');
