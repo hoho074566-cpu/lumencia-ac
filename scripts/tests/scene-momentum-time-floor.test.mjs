@@ -515,20 +515,29 @@ assert.deepEqual(turn.state_delta.pc_knowledge_add,[],'an unfinished clause owne
 const ongoingDirector={source:'director',intervention:'medium',beat:'choice',event_kind:'world',spotlight_keys:['artemis'],callback_key:null,callback_phase:null,callback_note:'ongoing-fire',reason:'ongoing-fire evacuation choice'};
 turn={scene_title:'훈련 뒤 계속되는 화재',scene:[{kind:'narration',text:'한 시간 훈련을 마친 순간 화재 현장의 대피 지시가 이어졌다.'},{kind:'dialogue',speaker_key:'artemis',text:'동쪽과 서쪽 중 어디부터 대피시키겠나?'}],choices:['동쪽부터.','서쪽부터.','상황을 본다.'],director:ongoingDirector,event_progress:{event_instance_id:'director:ongoing-fire',active_beat:'evacuation-choice',completed_beats:['alarm']},state_delta:{advance_minutes:60,active_events_add:[]}};
 turn.time_execution=choiceExecution(turn,{boundaryEventId:'director:ongoing-fire',owners:[effectOwner('event_progress',null,'director:ongoing-fire','boundary-event','turn'),effectOwner('director',null,'director:ongoing-fire','boundary-event','turn')]});
-applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{...structuralCompoundSave,sceneRuntime:{eventProgress:{eventInstanceId:'director:ongoing-fire'}}}},turn,'game');
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{...structuralCompoundSave,sceneRuntime:{eventProgress:{eventInstanceId:'director:ongoing-fire'}}}},turn,'game',null,[],{director_occurrence_id:'director:ongoing-fire'});
 assert.equal(turn.event_progress?.event_instance_id,'director:ongoing-fire','an owned nonterminal active Director event survives its resumed choice boundary');
 assert.deepEqual(turn.director,ongoingDirector,'owned active Director metadata remains attached to its choices');
 
 const ongoingQuestProgress={event_instance_id:'quest:escort',active_beat:'route-choice',completed_beats:['briefing']};
 turn={scene_title:'훈련 뒤 호위 경로 선택',scene:[{kind:'narration',text:'한 시간 훈련을 마친 뒤 진행 중인 호위 임무의 갈림길에 도착했다.'},{kind:'dialogue',speaker_key:'emily',text:'동문과 서문 중 어느 길로 갈까?'}],choices:['동문으로 간다.','서문으로 간다.','상황을 확인한다.'],event_progress:ongoingQuestProgress,state_delta:{advance_minutes:60,active_events_add:[]}};
 turn.time_execution=choiceExecution(turn,{boundaryEventId:'quest:escort',owners:[effectOwner('event_progress',null,'quest:escort','boundary-event','turn')]});
-applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{...structuralCompoundSave,activeEvents:['quest:escort'],sceneRuntime:{eventProgress:{eventInstanceId:'quest:escort',activeBeat:'briefing'}}}},turn,'game');
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{...structuralCompoundSave,activeEvents:['quest:escort'],sceneRuntime:{eventProgress:{eventInstanceId:'quest:escort',activeBeat:'briefing'}}}},turn,'game',null,[],{choice_event_ids:['quest:escort']});
 assert.deepEqual(turn.event_progress,ongoingQuestProgress,'validated turn-owned progress is restored for an active non-Director choice event');
 
-turn={scene_title:'훈련 뒤 일반 선택',scene:[{kind:'narration',text:'한 시간 훈련을 마쳤다.'},{kind:'dialogue',speaker_key:'artemis',text:'이제 어디로 가겠나?'}],choices:['훈련장에 남는다.','기숙사로 간다.','상황을 묻는다.'],state_delta:{advance_minutes:60,items_add:['숙면 보상']}};
-turn.time_execution=choiceExecution(turn,{boundaryEventId:'quest:unrelated',owners:[effectOwner('items_add',0,'quest:unrelated','boundary-event')]});
+turn={scene_title:'훈련 뒤 일반 선택',scene:[{kind:'narration',text:'한 시간 훈련을 마쳤다.'},{kind:'dialogue',speaker_key:'artemis',text:'이제 어디로 가겠나?'}],choices:['훈련장에 남는다.','기숙사로 간다.','상황을 묻는다.'],event_progress:{event_instance_id:'quest:unrelated',active_beat:'waiting',completed_beats:[]},state_delta:{advance_minutes:60,items_add:['숙면 보상']}};
+turn.time_execution=choiceExecution(turn,{boundaryEventId:'quest:unrelated',owners:[effectOwner('items_add',0,'quest:unrelated','boundary-event'),effectOwner('event_progress',null,'quest:unrelated','boundary-event','turn')]});
 applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{...structuralCompoundSave,activeEvents:['quest:unrelated'],sceneRuntime:{eventProgress:{eventInstanceId:'quest:unrelated',activeBeat:'waiting'}}}},turn,'game');
-assert.deepEqual(turn.state_delta.items_add,[],'an unrelated saved event ID cannot authenticate an ordinary choice or preserve an unfinished suffix reward');
+assert.deepEqual(turn.state_delta.items_add,[],'matching model-returned event claims cannot authenticate an ordinary choice or preserve an unfinished suffix reward');
+assert.equal(turn.event_progress,null,'an unrelated saved event is not restored without pre-response routed choice authority');
+
+turn={scene_title:'훈련 뒤 미완료 수면',scene:[{kind:'narration',text:'한 시간 훈련을 마친 뒤 잠들기 시작했고 숙면 보상을 얻었다.'}],choices:[],state_delta:{advance_minutes:60,items_add:['숙면 보상']}};
+turn.time_execution=choiceExecution(turn,{boundaryKind:'none',completed:['action_1'],interrupted:'action_2',owners:[effectOwner('items_add',0,'action_2')]});
+const rejectedNoneIntent=applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:structuralCompoundSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,60,'an invalid no-boundary receipt cannot trigger the full compound profile floor');
+assert.deepEqual(turn.state_delta.items_add,[],'an invalid no-boundary receipt fails closed on every untrusted effect');
+assert.equal(rejectedNoneIntent.reconciliationReason,'invalid-structured-execution','the caller records a deterministic fail-closed reason for the rejected receipt');
+assert.match(turn.scene_summary,/검증할 수 없어/,'the returned narration exposes a bounded stop instead of claiming suffix completion');
 
 turn={scene_title:'수면 중 가짜 화재',scene:[{kind:'dialogue',speaker_key:'artemis',text:'불을 끌까?'}],choices:['끈다.','대피한다.','살핀다.'],director:ongoingDirector,event_progress:{event_instance_id:'director:invented-fire',active_beat:'choice',completed_beats:[]},state_delta:{advance_minutes:60,items_add:['화재 보상'],active_events_add:['director:invented-fire']}};
 turn.time_execution=choiceExecution(turn,{completed:[],interrupted:'action_1',boundaryEventId:'director:invented-fire',owners:[effectOwner('items_add',0,'director:invented-fire','boundary-event'),effectOwner('event_progress',null,'director:invented-fire','boundary-event','turn'),effectOwner('director',null,'director:invented-fire','boundary-event','turn')]});
