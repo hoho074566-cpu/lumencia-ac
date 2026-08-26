@@ -386,8 +386,8 @@ function effectActionTypes(value){
 }
 function prefixEffectMatchesCompletedClauses(value,segments=[],completedTypes=[]){
   if(typeof value==='string')return prefixEffectMatches(value,segments);
-  const exactValues=Object.values(object(value)).flatMap(item=>Array.isArray(item)?item:[item]).filter(item=>typeof item==='string').map(item=>item.trim().toLowerCase()).filter(item=>item.length>=4);if(exactValues.some(text=>array(segments).some(segment=>String(segment||'').toLowerCase().includes(text))))return true;
   const completed=new Set(array(completedTypes).map(String)),mentioned=effectActionTypes(value);if(mentioned.size&&[...mentioned].some(type=>!completed.has(type)))return false;
+  const exactValues=Object.values(object(value)).flatMap(item=>Array.isArray(item)?item:[item]).filter(item=>typeof item==='string').map(item=>item.trim().toLowerCase()).filter(item=>item.length>=4);if(exactValues.some(text=>array(segments).some(segment=>String(segment||'').toLowerCase().includes(text))))return true;
   return prefixEffectMatches(value,segments);
 }
 function consequenceNpcScheduleMatches(row,segments=[]){

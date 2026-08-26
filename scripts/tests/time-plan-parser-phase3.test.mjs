@@ -22,6 +22,10 @@ assert.deepEqual(threeStep.structuredExecutionPlan.clauses.map(row=>row.complete
 
 const concurrent=classifySceneIntent('1시간 훈련하면서 1시간 대화한다',context);
 assert.equal(concurrent.structuredExecutionPlan,null,'a sequential parser interpretation cannot take boundary authority when the legacy concurrent total disagrees');
+const interveningAction=parseTimePlan('1시간 훈련하고 샤워한 뒤 8시간 잔다',context);
+assert.equal(interveningAction.clauses[1].unparsed_prefix_action,true,'an unsupported action between recognized anchors remains explicit parser uncertainty');
+assert.equal(interveningAction.clauses[1].committed,false,'a clause with an unparsed intervening action cannot become committed execution');
+assert.equal(deriveStructuredExecutionPlan(interveningAction).eligible,false,'an omitted intervening action cannot grant exact timeline authority');
 const explicitConcurrent=parseTimePlan('1시간 훈련하고 동시에 1시간 대화한다',context);
 assert.equal(explicitConcurrent.clauses[1].concurrent,true,'an explicit concurrency marker becomes a structured relation instead of a synthetic sequence');
 assert.equal(deriveStructuredExecutionPlan(explicitConcurrent).eligible,false,'concurrent clauses cannot enter sequential boundary execution');

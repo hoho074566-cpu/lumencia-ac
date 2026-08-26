@@ -406,6 +406,10 @@ const suffixSkillInsight={skill:'검술',amount:1,reason:'한 시간 수면 중 
 turn={scene_title:'훈련 뒤 선택',scene:[{kind:'narration',text:'한 시간 검술 훈련을 마쳤다.'},{kind:'dialogue',speaker_key:'artemis',text:'지금 경계 임무를 맡겠나?'}],choices:['맡는다.','잔다.','묻는다.'],state_delta:{advance_minutes:60,skill_experience:[suffixSkillInsight],items_add:['숙면 보상']}};
 applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
 assert.deepEqual(turn.state_delta.skill_experience,[],'an effect tied to the unfinished sleep clause cannot survive incidental prefix token overlap');
+const exactSuffixSkillInsight={skill:'고급 검술',amount:1,reason:'8시간 수면 중 고급 검술의 통찰을 얻었다'};
+turn={scene_title:'고급 훈련 뒤 선택',scene:[{kind:'narration',text:'한 시간 고급 검술 훈련을 마쳤다.'},{kind:'dialogue',speaker_key:'artemis',text:'지금 경계 임무를 맡겠나?'}],choices:['맡는다.','잔다.','묻는다.'],state_delta:{advance_minutes:60,skill_experience:[exactSuffixSkillInsight],items_add:['숙면 보상']}};
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
+assert.deepEqual(turn.state_delta.skill_experience,[],'a long exact skill name cannot bypass the unfinished-clause rejection in its reason');
 turn={scene_title:'대기 뒤 선택',scene:[{kind:'narration',text:'한 시간을 기다렸고 전령의 편지를 받았다.'},{kind:'dialogue',speaker_key:'artemis',text:'편지를 지금 열겠나?'}],choices:['연다.','나중에 연다.','발신인을 묻는다.'],state_delta:{advance_minutes:60,items_add:['전령의 편지','숙면 보상']}};
 applySceneMomentumTimeFloor({action:'1시간 기다리고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'정문'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
 assert.deepEqual(turn.state_delta.items_add,['전령의 편지'],'a declared-duration finite wait preserves its visibly earned prefix item');
