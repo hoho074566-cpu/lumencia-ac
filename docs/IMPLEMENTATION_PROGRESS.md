@@ -3,6 +3,12 @@
 ## Current Phase
 Narrative Engine continuation — Adaptive Time Scale V2 checkpoint closure and Time Plan Parser (TPP) structural transition.
 
+## Permanent P0/P1 Operation Rule
+- Current exact HEAD에 P0/P1이 남아 있는 동안 수정·focused test·full regression·push·Safety/Vercel·fresh exact-head review를 계속한다. 5-cycle은 기본 리듬이지 수정 횟수 상한이 아니며, 중간 보고·`MERGE_GATE: FAIL`·새 review·HEAD 변경은 stop condition이 아니다.
+- Prior-head review를 current HEAD 승인으로 재사용하지 않는다. P0/P1 loop는 current exact HEAD fresh P0/P1=0, Safety PASS, Vercel PASS, 필수 regression PASS 후에만 닫는다.
+- 게임에 실질적 손상을 주는 P2만 즉시 처리하고 나머지 P2/P3는 backlog으로 유지한다. 같은 root cause의 유사 P0/P1이 3개 이상이면 wording/regex 추가 대신 authoritative shared structure를 수정한다.
+- 중단은 실제 write/인증/외부 서비스/도구 불가나 중요한 사용자 선택이 필요한 경우만 허용한다. Protected PR은 모든 final exact-head gate 후에도 사람이 expected-head로 병합한다.
+
 ## Current GitHub State
 - Repo: `hoho074566-cpu/lumencia-ac`
 - Main: `1018d8c27c451dc122982fb14bf7d3e3902c70ca` (PR #53 merge).
@@ -14,6 +20,7 @@ Narrative Engine continuation — Adaptive Time Scale V2 checkpoint closure and 
 - Phase 2 code checkpoint `1ce3f140c1104a1c9fd2d5d393a4b93ea4937210` is published as protected stacked PR #56 against exact reviewed Phase 1 head `2ad5e283...`. It consumes only a confidence-gated subset of the structured plan: elapsed/future relative-date starts, committed terminal action recovery, and a single regional-travel prefix. Explicit duration/range/deadline and all uncertain inputs stay on the legacy path. Sentence ownership, partial-clock confidence, same-day/ambiguous-night fallback, and predicate negation prevent incomplete plans from taking authority.
 - TPP Phase 2 stable checkpoint is exact reviewed code/docs head `5980e39b38240a6b94266db6316a0dc2bed22e76` with code checkpoint `9b138b2b03898423f1b7de2e0880d6e1ad964c81`. Fresh exact-head Codex review reported no major issues/direct P0/P1=0; Vercel, mergeability, exact Phase 1 base/merge-base `2ad5e283...`, behind 0 / ahead 17, focused tests, syntax/static, `git diff --check`, and full repository regression pass. All seventeen Phase 2 P1s have permanent regressions. The malformed period-hour and destination-substring P2s remain non-blocking backlog. Main is still `1018d8c...`; stacked PR #56 has no main-only Safety signal and remains protected/human-merge-only. This progress-only commit requires one final exact-head Vercel/review confirmation before the separate Phase 3 branch starts. Schedule/consequence arbitration, mutation, narration, boundary reconciliation, API routing, one-call behavior, saves, canon, cache, and budgets remain unchanged.
 - TPP Phase 3 is active in protected stacked PR #57. The structured ordered execution plan now arbitrates schedule, consequence, and player-decision boundaries; it keeps only evidence-attributed completed prefix effects, removes unfinished suffix effects, and reconciles authoritative time, visible narration, and retained choices without a second model call or save/schema change.
+- Phase 3 exact code head `866e486da4e6d91d68c8f221c28beed72532af73` passes focused/full regression and Vercel, remains based/merge-based on reviewed Phase 2 exact `f0971430...` with behind 0 and no conflict, and has fresh direct Codex P0/P1=0. Exact Preview case 1 passed at the 09:00 required boundary with unfinished training/sleep effects removed. This progress-only checkpoint must receive its own Vercel/fresh exact-head review before the remaining Preview boundary corpus continues.
 - Fresh direct review of exact head `4a57bb1c68bf25b80f5592eeabe05ce4ecd28d48` found six P1s: whole-turn title/summary evidence crossing an earlier choice, post-choice prefix evidence, positive upper-bounded prefix loss, action-completion modifiers, selection of the first ordinary dialogue instead of the actual prompt, and additive timing adverbs misread as `도`-marked NPC subjects.
 - Code checkpoint `375b980d3edcbbbdd7a63f05a22f5fe7a36036ba` closes the six findings structurally. Choice evidence is an ordered scene prefix with title/summary and post-prompt content excluded; the last visible question (or last dialogue fallback) identifies the prompt; all reconciliation at a meaningful stop uses the same prefix evidence. Positive upper-bounded clauses remain eligible while exact zero-duration clauses do not; bounded completion modifiers remain action-bound; additive adverbs no longer become actors; and lower-bound duration qualifiers align with the legacy range.
 - Permanent regressions cover the six exact findings plus `적어도/정도/이번에도` versus `에밀리도`. Focused Phase 1/2/3 and Scene Momentum time-floor suites pass, `git diff --check` passes, and full `node scripts/lumensia-pr-check.mjs` passes. Fresh exact-head Vercel/review is the remaining current blocker; P0/P1 closure continues immediately if either finds a new blocker.
@@ -502,10 +509,11 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 
 ## NEXT ACTION
 1. Keep PR #54 runtime frozen at `24407193...`; its direct parsing P1=4 remains `MERGE_GATE: FAIL`. Do not add wording-specific patches there.
-2. Publish the PR #57 Phase 3 docs checkpoint following code `ff4e930...`; require exact-current-HEAD Vercel, current-stack mergeability, and fresh direct P0/P1=0. Any new P0/P1 starts immediate correction; cycle counts and reports are not stop conditions.
+2. Commit/push the permanent-operation-rule docs checkpoint on top of Phase 3 code head `866e486...`; require the resulting exact HEAD's Vercel and fresh direct P0/P1=0. Any new P0/P1 starts immediate structural correction; cycle counts and reports are not stop conditions.
 3. Reconfirm PR #57 base and merge-base remain exact reviewed Phase 2 head `f0971430...`, behind 0, conflict-free/mergeable. Main remains `1018d8c...`; do not misreport the absent main-target-only Safety workflow as PASS.
-4. After direct P0/P1=0, run the Phase 3 Exact Preview boundary corpus without inspecting or bypassing Preview protection. Do not merge protected-path PR #57; it is human-merge-only.
-5. Keep non-blocking P2s in backlog. Phase 4 legacy cleanup waits for full permanent regression and Exact Preview evidence.
+4. After direct P0/P1=0, resume the Phase 3 Exact Preview corpus from completed dialogue prefix plus interrupted sleep, then decision sovereignty, turn-limit/resumability, and META/AUTO/CONTINUE freeze. Never inspect or bypass Preview protection.
+5. Any Preview P0/P1 returns immediately to structural clause/action/effect-ownership correction and a new exact-head test/review cycle. Do not add wording-specific regexes.
+6. Do not merge protected PR #57. Keep non-blocking P2/P3 in backlog. Phase 4 legacy cleanup waits for full permanent regression and Exact Preview evidence.
 
 ## Stop Record
 - Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.

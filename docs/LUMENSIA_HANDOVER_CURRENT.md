@@ -1,12 +1,29 @@
 # LUMENSIA — CURRENT INTEGRATED DEVELOPMENT HANDOVER
 
-작성 기준: 2026-08-26
+작성 기준: 2026-08-27
 프로젝트: 긴빠이 프로젝트 / Lumensia Academy  
 Repository: `hoho074566-cpu/lumencia-ac`
 
 > 이 문서는 새 프로젝트 시작 문서가 아니다. HANDOVER 1(2026-08-19) → HANDOVER 2(2026-08-22) → HANDOVER 3(2026-08-23) → V1.5.5 NPC Motivation / Relationship Reason → V1.5.6 NPC Goal V2 → Scene Momentum Recovery HF1의 연속선이다.
 >
 > 완료된 HF1 진단을 처음부터 재분석하지 않는다. SHA / PR / checks처럼 변하는 값은 GitHub live 상태가 우선하며, 다음 세션은 이 문서의 **CURRENT BLOCKER / NEXT ACTION**부터 이어간다.
+
+---
+
+# GLOBAL P0/P1 CONTINUOUS FIX & REVIEW RULE — 상시 적용
+
+이 규칙은 Lumensia의 모든 구현·리뷰·수정 Phase에 계속 적용한다.
+
+1. 현재 exact HEAD의 P0/P1이 하나라도 남으면 `원인 분석 → 최소 범위 수정 → focused test → full regression → commit/push → Safety/Vercel → fresh exact-current-HEAD review`를 반복한다. 중간 보고, `MERGE_GATE: FAIL`, HEAD 변경, fresh review 필요, 예상보다 긴 작업은 중단 조건이 아니다.
+2. Phase별 5-cycle은 연속 실행 기본 리듬이지 P0/P1 수정 횟수 상한이 아니다. 5회에 도달해도 P0/P1이 남으면 반복을 계속한다.
+3. P0/P1 loop는 current exact HEAD의 fresh Codex review P0=0/P1=0, Safety PASS, Vercel PASS, 필요 deterministic/focused/full regression PASS가 모두 확인된 뒤에만 종료한다. Prior-head review는 current HEAD 승인으로 재사용하지 않는다.
+4. P2는 기본적으로 Phase blocker가 아니다. 단, 크래시·데이터/저장 손상·잘못된 world mutation·시간 역행/일정 무시·player sovereignty/canon 침해·관계/성장/스킬/보상의 잘못된 영구 반영·event progression corruption·주요 게임 진행 차단·보안/권한/merge safety·정상 주요 기능 regression은 현재 Phase에서 즉시 처리한다. 그 외 P2는 Known Issues/P0.5/backlog에 기록한다.
+5. P3는 사소한 정리·문구·미세 UX·스타일·비핵심 edge case로 보고 현재 Phase에서 기본적으로 수정하지 않는다.
+6. 같은 root cause의 유사 P0/P1이 3개 이상 파생하면 개별 wording/regex 예외를 계속 더하지 않고 authoritative single-source classification/state와 공유 canonical result를 우선한다. Canon, player agency, one canonical call, stable routing, safety architecture는 유지한다.
+7. 작업 중단은 실제 write 권한 부재, 필수 외부 서비스 장애, 사용자만 할 수 있는 인증/권한, 중요한 플레이어/제품 선택, 또는 도구/세션 한계로 실제 진행이 불가능한 경우만 허용한다.
+8. Protected/core/runtime PR은 P0/P1 loop 종료 후에도 exact HEAD/current main, Safety, Vercel, fresh direct P0/P1=0, unresolved current threads, conflict, `main...exact HEAD`, base/merge-base/current-main 일치, behind 0을 재검증한 후 사람이 expected-head로만 병합한다. Sticky READY는 direct current-head P0/P1 보다 우선하지 않는다.
+9. 큰 fix cycle마다 `docs/IMPLEMENTATION_PROGRESS.md`에 current HEAD, P0/P1, 수정, 테스트, fresh review, blocker, NEXT ACTION을 기록한다. P0/P1이 남으면 NEXT ACTION은 반드시 그 수정부터 시작한다.
+10. Stacked PR에서 main-target-only Safety가 없는 것은 PASS로 합성하지 않는다. 이는 수정·리뷰·Preview 검증을 중단할 이유는 아니지만 final merge gate는 만족시키지 못한다.
 
 ---
 
@@ -26,6 +43,7 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Focused Scene Momentum/Exit/Purpose/Hook/Orchestration/Router/Event Director/NPC/growth suites pass. The full repository regression passes on exact runtime code checkpoint `24407193...`.
 - Because `api/**` changes, the eventual Adaptive Time Scale V2 PR is protected-path and remains human-merge only.
 - TPP Phase 3 is implemented on PR #57. It uses the structured ordered timeline for schedule/consequence/decision shortening, preserves only visibly completed prefix effects, removes unfinished suffix effects, and reconciles time/narration/choices. One canonical core/model call, stable routing, `store:false`, prompt cache/retention, Context Router budgets, canon, player sovereignty, and freeze behavior remain unchanged.
+- Phase 3 exact code head `866e486da4e6d91d68c8f221c28beed72532af73` passed the full repository regression, Vercel, exact Phase 2 base/merge-base `f0971430...`, behind 0, conflict-free mergeability, and fresh direct Codex P0/P1=0. The first Exact Preview boundary case also passed: `1시간 훈련하고 8시간 잔다` stopped at the 09:00 required schedule after 20 minutes without applying unfinished training/sleep effects. Remaining Preview cases still require execution on the new docs exact HEAD before Phase 4 may start.
 - Fresh direct review of exact head `4a57bb1...` found six P1 boundary-evidence cases. Code checkpoint `375b980d3edcbbbdd7a63f05a22f5fe7a36036ba` closes all six with a single ordered pre-choice evidence view, positive-range versus exact-zero discrimination, action-bound completion modifiers, actual-prompt selection, and additive-adverb actor filtering. Permanent focused regressions and full `scripts/lumensia-pr-check.mjs` pass. The new docs exact HEAD still requires Vercel and fresh direct review; any P0/P1 continues the correction loop immediately.
 - Fresh review of docs exact head `57884cf...` found six further P1s. Code checkpoint `f58405a915c2645c95de665673454074eacaf3ce` now fail-closes repeated action kinds without disabling the boundary, distinguishes later-action context mentions from real transitions, binds choices to their actual prompt, preserves grounded terminal-maximum time, retains only evidence-attributed completed-prefix lifecycle effects, and preserves a verified short travel destination. All six have permanent regressions; focused/full local checks pass. Push the docs checkpoint and require another exact-head Vercel/direct review cycle.
 - Fresh direct review `PRR_kwDOT8LCAs8AAAABK9bXDQ` of exact docs head `681f34268cfa396593421e78d4fdbcb816128f73` found three P1s: no-choice boundary evidence was not ordered before the boundary, aggregate fatigue/gold could be misassigned to a completed prefix, and a coincident schedule/consequence could override a real choice reconciliation. Code checkpoint `270eeef9ed0c249713490343674aec5e9b73b117` now clips schedule/consequence evidence before the visible boundary (or requires upper-bound completion when ordering is unavailable), fails closed for aggregate scalar ownership in shortened compounds, and gives the player choice visible priority while preserving authoritative started-schedule state. The exact choice prompt is retained instead of later rhetorical narration. Permanent focused regressions and the full repository check pass; publish the docs checkpoint and continue exact-head hosted/direct review.
@@ -854,10 +872,12 @@ The correction tags every parsed model effect row with its non-serializing raw s
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
 2. Confirm main remains PR #53 merge `1018d8c27c451dc122982fb14bf7d3e3902c70ca`; merge and reviewed-head trees must remain equal. Do **not** redo completed HF1/HF2/HF3 through Event Director V3.
 3. Preserve PR #54 runtime checkpoint `24407193b59d0f9e9cf2f9d8f1a4589b4b92c95c` and direct parsing P1=4. Do not add another wording-specific patch and do not merge PR #54.
-4. Commit/push the structural core-sanitization/decision fallback correction following review `5032985516`, then require exact-current-HEAD Vercel and another fresh direct P0/P1=0 review. Any new P0/P1 starts the next correction immediately; cycle counts and reports are not stop conditions. Repeated narration/wording/effect-attribution findings must be fixed through clause/effect ownership, not new wording regexes.
+4. Commit/push this progress-only rule checkpoint on top of code head `866e486...`, then require the new exact HEAD's Vercel and fresh direct P0/P1=0 review. Any P0/P1 starts immediate structural correction; cycle counts and reports are not stop conditions.
 5. Reconfirm the stacked base/merge-base is reviewed Phase 2 exact `f0971430...`, behind 0, conflict-free/mergeable. Main remains `1018d8c...`; the main-only Safety workflow is absent on a stacked PR and cannot be treated as a synthetic pass.
-6. After direct P0/P1=0, run the Phase 3 Exact Preview boundary corpus without reading protection tokens/cookies/storage or bypassing protection. PR #57 changes `api/**`, so it remains human-merge-only and must not be merged by Codex.
-7. Phase 4 remains blocked until permanent regression and Phase 3 Exact Preview evidence pass. When it starts, it is **legacy-cleanup only**: prove one TPP-authoritatively replaced fallback with permanent regression, remove it, rerun focused/full regression, then move to the next removal. Add no feature, natural-language coverage, regex coverage, or new reconciliation policy. A removal regression must first be classified as evidence that legacy is still required or Phase 3 is incomplete; do not patch Phase 3 design flaws inside Phase 4.
+6. On the new reviewed docs exact HEAD, continue the Phase 3 Exact Preview corpus from case 2: completed 10-minute dialogue prefix plus interrupted sleep at the 09:00 required schedule. Then verify a real player-decision boundary, turn-limit/resumability, and META/AUTO/CONTINUE freeze without reading protection tokens/cookies/storage or bypassing protection.
+7. If Preview exposes a P0/P1, fix it structurally through clause/action/effect ownership, rerun focused/full tests, publish the new exact HEAD, and request a fresh review. Do not add narration/wording regex patches.
+8. After all Phase 3 Preview evidence passes, update both progress documents. PR #57 changes `api/**`, so it remains protected and human-merge-only; Codex must not merge it.
+9. Phase 4 remains blocked until permanent regression and Phase 3 Exact Preview evidence pass. When it starts, it is **legacy-cleanup only**: prove one TPP-authoritatively replaced fallback with permanent regression, remove it, rerun focused/full regression, then move to the next removal. Add no feature, natural-language coverage, regex coverage, or new reconciliation policy. A removal regression must first be classified as evidence that legacy is still required or Phase 3 is incomplete; do not patch Phase 3 design flaws inside Phase 4.
 
 ---
 
