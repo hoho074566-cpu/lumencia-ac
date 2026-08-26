@@ -154,9 +154,12 @@ for(const [action,prose,elapsed] of [
   applySceneMomentumTimeFloor({action,saveState:{pc:{name:'카인'},world:{date:'1285-03-01',time:'09:00'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
   assert.equal(turn.state_delta.advance_minutes,elapsed,`third-party completion must not complete the player's timed action: ${prose}`);
 }
-turn={scene:[{kind:'narration',text:'카인은 훈련을 마쳤다.'}],state_delta:{advance_minutes:10},choices:['다음 훈련을 고른다']};
-applySceneMomentumTimeFloor({action:'1시간 동안 훈련한다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-01',time:'09:00'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+turn={scene_title:'훈련 완료',scene:[{kind:'narration',text:'카인은 훈련을 마치고 보상을 챙겼다.'}],state_delta:{advance_minutes:10,items_add:['미검증 훈련 보상']},choices:['다음 훈련을 고른다']};
+const missingSingleCompletion=applySceneMomentumTimeFloor({action:'1시간 동안 훈련한다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-01',time:'09:00'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'an eligible single-action plan cannot use player-subject narration as completion authority without a structural receipt');
+assert.deepEqual(turn.state_delta.items_add,[],'a missing single-action receipt removes unowned completion rewards at the returned choice minute');
+assert.equal(missingSingleCompletion.returnedSceneReconciled,true,'a missing single-action receipt enters deterministic decision reconciliation');
+assert.doesNotMatch(JSON.stringify(turn.scene),/보상을 챙겼다/,'unverified post-completion narration is removed with its effects');
 turn={scene:[{kind:'narration',text:'카인은 훈련을 마쳤다.'}],state_delta:{advance_minutes:60,items_add:['훈련 완료 증표']},choices:['다음 훈련을 고른다']};
 turn.time_execution=choiceExecution(turn,{minutes:60,completed:['action_1'],interrupted:null,owners:[effectOwner('items_add',0,'action_1')]});
 const ownedSingleCompletion=applySceneMomentumTimeFloor({action:'1시간 동안 훈련한다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-01',time:'09:00'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
@@ -951,12 +954,12 @@ assert.equal(turn.state_delta.advance_minutes,20,'object-specific meal completio
 assert.equal(turn.state_delta.pc_status,null,'meal completion state beyond the required schedule must fail closed');
 assert.deepEqual(turn.state_delta.items_remove,[],'food consumption beyond the required schedule must fail closed');
 
-turn={scene:[{kind:'narration',text:'10분 뒤 창고에서 불길이 치솟았다.'}],event_progress:{event_instance_id:'director:warehouse-fire',active_beat:'ignite',completed_beats:[]},state_delta:{advance_minutes:10,active_events_add:['warehouse-fire']},choices:['불을 끈다','사람을 부른다','대피한다']};
+turn={scene:[{kind:'narration',text:'10분 뒤 창고에서 불길이 치솟았다.'}],director:directorMetadata,event_progress:{event_instance_id:directorEventId,active_beat:'ignite',completed_beats:[]},state_delta:{advance_minutes:10,active_events_add:[directorEventId]},choices:['불을 끈다','사람을 부른다','대피한다']};
 const interruptedBeforeConsequence={selected_id:consequenceHook.id,status:'open',attribution_safe:true};
-applySceneMomentumTimeFloor({action:'40분 기다린다.',saveState:consequenceSave},turn,'game',interruptedBeforeConsequence);
+applySceneMomentumTimeFloor({action:'40분 기다린다.',saveState:consequenceSave},turn,'game',interruptedBeforeConsequence,[],{director_occurrence_id:directorEventId});
 assert.equal(turn.state_delta.advance_minutes,10,'a real earlier interruption must not be advanced to a later queued consequence');
-assert.equal(turn.event_progress.event_instance_id,'director:warehouse-fire','the earlier structured interruption must survive consequence arbitration');
-assert.deepEqual(turn.state_delta.active_events_add,['warehouse-fire'],'state attributable to the earlier interruption must not be cleared');
+assert.equal(turn.event_progress.event_instance_id,directorEventId,'the earlier structured interruption must survive consequence arbitration');
+assert.deepEqual(turn.state_delta.active_events_add,[directorEventId],'state attributable to the earlier interruption must not be cleared');
 
 const earlierSchedule={id:'early-class',title:'기사과 필수 수업',date:'1285-03-01',time:'09:10',kind:'academic',status:'scheduled'},scheduleBeforeResolvedConsequenceSave={...rangedConsequenceSave,pc:knightPc,scheduleContext:{due:[],upcoming:[earlierSchedule]},scheduledEvents:[earlierSchedule]};
 turn={scene:[{kind:'narration',text:'훈련 중 에밀리가 도착했다.'}],state_delta:{advance_minutes:90,hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
@@ -1251,6 +1254,7 @@ assert.equal(turn.state_delta.advance_minutes,10,'a third-party arrival at the d
 turn={scene:[{kind:'narration',text:'왕도에 도착했다.'}],state_delta:{advance_minutes:10,new_location:'왕도'},choices:['성문으로 간다','주변을 본다','쉰다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'1시간 동안 왕도로 간다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-02',time:'07:20',location:'남부 도로'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'a returned location claim cannot replace the single-action execution receipt');
+assert.equal(turn.state_delta.new_location,null,'an unowned arrival effect fails closed with the missing single-action receipt');
 turn={scene:[{kind:'narration',text:'회의를 마쳤고 다음 의제를 고르라고 했다.'}],state_delta:{advance_minutes:10},choices:['조사를 계속한다','휴식한다','자리를 뜬다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'1시간 동안 회의를 한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'dialogue-activity completion wording cannot replace structural completion authority');
