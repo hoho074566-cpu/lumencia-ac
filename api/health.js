@@ -29,6 +29,7 @@ export default async function handler(req, res) {
     awakeningTalentEvolution: 'V1 rare-evidence Trait/Authority candidates + milestone gates + one-step mythical talent evolution',
     sceneMomentum: 'HF1 semantic action compression + deterministic State Delta/stall + NPC initiative + meaningful-stop policy',
     adaptiveTimeScale: 'V2 action-sensitive dialogue/meal/training/class/sleep/travel time guides + schedule-boundary priority',
+    timePlanParser: 'Phase 1 shadow structured clause/time plan + legacy execution authority',
     sceneOrchestration: 'V1 one primary driver + at most one causally connected secondary response + effect-only system guard',
     sceneNovelty: 'V1 bounded visible-term repetition tracking + change-first suppression',
     tokenBudget: { routine: 17000, routineSoftMax: 20000, scheduled: 18000, important: 20000, critical: 24000 },

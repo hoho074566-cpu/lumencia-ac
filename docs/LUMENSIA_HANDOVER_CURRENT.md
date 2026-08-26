@@ -13,7 +13,7 @@ Repository: `hoho074566-cpu/lumencia-ac`
 # 0. SESSION STOP CHECKPOINT — 가장 먼저 읽을 것
 
 ## Live state immediately before this handover update
-- Branch: `codex/adaptive-time-scale-v2`.
+- Branch: `codex/time-plan-parser-phase1`, stacked on PR #54 docs checkpoint `761d257dec265215e865c119075ea13f7024bf02`.
 - Base/current main: `1018d8c27c451dc122982fb14bf7d3e3902c70ca` (PR #53 merge).
 - PR #53 is **merged** from exact reviewed/accepted head `eae16c036c51767f2059b86cd5f0ef077764a3c8`. Merge and reviewed trees both equal `e2a4b99a89640a553dfbf0fa7f1748a201c039f3`.
 - PR #53 post-merge verification passes: main Vercel is successful, production `/api/health` is 200/configured on app `1.5.6` / adapter `0.8.5`, and merged-main clean-LF full regression passes.
@@ -79,7 +79,7 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Production `/api/health`: healthy; app `1.5.6`, canonical `/api/chat`, adapter `/api/chat-router`, `24h` prompt-cache retention.
 - Full post-merge `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
-## Current active work — Adaptive Time Scale V2
+## Current active work — Time Plan Parser Phase 1
 - PR #54 is open on `codex/adaptive-time-scale-v2`, based directly on verified PR #53 merge `1018d8c...`. Runtime code head `24407193b59d0f9e9cf2f9d8f1a4589b4b92c95c` passes full local regression, Safety run `32947576791`, Vercel, behind 0, and conflict-free mergeability, but fresh exact-head review `5028340142` has four direct parsing P1s.
 - The change extends the proven deterministic Scene Momentum layer instead of adding another model pass or rewriting canonical cores.
 - Action profiles cover dialogue, meal, training, class attendance, long sleep, and location-aware travel. Explicit durations, earlier required schedules, and due consequences remain authoritative boundaries.
@@ -87,6 +87,9 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Exact Preview acceptance covers the ordinary profile/freeze matrix, the corrected noon schedule interruption, future scheduled travel, explicit clock intervals, sleep, and the final `0분` event-progress freeze. The final turn held `16:00`, produced no growth, and explicitly left the existing orientation unfinished.
 - Dedicated and affected tests plus the full repository regression pass after substantive second review. The closure preserves real Director interruption, direct-question/negation guards, selected consequence resolution and runtime participants, prevalidated bounded growth, authority-tail reservation, canonical one-turn maximum, stable routing budgets, and one canonical model call.
 - PR #54 wording patching is frozen. The next implementation is a separate stacked TPP Phase 1 branch with structured clause output and shadow comparison; existing execution remains authoritative until later phases. Because direct P1 is nonzero and `api/**` is protected, PR #54 must not be merged.
+- `codex/time-plan-parser-phase1` now contains the local Phase 1 implementation. `lib/time-plan-parser.js` creates ordered structured clauses with actor, action type, start/date/clock, duration/range, destination, deadline, sequence, commitment/completion, hypothetical, quoted, and third-party fields.
+- The four transferred #54 P1 reproductions plus actor separation, quoted-action, and hypothetical-action guards are a data-driven permanent corpus. Existing Adaptive Time Scale and repository regressions remain unchanged and green.
+- The parser is shadow-only. `applySceneMomentumTimeFloor`, schedule/consequence arbitration, world mutation, narration, and stop points do not consume it. Compact pipeline telemetry omits raw input/actor names; bounded input and a fail-safe keep parser diagnostics from blocking a turn.
 
 ## Completed active predecessor — Awakening / Talent Evolution V1
 - Final reviewed head `1eb316b498d892c1d5fbb816a8a5464831d2f112` merged in PR #50 as `88ce7b4c17ceb6ab1234c5cedc8bc86c5c3e1dbe`; reviewed and merged trees are identical.
@@ -758,14 +761,14 @@ Gameplay roadmap discussed:
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
 2. Confirm main remains PR #53 merge `1018d8c27c451dc122982fb14bf7d3e3902c70ca`; merge and reviewed-head trees must remain equal. Do **not** redo completed HF1/HF2/HF3 through Event Director V3.
-3. Preserve PR #54 runtime checkpoint `24407193b59d0f9e9cf2f9d8f1a4589b4b92c95c`. Fresh review `5028340142` has four direct parsing P1s; do not add another wording-specific regex/condition patch and do not merge PR #54.
-4. Create a separate stacked TPP Phase 1 branch/PR. Preserve all existing PR #54 regression tests and add corpus rows for: past relative-date committed start; day-relative date plus clock; committed `훈련하자`; and destination-aware compound travel prefix.
-5. Add a structured clause/time-plan parser beside the legacy classifier. Each clause records actor, action type, absolute/relative start, duration/range, destination, deadline, sequence relation, and committed/hypothetical/quoted/third-party flags. Phase 1 must be shadow/diagnostic only and must not change schedule, consequence, state mutation, narration, or stop behavior.
-6. Preserve one canonical model call, stable `/api/chat-router -> api/chat.js`, `store:false`, prompt cache/retention, Context Router budgets, canon, player sovereignty, META/AUTO/CONTINUE freeze, and the 1440-minute turn cap. Add no schema/save root/migration/endpoint/serverless function.
-7. Run the TPP corpus, affected Adaptive Time Scale suites, syntax/static checks, full `scripts/lumensia-pr-check.mjs`, and a substantive second review. Only after Phase 1 is stable may Phase 2 migrate calculations from legacy regexes to the structured plan.
+3. Preserve PR #54 runtime checkpoint `24407193b59d0f9e9cf2f9d8f1a4589b4b92c95c` and direct parsing P1=4. Do not add another wording-specific patch and do not merge PR #54.
+4. On `codex/time-plan-parser-phase1`, finish final diff/architecture review, run the data-driven TPP corpus, affected suites, syntax/static checks, and full `scripts/lumensia-pr-check.mjs`, then commit/push.
+5. Open the Phase 1 PR stacked on base `codex/adaptive-time-scale-v2`. Require exact-head Safety, Vercel, mergeability/current-base, and fresh P0/P1=0. It changes `api/**`, so merge is human-only.
+6. Confirm the Phase 1 parser remains shadow/diagnostic only: no consumer may use it for schedule, consequence, state mutation, narration, stop points, growth, or persistence. Preserve one canonical model call, stable routing, `store:false`, prompt cache/retention, Context Router budgets, canon, player sovereignty, freeze paths, and the 1440-minute cap.
+7. Do not start Phase 2 calculation migration until Phase 1 is reviewed. Phase 2, Phase 3 boundary reconciliation, and Phase 4 legacy cleanup remain separate focused changes.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #53은 reviewed head `eae16c0...`에서 main `1018d8c...`로 merge됐고 양쪽 tree는 `e2a4b99...`로 정확히 같다. 완료된 HF1/HF2/HF3부터 Event Director V3까지 다시 분석하지 않는다. PR #54 runtime checkpoint `24407193...`은 full regression, Safety run `32947576791`, Vercel, current-base/behind-zero/conflict-free를 통과했지만 fresh review `5028340142`에 parsing P1 4건이 남아 있어 병합 불가다. past relative date, day+clock, `훈련하자`, compound regional-travel prefix를 더 이상 #54 regex patch로 고치지 말고 TPP corpus로 보존한다. 다음은 별도 stacked `codex/time-plan-parser-phase1`에서 structured clause/time plan을 legacy classifier 옆 shadow 경로로 도입하는 것이다. 실행 계산은 Phase 1에서 바꾸지 않는다. one canonical model call, stable routing, `store:false`, prompt cache/retention, Context Router budgets, canon, player sovereignty, META/AUTO/CONTINUE, 1440분 cap을 보존한다. 보호된 Preview token/cookie/local storage를 읽거나 우회하지 않는다. `api/**` 보호 경로 및 PR #54 병합은 사람만 수행하며 현재 gate는 FAIL이다.`
+> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. PR #53은 reviewed head `eae16c0...`에서 main `1018d8c...`로 merge됐고 양쪽 tree는 `e2a4b99...`로 정확히 같다. 완료된 HF1/HF2/HF3부터 Event Director V3까지 다시 분석하지 않는다. PR #54 runtime checkpoint `24407193...`은 full regression/Safety/Vercel/current-base를 통과했지만 fresh review `5028340142`의 parsing P1 4건 때문에 병합 불가이며 더 이상 wording patch를 추가하지 않는다. 현재 branch는 stacked `codex/time-plan-parser-phase1`, parent는 #54 docs checkpoint `761d257...`이다. structured clause/time plan, 데이터 기반 corpus, compact shadow telemetry가 구현됐고 focused/full regression이 통과했다. legacy time execution은 그대로 authoritative이며 parser failure도 턴을 막지 않는다. 다음은 final diff review → commit/push → base `codex/adaptive-time-scale-v2`인 stacked PR → exact-head Safety/Vercel/fresh review다. one canonical model call, stable routing, `store:false`, prompt cache/retention, budgets, canon, player sovereignty, freeze, 1440 cap을 보존한다. `api/**` 보호 경로는 사람만 병합한다.`
