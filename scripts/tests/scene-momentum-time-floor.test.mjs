@@ -327,6 +327,32 @@ turn={scene_title:'가변 훈련 뒤 제안',scene:[{kind:'narration',text:'한 
 applySceneMomentumTimeFloor({action:'최대 1시간 훈련하고 8시간 잔다',saveState:compoundBoundarySave},turn,'game');
 assert.deepEqual(turn.state_delta.skill_experience,[multiPrefixGrowth],'a positive upper-bounded prefix with an action-bound modifier preserves visibly earned effects');
 assert.deepEqual(turn.state_delta.items_add,[],'an upper-bounded completed prefix cannot preserve the unfinished terminal reward');
+turn={scene_title:'반복 훈련 중 제안',scene:[{kind:'narration',text:'첫 한 시간 훈련을 마쳤다.'},{kind:'dialogue',speaker_key:'artemis',text:'두 번째 훈련 대신 경계 임무를 맡겠나?'}],choices:['경계 임무를 맡는다.','두 번째 훈련을 한다.','상황을 묻는다.'],state_delta:{advance_minutes:60,skill_experience:[multiPrefixGrowth],items_add:['두 번째 훈련 보상','숙면 보상']}};
+const repeatedKindDecision=applySceneMomentumTimeFloor({action:'1시간 훈련하고 1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
+assert.equal(repeatedKindDecision.reconciliationReason,'decision-boundary','repeated action kinds still receive fail-closed structured choice reconciliation');
+assert.deepEqual(turn.state_delta.items_add,[],'effects cannot survive from ambiguous repeated clauses or their terminal suffix');
+turn={scene_title:'훈련 뒤 제안',scene:[{kind:'narration',text:'훈련 도중 수면 부족을 느꼈지만, 한 시간 검술 훈련을 마쳤고 자세를 교정했다.'},{kind:'dialogue',speaker_key:'artemis',text:'이제 경계 임무를 맡겠나?'}],choices:['경계 임무를 맡는다.','예정대로 잔다.','상황을 묻는다.'],state_delta:{advance_minutes:60,skill_experience:[multiPrefixGrowth],pc_knowledge_add:['검술 자세 교정법'],items_add:['숙면 보상']}};
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
+assert.deepEqual(turn.state_delta.skill_experience,[multiPrefixGrowth],'a later action mentioned as context cannot truncate the actual prefix completion phrase');
+assert.deepEqual(turn.state_delta.items_add,[],'a contextual later-action mention still cannot preserve terminal effects');
+turn={scene_title:'질문 뒤 과잉 수면',scene:[{kind:'narration',text:'한 시간 검술 훈련을 마쳤다.'},{kind:'dialogue',speaker_key:'artemis',text:'지금 경계 임무를 맡겠나?'},{kind:'narration',text:'대답을 기다리지 않고 여덟 시간 수면을 마쳤다.'},{kind:'dialogue',speaker_key:'artemis',text:'대체 무엇을 망설이는가?'}],choices:['경계 임무를 맡는다.','예정대로 잔다.','조건을 먼저 묻는다.'],state_delta:{advance_minutes:540,skill_experience:[multiPrefixGrowth],items_add:['숙면 보상']}};
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
+assert.deepEqual(turn.state_delta.skill_experience,[multiPrefixGrowth],'choice text binds evidence to its actual prompt instead of a later rhetorical question');
+assert.deepEqual(turn.state_delta.items_add,[],'terminal completion after the choice prompt is removed even when a later rhetorical question exists');
+turn={scene_title:'수면 끝의 선택',scene:[{kind:'narration',text:'한 시간 검술 훈련을 마쳤다.'},{kind:'dialogue',speaker_key:'artemis',text:'눈을 뜬 지금 바로 경계 임무를 맡겠나?'}],choices:['경계 임무를 맡는다.','조금 더 잔다.','상황을 묻는다.'],state_delta:{advance_minutes:540,skill_experience:[multiPrefixGrowth],items_add:['숙면 보상']}};
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,540,'a choice exactly at the terminal maximum preserves the reported decision time');
+assert.deepEqual(turn.state_delta.items_add,[],'terminal effects without completion evidence remain removed at the maximum');
+const prefixMeeting={npc_key:'emily',date:'1285-03-02',time:'12:00',location:'중앙광장',activity:'면담',reason:'대화에서 내일 정오 면담을 약속했다'},prefixHook={id:'tomorrow-meeting',title:'내일 정오 면담',reason:'에밀리와 중앙광장에서 만나기로 약속했다'},prefixConsequence={event_name:'내일 정오 면담',reason:'에밀리와 중앙광장에서 만나기로 약속했다'};
+turn={scene_title:'대화 뒤 수면 중 선택',scene:[{kind:'narration',text:'한 시간 대화를 마쳤고 에밀리와 내일 정오 중앙광장에서 면담하기로 약속했다.'},{kind:'dialogue',speaker_key:'artemis',text:'잠든 지 얼마 안 됐지만 지금 경계 임무를 맡겠나?'}],choices:['경계 임무를 맡는다.','계속 잔다.','상황을 묻는다.'],state_delta:{advance_minutes:90,npc_schedule_updates:[prefixMeeting],hooks_add:[prefixHook,{id:'dream-hook',title:'수면 중 꿈의 계시',reason:'잠든 뒤 꿈을 꾸었다'}],delayed_consequences_add:[prefixConsequence,{event_name:'꿈의 계시',reason:'수면을 마친 뒤 나타난다'}],items_add:['숙면 보상']}};
+applySceneMomentumTimeFloor({action:'1시간 대화하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'상담실'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
+assert.deepEqual(turn.state_delta.npc_schedule_updates,[prefixMeeting],'a visibly arranged future NPC schedule survives from the completed dialogue prefix');
+assert.deepEqual(turn.state_delta.hooks_add,[prefixHook],'only the evidence-attributed prefix hook survives');
+assert.deepEqual(turn.state_delta.delayed_consequences_add,[prefixConsequence],'only the evidence-attributed prefix consequence survives');
+turn={scene_title:'왕도 도착 뒤 선택',scene:[{kind:'narration',text:'왕도에 도착해 성문 안으로 들어왔다.'},{kind:'dialogue',speaker_key:'artemis',text:'잠들기 전에 지금 경계 임무를 맡겠나?'}],choices:['경계 임무를 맡는다.','여관에서 잔다.','상황을 묻는다.'],state_delta:{advance_minutes:60,new_location:'왕도',items_add:['숙면 보상']}};
+applySceneMomentumTimeFloor({action:'왕도로 이동하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'남부 도로'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
+assert.equal(turn.state_delta.new_location,'왕도','a verified short structured travel destination survives suffix reconciliation');
+assert.deepEqual(turn.state_delta.items_add,[],'short-destination preservation does not retain sleep rewards');
 turn={
   scene_title:'훈련 완료와 수업 종료',scene:[{kind:'narration',text:'네 시간의 검술 훈련을 마쳤다.'},{kind:'narration',text:'10시가 되자 기사과 기초 수업까지 수료하고 보상을 받았다.'}],choices:[],
   state_delta:{advance_minutes:240,skill_experience:[trainingGrowth,prematureClassGrowth],items_add:['훈련 기록표','수료 보상']},
