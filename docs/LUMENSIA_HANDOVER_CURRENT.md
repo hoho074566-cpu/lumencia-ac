@@ -13,7 +13,7 @@ Repository: `hoho074566-cpu/lumencia-ac`
 # 0. SESSION STOP CHECKPOINT — 가장 먼저 읽을 것
 
 ## Live state immediately before this handover update
-- Branch: `codex/time-plan-parser-phase1`, stacked on PR #54 docs checkpoint `761d257dec265215e865c119075ea13f7024bf02`.
+- Branch: `codex/time-plan-parser-phase3`, protected stacked PR #57, based on reviewed Phase 2 exact head `f0971430af351c4a007e18daa0bd18454e6aab4f`.
 - Base/current main: `1018d8c27c451dc122982fb14bf7d3e3902c70ca` (PR #53 merge).
 - PR #53 is **merged** from exact reviewed/accepted head `eae16c036c51767f2059b86cd5f0ef077764a3c8`. Merge and reviewed trees both equal `e2a4b99a89640a553dfbf0fa7f1748a201c039f3`.
 - PR #53 post-merge verification passes: main Vercel is successful, production `/api/health` is 200/configured on app `1.5.6` / adapter `0.8.5`, and merged-main clean-LF full regression passes.
@@ -25,6 +25,8 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - No new schema/migration, endpoint, serverless function, canonical `app.js`/`api/chat.js` edit, canon expansion, Context Router budget change, prompt-cache change, or second model call exists.
 - Focused Scene Momentum/Exit/Purpose/Hook/Orchestration/Router/Event Director/NPC/growth suites pass. The full repository regression passes on exact runtime code checkpoint `24407193...`.
 - Because `api/**` changes, the eventual Adaptive Time Scale V2 PR is protected-path and remains human-merge only.
+- TPP Phase 3 is implemented on PR #57. It uses the structured ordered timeline for schedule/consequence/decision shortening, preserves only visibly completed prefix effects, removes unfinished suffix effects, and reconciles time/narration/choices. One canonical core/model call, stable routing, `store:false`, prompt cache/retention, Context Router budgets, canon, player sovereignty, and freeze behavior remain unchanged.
+- Fresh direct review of exact head `4a57bb1...` found six P1 boundary-evidence cases. Code checkpoint `375b980d3edcbbbdd7a63f05a22f5fe7a36036ba` closes all six with a single ordered pre-choice evidence view, positive-range versus exact-zero discrimination, action-bound completion modifiers, actual-prompt selection, and additive-adverb actor filtering. Permanent focused regressions and full `scripts/lumensia-pr-check.mjs` pass. The new docs exact HEAD still requires Vercel and fresh direct review; any P0/P1 continues the correction loop immediately.
 - PR #54 was opened from exact docs head `649dc8747b8463f039c6040e55d09b2a6ba525f2`; Safety #397 passed and Vercel was Ready. Exact Preview live play passed direct-question same-moment, dialogue `+3`, within-building `+7`, explicit wait `+10`, campus travel `+10`, meal `+35`, training `+60`, class `+60`, regional travel `+15`, historical-duration question freeze, and CONTINUE/META/AUTO freeze. It exposed two time-normalization failures: a narrated 11:05→12:00 required-schedule stop applied the full explicit three hours to the clock (`14:05`), and a plain `잠을 잔다` completed with choices after only `60` minutes instead of the `240–480` sleep range. A compound travel-and-sleep sentence also fell outside the sleep classifier.
 - Correction checkpoint `fb239378d4d724b59bf4a4cadd8fb3b3b4f55c03` clamps completed compressed actions to their profile bounds, aligns visibly reached required schedule/consequence boundaries exactly, preserves a genuinely new Director interruption, strengthens the downtime hard-range instruction, and recognizes terminal sleep in a compound action while preserving question/negation guards.
 - Prior-head Codex review also reported one P1 for natural object-duration-verb order. Code checkpoint `4a2533a7a08d7b3e7348e02ae21e7011d0f6a089` closes it narrowly: `점심을 한 시간 동안 먹는다` and `수업을 두 시간 동안 듣는다` now retain exact `60`/`120` minute profiles. Focused and full clean-LF regression pass. P2 dialogue/regional/building-anchor expansions remain non-blocking and are not mixed into this correction.
@@ -766,10 +768,10 @@ Gameplay roadmap discussed:
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
 2. Confirm main remains PR #53 merge `1018d8c27c451dc122982fb14bf7d3e3902c70ca`; merge and reviewed-head trees must remain equal. Do **not** redo completed HF1/HF2/HF3 through Event Director V3.
 3. Preserve PR #54 runtime checkpoint `24407193b59d0f9e9cf2f9d8f1a4589b4b92c95c` and direct parsing P1=4. Do not add another wording-specific patch and do not merge PR #54.
-4. PR #56 reviewed head `5980e39...` has direct P0/P1=0, Vercel PASS, exact Phase 1 base/merge-base, behind 0, and full local regression PASS. Revalidate this progress-only checkpoint's exact HEAD; if any P0/P1 appears, continue correction immediately without a cycle-count stop.
-5. After the docs-only exact HEAD is green, create a separate `codex/time-plan-parser-phase3` branch stacked on it. Do not merge PR #56; main-only Safety remains pending until stack resolution and protected paths remain human-merge only.
-6. Phase 3 implements plan-based schedule/consequence/decision boundary reconciliation: preserve completed prefix effects, remove only unfinished suffix effects, and align authoritative time with narration. Keep the two non-blocking Phase 2 P2s in backlog and do not resume PR #54 wording patches.
-7. Phase 4 legacy cleanup remains blocked until permanent regression and Exact Preview evidence pass.
+4. PR #57 Phase 3 code checkpoint `375b980...` closes the latest six direct P1s and passes focused/full local regression. Commit/push this progress checkpoint, then require exact-current-HEAD Vercel and a fresh direct P0/P1=0 review. Any new P0/P1 starts the next correction immediately; cycle counts and reports are not stop conditions.
+5. Reconfirm the stacked base/merge-base is reviewed Phase 2 exact `f0971430...`, behind 0, conflict-free/mergeable. Main remains `1018d8c...`; the main-only Safety workflow is absent on a stacked PR and cannot be treated as a synthetic pass.
+6. After direct P0/P1=0, run the Phase 3 Exact Preview boundary corpus without reading protection tokens/cookies/storage or bypassing protection. PR #57 changes `api/**`, so it remains human-merge-only and must not be merged by Codex.
+7. Phase 4 legacy cleanup remains blocked until the permanent regression and Phase 3 Exact Preview evidence pass. Do not resume PR #54 wording-specific patches or discard the accumulated TPP corpus.
 
 ---
 
