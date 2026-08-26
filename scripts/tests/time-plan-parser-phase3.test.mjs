@@ -27,6 +27,10 @@ assert.equal(explicitConcurrent.clauses[1].concurrent,true,'an explicit concurre
 assert.equal(deriveStructuredExecutionPlan(explicitConcurrent).eligible,false,'concurrent clauses cannot enter sequential boundary execution');
 assert.equal(deriveStructuredExecutionPlan(parseTimePlan('1시간 훈련하고 병행하여 1시간 대화한다',context)).eligible,false,'병행 concurrency cannot become a sequential execution plan');
 assert.equal(deriveStructuredExecutionPlan(parseTimePlan('에밀리도 1시간 훈련하고 나는 8시간 잔다',context)).eligible,false,'a named topic-marked third party cannot enter the PC execution plan');
+for(const action of ['적어도 1시간 훈련하고 8시간 잔다','1시간 정도 훈련하고 8시간 잔다','이번에도 1시간 훈련하고 8시간 잔다']){
+  assert.equal(classifySceneIntent(action,context).structuredExecutionPlan?.eligible,true,`${action}: additive timing adverbs cannot become NPC actors`);
+}
+assert.deepEqual([classifySceneIntent('적어도 1시간 훈련하고 8시간 잔다',context).structuredExecutionPlan.total_min_minutes,classifySceneIntent('적어도 1시간 훈련하고 8시간 잔다',context).structuredExecutionPlan.total_max_minutes],[540,600],'a lower-bound qualifier remains aligned with the legacy activity range');
 
 for(const action of ['준비되면 1시간 훈련하자','에밀리가 1시간 훈련하고 나는 8시간 잔다','「1시간 훈련하고 8시간 자라」고 말했다']){
   assert.equal(deriveStructuredExecutionPlan(parseTimePlan(action,context)).eligible,false,`${action}: conditional, third-party, and quoted plans fail closed`);

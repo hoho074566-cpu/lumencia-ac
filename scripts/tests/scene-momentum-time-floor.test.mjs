@@ -312,6 +312,21 @@ turn={scene_title:'질문 뒤 과잉 진행',scene:[{kind:'narration',text:'한 
 const postChoiceCompletion=applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:compoundBoundarySave},turn,'game');
 assert.equal(postChoiceCompletion.reconciliationReason,'decision-boundary','terminal completion after the visible question cannot cross the choice');
 assert.deepEqual(turn.state_delta.items_add,[],'post-choice terminal effects are removed');
+turn={scene_title:'훈련과 수면 완료',scene_summary:'질문 뒤 수면까지 모두 마쳤다.',scene:[{kind:'dialogue',speaker_key:'artemis',text:'지금 경계 임무를 맡겠나?'}],choices:['맡는다.','쉰다.','묻는다.'],state_delta:{advance_minutes:540,skill_experience:[multiPrefixGrowth],items_add:['숙면 보상']}};
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:compoundBoundarySave},turn,'game');
+assert.deepEqual(turn.state_delta.skill_experience,[],'a whole-turn title or summary cannot prove prefix completion before an earlier choice');
+assert.deepEqual(turn.state_delta.items_add,[],'a whole-turn summary cannot preserve terminal effects across an unanswered choice');
+turn={scene_title:'질문 뒤 훈련 완료',scene:[{kind:'dialogue',speaker_key:'artemis',text:'지금 경계 임무를 맡겠나?'},{kind:'narration',text:'대답을 기다리지 않고 한 시간 훈련을 마쳤다.'}],choices:['맡는다.','쉰다.','묻는다.'],state_delta:{advance_minutes:540,skill_experience:[multiPrefixGrowth],items_add:['숙면 보상']}};
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:compoundBoundarySave},turn,'game');
+assert.deepEqual(turn.state_delta.skill_experience,[],'post-choice narration cannot prove or preserve a prefix action effect');
+turn={scene_title:'훈련 뒤 제안',scene:[{kind:'dialogue',speaker_key:'artemis',text:'오늘도 수고가 많군.'},{kind:'narration',text:'한 시간 검술 훈련을 모두 마쳤고 검술 자세 교정법을 익혔다.'},{kind:'dialogue',speaker_key:'artemis',text:'이제 경계 임무를 맡겠나?'}],choices:['맡는다.','쉰다.','묻는다.'],state_delta:{advance_minutes:540,skill_experience:[multiPrefixGrowth],pc_knowledge_add:['검술 자세 교정법'],items_add:['숙면 보상']}};
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:compoundBoundarySave},turn,'game');
+assert.deepEqual(turn.state_delta.skill_experience,[multiPrefixGrowth],'ordinary dialogue before the actual prompt cannot hide a later completed prefix');
+assert.deepEqual(turn.state_delta.items_add,[],'the actual later question still removes terminal sleep effects');
+turn={scene_title:'가변 훈련 뒤 제안',scene:[{kind:'narration',text:'한 시간 검술 훈련을 전부 마쳤고 검술 자세 교정법을 익혔다.'},{kind:'dialogue',speaker_key:'artemis',text:'이제 경계 임무를 맡겠나?'}],choices:['맡는다.','쉰다.','묻는다.'],state_delta:{advance_minutes:60,skill_experience:[multiPrefixGrowth],pc_knowledge_add:['검술 자세 교정법'],items_add:['숙면 보상']}};
+applySceneMomentumTimeFloor({action:'최대 1시간 훈련하고 8시간 잔다',saveState:compoundBoundarySave},turn,'game');
+assert.deepEqual(turn.state_delta.skill_experience,[multiPrefixGrowth],'a positive upper-bounded prefix with an action-bound modifier preserves visibly earned effects');
+assert.deepEqual(turn.state_delta.items_add,[],'an upper-bounded completed prefix cannot preserve the unfinished terminal reward');
 turn={
   scene_title:'훈련 완료와 수업 종료',scene:[{kind:'narration',text:'네 시간의 검술 훈련을 마쳤다.'},{kind:'narration',text:'10시가 되자 기사과 기초 수업까지 수료하고 보상을 받았다.'}],choices:[],
   state_delta:{advance_minutes:240,skill_experience:[trainingGrowth,prematureClassGrowth],items_add:['훈련 기록표','수료 보상']},
