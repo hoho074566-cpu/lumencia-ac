@@ -124,12 +124,13 @@ const deadlineProposal = parseTimePlan('내일까지 훈련하자', context);
 assert.ok(deadlineProposal.clauses[0].explicit_deadline, 'the terminal deadline is represented before execution gating');
 assert.equal(deriveStructuredTimingCandidate(deadlineProposal).eligible, false, 'terminal deadlines stay on fallback until deadline execution migrates');
 assert.equal(classifySceneIntent('내일까지 훈련하자', context).kind, 'generic', 'an unmigrated deadline proposal cannot execute a short default session');
-for (const contextualDate of ['어제도 기억하면서 1시간 훈련한다', '내일도 생각하며 1시간 훈련하자']) {
+for (const [contextualDate, expectedKind, expectedGuide] of [['어제도 기억하면서 1시간 훈련한다', 'training', [60, 60]], ['내일도 생각하며 1시간 훈련하자', 'generic', [0, 10]]]) {
   const contextualPlan = parseTimePlan(contextualDate, context), contextual = classifySceneIntent(contextualDate, context);
   assert.equal(contextualPlan.clauses[0].start.date_owned_by_action, false, `${contextualDate}: a date before an unparsed contextual clause does not own the action`);
-  assert.equal(contextual.kind, 'training', `${contextualDate}: the committed terminal training remains executable`);
-  assert.deepEqual(contextual.suggestedAdvanceMinutes, [60, 60], `${contextualDate}: the unrelated date cannot reject or delay the exact training duration`);
-  assert.ok(!contextual.structuredTimePlanApplied.includes('relative-date-start'), `${contextualDate}: an unowned date cannot enter structured execution`);
+  assert.equal(deriveStructuredTimingCandidate(contextualPlan).eligible, false, `${contextualDate}: incomplete start ownership prevents terminal promotion`);
+  assert.equal(contextual.kind, expectedKind, `${contextualDate}: the legacy fallback remains authoritative`);
+  assert.deepEqual(contextual.suggestedAdvanceMinutes, expectedGuide, `${contextualDate}: the unrelated date cannot reject or delay the action`);
+  assert.ok(!(contextual.structuredTimePlanApplied || []).includes('relative-date-start'), `${contextualDate}: an unowned date cannot enter structured execution`);
 }
 const unrelatedDurationPlan = parseTimePlan('2일간의 여행을 떠올리며 훈련하자', context);
 assert.equal(unrelatedDurationPlan.clauses[0].duration_ownership_complete, false, 'a duration separated by an unparsed contextual clause is not action-owned');
@@ -138,6 +139,16 @@ assert.equal(classifySceneIntent('2일간의 여행을 떠올리며 훈련하자
 const boundedDurationPlan = parseTimePlan('1시간 이상 훈련하자', context);
 assert.equal(boundedDurationPlan.clauses[0].duration_ownership_complete, true, 'a directly adjacent supported duration bound remains action-owned');
 assert.equal(deriveStructuredTimingCandidate(boundedDurationPlan).eligible, true, 'a proven adjacent duration bound can retain terminal promotion');
+const contextualOffsetPlan = parseTimePlan('3시간 후 만날 일을 생각하며 1시간 훈련하자', context);
+assert.equal(contextualOffsetPlan.clauses[0].start.relative_offset_owned_by_action, false, 'a relative offset before an unparsed contextual clause is not action-owned');
+assert.equal(deriveStructuredTimingCandidate(contextualOffsetPlan).eligible, false, 'incomplete relative-offset ownership prevents terminal promotion');
+assert.equal(classifySceneIntent('3시간 후 만날 일을 생각하며 1시간 훈련하자', context).kind, 'generic', 'an unrelated relative offset cannot schedule promoted training');
+const negotiation = classifySceneIntent('협상하자', context);
+assert.equal(negotiation.kind, 'committed-consequence', 'a promoted negotiation retains consequential action routing');
+assert.equal(negotiation.stopPolicy, 'resolve-committed-action-then-meaningful-choice', 'negotiation resolves reactions before returning sovereignty');
+const fractionalMinute = classifySceneIntent('0.333일 후 1시간 훈련한다', context);
+assert.equal(fractionalMinute.dateQualifiedStartOffsetMinutes, 480, 'fractional fixed-day offsets normalize to an integer authoritative minute');
+assert.deepEqual(fractionalMinute.suggestedAdvanceMinutes, [540, 540], 'integer-normalized offset plus exact duration remains schema-compatible');
 for (const [nonCommittedAction, expectedKind] of [
   ['어제 1시간 훈련했다. 지금 공격한다', 'committed-consequence'],
   ['1시간 훈련한다고 들었다', 'generic'],
