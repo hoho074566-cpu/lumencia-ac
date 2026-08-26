@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { classifySceneIntent } from '../../lib/scene-momentum.js';
-import { deriveStructuredExecutionPlan, parseTimePlan } from '../../lib/time-plan-parser.js';
+import { deriveStructuredDecisionPlan, deriveStructuredExecutionPlan, parseTimePlan } from '../../lib/time-plan-parser.js';
 
 const context={location:'기숙사',currentTime:'08:00',currentDate:'1285-03-01',currentWeekday:'수요일',actorName:'아리아'};
 
@@ -33,6 +33,11 @@ const unboundedLower=parseTimePlan('적어도 1시간 훈련하고 8시간 잔�
 assert.equal(unboundedLower.clauses[0].actor.kind,'pc','적어도 remains an additive timing adverb, not an NPC actor');
 assert.equal(unboundedLower.clauses[0].duration.upper_bounded,false,'a lower-bound-only duration remains explicitly unbounded');
 assert.equal(deriveStructuredExecutionPlan(unboundedLower).eligible,false,'an invented profile maximum cannot grant exact timeline authority');
+const unboundedDecision=deriveStructuredDecisionPlan(unboundedLower);
+assert.equal(unboundedDecision.eligible,true,'a lower-bound-only compound remains available for choice-only reconciliation');
+assert.equal(unboundedDecision.exact_timeline,false,'the choice-only plan never claims exact timestamp authority');
+assert.equal(unboundedDecision.clauses[0].complete_max_minutes,null,'the open upper bound remains structurally open');
+assert.equal(classifySceneIntent('적어도 1시간 훈련하고 8시간 잔다',context).structuredDecisionPlan?.exact_timeline,false,'the runtime intent exposes only the non-authoritative choice plan');
 for(const action of ['1시간 정도 훈련하고 8시간 잔다','이번에도 1시간 훈련하고 8시간 잔다']){
   assert.equal(classifySceneIntent(action,context).structuredExecutionPlan?.eligible,true,`${action}: additive timing adverbs cannot become NPC actors`);
 }
