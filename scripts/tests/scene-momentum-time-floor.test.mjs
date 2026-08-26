@@ -15,7 +15,7 @@ const timeFloorSource=source.slice(start,end);
 const makeHelpers=new Function('array','object','classifySceneIntent','isPcRelevantScheduleEvent','nextScheduleBoundaryMinutes','scheduleBoundaryLimitMinutes','scheduledIdsDueByTurnEnd','minutesUntilEventConsequence','CHARACTER_REGISTRY','isAdditiveAdverbialStem',`${timeFloorSource}\nreturn {applySceneMomentumTimeFloor,consequenceNpcKeysForShortening,consequenceNpcEffectsForShortening,deriveTimedActionRuntime,runtimeSynthesisTurn,prefixNpcStateUpdate};`);
 const array=(value)=>Array.isArray(value)?value:[];
 const object=(value)=>value&&typeof value==='object'&&!Array.isArray(value)?value:{};
-const testRegistry={artemis:'아르테미스',emily:'에밀리'};
+const testRegistry={artemis:'아르테미스',emily:'에밀리',lena:'레나'};
 const {applySceneMomentumTimeFloor,consequenceNpcKeysForShortening,consequenceNpcEffectsForShortening,deriveTimedActionRuntime,runtimeSynthesisTurn,prefixNpcStateUpdate}=makeHelpers(array,object,classifySceneIntent,isPcRelevantScheduleEvent,nextScheduleBoundaryMinutes,scheduleBoundaryLimitMinutes,scheduledIdsDueByTurnEnd,minutesUntilEventConsequence,testRegistry,isAdditiveAdverbialStem);
 
 const knightPc={name:'카인',department:'기사과'};
@@ -290,6 +290,10 @@ applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveSt
 assert.deepEqual(turn.state_delta.skill_experience,[multiPrefixGrowth],'completion evidence before a same-row question preserves completed-prefix growth');
 assert.deepEqual(turn.state_delta.items_add,['훈련 기록표'],'same-row prefix evidence preserves its item while removing the terminal reward');
 assert.match(turn.scene.map(item=>item.text).join(' '),/지금 경계 임무를 맡겠나/,'same-row reconciliation retains the actual question text');
+turn={scene_title:'같은 문장의 훈련 뒤 제안',scene:[{kind:'narration',text:'한 시간 검술 훈련을 마치고 훈련 기록표를 받았는데, 지금 경계 임무를 맡겠나?'}],choices:['맡는다.','잔다.','묻는다.'],state_delta:{advance_minutes:60,skill_experience:[multiPrefixGrowth],items_add:['훈련 기록표','숙면 보상']}};
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
+assert.deepEqual(turn.state_delta.skill_experience,[multiPrefixGrowth],'completion evidence before a same-sentence question clause preserves prefix growth');
+assert.deepEqual(turn.state_delta.items_add,['훈련 기록표'],'same-sentence clause slicing preserves only the earned prefix item');
 const dialoguePrefixGrowth={skill:'검술',amount:1,reason:'카인은 한 시간 검술 훈련을 모두 마쳤다'};
 turn={scene_title:'교관의 확인 뒤 제안',scene:[{kind:'dialogue',speaker_key:'artemis',text:'카인, 한 시간 검술 훈련을 모두 마쳤군, 검술 배지도 받아라.'},{kind:'dialogue',speaker_key:'artemis',text:'이제 잠들기 전에 경계 임무를 맡겠나?'}],choices:['맡는다.','잔다.','묻는다.'],state_delta:{advance_minutes:60,skill_experience:[dialoguePrefixGrowth],items_add:['검술 배지','숙면 보상']}};
 applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
@@ -326,6 +330,12 @@ const evidenceFreeDecision=applySceneMomentumTimeFloor({action:'1시간 훈련�
 assert.equal(evidenceFreeDecision.reconciliationReason,'decision-boundary','a meaningful choice remains a boundary without prefix-completion prose');
 assert.deepEqual(turn.state_delta.skill_experience,[],'unproven prefix effects fail closed at the choice');
 assert.deepEqual(turn.state_delta.items_add,[],'terminal effects fail closed at the choice');
+turn={scene_title:'왕도 도착 직전 선택',scene:[{kind:'narration',text:'10분 만에 왕도에 도착했다고 알렸다.'},{kind:'dialogue',speaker_key:'artemis',text:'지금 성문으로 들어가겠나?'}],choices:['들어간다.','기다린다.','묻는다.'],state_delta:{advance_minutes:10,new_location:'왕도',items_add:['숙면 보상']}};
+const belowRangeDecision=applySceneMomentumTimeFloor({action:'왕도로 이동하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'남부 도로'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
+assert.equal(belowRangeDecision.reconciliationReason,'decision-boundary','a choice below a ranged prefix minimum still owns fail-closed suffix reconciliation');
+assert.equal(turn.state_delta.advance_minutes,10,'the ranged-prefix choice keeps returned time without inventing minimum completion');
+assert.equal(turn.state_delta.new_location,null,'an arrival below the structured minimum cannot preserve the unproven travel result');
+assert.deepEqual(turn.state_delta.items_add,[],'unfinished terminal rewards are removed below a ranged prefix minimum');
 turn={scene_title:'훈련 중 준비',scene:[{kind:'narration',text:'훈련을 계속하던 중 경계 임무 준비를 완료했다.'}],choices:[],state_delta:{advance_minutes:540,skill_experience:[multiPrefixGrowth]}};
 applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:compoundBoundarySave},turn,'game');
 assert.deepEqual(turn.state_delta.skill_experience,[],'an unrelated completion cue cannot prove the training action complete');
@@ -344,6 +354,11 @@ turn={scene_title:'훈련 뒤 제안',scene:[{kind:'dialogue',speaker_key:'artem
 applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:compoundBoundarySave},turn,'game');
 assert.deepEqual(turn.state_delta.skill_experience,[multiPrefixGrowth],'ordinary dialogue before the actual prompt cannot hide a later completed prefix');
 assert.deepEqual(turn.state_delta.items_add,[],'the actual later question still removes terminal sleep effects');
+turn={scene_title:'흔적과 훈련 뒤 제안',scene:[{kind:'narration',text:'누가 이런 흔적을 남겼을까?'},{kind:'narration',text:'한 시간 검술 훈련을 모두 마쳤다.'},{kind:'dialogue',speaker_key:'artemis',text:'이 요청을 받아들이겠나?'}],choices:['수락한다.','거절한다.','보류한다.'],state_delta:{advance_minutes:60,skill_experience:[multiPrefixGrowth],items_add:['숙면 보상']}};
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:compoundBoundarySave},turn,'game');
+assert.deepEqual(turn.state_delta.skill_experience,[multiPrefixGrowth],'zero lexical overlap falls back to the latest choice-bearing question after completed-prefix evidence');
+assert.match(turn.scene.map(item=>item.text).join(' '),/이 요청을 받아들이겠나/,'generic choices remain attached to the later decision prompt');
+assert.doesNotMatch(turn.scene.map(item=>item.text).join(' '),/누가 이런 흔적/,'an earlier rhetorical question cannot replace the actual decision prompt');
 turn={scene_title:'가변 훈련 뒤 제안',scene:[{kind:'narration',text:'한 시간 검술 훈련을 전부 마쳤고 검술 자세 교정법을 익혔다.'},{kind:'dialogue',speaker_key:'artemis',text:'이제 경계 임무를 맡겠나?'}],choices:['맡는다.','쉰다.','묻는다.'],state_delta:{advance_minutes:60,skill_experience:[multiPrefixGrowth],pc_knowledge_add:['검술 자세 교정법'],items_add:['숙면 보상']}};
 applySceneMomentumTimeFloor({action:'최대 1시간 훈련하고 8시간 잔다',saveState:compoundBoundarySave},turn,'game');
 assert.deepEqual(turn.state_delta.skill_experience,[multiPrefixGrowth],'a positive upper-bounded prefix with an action-bound modifier preserves visibly earned effects');
@@ -379,10 +394,11 @@ applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveSt
 assert.deepEqual(turn.state_delta.active_events_add,[],'a Director event narrated only after an unrelated prompt is not restored');
 assert.equal(turn.event_progress,null,'hidden post-choice Director progress is removed');
 assert.equal(turn.director,null,'post-choice Director metadata cannot attach to unrelated choices');
-const prefixMeeting={npc_key:'emily',date:'1285-03-02',time:'12:00',location:'중앙광장',activity:'면담',reason:'대화에서 내일 정오 면담을 약속했다'},suffixNpcMeeting={npc_key:'lena',date:'1285-03-02',time:'12:00',location:'중앙광장',activity:'면담',reason:'수면 중 레나의 같은 장소 면담이 정해졌다'},prefixHook={id:'tomorrow-meeting',title:'내일 정오 면담',reason:'에밀리와 중앙광장에서 만나기로 약속했다'},prefixConsequence={event_name:'내일 정오 면담',reason:'에밀리와 중앙광장에서 만나기로 약속했다'};
-turn={scene_title:'대화 뒤 수면 중 선택',scene:[{kind:'narration',text:'한 시간 대화를 마쳤고 에밀리와 내일 정오 중앙광장에서 면담하기로 약속했다.'},{kind:'dialogue',speaker_key:'artemis',text:'잠든 지 얼마 안 됐지만 지금 경계 임무를 맡겠나?'}],choices:['경계 임무를 맡는다.','계속 잔다.','상황을 묻는다.'],state_delta:{advance_minutes:90,npc_schedule_updates:[prefixMeeting,suffixNpcMeeting],hooks_add:[prefixHook,{id:'dream-hook',title:'수면 중 꿈의 계시',reason:'잠든 뒤 꿈을 꾸었다'}],delayed_consequences_add:[prefixConsequence,{event_name:'꿈의 계시',reason:'수면을 마친 뒤 나타난다'}],items_add:['숙면 보상']}};
+const prefixMeeting={npc_key:'emily',date:'1285-03-02',time:'12:00',location:'중앙광장',activity:'면담',reason:'대화에서 내일 정오 면담을 약속했다'},suffixNpcMeeting={npc_key:'lena',date:'1285-03-02',time:'12:00',location:'중앙광장',activity:'면담',reason:'수면 중 레나의 같은 장소 면담이 정해졌다'},prefixHook={id:'tomorrow-meeting',title:'내일 정오 면담',reason:'에밀리와 중앙광장에서 만나기로 약속했다'},prefixConsequence={event_name:'내일 정오 면담',reason:'에밀리와 중앙광장에서 만나기로 약속했다'},prefixRelationship={npc_key:'emily',affinity_delta:1,reason:'에밀리와 대화를 마쳤다'},suffixRelationship={npc_key:'lena',affinity_delta:1,reason:'레나와 대화를 마쳤다'};
+turn={scene_title:'대화 뒤 수면 중 선택',scene:[{kind:'narration',text:'한 시간 대화를 마쳤고 에밀리는 내일 정오 중앙광장에서 면담하기로 했다고 레나에게 알렸다.'},{kind:'dialogue',speaker_key:'artemis',text:'잠든 지 얼마 안 됐지만 지금 경계 임무를 맡겠나?'}],choices:['경계 임무를 맡는다.','계속 잔다.','상황을 묻는다.'],state_delta:{advance_minutes:90,npc_schedule_updates:[prefixMeeting,suffixNpcMeeting],relationship_changes:[prefixRelationship,suffixRelationship],hooks_add:[prefixHook,{id:'dream-hook',title:'수면 중 꿈의 계시',reason:'잠든 뒤 꿈을 꾸었다'}],delayed_consequences_add:[prefixConsequence,{event_name:'꿈의 계시',reason:'수면을 마친 뒤 나타난다'}],items_add:['숙면 보상']}};
 applySceneMomentumTimeFloor({action:'1시간 대화하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'상담실'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
 assert.deepEqual(turn.state_delta.npc_schedule_updates,[prefixMeeting],'a visibly arranged future NPC schedule survives from the completed dialogue prefix');
+assert.deepEqual(turn.state_delta.relationship_changes,[prefixRelationship],'NPC-keyed relationship effects require the evidenced NPC identity');
 assert.deepEqual(turn.state_delta.hooks_add,[prefixHook],'only the evidence-attributed prefix hook survives');
 assert.deepEqual(turn.state_delta.delayed_consequences_add,[prefixConsequence],'only the evidence-attributed prefix consequence survives');
 turn={scene_title:'대화 뒤 수면 중 선택',scene:[{kind:'narration',text:'한 시간 대화를 마쳤고 에밀리는 대화 완료 상태가 되었다.'},{kind:'dialogue',speaker_key:'artemis',text:'잠든 지 얼마 안 됐지만 지금 경계 임무를 맡겠나?'}],choices:['경계 임무를 맡는다.','계속 잔다.','상황을 묻는다.'],state_delta:{advance_minutes:90,npc_state_updates:[{npc_key:'emily',status:'대화 완료',current_goal:'8시간 취침',next_activity:'잠자기'}],items_add:['숙면 보상']}};
@@ -421,6 +437,9 @@ const exactSuffixSkillInsight={skill:'고급 검술',amount:1,reason:'8시간 �
 turn={scene_title:'고급 훈련 뒤 선택',scene:[{kind:'narration',text:'한 시간 고급 검술 훈련을 마쳤다.'},{kind:'dialogue',speaker_key:'artemis',text:'지금 경계 임무를 맡겠나?'}],choices:['맡는다.','잔다.','묻는다.'],state_delta:{advance_minutes:60,skill_experience:[exactSuffixSkillInsight],items_add:['숙면 보상']}};
 applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
 assert.deepEqual(turn.state_delta.skill_experience,[],'a long exact skill name cannot bypass the unfinished-clause rejection in its reason');
+turn={scene_title:'훈련 뒤 조건부 수면 보상',scene:[{kind:'narration',text:'한 시간 훈련을 마쳤고 잠들면 숙면 보상을 받을 수 있다.'},{kind:'dialogue',speaker_key:'artemis',text:'지금 경계 임무를 맡겠나?'}],choices:['맡는다.','잔다.','묻는다.'],state_delta:{advance_minutes:60,items_add:['숙면 보상']}};
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
+assert.deepEqual(turn.state_delta.items_add,[],'a string-array effect named after an unfinished action cannot bypass action-type filtering');
 turn={scene_title:'대기 뒤 선택',scene:[{kind:'narration',text:'한 시간을 기다렸고 전령의 편지를 받았다.'},{kind:'dialogue',speaker_key:'artemis',text:'편지를 지금 열겠나?'}],choices:['연다.','나중에 연다.','발신인을 묻는다.'],state_delta:{advance_minutes:60,items_add:['전령의 편지','숙면 보상']}};
 applySceneMomentumTimeFloor({action:'1시간 기다리고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'정문'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
 assert.deepEqual(turn.state_delta.items_add,['전령의 편지'],'a declared-duration finite wait preserves its visibly earned prefix item');
