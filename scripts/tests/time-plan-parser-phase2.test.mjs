@@ -18,6 +18,14 @@ assert.equal(future.turnLimitTruncated, true, 'a start beyond the one-turn cap r
 assert.ok(future.structuredTimePlanApplied.includes('relative-date-start'), 'future start migration records structured provenance');
 const missingClockContext = deriveStructuredTimingCandidate(parseTimePlan('3일 후 오전 10시에 1시간 훈련한다', { ...context, currentTime: '' }));
 assert.equal(missingClockContext.relative_date_start_offset_minutes, null, 'date-plus-clock execution requires an authoritative current clock');
+for (const [calendarAction, expectedOffset] of [['다음주 금요일에 1시간 훈련한다', 12960], ['한 달 후 1시간 훈련한다', 44640]]) {
+  const calendar = classifySceneIntent(calendarAction, context);
+  assert.ok(!calendar.structuredTimePlanApplied?.includes('relative-date-start'), 'calendar-aware offsets stay on the established calendar path');
+  assert.equal(calendar.dateQualifiedStartOffsetMinutes, expectedOffset, 'calendar-aware fallback preserves the authoritative legacy offset');
+}
+const droppedColonPeriod = classifySceneIntent('내일 오후 3:00에 1시간 훈련한다', context);
+assert.equal(droppedColonPeriod.dateQualifiedStartOffsetMinutes, 1800, 'a colon clock with a separate period marker falls back to the established normalized clock');
+assert.ok(!droppedColonPeriod.structuredTimePlanApplied.includes('relative-date-start'), 'a partially parsed period marker cannot enter structured execution');
 
 const inheritedDate = classifySceneIntent('내일 9시에 아침을 먹고 10시에 수업을 듣는다.', { ...context, currentTime: '08:00', location: '여관' });
 assert.equal(inheritedDate.scheduledStartOffsetMinutes, null, 'a date qualifier owned by an earlier clause cannot promote the terminal clock onto today');
@@ -65,6 +73,7 @@ for (const negatedAction of ['나는 안 기다린다.', '못 기다린다.']) {
   assert.equal(negatedCandidate.eligible, false, 'a negated action cannot enter structured execution');
   assert.equal(classifySceneIntent(negatedAction, context).kind, 'generic', 'legacy negation suppression remains authoritative');
 }
+assert.equal(classifySceneIntent('안 1시간 훈련하자', context).kind, 'generic', 'a separated predicate negator prevents terminal action promotion');
 for (const [nonCommittedAction, expectedKind] of [
   ['어제 1시간 훈련했다. 지금 공격한다', 'committed-consequence'],
   ['1시간 훈련한다고 들었다', 'generic'],
