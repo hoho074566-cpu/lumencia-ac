@@ -11,7 +11,7 @@ import { routeOpenAIParams, routerVersion, array, object, clampText } from './li
 import { actualScheduledEntrants, freshChoices, reconcileParticipants } from '../lib/scene-continuity.js';
 import { ADAPTIVE_TIME_SCALE_VERSION, SCENE_MOMENTUM_VERSION, classifySceneIntent, deriveSceneDelta, isPcRelevantScheduleEvent, nextScheduleBoundaryMinutes, updateSceneMomentum } from '../lib/scene-momentum.js';
 import { TIME_PLAN_PARSER_VERSION, isAdditiveAdverbialStem, parseTimePlan, summarizeTimePlan } from '../lib/time-plan-parser.js';
-import { projectStructuredOwnedEffects, replaceStructuredEffectRows, validateStructuredTimeExecution } from '../lib/time-plan-reconciliation.js';
+import { projectStructuredOwnedEffects, replaceStructuredEffectRows, structuredEffectRows, validateStructuredTimeExecution } from '../lib/time-plan-reconciliation.js';
 import { SCENE_NOVELTY_VERSION, deriveSceneNovelty } from '../lib/scene-novelty.js';
 import { deriveScenePurpose } from '../lib/scene-purpose.js';
 import { deriveSceneExitCondition, evaluateSceneExitCondition } from '../lib/scene-exit.js';
@@ -1053,11 +1053,11 @@ export default async function handler(req,res){
     applyExtendedExpressions(data.turn,incoming0.saveState||{});
     data.turn.choices=filterTurnHookChoices(incoming.action,{...data.turn,choices:freshChoices(incoming.action,data.turn)});
     const growthIntent=classifySceneIntent(incoming0.action||'',{location:incoming.saveState?.world?.location||'',currentTime:incoming.saveState?.world?.time||'',currentDate:incoming.saveState?.world?.date||'',currentWeekday:incoming.saveState?.world?.weekday||'',actorName:incoming.saveState?.pc?.name||'',resumeTimedAction:incoming.saveState?.sceneRuntime?.timed_action}),zeroElapsedRange=array(growthIntent.explicitDurationRangeMinutes).length===2&&growthIntent.explicitDurationRangeMinutes.every(value=>Number(value)===0),zeroElapsedIntent=mode==='game'&&(growthIntent.explicitDurationMinutes===0||zeroElapsedRange)&&Number(growthIntent.minAdvanceMinutes||0)<=0,growthAllowed=mode==='game'&&!zeroElapsedIntent,growthValidationScene=data.turn?.scene;
-    if(data.turn?.state_delta)replaceStructuredEffectRows(data.turn,'skill_experience',mode==='auto'?[]:filterExistingSkillExperience(data.turn.state_delta.skill_experience,incoming0.saveState?.pc?.skills));
+    if(data.turn?.state_delta)replaceStructuredEffectRows(data.turn,'skill_experience',mode==='auto'?[]:filterExistingSkillExperience(structuredEffectRows(data.turn,'skill_experience'),incoming0.saveState?.pc?.skills));
     const combatGrowthState=deriveCombatGrowthState({
       pc:incoming0.saveState?.pc,
-      statChanges:data.turn?.state_delta?.stat_progress,
-      skillChanges:data.turn?.state_delta?.skill_experience,
+      statChanges:structuredEffectRows(data.turn,'stat_progress'),
+      skillChanges:structuredEffectRows(data.turn,'skill_experience'),
       action:incoming0.action||'',
       scene:growthValidationScene,
       resolutionLog:data.turn?.resolution_log,
@@ -1067,7 +1067,7 @@ export default async function handler(req,res){
     const skillLearningState=deriveSkillLearningState({
       existingSkills:incoming0.saveState?.pc?.skills,
       previousCandidates:incoming0.saveState?.pc?.skillCandidates,
-      changes:data.turn?.state_delta?.skill_learning,
+      changes:structuredEffectRows(data.turn,'skill_learning'),
       action:incoming0.action||'',
       scene:growthValidationScene,
       turnNumber:Number(incoming0.saveState?.turnNumber||0)+1,
@@ -1080,8 +1080,8 @@ export default async function handler(req,res){
       talents:incoming0.saveState?.pc?.talents,
       previousCandidates:incoming0.saveState?.pc?.awakeningCandidates,
       previousTalentHistory:incoming0.saveState?.pc?.talentEvolutionHistory,
-      awakeningChanges:data.turn?.state_delta?.awakening_progress,
-      talentEvolutionChanges:data.turn?.state_delta?.talent_evolution,
+      awakeningChanges:structuredEffectRows(data.turn,'awakening_progress'),
+      talentEvolutionChanges:structuredEffectRows(data.turn,'talent_evolution'),
       action:incoming0.action||'',
       saveState:incoming0.saveState||{},
       scene:growthValidationScene,
@@ -1100,15 +1100,15 @@ export default async function handler(req,res){
     let timePlan;try{timePlan=parseTimePlan(incoming0.action||'',{location:incoming.saveState?.world?.location||'',currentTime:incoming.saveState?.world?.time||'',currentDate:incoming.saveState?.world?.date||'',currentWeekday:incoming.saveState?.world?.weekday||'',actorName:incoming.saveState?.pc?.name||''});}catch{timePlan={version:TIME_PLAN_PARSER_VERSION,mode:'shadow',clauses:[],diagnostics:['shadow-parser-error']};}const timePlanTelemetry=summarizeTimePlan(timePlan,sceneIntent);
     let persistedCombatGrowthState=combatGrowthState,persistedSkillLearningState=skillLearningState,persistedAwakeningTalentState=awakeningTalentState;
     if(data.turn?.state_delta&&(data.turn.state_delta.stat_progress!==combatGrowthState.accepted_stat_progress||data.turn.state_delta.skill_experience!==combatGrowthState.accepted_skill_experience)){
-      persistedCombatGrowthState=deriveCombatGrowthState({pc:incoming0.saveState?.pc,statChanges:data.turn.state_delta.stat_progress,skillChanges:data.turn.state_delta.skill_experience,action:incoming0.action||'',scene:growthValidationScene,resolutionLog:data.turn?.resolution_log,allowProgress:growthAllowed});
+      persistedCombatGrowthState=deriveCombatGrowthState({pc:incoming0.saveState?.pc,statChanges:structuredEffectRows(data.turn,'stat_progress'),skillChanges:structuredEffectRows(data.turn,'skill_experience'),action:incoming0.action||'',scene:growthValidationScene,resolutionLog:data.turn?.resolution_log,allowProgress:growthAllowed});
       replaceStructuredEffectRows(data.turn,'stat_progress',persistedCombatGrowthState.accepted_stat_progress);replaceStructuredEffectRows(data.turn,'skill_experience',persistedCombatGrowthState.accepted_skill_experience);
     }
     if(data.turn?.state_delta&&data.turn.state_delta.skill_learning!==skillLearningState.accepted_changes){
-      persistedSkillLearningState=deriveSkillLearningState({existingSkills:incoming0.saveState?.pc?.skills,previousCandidates:incoming0.saveState?.pc?.skillCandidates,changes:data.turn.state_delta.skill_learning,action:incoming0.action||'',scene:growthValidationScene,turnNumber:Number(incoming0.saveState?.turnNumber||0)+1,allowProgress:growthAllowed});
+      persistedSkillLearningState=deriveSkillLearningState({existingSkills:incoming0.saveState?.pc?.skills,previousCandidates:incoming0.saveState?.pc?.skillCandidates,changes:structuredEffectRows(data.turn,'skill_learning'),action:incoming0.action||'',scene:growthValidationScene,turnNumber:Number(incoming0.saveState?.turnNumber||0)+1,allowProgress:growthAllowed});
       replaceStructuredEffectRows(data.turn,'skill_learning',persistedSkillLearningState.accepted_changes);
     }
     if(data.turn?.state_delta&&(data.turn.state_delta.awakening_progress!==awakeningTalentState.accepted_awakening_changes||data.turn.state_delta.talent_evolution!==awakeningTalentState.accepted_talent_evolution)){
-      persistedAwakeningTalentState=deriveAwakeningTalentState({existingTraits:incoming0.saveState?.pc?.traits,existingAuthorities:incoming0.saveState?.pc?.authorities,talents:incoming0.saveState?.pc?.talents,previousCandidates:incoming0.saveState?.pc?.awakeningCandidates,previousTalentHistory:incoming0.saveState?.pc?.talentEvolutionHistory,awakeningChanges:data.turn.state_delta.awakening_progress,talentEvolutionChanges:data.turn.state_delta.talent_evolution,action:incoming0.action||'',saveState:incoming0.saveState||{},scene:growthValidationScene,turnNumber:Number(incoming0.saveState?.turnNumber||0)+1,allowProgress:growthAllowed});
+      persistedAwakeningTalentState=deriveAwakeningTalentState({existingTraits:incoming0.saveState?.pc?.traits,existingAuthorities:incoming0.saveState?.pc?.authorities,talents:incoming0.saveState?.pc?.talents,previousCandidates:incoming0.saveState?.pc?.awakeningCandidates,previousTalentHistory:incoming0.saveState?.pc?.talentEvolutionHistory,awakeningChanges:structuredEffectRows(data.turn,'awakening_progress'),talentEvolutionChanges:structuredEffectRows(data.turn,'talent_evolution'),action:incoming0.action||'',saveState:incoming0.saveState||{},scene:growthValidationScene,turnNumber:Number(incoming0.saveState?.turnNumber||0)+1,allowProgress:growthAllowed});
       replaceStructuredEffectRows(data.turn,'awakening_progress',persistedAwakeningTalentState.accepted_awakening_changes);replaceStructuredEffectRows(data.turn,'talent_evolution',persistedAwakeningTalentState.accepted_talent_evolution);
     }
     const runtimeTurn=runtimeSynthesisTurn(data.turn,sceneIntent);

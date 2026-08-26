@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { buildSceneMomentumDirective, classifySceneIntent } from '../../lib/scene-momentum.js';
 import { deriveStructuredDecisionPlan, deriveStructuredExecutionPlan, parseTimePlan } from '../../lib/time-plan-parser.js';
-import { projectStructuredOwnedEffects, replaceStructuredEffectRows, validateStructuredTimeExecution } from '../../lib/time-plan-reconciliation.js';
+import { projectStructuredOwnedEffects, replaceStructuredEffectRows, structuredEffectRows, validateStructuredTimeExecution } from '../../lib/time-plan-reconciliation.js';
 
 const context={location:'기숙사',currentTime:'08:00',currentDate:'1285-03-01',currentWeekday:'수요일',actorName:'아리아'};
 
@@ -109,6 +109,11 @@ assert.equal(validateStructuredTimeExecution(oversizedScalar,exact,scheduleRunti
 const filteredTurn={state_delta:{skill_experience:[{skill:'없는 기술',amount:1},{skill:'검술',amount:2}]},time_execution:{effect_owners:[{scope:'state_delta',field:'skill_experience',effect_index:1,owner_kind:'clause',owner_id:'action_1'}]}};
 replaceStructuredEffectRows(filteredTurn,'skill_experience',[{skill:'검술',amount:2}]);
 assert.equal(filteredTurn.time_execution.effect_owners[0].effect_index,0,'effect ownership follows an accepted row when validation compacts its array');
+const duplicateFilteredTurn={state_delta:{skill_experience:[{skill:'검술',amount:0,reason:'무효'},{skill:'검술',amount:2,reason:'유효'}]},time_execution:{effect_owners:[{scope:'state_delta',field:'skill_experience',effect_index:1,owner_kind:'clause',owner_id:'action_1'}]}};
+const taggedDuplicateRows=structuredEffectRows(duplicateFilteredTurn,'skill_experience'),acceptedDuplicate={...taggedDuplicateRows[1],amount:1};
+replaceStructuredEffectRows(duplicateFilteredTurn,'skill_experience',[acceptedDuplicate]);
+assert.equal(duplicateFilteredTurn.time_execution.effect_owners[0].effect_index,0,'an accepted duplicate key keeps its exact raw source instead of borrowing the first rejected row');
+assert.doesNotMatch(JSON.stringify(duplicateFilteredTurn.state_delta.skill_experience),/lumensia\.time\.effect/,'internal source markers never enter the JSON response');
 
 const overLimitPlan=deriveStructuredExecutionPlan(parseTimePlan('25시간 기다리고 8시간 잔다',context));
 const overLimitTurn={scene:[{text:'계속 기다릴까?'}],choices:['계속한다.'],state_delta:{advance_minutes:1440,fatigue_delta:0,gold_delta:0},time_execution:{version:'1.0',plan_used:true,boundary_kind:'choice',boundary_minutes:1440,completed_clause_ids:[],interrupted_clause_id:'action_1',decision_scene_index:0,boundary_event_id:null,effect_owners:[],scalar_contributions:[]}};
