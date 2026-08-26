@@ -206,6 +206,15 @@ assert.equal(nextDayClass.compression,false,'a date-qualified activity beyond th
 assert.deepEqual(nextDayClass.suggestedAdvanceMinutes,[0,1440],'a date-qualified activity must inspect the bounded next-day window without inheriting the same-day class floor');
 assert.equal(nextDayClass.boundaryLookaheadMinutes,1440,'a date-qualified activity must expose one bounded day for schedule and consequence arbitration');
 assert.match(buildSceneMomentumDirective({action:'내일 10시 30분에 수업을 듣는다.',saveState:{world:{date:'1285-03-01',time:'07:40',location:'여관'}}}),/날짜 지정 시작 규칙/,'the model must be told to preserve the requested day instead of pulling the class into today');
+for(const action of ['다음 주 1시간 훈련한다.','다음주에 1시간 훈련한다.','차주에는 1시간 훈련한다.']){
+  const nextWeekTraining=classifySceneIntent(action,{location:'훈련장',currentDate:'1285-03-01',currentTime:'09:00'});
+  assert.equal(nextWeekTraining.dateQualifiedStart,true,`a week-relative action must retain its future date: ${action}`);
+  assert.equal(nextWeekTraining.compression,false,`a next-week action must not execute in the current turn: ${action}`);
+  assert.equal(nextWeekTraining.explicitDurationMinutes,60,`the declared duration must remain attached to the deferred training: ${action}`);
+  assert.deepEqual(nextWeekTraining.suggestedAdvanceMinutes,[0,1440],`a next-week action must expose only the bounded current-turn lookahead: ${action}`);
+}
+const nextWeekBoundaryDirective=buildSceneMomentumDirective({action:'다음 주 1시간 훈련한다.',saveState:{world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[{id:'tomorrow-class',title:'필수 수업',kind:'academic',date:'1285-03-02',time:'08:00'}]}}});
+assert.match(nextWeekBoundaryDirective,/SCHEDULE_BOUNDARY=1380min/,'a current-turn schedule must remain authoritative before a deferred next-week action');
 const reachableNextDayClass=classifySceneIntent('내일 오전 1시에 수업을 듣는다.', { location:'여관',currentTime:'23:30' });
 assert.equal(reachableNextDayClass.scheduledStartOffsetMinutes,90,'a next-day start inside the turn window must retain its real offset');
 assert.deepEqual(reachableNextDayClass.suggestedAdvanceMinutes,[135,210],'a reachable next-day class must include its wait and natural class duration');
