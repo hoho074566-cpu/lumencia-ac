@@ -29,6 +29,9 @@ assert.equal(classifySceneIntent('에밀리가 한 시간 훈련하고 잠을 �
 assert.equal(classifySceneIntent('에밀리가 한 시간 훈련하고 나는 잠을 잔다.').kind,'downtime','an explicit terminal first-person subject must override an earlier NPC subject');
 assert.equal(classifySceneIntent('누군가 “죽이겠다”고 외치는 소리를 듣고 에밀리가 잠을 잔다.').kind,'generic','an attributed report must not hide an explicit third-party terminal subject');
 assert.equal(classifySceneIntent('카인이 잠을 잔다.',{actorName:'카인'}).kind,'downtime','the actual player name must remain a valid explicit subject');
+assert.deepEqual(classifySceneIntent('리나가 나와 함께 1시간 훈련한다.').suggestedAdvanceMinutes,[60,60],'an explicit first-person co-participant must preserve joint PC timed intent');
+assert.deepEqual(classifySceneIntent('리나가 카인과 함께 1시간 훈련한다.',{actorName:'카인'}).suggestedAdvanceMinutes,[60,60],'the saved actor name must preserve joint PC timed intent');
+assert.equal(classifySceneIntent('리나가 나와 함께하지 않고 1시간 훈련한다.').kind,'generic','negated joint participation must remain NPC-only');
 assert.deepEqual(classifySceneIntent('기숙사에서 카인이 8시간 잠을 잔다.',{actorName:'카인'}).suggestedAdvanceMinutes,[480,480],'a leading location adjunct must not hide the saved PC subject');
 assert.deepEqual(classifySceneIntent('조용히 카인이 8시간 잠을 잔다.',{actorName:'카인'}).suggestedAdvanceMinutes,[480,480],'a leading manner adjunct must not hide the saved PC subject');
 assert.deepEqual(classifySceneIntent('몸이 피곤해서 8시간 잠을 잔다.').suggestedAdvanceMinutes,[480,480],'a causal-clause subject must not become the omitted subject of the terminal PC action');
@@ -317,6 +320,20 @@ assert.notEqual(classifySceneIntent('잠을 자지 않는다.', { location:'개�
 assert.match(buildSceneMomentumDirective({ action:'잠을 잔다.', saveState:{ world:{ date:'1285-03-02', time:'07:20', location:'개인실' } } }), /완료 시간과 advance_minutes를 TIME_GUIDE 240-480 안에 두며/, 'completed sleep must receive explicit hard profile bounds');
 assert.deepEqual(classifySceneIntent('한 시간 잠을 잔다.').suggestedAdvanceMinutes, [60, 60], 'explicit sleep duration must remain exact');
 assert.deepEqual(classifySceneIntent('1시간 반 동안 잠을 잔다.').suggestedAdvanceMinutes, [90, 90], 'the half-hour suffix must add thirty minutes to an explicit hour duration');
+for(const nap of ['낮잠을 잔다.','쪽잠을 잔다.','선잠을 잔다.','토막잠을 잔다.']){
+  const napIntent=classifySceneIntent(nap);
+  assert.equal(napIntent.timeProfile,'rest',`a named nap must use the short-rest profile: ${nap}`);
+  assert.deepEqual(napIntent.suggestedAdvanceMinutes,[30,240],`a named nap must not inherit the 4-8 hour sleep floor: ${nap}`);
+}
+const strictDaySleep=classifySceneIntent('하루 넘게 잠을 잔다.');
+assert.equal(strictDaySleep.explicitDurationMinutes,null,'a strict lower bound must not become an exact duration');
+assert.equal(strictDaySleep.strictDurationLowerBoundMinutes,1440,'the strict lower bound must remain visible to routing');
+assert.deepEqual(strictDaySleep.suggestedAdvanceMinutes,[1440,1440],'a strict day-plus request must stop at the one-turn cap');
+assert.equal(strictDaySleep.turnLimitTruncated,true,'a strict day-plus request must remain incomplete at the cap');
+assert.equal(classifySceneIntent('하루를 초과해서 잠을 잔다.').turnLimitTruncated,true,'초과 forms must preserve the same incomplete strict bound');
+const strictTraining=classifySceneIntent('2시간 넘게 훈련한다.');
+assert.equal(strictTraining.explicitDurationMinutes,null,'a strict training bound must not be emitted as exact');
+assert.deepEqual(strictTraining.suggestedAdvanceMinutes,[121,121],'strict training must run beyond the declared lower bound');
 const overlongRest=classifySceneIntent('48시간 쉰다.');
 assert.equal(overlongRest.minAdvanceMinutes,1440,'a declared duration beyond one turn must cap its deterministic floor');
 assert.deepEqual(overlongRest.suggestedAdvanceMinutes,[1440,1440],'an overlong declared duration must never emit a guide beyond the canonical turn limit');
