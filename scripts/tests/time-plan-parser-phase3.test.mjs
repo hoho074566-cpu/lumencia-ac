@@ -84,6 +84,16 @@ assert.deepEqual(projectStructuredOwnedEffects(structuralTurn,structuralAuthorit
 const missingInterrupted=structuredClone(structuralTurn);
 missingInterrupted.time_execution.interrupted_clause_id=null;
 assert.equal(validateStructuredTimeExecution(missingInterrupted,exact,scheduleRuntime).reason,'missing-interrupted-clause','a started incomplete action cannot disappear from the execution receipt');
+const incompleteNoneBoundary=structuredClone(structuralTurn);
+incompleteNoneBoundary.state_delta={advance_minutes:60,fatigue_delta:0,gold_delta:0};
+incompleteNoneBoundary.time_execution={version:'1.0',plan_used:true,boundary_kind:'none',boundary_minutes:60,completed_clause_ids:['action_1'],interrupted_clause_id:'action_2',decision_scene_index:null,boundary_event_id:null,effect_owners:[],scalar_contributions:[]};
+assert.equal(validateStructuredTimeExecution(incompleteNoneBoundary,exact).reason,'incomplete-none-boundary','a no-boundary receipt cannot leave an interrupted suffix for the profile floor to complete');
+const completedNoneBoundary=structuredClone(incompleteNoneBoundary);
+completedNoneBoundary.state_delta.advance_minutes=540;
+completedNoneBoundary.time_execution.boundary_minutes=540;
+completedNoneBoundary.time_execution.completed_clause_ids=['action_1','action_2'];
+completedNoneBoundary.time_execution.interrupted_clause_id=null;
+assert.equal(validateStructuredTimeExecution(completedNoneBoundary,exact).valid,true,'a no-boundary receipt remains valid only after the whole structured plan completed');
 assert.equal(projectStructuredOwnedEffects(structuralTurn,structuralAuthority,90).reason,'boundary-rebased','a receipt from a longer model timeline cannot authorize effects after a locally earlier boundary');
 const wholeArrayClaim=structuredClone(structuralTurn);
 wholeArrayClaim.time_execution.effect_owners[0].effect_index=null;
