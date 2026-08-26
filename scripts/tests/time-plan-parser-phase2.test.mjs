@@ -42,6 +42,24 @@ assert.ok(!ambiguousNight.structuredTimePlanApplied.includes('relative-date-star
 const separateSentence = classifySceneIntent('내일. 지금 30분 동안 기다린다.', { ...context, currentTime: '09:00', location: '광장' });
 assert.equal(separateSentence.dateQualifiedStart, false, 'a date in a completed sentence cannot qualify the following action clause');
 assert.deepEqual(separateSentence.suggestedAdvanceMinutes, [30, 30], 'the following immediate wait retains its own duration');
+const fractionalDay = classifySceneIntent('0.5일 후 1시간 훈련한다', context);
+assert.equal(fractionalDay.dateQualifiedStartOffsetMinutes, 720, 'a decimal point inside a number is not a sentence boundary');
+assert.deepEqual(fractionalDay.suggestedAdvanceMinutes, [780, 780], 'a fractional fixed-day start preserves its exact offset and activity duration');
+for (const embeddedDate of ['어제처럼 1시간 훈련한다', '내일성에서 1시간 훈련한다']) {
+  const embedded = classifySceneIntent(embeddedDate, context);
+  assert.equal(embedded.kind, 'training', `${embeddedDate}: embedded date text remains an immediate training action`);
+  assert.equal(embedded.dateQualifiedStart, false, `${embeddedDate}: a date name must have a supported token or particle boundary`);
+  assert.deepEqual(embedded.suggestedAdvanceMinutes, [60, 60], `${embeddedDate}: embedded date text cannot delay or reject the action`);
+  assert.ok(!embedded.structuredTimePlanApplied.includes('relative-date-start'), `${embeddedDate}: embedded date text cannot enter structured date execution`);
+}
+const dateParticle = classifySceneIntent('내일은 1시간 훈련한다', context);
+assert.equal(dateParticle.dateQualifiedStartOffsetMinutes, 1440, 'a supported topic particle preserves a standalone named date');
+assert.ok(dateParticle.structuredTimePlanApplied.includes('relative-date-start'), 'a bounded date particle remains eligible for structured date execution');
+const structuredSleep = classifySceneIntent('잠을 자자', { ...context, location: '개인실' });
+assert.equal(structuredSleep.kind, 'downtime', 'a committed structured sleep remains downtime');
+assert.equal(structuredSleep.timeProfile, 'sleep', 'the structured sleep subtype survives execution classification');
+assert.deepEqual(structuredSleep.suggestedAdvanceMinutes, [240, 480], 'structured sleep uses the sleep range rather than the short-rest range');
+assert.ok(structuredSleep.structuredTimePlanApplied.includes('sleep-subtype'), 'sleep subtype migration records structured provenance');
 
 const propositive = classifySceneIntent('1시간 훈련하자', context);
 assert.equal(propositive.kind, 'training', 'a propositive committed training action is no longer generic');
