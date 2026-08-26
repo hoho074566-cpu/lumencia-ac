@@ -21,7 +21,7 @@ const schemaStart=source.indexOf('function goalV2FieldSchema(){');
 const schemaEnd=source.indexOf('function installResponsesRouter()');
 assert.ok(schemaStart>=0&&schemaEnd>schemaStart,'Goal V2 structured-format source markers missing');
 const schemaSource=source.slice(schemaStart,schemaEnd);
-const makeSchema=new Function(`const GOAL_V2_RULES='[NPC GOAL V2]';${schemaSource};return {patchGoalV2StructuredFormat};`);
+const makeSchema=new Function(`const GOAL_V2_RULES='[NPC GOAL V2]';const TIME_EXECUTION_RULES='[TPP PHASE 3]';${schemaSource};return {patchGoalV2StructuredFormat};`);
 const {patchGoalV2StructuredFormat}=makeSchema();
 
 const key='anastasia';

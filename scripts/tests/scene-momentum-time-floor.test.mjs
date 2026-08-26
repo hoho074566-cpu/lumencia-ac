@@ -6,17 +6,21 @@ import { mergeRoutedEventProgressState, scheduledIdsDueByTurnEnd } from '../../l
 import { minutesUntilEventConsequence } from '../../lib/event-consequence.js';
 import { buildSceneMomentumDirective, classifySceneIntent, isPcRelevantScheduleEvent, nextScheduleBoundaryMinutes, scheduleBoundaryLimitMinutes } from '../../lib/scene-momentum.js';
 import { isAdditiveAdverbialStem } from '../../lib/time-plan-parser.js';
+import { projectStructuredOwnedEffects, validateStructuredTimeExecution } from '../../lib/time-plan-reconciliation.js';
 
 const source=readFileSync('api/chat-router.js','utf8');
 const start=source.indexOf('function bounded(');
 const end=source.indexOf('function uniqText(');
 assert.ok(start>=0&&end>start,'Scene Momentum time-floor source markers missing');
 const timeFloorSource=source.slice(start,end);
-const makeHelpers=new Function('array','object','classifySceneIntent','isPcRelevantScheduleEvent','nextScheduleBoundaryMinutes','scheduleBoundaryLimitMinutes','scheduledIdsDueByTurnEnd','minutesUntilEventConsequence','CHARACTER_REGISTRY','isAdditiveAdverbialStem',`${timeFloorSource}\nreturn {applySceneMomentumTimeFloor,consequenceNpcKeysForShortening,consequenceNpcEffectsForShortening,deriveTimedActionRuntime,runtimeSynthesisTurn,prefixNpcStateUpdate};`);
+const makeHelpers=new Function('array','object','classifySceneIntent','isPcRelevantScheduleEvent','nextScheduleBoundaryMinutes','scheduleBoundaryLimitMinutes','scheduledIdsDueByTurnEnd','minutesUntilEventConsequence','CHARACTER_REGISTRY','isAdditiveAdverbialStem','projectStructuredOwnedEffects','validateStructuredTimeExecution',`${timeFloorSource}\nreturn {applySceneMomentumTimeFloor,consequenceNpcKeysForShortening,consequenceNpcEffectsForShortening,deriveTimedActionRuntime,runtimeSynthesisTurn,prefixNpcStateUpdate};`);
 const array=(value)=>Array.isArray(value)?value:[];
 const object=(value)=>value&&typeof value==='object'&&!Array.isArray(value)?value:{};
 const testRegistry={artemis:'아르테미스',emily:'에밀리',lena:'레나'};
-const {applySceneMomentumTimeFloor,consequenceNpcKeysForShortening,consequenceNpcEffectsForShortening,deriveTimedActionRuntime,runtimeSynthesisTurn,prefixNpcStateUpdate}=makeHelpers(array,object,classifySceneIntent,isPcRelevantScheduleEvent,nextScheduleBoundaryMinutes,scheduleBoundaryLimitMinutes,scheduledIdsDueByTurnEnd,minutesUntilEventConsequence,testRegistry,isAdditiveAdverbialStem);
+const {applySceneMomentumTimeFloor,consequenceNpcKeysForShortening,consequenceNpcEffectsForShortening,deriveTimedActionRuntime,runtimeSynthesisTurn,prefixNpcStateUpdate}=makeHelpers(array,object,classifySceneIntent,isPcRelevantScheduleEvent,nextScheduleBoundaryMinutes,scheduleBoundaryLimitMinutes,scheduledIdsDueByTurnEnd,minutesUntilEventConsequence,testRegistry,isAdditiveAdverbialStem,projectStructuredOwnedEffects,validateStructuredTimeExecution);
+
+const effectOwner=(field,effectIndex=null,ownerId='action_1',ownerKind='clause',scope='state_delta')=>({scope,field,effect_index:effectIndex,owner_kind:ownerKind,owner_id:ownerId});
+const choiceExecution=(turn,{minutes=Number(turn?.state_delta?.advance_minutes||0),completed=['action_1'],interrupted='action_2',owners=[],boundaryEventId=null}={})=>({version:'1.0',plan_used:true,boundary_kind:'choice',boundary_minutes:minutes,completed_clause_ids:completed,interrupted_clause_id:interrupted,decision_scene_index:turn.scene.length-1,boundary_event_id:boundaryEventId,effect_owners:owners});
 
 const knightPc={name:'카인',department:'기사과'};
 const irrelevantScheduleSave={
@@ -440,6 +444,56 @@ assert.deepEqual(turn.state_delta.skill_experience,[],'a long exact skill name c
 turn={scene_title:'훈련 뒤 조건부 수면 보상',scene:[{kind:'narration',text:'한 시간 훈련을 마쳤고 잠들면 숙면 보상을 받을 수 있다.'},{kind:'dialogue',speaker_key:'artemis',text:'지금 경계 임무를 맡겠나?'}],choices:['맡는다.','잔다.','묻는다.'],state_delta:{advance_minutes:60,items_add:['숙면 보상']}};
 applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
 assert.deepEqual(turn.state_delta.items_add,[],'a string-array effect named after an unfinished action cannot bypass action-type filtering');
+
+// Phase 3 structural ownership corpus: narration wording is not keep/drop authority.
+const structuralCompoundSave={pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]};
+turn={scene_title:'PC 훈련 뒤 선택',scene:[{kind:'narration',text:'한 시간 훈련을 마쳤고 훈련 완료 상태가 되었다.'},{kind:'dialogue',speaker_key:'artemis',text:'지금 임무를 맡겠나?'}],choices:['맡는다.','잔다.','묻는다.'],state_delta:{advance_minutes:60,npc_state_updates:[{npc_key:'emily',status:'훈련 완료'}]}};
+turn.time_execution=choiceExecution(turn,{owners:[]});
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:structuralCompoundSave},turn,'game');
+assert.deepEqual(turn.state_delta.npc_state_updates,[],'an NPC state row without clause ownership cannot borrow PC completion wording');
+
+turn={scene_title:'수사 질문 뒤 임무 선택',scene:[{kind:'narration',text:'누가 이 흔적을 조사했을까?'},{kind:'narration',text:'한 시간 훈련을 마치고 검술이 늘었다.'},{kind:'dialogue',speaker_key:'artemis',text:'이 임무를 받아들이겠나?'}],choices:['조사한다.','거절한다.','보류한다.'],state_delta:{advance_minutes:60,skill_experience:[multiPrefixGrowth]}};
+turn.time_execution=choiceExecution(turn,{owners:[effectOwner('skill_experience',0)]});
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:structuralCompoundSave},turn,'game');
+assert.deepEqual(turn.state_delta.skill_experience,[multiPrefixGrowth],'the structured decision index preserves completed effects despite rhetorical lexical overlap');
+assert.match(turn.scene.map(item=>item.text).join(' '),/이 임무를 받아들이겠나/,'the declared final decision item owns the choices');
+assert.doesNotMatch(turn.scene.map(item=>item.text).join(' '),/누가 이 흔적/,'an earlier rhetorical question is not rebound to the choices');
+
+turn={scene_title:'무구두점 선택',scene:[{kind:'narration',text:'한 시간 훈련을 마치고 기록표를 받았는데 지금 임무를 맡겠나?'}],choices:['맡는다.','잔다.','묻는다.'],state_delta:{advance_minutes:60,items_add:['훈련 기록표']}};
+turn.time_execution=choiceExecution(turn,{owners:[effectOwner('items_add',0)]});
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:structuralCompoundSave},turn,'game');
+assert.deepEqual(turn.state_delta.items_add,['훈련 기록표'],'clause ownership preserves an earned item without punctuation-based sentence slicing');
+
+turn={scene_title:'훈련 자원 변화 뒤 선택',scene:[{kind:'narration',text:'한 시간 훈련을 마쳐 피로가 3 늘고 금화 5개를 받았다.'},{kind:'dialogue',speaker_key:'artemis',text:'이제 임무를 맡겠나?'}],choices:['맡는다.','잔다.','묻는다.'],state_delta:{advance_minutes:60,fatigue_delta:3,gold_delta:5}};
+turn.time_execution=choiceExecution(turn,{owners:[effectOwner('fatigue_delta'),effectOwner('gold_delta')]});
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:structuralCompoundSave},turn,'game');
+assert.equal(turn.state_delta.fatigue_delta,3,'completed-clause ownership preserves evidenced scalar fatigue');
+assert.equal(turn.state_delta.gold_delta,5,'completed-clause ownership preserves evidenced scalar currency');
+
+turn={scene_title:'조건부 수면 계시',scene:[{kind:'narration',text:'한 시간 훈련을 마쳤고 잠들면 붉은 달의 계시를 얻을 수 있다.'},{kind:'dialogue',speaker_key:'artemis',text:'지금 임무를 맡겠나?'}],choices:['맡는다.','잔다.','묻는다.'],state_delta:{advance_minutes:60,pc_knowledge_add:['붉은 달의 계시']}};
+turn.time_execution=choiceExecution(turn,{owners:[effectOwner('pc_knowledge_add',0,'action_2')]});
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:structuralCompoundSave},turn,'game');
+assert.deepEqual(turn.state_delta.pc_knowledge_add,[],'an unfinished clause owner is dropped even when its conditional effect is narrated beside completion');
+
+const ongoingDirector={source:'director',intervention:'medium',beat:'choice',event_kind:'world',spotlight_keys:['artemis'],callback_key:null,callback_phase:null,callback_note:'ongoing-fire',reason:'ongoing-fire evacuation choice'};
+turn={scene_title:'훈련 뒤 계속되는 화재',scene:[{kind:'narration',text:'한 시간 훈련을 마친 순간 화재 현장의 대피 지시가 이어졌다.'},{kind:'dialogue',speaker_key:'artemis',text:'동쪽과 서쪽 중 어디부터 대피시키겠나?'}],choices:['동쪽부터.','서쪽부터.','상황을 본다.'],director:ongoingDirector,event_progress:{event_instance_id:'director:ongoing-fire',active_beat:'evacuation-choice',completed_beats:['alarm']},state_delta:{advance_minutes:60,active_events_add:[]}};
+turn.time_execution=choiceExecution(turn,{boundaryEventId:'director:ongoing-fire',owners:[effectOwner('event_progress',null,'director:ongoing-fire','boundary-event','turn'),effectOwner('director',null,'director:ongoing-fire','boundary-event','turn')]});
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{...structuralCompoundSave,sceneRuntime:{eventProgress:{eventInstanceId:'director:ongoing-fire'}}}},turn,'game');
+assert.equal(turn.event_progress?.event_instance_id,'director:ongoing-fire','an owned nonterminal active Director event survives its resumed choice boundary');
+assert.deepEqual(turn.director,ongoingDirector,'owned active Director metadata remains attached to its choices');
+
+turn={scene_title:'0분 상한 훈련 선택',scene:[{kind:'narration',text:'훈련을 모두 마치고 기록표를 받았다.'},{kind:'dialogue',speaker_key:'artemis',text:'이제 잠들겠나?'}],choices:['잔다.','기다린다.','묻는다.'],state_delta:{advance_minutes:0,items_add:['훈련 기록표']}};
+turn.time_execution=choiceExecution(turn,{minutes:0,owners:[effectOwner('items_add',0)]});
+applySceneMomentumTimeFloor({action:'최대 1시간 훈련하고 8시간 잔다',saveState:structuralCompoundSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,0,'a zero-minute ranged prefix remains at the actual boundary');
+assert.deepEqual(turn.state_delta.items_add,[],'an invalid zero-time positive-range completion fails closed instead of preserving a reward');
+
+const structuralGoalProgress={npc_key:'emily',current_goal:'단서 조사',goal_progress_delta:20,goal_state:'active',goal_reason:'새 단서를 확보했다',goal_next_action:'기록을 대조한다',goal_replace:false};
+turn={scene_title:'대화로 단서 확보',scene:[{kind:'narration',text:'한 시간 대화를 마치며 에밀리가 새 단서를 확보해 조사를 진전시켰다.'},{kind:'dialogue',speaker_key:'artemis',text:'이제 휴식하겠나?'}],choices:['쉰다.','계속 대화한다.','묻는다.'],state_delta:{advance_minutes:60,npc_state_updates:[structuralGoalProgress]}};
+turn.time_execution=choiceExecution(turn,{owners:[effectOwner('npc_state_updates',0)]});
+applySceneMomentumTimeFloor({action:'1시간 대화하고 8시간 잔다',saveState:{...structuralCompoundSave,world:{...structuralCompoundSave.world,location:'상담실'}}},turn,'game');
+assert.deepEqual(turn.state_delta.npc_state_updates,[structuralGoalProgress],'a cohesive Goal V2 progress row survives by completed-clause ownership');
+
 turn={scene_title:'대기 뒤 선택',scene:[{kind:'narration',text:'한 시간을 기다렸고 전령의 편지를 받았다.'},{kind:'dialogue',speaker_key:'artemis',text:'편지를 지금 열겠나?'}],choices:['연다.','나중에 연다.','발신인을 묻는다.'],state_delta:{advance_minutes:60,items_add:['전령의 편지','숙면 보상']}};
 applySceneMomentumTimeFloor({action:'1시간 기다리고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'정문'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
 assert.deepEqual(turn.state_delta.items_add,['전령의 편지'],'a declared-duration finite wait preserves its visibly earned prefix item');

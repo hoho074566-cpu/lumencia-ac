@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
-import { classifySceneIntent } from '../../lib/scene-momentum.js';
+import { buildSceneMomentumDirective, classifySceneIntent } from '../../lib/scene-momentum.js';
 import { deriveStructuredDecisionPlan, deriveStructuredExecutionPlan, parseTimePlan } from '../../lib/time-plan-parser.js';
+import { projectStructuredOwnedEffects, validateStructuredTimeExecution } from '../../lib/time-plan-reconciliation.js';
 
 const context={location:'기숙사',currentTime:'08:00',currentDate:'1285-03-01',currentWeekday:'수요일',actorName:'아리아'};
 
 const exact=deriveStructuredExecutionPlan(parseTimePlan('1시간 훈련하고 8시간 잔다',context));
 assert.equal(exact.eligible,true,'an owned committed compound becomes an ordered execution plan');
+assert.deepEqual(exact.clauses.map(row=>row.clause_id),['action_1','action_2'],'execution clauses expose stable action IDs');
 assert.deepEqual(exact.clauses.map(row=>[row.action_type,row.start_min_minutes,row.complete_min_minutes]),[['training',0,60],['sleep',60,540]],'exact clauses preserve order and cumulative completion boundaries');
 assert.deepEqual([exact.total_min_minutes,exact.total_max_minutes],[540,540]);
 
@@ -53,5 +55,37 @@ for(const action of ['1시간 정도 훈련하고 8시간 잔다','이번에도 
 for(const action of ['준비되면 1시간 훈련하자','에밀리가 1시간 훈련하고 나는 8시간 잔다','「1시간 훈련하고 8시간 자라」고 말했다']){
   assert.equal(deriveStructuredExecutionPlan(parseTimePlan(action,context)).eligible,false,`${action}: conditional, third-party, and quoted plans fail closed`);
 }
+
+const directive=buildSceneMomentumDirective({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:{name:'아리아'},world:{date:'1285-03-01',time:'08:00',location:'기숙사'},sceneRuntime:{}},registry:{}});
+assert.match(directive,/STRUCTURED_TIME_PLAN=action_1:training@0-60\/0-60;action_2:sleep@60-540\/60-540/,'the canonical call receives the exact clause IDs and timeline');
+assert.match(directive,/effect_owners/,'the canonical call is instructed to return structural effect ownership');
+
+const structuralTurn={
+  scene:[{text:'훈련은 끝났고, 잠든 지 한 시간이 지났다.'}],
+  choices:[],
+  state_delta:{advance_minutes:120,fatigue:-3,items_add:['미완료 수면 보상']},
+  time_execution:{
+    version:'1.0',plan_used:true,boundary_kind:'schedule',boundary_minutes:120,
+    completed_clause_ids:['action_1'],interrupted_clause_id:'action_2',decision_scene_index:null,
+    boundary_event_id:'schedule:morning-roll-call',
+    effect_owners:[
+      {scope:'state_delta',field:'fatigue',effect_index:null,owner_kind:'clause',owner_id:'action_1'},
+      {scope:'state_delta',field:'items_add',effect_index:0,owner_kind:'clause',owner_id:'action_2'},
+    ],
+  },
+};
+const structuralAuthority=validateStructuredTimeExecution(structuralTurn,exact);
+assert.equal(structuralAuthority.valid,true,'a started incomplete action is explicitly identified by clause ID');
+assert.deepEqual(projectStructuredOwnedEffects(structuralTurn,structuralAuthority,120).preserved_delta,{fatigue:-3},'projection keeps completed-clause effects and drops interrupted-clause effects');
+const missingInterrupted=structuredClone(structuralTurn);
+missingInterrupted.time_execution.interrupted_clause_id=null;
+assert.equal(validateStructuredTimeExecution(missingInterrupted,exact).reason,'missing-interrupted-clause','a started incomplete action cannot disappear from the execution receipt');
+assert.equal(projectStructuredOwnedEffects(structuralTurn,structuralAuthority,90).reason,'boundary-rebased','a receipt from a longer model timeline cannot authorize effects after a locally earlier boundary');
+const wholeArrayClaim=structuredClone(structuralTurn);
+wholeArrayClaim.time_execution.effect_owners[1].effect_index=null;
+assert.equal(validateStructuredTimeExecution(wholeArrayClaim,exact).reason,'invalid-array-effect-index','an array cannot be preserved wholesale through a scalar ownership claim');
+const outOfRangeClaim=structuredClone(structuralTurn);
+outOfRangeClaim.time_execution.effect_owners[1].effect_index=1;
+assert.equal(validateStructuredTimeExecution(outOfRangeClaim,exact).reason,'invalid-array-effect-index','an ownership claim cannot point beyond the returned effect rows');
 
 console.log('PASS Time Plan Parser Phase 3 ordered execution timeline, range, alignment, and fail-closed boundaries');
