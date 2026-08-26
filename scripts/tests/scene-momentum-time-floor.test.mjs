@@ -13,15 +13,33 @@ const start=source.indexOf('function bounded(');
 const end=source.indexOf('function uniqText(');
 assert.ok(start>=0&&end>start,'Scene Momentum time-floor source markers missing');
 const timeFloorSource=source.slice(start,end);
-const makeHelpers=new Function('array','object','classifySceneIntent','isPcRelevantScheduleEvent','nextScheduleBoundaryMinutes','scheduleBoundaryLimitMinutes','scheduledIdsDueByTurnEnd','minutesUntilEventConsequence','CHARACTER_REGISTRY','isAdditiveAdverbialStem','projectStructuredOwnedEffects','validateStructuredTimeExecution',`${timeFloorSource}\nreturn {applySceneMomentumTimeFloor,consequenceNpcKeysForShortening,consequenceNpcEffectsForShortening,deriveTimedActionRuntime,runtimeSynthesisTurn,prefixNpcStateUpdate};`);
+const makeHelpers=new Function('array','object','classifySceneIntent','isPcRelevantScheduleEvent','nextScheduleBoundaryMinutes','scheduleBoundaryLimitMinutes','scheduledIdsDueByTurnEnd','minutesUntilEventConsequence','CHARACTER_REGISTRY','isAdditiveAdverbialStem','projectStructuredOwnedEffects','validateStructuredTimeExecution',`${timeFloorSource}\nreturn {applySceneMomentumTimeFloor,consequenceNpcKeysForShortening,consequenceNpcEffectsForShortening,deriveTimedActionRuntime,runtimeSynthesisTurn,prefixNpcStateUpdate,turnBeforePlayerChoice};`);
 const array=(value)=>Array.isArray(value)?value:[];
 const object=(value)=>value&&typeof value==='object'&&!Array.isArray(value)?value:{};
 const testRegistry={artemis:'아르테미스',emily:'에밀리',lena:'레나'};
-const {applySceneMomentumTimeFloor,consequenceNpcKeysForShortening,consequenceNpcEffectsForShortening,deriveTimedActionRuntime,runtimeSynthesisTurn,prefixNpcStateUpdate}=makeHelpers(array,object,classifySceneIntent,isPcRelevantScheduleEvent,nextScheduleBoundaryMinutes,scheduleBoundaryLimitMinutes,scheduledIdsDueByTurnEnd,minutesUntilEventConsequence,testRegistry,isAdditiveAdverbialStem,projectStructuredOwnedEffects,validateStructuredTimeExecution);
+const {applySceneMomentumTimeFloor,consequenceNpcKeysForShortening,consequenceNpcEffectsForShortening,deriveTimedActionRuntime,runtimeSynthesisTurn,prefixNpcStateUpdate,turnBeforePlayerChoice}=makeHelpers(array,object,classifySceneIntent,isPcRelevantScheduleEvent,nextScheduleBoundaryMinutes,scheduleBoundaryLimitMinutes,scheduledIdsDueByTurnEnd,minutesUntilEventConsequence,testRegistry,isAdditiveAdverbialStem,projectStructuredOwnedEffects,validateStructuredTimeExecution);
 
 const effectOwner=(field,effectIndex=null,ownerId='action_1',ownerKind='clause',scope='state_delta')=>({scope,field,effect_index:effectIndex,owner_kind:ownerKind,owner_id:ownerId});
 const choiceExecution=(turn,{minutes=Number(turn?.state_delta?.advance_minutes||0),completed=['action_1'],interrupted='action_2',owners=[],scalarContributions=[],boundaryEventId=null,boundaryKind='choice'}={})=>({version:'1.0',plan_used:true,boundary_kind:boundaryKind,boundary_minutes:minutes,completed_clause_ids:completed,interrupted_clause_id:interrupted,decision_scene_index:turn.choices?.length?turn.scene.length-1:null,boundary_event_id:boundaryEventId,effect_owners:owners,scalar_contributions:scalarContributions});
 const scalarContribution=(field,amount,ownerId='action_1',ownerKind='clause')=>({field,amount,owner_kind:ownerKind,owner_id:ownerId});
+
+const cappedDecisionTurn={
+  scene:[
+    {kind:'narration',text:'복도를 걸었다.'},
+    {kind:'narration',text:'창밖이 밝았다.'},
+    {kind:'narration',text:'학생들이 지나갔다.'},
+    {kind:'narration',text:'종이 울렸다.'},
+    {kind:'narration',text:'갈림길에 도착했다.'},
+    {kind:'dialogue',text:'동문과 서문 중 어느 길로 갈까?'},
+    {kind:'narration',text:'바람이 불었다.'},
+    {kind:'narration',text:'횃불이 흔들렸다.'},
+  ],
+  choices:['동문','서문'],
+};
+const cappedDecisionEvidence=turnBeforePlayerChoice(cappedDecisionTurn,{applicable:true,valid:false,reason:'invalid-decision-location',decision_scene_index:8});
+assert.match(cappedDecisionEvidence._choice_prompt_text,/동문과 서문/,'a decision receipt invalidated by core scene capping falls back to the surviving choice prompt');
+assert.equal(cappedDecisionEvidence.scene.length,5,'the invalid structured index cannot bind choices to the unrelated last surviving row');
+assert.equal(cappedDecisionEvidence._structured_choice_authority,undefined,'an invalid receipt never gains structured choice authority through fallback');
 
 const knightPc={name:'카인',department:'기사과'};
 const irrelevantScheduleSave={

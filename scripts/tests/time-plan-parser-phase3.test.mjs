@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { buildSceneMomentumDirective, classifySceneIntent } from '../../lib/scene-momentum.js';
 import { deriveStructuredDecisionPlan, deriveStructuredExecutionPlan, parseTimePlan } from '../../lib/time-plan-parser.js';
-import { projectStructuredOwnedEffects, replaceStructuredEffectRows, structuredEffectRows, validateStructuredTimeExecution } from '../../lib/time-plan-reconciliation.js';
+import { projectStructuredOwnedEffects, rebaseStructuredEffectOwners, replaceStructuredEffectRows, structuredEffectRows, validateStructuredTimeExecution } from '../../lib/time-plan-reconciliation.js';
 
 const context={location:'기숙사',currentTime:'08:00',currentDate:'1285-03-01',currentWeekday:'수요일',actorName:'아리아'};
+const routerSource=readFileSync('api/chat-router.js','utf8');
+assert.match(routerSource,/mergeRawGoalV2Fields[\s\S]*structuredEffectRows\(parsed,field\)[\s\S]*rebaseStructuredEffectOwners\(data\.turn\)/,'the adapter tags pre-sanitization rows and rebases the returned receipt before any runtime validators');
 
 const exact=deriveStructuredExecutionPlan(parseTimePlan('1시간 훈련하고 8시간 잔다',context));
 assert.equal(exact.eligible,true,'an owned committed compound becomes an ordered execution plan');
@@ -124,6 +127,16 @@ const taggedDuplicateRows=structuredEffectRows(duplicateFilteredTurn,'skill_expe
 replaceStructuredEffectRows(duplicateFilteredTurn,'skill_experience',[acceptedDuplicate]);
 assert.equal(duplicateFilteredTurn.time_execution.effect_owners[0].effect_index,0,'an accepted duplicate key keeps its exact raw source instead of borrowing the first rejected row');
 assert.doesNotMatch(JSON.stringify(duplicateFilteredTurn.state_delta.skill_experience),/lumensia\.time\.effect/,'internal source markers never enter the JSON response');
+
+const coreSanitizedTurn={
+  state_delta:{relationship_changes:[{...structuredEffectRows({state_delta:{relationship_changes:[{npc_key:'invalid'},{npc_key:'emily'}]}},'relationship_changes')[1]}]},
+  time_execution:{effect_owners:[
+    {scope:'state_delta',field:'relationship_changes',effect_index:0,owner_kind:'clause',owner_id:'action_1'},
+    {scope:'state_delta',field:'relationship_changes',effect_index:1,owner_kind:'clause',owner_id:'action_2'},
+  ]},
+};
+rebaseStructuredEffectOwners(coreSanitizedTurn);
+assert.deepEqual(coreSanitizedTurn.time_execution.effect_owners,[{scope:'state_delta',field:'relationship_changes',effect_index:0,owner_kind:'clause',owner_id:'action_2'}],'core sanitization drops the removed source owner and rebases the exact retained row instead of lending its compacted index');
 
 const overLimitPlan=deriveStructuredExecutionPlan(parseTimePlan('25시간 기다리고 8시간 잔다',context));
 const overLimitTurn={scene:[{text:'계속 기다릴까?'}],choices:['계속한다.'],state_delta:{advance_minutes:1440,fatigue_delta:0,gold_delta:0},time_execution:{version:'1.0',plan_used:true,boundary_kind:'choice',boundary_minutes:1440,completed_clause_ids:[],interrupted_clause_id:'action_1',decision_scene_index:0,boundary_event_id:null,effect_owners:[],scalar_contributions:[]}};

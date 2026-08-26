@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { structuredEffectRows } from '../../lib/time-plan-reconciliation.js';
 
 const source=readFileSync('api/chat-router.js','utf8');
 const lifecycleStart=source.indexOf('function bounded(');
@@ -21,8 +22,8 @@ const schemaStart=source.indexOf('function goalV2FieldSchema(){');
 const schemaEnd=source.indexOf('function installResponsesRouter()');
 assert.ok(schemaStart>=0&&schemaEnd>schemaStart,'Goal V2 structured-format source markers missing');
 const schemaSource=source.slice(schemaStart,schemaEnd);
-const makeSchema=new Function(`const GOAL_V2_RULES='[NPC GOAL V2]';const TIME_EXECUTION_RULES='[TPP PHASE 3]';${schemaSource};return {patchGoalV2StructuredFormat};`);
-const {patchGoalV2StructuredFormat}=makeSchema();
+const makeSchema=new Function('structuredEffectRows',`const GOAL_V2_RULES='[NPC GOAL V2]';const TIME_EXECUTION_RULES='[TPP PHASE 3]';${schemaSource};return {patchGoalV2StructuredFormat};`);
+const {patchGoalV2StructuredFormat}=makeSchema(structuredEffectRows);
 
 const key='anastasia';
 function oldGoal(overrides={}){
@@ -51,6 +52,7 @@ test('duplicate npc_state_updates stay row-aligned after legacy parsing',()=>{
   assert.equal(parsed.state_delta.npc_state_updates[1].goal_progress_delta,-7);
   assert.equal(parsed.state_delta.npc_state_updates[1].goal_reason,'둘째 근거');
   assert.equal(parsed.state_delta.npc_state_updates[1].goal_replace,true);
+  assert.equal(parsed.state_delta.npc_state_updates[1][Symbol.for('lumensia.time.effect.source')],1,'the parser carries the exact raw row index through core sanitization');
 });
 
 test('legacy structured output preserves the Event Consequence queue field added by the adapter',()=>{
@@ -66,7 +68,7 @@ test('legacy structured output preserves the Event Consequence queue field added
   assert.ok(patched.text.format.schema.properties.state_delta.required.includes('delayed_consequences_add'));
   const consequence={event_name:'교수 호출',target_bucket:'active',delay_minutes:30,reason:'결투 여파',secret_level:0};
   const raw={state_delta:{hooks_add:[],npc_state_updates:[],delayed_consequences_add:[consequence]}};
-  assert.deepEqual(patched.text.format.$parseRaw(JSON.stringify(raw)).state_delta.delayed_consequences_add,[consequence]);
+  assert.deepEqual(JSON.parse(JSON.stringify(patched.text.format.$parseRaw(JSON.stringify(raw)).state_delta.delayed_consequences_add)),[consequence]);
 });
 
 test('structured format requires and preserves the TPP execution ownership receipt',()=>{

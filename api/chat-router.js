@@ -11,7 +11,7 @@ import { routeOpenAIParams, routerVersion, array, object, clampText } from './li
 import { actualScheduledEntrants, freshChoices, reconcileParticipants } from '../lib/scene-continuity.js';
 import { ADAPTIVE_TIME_SCALE_VERSION, SCENE_MOMENTUM_VERSION, classifySceneIntent, deriveSceneDelta, isPcRelevantScheduleEvent, nextScheduleBoundaryMinutes, updateSceneMomentum } from '../lib/scene-momentum.js';
 import { TIME_PLAN_PARSER_VERSION, isAdditiveAdverbialStem, parseTimePlan, summarizeTimePlan } from '../lib/time-plan-parser.js';
-import { projectStructuredOwnedEffects, replaceStructuredEffectRows, structuredEffectRows, validateStructuredTimeExecution } from '../lib/time-plan-reconciliation.js';
+import { projectStructuredOwnedEffects, rebaseStructuredEffectOwners, replaceStructuredEffectRows, structuredEffectRows, validateStructuredTimeExecution } from '../lib/time-plan-reconciliation.js';
 import { SCENE_NOVELTY_VERSION, deriveSceneNovelty } from '../lib/scene-novelty.js';
 import { deriveScenePurpose } from '../lib/scene-purpose.js';
 import { deriveSceneExitCondition, evaluateSceneExitCondition } from '../lib/scene-exit.js';
@@ -230,6 +230,10 @@ function mergeRawGoalV2Fields(parsed,raw){
   if(parsed?.state_delta&&Array.isArray(rawAwakeningProgress))parsed.state_delta.awakening_progress=rawAwakeningProgress.slice(0,1);
   const rawTalentEvolution=raw?.state_delta?.talent_evolution;
   if(parsed?.state_delta&&Array.isArray(rawTalentEvolution))parsed.state_delta.talent_evolution=rawTalentEvolution.slice(0,1);
+  const parsedDelta=parsed?.state_delta;
+  if(parsedDelta&&typeof parsedDelta==='object'&&!Array.isArray(parsedDelta))for(const field of Object.keys(parsedDelta)){
+    if(Array.isArray(parsedDelta[field]))structuredEffectRows(parsed,field);
+  }
   return parsed;
 }
 function patchGoalV2StructuredFormat(params){
@@ -585,8 +589,8 @@ function choicePromptScore(text='',choices=[]){
   return score;
 }
 function turnBeforePlayerChoice(turn,executionAuthority=null){
-  if(executionAuthority?.applicable&&executionAuthority?.reason!=='missing-contract'){
-    const scene=array(turn?.scene),decisionIndex=executionAuthority.valid&&executionAuthority.decision_scene_index!=null?Number(executionAuthority.decision_scene_index):Math.max(0,scene.length-1),item=object(scene[decisionIndex]),prompt=String(item.text||'').trim();
+  if(executionAuthority?.valid){
+    const scene=array(turn?.scene),decisionIndex=Number(executionAuthority.decision_scene_index),item=object(scene[decisionIndex]),prompt=String(item.text||'').trim();
     return{...turn,scene_title:'',scene_summary:'',scene:scene.slice(0,decisionIndex),choices:[],_choice_prompt_text:prompt,_decision_evidence_ordered:true,_structured_choice_authority:true};
   }
   const scene=array(turn?.scene),choices=array(turn?.choices),candidates=scene.map((item,index)=>({index,question:/[?？]/.test(String(item?.text||'')),dialogue:String(item?.kind||'')==='dialogue',score:choicePromptScore(item?.text,choices)})).filter(row=>row.question||row.dialogue),scored=[...candidates].sort((left,right)=>right.score-left.score||right.index-left.index),questionIndexes=candidates.filter(row=>row.question).map(row=>row.index),dialogueIndexes=candidates.filter(row=>row.dialogue).map(row=>row.index),decisionIndex=scored[0]?.score>0?scored[0].index:questionIndexes.at(-1)??dialogueIndexes.at(-1)??scene.length;
@@ -1051,6 +1055,7 @@ export default async function handler(req,res){
     if(isCombatLike(incoming.action)&&incoming.reasoningEffort==='auto')incoming.reasoningEffort='medium';
     const result=await runCore(req,incoming,mode);if(result.status<200||result.status>=300)return res.status(result.status).json({...result.data,server_version:ADAPTER_VERSION,adapter_version:ADAPTER_VERSION});
     const data=result.data;if(!data?.turn)throw new Error('코어 API 응답에 turn이 없습니다.');
+    rebaseStructuredEffectOwners(data.turn);
     let telemetry=result.telemetry||{routerVersion:routerVersion(),enabled:false,profile:'unknown'};telemetry={...telemetry,actual_input_tokens:Number(data?.usage?.input_tokens||0),actual_output_tokens:Number(data?.usage?.output_tokens||0)};if(Number(telemetry.soft_max_tokens||0)>0)telemetry.budget_status=telemetry.actual_input_tokens<=telemetry.soft_max_tokens?'OK':'OVER';
     if(mode==='continue'){lockContinueTurn(data.turn);applyExtendedExpressions(data.turn,incoming0.saveState||{});data.runtime_state=consumeContinuationRuntime({...incoming,saveState:object(incoming0.saveState)},data.turn);data.background_digest=String(incoming.saveState?.backgroundDigest||'').slice(-1800);const pipeline={pipeline:'continue-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,event_director_v3:telemetry?.event_director_v3||null,event_director_v3_enabled:true,world_result_surface:data.runtime_state.scene_runtime?.world_result_surface||null,world_result_surfacing_v1:true,adaptive_time_scale_version:ADAPTIVE_TIME_SCALE_VERSION,adaptive_time_scale_v2:true,scene_novelty:data.runtime_state.scene_runtime?.novelty||null,scene_novelty_v1:true,scene_purpose:data.runtime_state.scene_runtime?.purpose||null,scene_purpose_v1:true,scene_exit_condition:data.runtime_state.scene_runtime?.exit_condition||null,scene_exit_condition_v1:true,turn_hook:data.runtime_state.scene_runtime?.turn_hook||null,turn_hook_v1:true,scene_orchestration:data.runtime_state.scene_runtime?.orchestration||telemetry?.scene_orchestration||null,scene_orchestration_v1:true,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true,faction_social_v1:true,combat_growth_v2:true,skill_learning_v1:true,awakening_talent_v1:true};data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);}
     if(mode==='meta'){if(data.turn?.state_delta){data.turn.state_delta.stat_progress=[];data.turn.state_delta.skill_experience=[];data.turn.state_delta.skill_learning=[];data.turn.state_delta.awakening_progress=[];data.turn.state_delta.talent_evolution=[];}const pipeline={pipeline:'meta-full-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,event_director_v3:telemetry?.event_director_v3||null,event_director_v3_enabled:true,world_result_surface:null,world_result_surfacing_v1:true,adaptive_time_scale_version:ADAPTIVE_TIME_SCALE_VERSION,adaptive_time_scale_v2:true,scene_orchestration:telemetry?.scene_orchestration||null,scene_orchestration_v1:true,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true,faction_social_v1:true,combat_growth_v2:true,skill_learning_v1:true,awakening_talent_v1:true};data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);}
