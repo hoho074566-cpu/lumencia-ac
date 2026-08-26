@@ -360,6 +360,18 @@ const evidenceFreeDecision=applySceneMomentumTimeFloor({action:'1시간 훈련�
 assert.equal(evidenceFreeDecision.reconciliationReason,'decision-boundary','a meaningful choice remains a boundary without prefix-completion prose');
 assert.deepEqual(turn.state_delta.skill_experience,[],'unproven prefix effects fail closed at the choice');
 assert.deepEqual(turn.state_delta.items_add,[],'terminal effects fail closed at the choice');
+const noScheduleCompoundSave={pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]};
+turn={scene_title:'완료 주장 뒤 제안',scene:[{kind:'narration',text:'한 시간 훈련을 마치고 여덟 시간 수면도 모두 마쳤다.'},{kind:'dialogue',speaker_key:'artemis',text:'이제 경계 임무를 맡겠나?'}],choices:['맡는다.','쉰다.','묻는다.'],state_delta:{advance_minutes:540,items_add:['숙면 보상']}};
+const missingReceiptCompletion=applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:noScheduleCompoundSave},turn,'game');
+assert.equal(missingReceiptCompletion.reconciliationReason,'decision-boundary','an eligible plan without its structural receipt cannot use narration as terminal-completion authority');
+assert.equal(turn.state_delta.advance_minutes,60,'missing structural completion authority fails closed at the proven prefix boundary');
+assert.deepEqual(turn.state_delta.items_add,[],'missing structural ownership cannot preserve the claimed terminal reward');
+turn={scene_title:'구조화 완료 뒤 제안',scene:[{kind:'narration',text:'한 시간 훈련을 마치고 여덟 시간 수면도 모두 마쳤다.'},{kind:'dialogue',speaker_key:'artemis',text:'이제 경계 임무를 맡겠나?'}],choices:['맡는다.','쉰다.','묻는다.'],state_delta:{advance_minutes:540,items_add:['숙면 보상']}};
+turn.time_execution=choiceExecution(turn,{minutes:540,completed:['action_1','action_2'],interrupted:null,owners:[effectOwner('items_add',0,'action_2')]});
+const ownedReceiptCompletion=applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:noScheduleCompoundSave},turn,'game');
+assert.equal(ownedReceiptCompletion.returnedSceneReconciled,false,'a valid completed-clause receipt remains authoritative without legacy narration completion');
+assert.equal(turn.state_delta.advance_minutes,540,'the valid receipt preserves the completed compound duration');
+assert.deepEqual(turn.state_delta.items_add,['숙면 보상'],'the valid action owner preserves its completed terminal reward');
 turn={scene_title:'왕도 도착 직전 선택',scene:[{kind:'narration',text:'10분 만에 왕도에 도착했다고 알렸다.'},{kind:'dialogue',speaker_key:'artemis',text:'지금 성문으로 들어가겠나?'}],choices:['들어간다.','기다린다.','묻는다.'],state_delta:{advance_minutes:10,new_location:'왕도',items_add:['숙면 보상']}};
 const belowRangeDecision=applySceneMomentumTimeFloor({action:'왕도로 이동하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'남부 도로'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
 assert.equal(belowRangeDecision.reconciliationReason,'decision-boundary','a choice below a ranged prefix minimum still owns fail-closed suffix reconciliation');
