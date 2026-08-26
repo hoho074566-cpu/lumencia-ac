@@ -38,6 +38,10 @@ assert.equal(unboundedDecision.eligible,true,'a lower-bound-only compound remain
 assert.equal(unboundedDecision.exact_timeline,false,'the choice-only plan never claims exact timestamp authority');
 assert.equal(unboundedDecision.clauses[0].complete_max_minutes,null,'the open upper bound remains structurally open');
 assert.equal(classifySceneIntent('적어도 1시간 훈련하고 8시간 잔다',context).structuredDecisionPlan?.exact_timeline,false,'the runtime intent exposes only the non-authoritative choice plan');
+const minimumAdverb=parseTimePlan('최소한 1시간 훈련하고 8시간 잔다',context);
+assert.equal(minimumAdverb.clauses[0].duration.upper_bounded,false,'최소한 remains a lower-bound-only duration qualifier');
+assert.equal(deriveStructuredExecutionPlan(minimumAdverb).eligible,false,'최소한 cannot invent an exact prefix completion time');
+assert.equal(deriveStructuredDecisionPlan(minimumAdverb).exact_timeline,false,'최소한 keeps only non-authoritative choice reconciliation');
 for(const action of ['1시간 정도 훈련하고 8시간 잔다','이번에도 1시간 훈련하고 8시간 잔다']){
   assert.equal(classifySceneIntent(action,context).structuredExecutionPlan?.eligible,true,`${action}: additive timing adverbs cannot become NPC actors`);
 }

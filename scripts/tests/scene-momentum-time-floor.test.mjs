@@ -272,7 +272,7 @@ assert.equal(compoundConsequenceIntent.reconciliationReason,'consequence-boundar
 assert.deepEqual(compoundConsequenceIntent.completedPrefixActionTypes,['dialogue'],'consequence arbitration uses the same completed-prefix result as schedule arbitration');
 assert.deepEqual(turn.state_delta.items_add,[dialogueNote],'consequence shortening preserves only the completed dialogue effect');
 assert.deepEqual(turn.state_delta.skill_experience,[],'effects from clauses after the consequence boundary are removed');
-turn={scene_title:'훈련 뒤 제안',scene:[{kind:'narration',text:'한 시간 검술 훈련을 마치고 검술 자세 교정법을 익혔다.'},{kind:'dialogue',speaker_key:'artemis',text:'수면을 미루고 지금 경계 임무를 맡겠나?'}],choices:['경계 임무를 맡는다.','예정대로 쉰다.','조건을 먼저 묻는다.'],state_delta:{advance_minutes:540,skill_experience:[multiPrefixGrowth],pc_knowledge_add:['검술 자세 교정법','꿈 내용'],items_add:['숙면 보상']}};
+turn={scene_title:'훈련 뒤 제안',scene:[{kind:'narration',text:'한 시간 검술 훈련을 마치고 검술 자세 교정법을 익혔다.'},{kind:'dialogue',speaker_key:'artemis',text:'수면을 미루고 지금 경계 임무를 맡겠나?'}],choices:['경계 임무를 맡는다.','예정대로 쉰다.','조건을 먼저 묻는다.'],cg_id:'cg_sleep_dream',state_delta:{advance_minutes:540,skill_experience:[multiPrefixGrowth],pc_knowledge_add:['검술 자세 교정법','꿈 내용'],items_add:['숙면 보상']}};
 const decisionBoundaryIntent=applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,60,'a meaningful choice after a completed prefix stops before the unperformed terminal clause');
 assert.equal(decisionBoundaryIntent.reconciliationReason,'decision-boundary','the structured timeline records a player-owned decision boundary');
@@ -282,8 +282,17 @@ assert.deepEqual(turn.state_delta.pc_knowledge_add,['검술 자세 교정법'],'
 assert.deepEqual(turn.state_delta.items_add,[],'terminal sleep rewards cannot cross the player decision boundary');
 assert.match(turn.scene_summary,/선택 지점/,'visible narration and authoritative time agree on the decision stop');
 assert.match(turn.scene.map(item=>item.text).join(' '),/경계 임무를 맡겠나/,'decision reconciliation preserves the question that explains the retained choices');
+assert.equal(turn.cg_id,null,'a CG from the discarded terminal scene cannot survive the deterministic decision replacement');
 assert.equal(decisionBoundaryIntent.runtimeSceneTrusted,true,'the deterministic decision reconciliation remains authoritative for scene-purpose synthesis');
 assert.deepEqual(runtimeSynthesisTurn(turn,decisionBoundaryIntent).choices,turn.choices,'runtime synthesis preserves the player-owned decision choices');
+const dialoguePrefixGrowth={skill:'검술',amount:1,reason:'카인은 한 시간 검술 훈련을 모두 마쳤다'};
+turn={scene_title:'교관의 확인 뒤 제안',scene:[{kind:'dialogue',speaker_key:'artemis',text:'카인, 한 시간 검술 훈련을 모두 마쳤군, 검술 배지도 받아라.'},{kind:'dialogue',speaker_key:'artemis',text:'이제 잠들기 전에 경계 임무를 맡겠나?'}],choices:['맡는다.','잔다.','묻는다.'],state_delta:{advance_minutes:60,skill_experience:[dialoguePrefixGrowth],items_add:['검술 배지','숙면 보상']}};
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
+assert.deepEqual(turn.state_delta.skill_experience,[dialoguePrefixGrowth],'factual pre-choice dialogue explicitly addressed to the PC can prove prefix completion');
+assert.deepEqual(turn.state_delta.items_add,['검술 배지'],'PC-addressed factual dialogue preserves only the visibly earned prefix item');
+turn={scene_title:'다른 학생의 확인 뒤 제안',scene:[{kind:'dialogue',speaker_key:'artemis',text:'에밀리, 한 시간 검술 훈련을 모두 마쳤군, 검술 배지도 받아라.'},{kind:'dialogue',speaker_key:'artemis',text:'카인, 이제 잠들기 전에 경계 임무를 맡겠나?'}],choices:['맡는다.','잔다.','묻는다.'],state_delta:{advance_minutes:60,items_add:['검술 배지','숙면 보상']}};
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
+assert.deepEqual(turn.state_delta.items_add,[],'factual dialogue addressed to another named character cannot establish the PC prefix');
 turn={scene_title:'훈련 뒤 수면 중 제안',scene:[{kind:'narration',text:'한 시간 검술 훈련을 마치고 검술 자세 교정법을 익혔다.'},{kind:'dialogue',speaker_key:'artemis',text:'잠든 지 얼마 안 됐지만 지금 깨워 경계 임무를 물을까?'}],choices:['지금 일어난다.','조금 더 잔다.','상황부터 묻는다.'],state_delta:{advance_minutes:90,skill_experience:[multiPrefixGrowth],pc_knowledge_add:['검술 자세 교정법']}};
 const partialDecisionIntent=applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,90,'a real choice during the next clause preserves elapsed partial-action time');
