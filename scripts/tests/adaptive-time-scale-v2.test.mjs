@@ -85,6 +85,15 @@ assert.deepEqual(training.suggestedAdvanceMinutes, [30, 120]);
 const explicitTraining = classifySceneIntent('45분 동안 마법을 연습한다.', { location:'훈련장' });
 assert.equal(explicitTraining.explicitDurationMinutes, 45);
 assert.deepEqual(explicitTraining.suggestedAdvanceMinutes, [45, 45]);
+for(const suffix of ['간','가량','정도','쯤']){
+  const suffixedTraining=classifySceneIntent(`훈련을 90분${suffix} 한다.`,{location:'훈련장'});
+  assert.equal(suffixedTraining.kind,'training',`${suffix} must preserve object-first training intent`);
+  assert.deepEqual(suffixedTraining.suggestedAdvanceMinutes,[90,90],`${suffix} must preserve the declared training duration`);
+}
+assert.deepEqual(classifySceneIntent('90분간 쉰다.').suggestedAdvanceMinutes,[90,90],'duration suffix support must remain consistent for downtime');
+assert.deepEqual(classifySceneIntent('90분 정도 기다린다.').suggestedAdvanceMinutes,[90,90],'spaced approximate duration suffixes must remain consistent for waiting');
+const suffixedBoundarySave={pc:{department:'기사과'},world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduledEvents:[{id:'suffix-class',title:'기사과 필수 수업',date:'1285-03-01',time:'10:00',kind:'academic'}],scheduleContext:{due:[],upcoming:[{id:'suffix-class',title:'기사과 필수 수업',date:'1285-03-01',time:'10:00',kind:'academic'}]}};
+assert.match(buildSceneMomentumDirective({action:'훈련을 90분간 한다.',saveState:suffixedBoundarySave}),/SCHEDULE_BOUNDARY=60min/,'a suffixed explicit duration must still expose an earlier authoritative schedule boundary');
 const rangedTraining=classifySceneIntent('1시간에서 2시간 동안 훈련한다.', { location:'훈련장' });
 assert.equal(rangedTraining.explicitDurationMinutes,null,'duration range endpoints must not be summed into one exact duration');
 assert.deepEqual(rangedTraining.explicitDurationRangeMinutes,[60,120],'the declared training duration range must remain explicit');
@@ -486,6 +495,14 @@ assert.deepEqual(reachableAbsoluteDateTraining.suggestedAdvanceMinutes,[870,960]
 const elapsedAbsoluteDateTraining=classifySceneIntent('1285년 3월 1일 오전 10시에 훈련한다.',{currentDate:'1285-03-02',currentTime:'08:00'});
 assert.equal(elapsedAbsoluteDateTraining.kind,'decision-sensitive','an elapsed absolute start must fail closed instead of replaying the clock today');
 assert.equal(elapsedAbsoluteDateTraining.elapsedScheduledStart,true,'an elapsed absolute start must be exposed to deterministic reconciliation');
+for(const action of ['3월 1일 새벽 1시에 30분 훈련한다.','1285-03-01 새벽 1시에 30분 훈련한다.','오늘 새벽 1시에 30분 훈련한다.']){
+  const elapsedDawn=classifySceneIntent(action,{currentDate:'1285-03-01',currentTime:'23:00'});
+  assert.equal(elapsedDawn.kind,'decision-sensitive',`an explicit same-date dawn start must not roll overnight: ${action}`);
+  assert.equal(elapsedDawn.elapsedScheduledStart,true,`an explicit same-date dawn start must be marked elapsed: ${action}`);
+}
+const elapsedDawnDeadline=classifySceneIntent('3월 1일 새벽 1시까지 기다린다.',{currentDate:'1285-03-01',currentTime:'23:00'});
+assert.equal(elapsedDawnDeadline.kind,'decision-sensitive','an explicit same-date dawn deadline must not roll into the next day');
+assert.equal(elapsedDawnDeadline.elapsedScheduledStart,true,'an elapsed explicit deadline must fail closed with the other missed schedule forms');
 const yearBoundaryTraining=classifySceneIntent('1월 1일 오전 10시에 훈련한다.',{currentDate:'1285-12-31',currentTime:'20:00'});
 assert.equal(yearBoundaryTraining.scheduledStartOffsetMinutes,840,'an omitted calendar year must resolve to the next valid occurrence across a year boundary');
 const absoluteDateTravel=classifySceneIntent('3월 1일 오전 10시에 도서관으로 간다.',{location:'A동 개인실',currentDate:'1285-02-28',currentTime:'20:00'});
