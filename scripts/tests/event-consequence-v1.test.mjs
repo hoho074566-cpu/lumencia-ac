@@ -112,6 +112,15 @@ test('secret cause is not copied into the due directive and expired items close 
   assert.equal(lifecycle.expired_ids.length,1);
   assert.equal(turn.state_delta.hooks_update.length,1);
   assert.equal(turn.state_delta.hooks_update[0].status,'expired');
+
+  const identicalExpired={id:expiredSave.hooks[0].id,status:'expired',reason:'Event Consequence V1 bounded lifetime 종료'};
+  const identicalTurn={
+    state_delta:{hooks_update:[identicalExpired]},
+    time_execution:{effect_owners:[{scope:'state_delta',field:'hooks_update',effect_index:0,owner_kind:'clause',owner_id:'action_1'}]},
+  };
+  reconcileEventConsequenceLifecycle({saveState:expiredSave,turn:identicalTurn});
+  assert.deepEqual(identicalTurn.time_execution.effect_owners,[],'a runtime-created expiry row cannot borrow ownership from an identical model row');
+  assert.doesNotThrow(()=>reconcileEventConsequenceLifecycle({saveState:expiredSave,turn:identicalTurn}),'an explicitly unowned runtime row stays safe when a later lifecycle pass tags raw source rows');
 });
 
 const instructions=`===== CHARACTER REGISTRY =====\nguide=가이드\n===== WORLD CANON =====\nacademy\n===== NPC CANON =====\nguide\n===== NPC SPEECH =====\nguide speech\n===== PC SYSTEM =====\npc`;
