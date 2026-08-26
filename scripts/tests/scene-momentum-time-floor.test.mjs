@@ -453,6 +453,13 @@ assert.deepEqual(turn.state_delta.items_remove,[],'terminal activity effects mus
 assert.equal(turn.state_delta.fatigue_delta,0,'terminal resource effects must not survive an overrun start boundary');
 assert.equal(noRowOverrunIntent.runtimeSceneTrusted,false,'an overrun start boundary must remain incomplete in runtime continuity');
 
+const mealBoundary={id:'meal-boundary-class',title:'기사과 필수 수업',date:'1285-03-01',time:'09:20',kind:'academic',status:'scheduled'},mealBoundarySave={pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'식당'},scheduleContext:{due:[],upcoming:[mealBoundary]},scheduledEvents:[mealBoundary]};
+turn={scene:[{kind:'narration',text:'빵을 모두 먹었다.'}],state_delta:{advance_minutes:10,pc_status:'식사 완료',items_remove:['빵']},choices:['수업으로 간다','조금 더 쉰다','주변을 본다']};
+applySceneMomentumTimeFloor({action:'30분 동안 빵을 먹는다.',saveState:mealBoundarySave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,20,'object-specific meal completion evidence must still stop at an earlier required schedule');
+assert.equal(turn.state_delta.pc_status,null,'meal completion state beyond the required schedule must fail closed');
+assert.deepEqual(turn.state_delta.items_remove,[],'food consumption beyond the required schedule must fail closed');
+
 turn={scene:[{kind:'narration',text:'10분 뒤 창고에서 불길이 치솟았다.'}],event_progress:{event_instance_id:'director:warehouse-fire',active_beat:'ignite',completed_beats:[]},state_delta:{advance_minutes:10,active_events_add:['warehouse-fire']},choices:['불을 끈다','사람을 부른다','대피한다']};
 const interruptedBeforeConsequence={selected_id:consequenceHook.id,status:'open',attribution_safe:true};
 applySceneMomentumTimeFloor({action:'40분 기다린다.',saveState:consequenceSave},turn,'game',interruptedBeforeConsequence);
