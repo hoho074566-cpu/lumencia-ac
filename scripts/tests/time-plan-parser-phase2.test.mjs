@@ -149,6 +149,23 @@ assert.equal(negotiation.stopPolicy, 'resolve-committed-action-then-meaningful-c
 const fractionalMinute = classifySceneIntent('0.333일 후 1시간 훈련한다', context);
 assert.equal(fractionalMinute.dateQualifiedStartOffsetMinutes, 480, 'fractional fixed-day offsets normalize to an integer authoritative minute');
 assert.deepEqual(fractionalMinute.suggestedAdvanceMinutes, [540, 540], 'integer-normalized offset plus exact duration remains schema-compatible');
+const consequentialPrefixPlan = parseTimePlan('계약에 서명하고 1시간 훈련하자', context);
+assert.equal(consequentialPrefixPlan.clauses[0].unparsed_prefix_action, true, 'an unparsed consequential connector is represented before terminal promotion');
+assert.equal(deriveStructuredTimingCandidate(consequentialPrefixPlan).eligible, false, 'an unparsed consequential prefix prevents terminal promotion');
+assert.equal(classifySceneIntent('계약에 서명하고 1시간 훈련하자', context).kind, 'committed-consequence', 'the consequential prefix resolves before the timed suffix');
+const caseConditionalPlan = parseTimePlan('필요할 경우 1시간 훈련하자', context);
+assert.equal(caseConditionalPlan.clauses[0].conditional, true, 'a 경우-gated pre-action scope is represented as unresolved');
+assert.equal(deriveStructuredTimingCandidate(caseConditionalPlan).eligible, false, 'a 경우-gated proposal cannot enter structured execution');
+assert.equal(classifySceneIntent('필요할 경우 1시간 훈련하자', context).kind, 'generic', 'a 경우-gated proposal remains noncommitted');
+assert.equal(classifySceneIntent('그리고 1시간 훈련하자', context).kind, 'training', 'a discourse connector is not mistaken for an unparsed action prefix');
+const structuredTravel = classifySceneIntent('왕도로 이동하자', { ...context, location: '기숙사' });
+assert.equal(structuredTravel.kind, 'travel', 'an eligible structured travel action enters travel classification');
+assert.equal(structuredTravel.semanticTarget, '왕도', 'structured travel preserves its parsed destination');
+assert.deepEqual(structuredTravel.suggestedAdvanceMinutes, [15, 60], 'structured regional travel uses the established regional profile');
+assert.ok(structuredTravel.structuredTimePlanApplied.includes('terminal-action'), 'structured travel promotion records provenance');
+const missingClockPromotion = deriveStructuredTimingCandidate(parseTimePlan('오후 3시에 1시간 훈련하자', { ...context, currentTime: '' }));
+assert.equal(missingClockPromotion.eligible, false, 'clock-qualified terminal promotion requires authoritative current time');
+assert.equal(classifySceneIntent('오후 3시에 1시간 훈련하자', { ...context, currentTime: '' }).kind, 'generic', 'a missing clock context cannot discard the requested start');
 for (const [nonCommittedAction, expectedKind] of [
   ['어제 1시간 훈련했다. 지금 공격한다', 'committed-consequence'],
   ['1시간 훈련한다고 들었다', 'generic'],
