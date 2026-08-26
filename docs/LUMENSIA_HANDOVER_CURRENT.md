@@ -777,12 +777,28 @@ Gameplay roadmap discussed:
 
 ---
 
+# PR #57 PHASE 3 — LATEST P0/P1 CLOSURE CYCLE
+
+Fresh direct review `PRR_kwDOT8LCAs8AAAABK_AqZQ` on exact docs head `3626be33a22fa257004db9404b2abc457146f7ed` found P0=0 / P1=6:
+- completion evidence before a same-sentence choice clause was discarded;
+- string-array effects could bypass unfinished action-type rejection;
+- an NPC schedule label mentioned only as a grammatical object could be treated as the schedule owner;
+- a decision below a ranged prefix minimum could skip suffix cleanup;
+- zero-overlap generic choices could bind to an earlier rhetorical question;
+- generic NPC-keyed effects could be preserved for the wrong NPC.
+
+Code checkpoint `ff4e930daec76c8e638f1e0c72f8178436f04eda` closes all six locally through shared decision-clause slicing, action-type-first effect filtering, grammatical NPC ownership evidence, fail-closed ranged-prefix completion, latest-question fallback, and NPC-keyed array attribution. Permanent regressions cover every reproduced case. `node --check`, both Phase 3 focused suites, `git diff --check`, and the full `node scripts/lumensia-pr-check.mjs` pass. The second regression/scope review found no architecture drift: one canonical call, stable routing, player sovereignty, freeze behavior, and the reviewed Phase 2 stack base remain unchanged.
+
+Fresh exact-head hosted authority has not yet been collected for the forthcoming docs checkpoint. The health/telemetry authority-label P2 remains a non-gameplay backlog item and is not part of P0/P1 closure.
+
+---
+
 # 12. NEXT ACTION — CURRENT START POINT
 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
 2. Confirm main remains PR #53 merge `1018d8c27c451dc122982fb14bf7d3e3902c70ca`; merge and reviewed-head trees must remain equal. Do **not** redo completed HF1/HF2/HF3 through Event Director V3.
 3. Preserve PR #54 runtime checkpoint `24407193b59d0f9e9cf2f9d8f1a4589b4b92c95c` and direct parsing P1=4. Do not add another wording-specific patch and do not merge PR #54.
-4. PR #57 Phase 3 code checkpoint `4fcc518d...` closes fresh review `PRR_kwDOT8LCAs8AAAABK-rBfw` P1=3 through same-row prompt slicing, post-cap decision rejection, and NPC-bound schedule evidence. Focused/full local regression passes. Commit/push this docs checkpoint, then require exact-current-HEAD Vercel and a fresh direct P0/P1=0 review. Any new P0/P1 starts the next correction immediately; cycle counts and reports are not stop conditions.
+4. Commit/push the PR #57 docs checkpoint following code `ff4e930...`, then require exact-current-HEAD Vercel and a fresh direct P0/P1=0 review. Any new P0/P1 starts the next correction immediately; cycle counts and reports are not stop conditions.
 5. Reconfirm the stacked base/merge-base is reviewed Phase 2 exact `f0971430...`, behind 0, conflict-free/mergeable. Main remains `1018d8c...`; the main-only Safety workflow is absent on a stacked PR and cannot be treated as a synthetic pass.
 6. After direct P0/P1=0, run the Phase 3 Exact Preview boundary corpus without reading protection tokens/cookies/storage or bypassing protection. PR #57 changes `api/**`, so it remains human-merge-only and must not be merged by Codex.
 7. Phase 4 legacy cleanup remains blocked until the permanent regression and Phase 3 Exact Preview evidence pass. Do not resume PR #54 wording-specific patches or discard the accumulated TPP corpus.
