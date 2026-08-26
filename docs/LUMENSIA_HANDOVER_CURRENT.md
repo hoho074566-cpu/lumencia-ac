@@ -789,7 +789,28 @@ Fresh direct review `PRR_kwDOT8LCAs8AAAABK_AqZQ` on exact docs head `3626be33a22
 
 Code checkpoint `ff4e930daec76c8e638f1e0c72f8178436f04eda` closes all six locally through shared decision-clause slicing, action-type-first effect filtering, grammatical NPC ownership evidence, fail-closed ranged-prefix completion, latest-question fallback, and NPC-keyed array attribution. Permanent regressions cover every reproduced case. `node --check`, both Phase 3 focused suites, `git diff --check`, and the full `node scripts/lumensia-pr-check.mjs` pass. The second regression/scope review found no architecture drift: one canonical call, stable routing, player sovereignty, freeze behavior, and the reviewed Phase 2 stack base remain unchanged.
 
-Fresh exact-head hosted authority has not yet been collected for the forthcoming docs checkpoint. The health/telemetry authority-label P2 remains a non-gameplay backlog item and is not part of P0/P1 closure.
+That correction was published with docs as exact head `14cd7b0aeab8503210e87aa62f8f7e6e0e089882`. Vercel passed and the stacked comparison remained based on reviewed Phase 2 exact `f0971430af351c4a007e18daa0bd18454e6aab4f`, behind 0 and conflict-free. Fresh direct review `PRR_kwDOT8LCAs8AAAABK_I5BA` / `5032261892` found P0=0 / P1=8:
+- NPC state fields could survive without structural NPC/effect ownership;
+- a positively scored rhetorical question could displace the actual later choice;
+- a same-sentence unpunctuated choice could discard completed prefix effects;
+- scalar prefix effects such as fatigue/currency were not retained;
+- an unfinished conditional suffix effect could survive beside a completed prefix;
+- resumed nonterminal Director progress/metadata could be discarded;
+- a zero-time positive-range prefix could be accepted as complete;
+- nonreplacement Goal V2 progress could be discarded.
+
+These findings share the Phase 3 root cause specified by the user: clause identity existed in the parser, but the returned runtime effects still had to be inferred from narration wording, sentence order, and NPC-name overlap. No additional wording-specific regex patch was added. Code checkpoint `334c659` changes Phase 3 structurally:
+- every parsed/timeline clause carries stable `action_N` identity;
+- the same canonical model response returns a required `time_execution` receipt containing completed/interrupted clause IDs, decision scene index, boundary event ID, and per-effect ownership;
+- a standalone structural validator verifies contiguous completion, positive elapsed time, interruption range, final-scene decision ownership, and array/scalar effect index shape;
+- deterministic projection retains only completed-clause or validated boundary-event effects and drops unmapped/interrupted effects fail-closed;
+- a locally earlier schedule/consequence boundary cannot reuse a receipt from a longer model timeline;
+- Director state is preserved only when both `event_progress` and `director` belong to the same `director:` boundary event;
+- existing narration-based reconciliation remains only as the explicitly identified missing-contract fallback for later Phase 4 removal, not as the new authority.
+
+Permanent regressions now cover all eight review cases plus missing interruption IDs, locally rebased boundaries, whole-array ownership claims, and out-of-range effect indexes. Focused Phase 3/time-floor/Goal V2 suites, syntax checks, `git diff --check`, and the full `node scripts/lumensia-pr-check.mjs` pass after a substantive second review. One canonical call, stable routing, `store:false`, prompt cache/retention, Context Router budgets, canon, player sovereignty, META/AUTO/CONTINUE freeze, and the reviewed Phase 2 stack base remain intact.
+
+The health/telemetry authority-label P2 remains a non-gameplay backlog item and is not part of P0/P1 closure.
 
 ---
 
@@ -798,10 +819,10 @@ Fresh exact-head hosted authority has not yet been collected for the forthcoming
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
 2. Confirm main remains PR #53 merge `1018d8c27c451dc122982fb14bf7d3e3902c70ca`; merge and reviewed-head trees must remain equal. Do **not** redo completed HF1/HF2/HF3 through Event Director V3.
 3. Preserve PR #54 runtime checkpoint `24407193b59d0f9e9cf2f9d8f1a4589b4b92c95c` and direct parsing P1=4. Do not add another wording-specific patch and do not merge PR #54.
-4. Commit/push the PR #57 docs checkpoint following code `ff4e930...`, then require exact-current-HEAD Vercel and a fresh direct P0/P1=0 review. Any new P0/P1 starts the next correction immediately; cycle counts and reports are not stop conditions.
+4. Commit/push the PR #57 docs checkpoint following structural code `334c659`, then require exact-current-HEAD Vercel and a fresh direct P0/P1=0 review. Any new P0/P1 starts the next correction immediately; cycle counts and reports are not stop conditions. Repeated narration/wording/effect-attribution findings must be fixed through clause/effect ownership, not new wording regexes.
 5. Reconfirm the stacked base/merge-base is reviewed Phase 2 exact `f0971430...`, behind 0, conflict-free/mergeable. Main remains `1018d8c...`; the main-only Safety workflow is absent on a stacked PR and cannot be treated as a synthetic pass.
 6. After direct P0/P1=0, run the Phase 3 Exact Preview boundary corpus without reading protection tokens/cookies/storage or bypassing protection. PR #57 changes `api/**`, so it remains human-merge-only and must not be merged by Codex.
-7. Phase 4 legacy cleanup remains blocked until the permanent regression and Phase 3 Exact Preview evidence pass. Do not resume PR #54 wording-specific patches or discard the accumulated TPP corpus.
+7. Phase 4 remains blocked until permanent regression and Phase 3 Exact Preview evidence pass. When it starts, it is **legacy-cleanup only**: prove one TPP-authoritatively replaced fallback with permanent regression, remove it, rerun focused/full regression, then move to the next removal. Add no feature, natural-language coverage, regex coverage, or new reconciliation policy. A removal regression must first be classified as evidence that legacy is still required or Phase 3 is incomplete; do not patch Phase 3 design flaws inside Phase 4.
 
 ---
 
