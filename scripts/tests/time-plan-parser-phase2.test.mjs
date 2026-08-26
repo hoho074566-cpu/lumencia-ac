@@ -109,6 +109,21 @@ const ambiguousElapsed = classifySceneIntent('어제 밤 1시에 1시간 훈련�
 assert.equal(ambiguousElapsed.kind, 'decision-sensitive', 'a fixed past date remains elapsed even when its clock period is gated');
 assert.equal(ambiguousElapsed.elapsedScheduledStart, true, 'reliable past-date ownership survives uncertain clock normalization');
 assert.deepEqual(ambiguousElapsed.suggestedAdvanceMinutes, [0, 0], 'an elapsed fixed-date action cannot be rescheduled as a future clock action');
+const daytimeClock = classifySceneIntent('내일 낮 1시에 1시간 훈련한다', context);
+assert.equal(daytimeClock.dateQualifiedStartOffsetMinutes, 1680, 'a legacy-supported daytime period is normalized before structured execution');
+assert.deepEqual(daytimeClock.suggestedAdvanceMinutes, [0, 1440], 'a daytime start beyond the one-turn horizon is deferred instead of executing twelve hours early');
+const whenConditional = parseTimePlan('가능할 때 1시간 훈련하자', context);
+assert.equal(whenConditional.clauses[0].conditional, true, 'a 때-gated pre-action scope is represented as unresolved');
+assert.equal(deriveStructuredTimingCandidate(whenConditional).eligible, false, 'a 때-gated proposal cannot enter structured execution');
+assert.equal(classifySceneIntent('가능할 때 1시간 훈련하자', context).kind, 'generic', 'a 때-gated proposal remains noncommitted');
+const nounSleep = parseTimePlan('투자자', context);
+assert.deepEqual(nounSleep.clauses.map((clause) => clause.action_type), ['unknown'], 'a sleep verb substring inside a noun has no actionable lexical boundary');
+assert.equal(deriveStructuredTimingCandidate(nounSleep).eligible, false, 'a noun suffix cannot become a structured sleep action');
+assert.equal(classifySceneIntent('투자자', context).kind, 'generic', 'a noun suffix cannot advance downtime');
+const deadlineProposal = parseTimePlan('내일까지 훈련하자', context);
+assert.ok(deadlineProposal.clauses[0].explicit_deadline, 'the terminal deadline is represented before execution gating');
+assert.equal(deriveStructuredTimingCandidate(deadlineProposal).eligible, false, 'terminal deadlines stay on fallback until deadline execution migrates');
+assert.equal(classifySceneIntent('내일까지 훈련하자', context).kind, 'generic', 'an unmigrated deadline proposal cannot execute a short default session');
 for (const [nonCommittedAction, expectedKind] of [
   ['어제 1시간 훈련했다. 지금 공격한다', 'committed-consequence'],
   ['1시간 훈련한다고 들었다', 'generic'],
