@@ -54,6 +54,14 @@ assert.match(boundedRestDirective,/SCHEDULE_BOUNDARY가 더 짧으면 그 일정
 const implicitRestSave={world:{date:'1285-03-01',time:'09:25'},scheduleContext:{due:[],upcoming:[{id:'class',date:'1285-03-01',time:'10:00'}]}};
 assert.match(buildSceneMomentumDirective({action:'쉰다.',saveState:implicitRestSave}),/SCHEDULE_BOUNDARY=35min/,'an implicit rest must expose any boundary reachable within its 30-240 minute guide');
 assert.match(buildSceneMomentumDirective({action:'10분 기다린다.',saveState:boundarySave}),/SCHEDULE_BOUNDARY=10min/,'a boundary equal to the explicit duration must remain a hard stop');
+const coincidentClass={id:'coincident-class',title:'기사과 필수 수업',date:'1285-03-01',time:'10:00',kind:'academic',status:'scheduled'},coincidentScheduleSave={pc:knightPc,world:{date:'1285-03-01',time:'09:00'},scheduledEvents:[coincidentClass],scheduleContext:{due:[],upcoming:[coincidentClass]}};
+let coincidentTurn={scene:[{kind:'narration',text:'한 시간 훈련을 마쳤다.'}],state_delta:{advance_minutes:60,fatigue_delta:2,stat_progress:[{stat:'신체',amount:1}]},choices:[],event_progress:null};
+const coincidentScheduleIntent=applySceneMomentumTimeFloor({action:'1시간 동안 훈련한다.',saveState:coincidentScheduleSave},coincidentTurn,'game');
+assert.equal(coincidentTurn.state_delta.advance_minutes,60,'an action may complete exactly when an authoritative schedule starts');
+assert.equal(coincidentTurn.state_delta.fatigue_delta,2,'legitimate completed-action effects must survive a coincident schedule boundary');
+assert.deepEqual(coincidentTurn.state_delta.stat_progress,[{stat:'신체',amount:1}],'completed growth must survive a coincident schedule boundary');
+assert.match(coincidentTurn.scene_summary,/기사과 필수 수업의 시작 시점/,'a coincident but unsurfaced schedule must become visible');
+assert.equal(coincidentScheduleIntent.reconciliationReason,'schedule-boundary','coincident schedule reconciliation must be reported as a schedule boundary');
 let turn={state_delta:{advance_minutes:0},choices:[]};
 applySceneMomentumTimeFloor({action:'쉰다.',saveState:boundarySave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'forced downtime floor must stop at the next authoritative schedule boundary');
@@ -392,6 +400,13 @@ for(const field of ['relationship_changes','stat_progress','skill_experience','s
 
 const consequenceHook={id:'consequence:emily-arrival',title:'에밀리의 도착',status:'deferred',importance:3,event_consequence:{version:'1.0',event_name:'에밀리의 도착',target_bucket:'active',reason:'에밀리가 약속 장소에 도착한다',secret_level:0,due_at:'1285-03-01T09:40',expires_at:'1285-03-04T09:40'}};
 const consequenceSave={world:{date:'1285-03-01',time:'09:20'},hooks:[consequenceHook],scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]};
+const coincidentConsequenceHook={id:'consequence:coincident',status:'deferred',event_consequence:{version:'1.0',event_name:'동시 후속 상황',target_bucket:'active',reason:'정확히 한 시간 뒤 발현한다',secret_level:0,due_at:'1285-03-01T10:00',expires_at:'1285-03-04T10:00'}},coincidentConsequenceLifecycle={selected_id:coincidentConsequenceHook.id,status:'open',attribution_safe:true};
+turn={scene:[{kind:'narration',text:'한 시간을 모두 기다렸다.'}],state_delta:{advance_minutes:60,pc_knowledge_add:['대기 중 확인한 공개 공지']},choices:[],event_progress:null};
+const coincidentConsequenceIntent=applySceneMomentumTimeFloor({action:'1시간 동안 기다린다.',saveState:{world:{date:'1285-03-01',time:'09:00'},hooks:[coincidentConsequenceHook],scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game',coincidentConsequenceLifecycle);
+assert.equal(turn.state_delta.advance_minutes,60,'an action may complete exactly when an open consequence becomes due');
+assert.deepEqual(turn.state_delta.pc_knowledge_add,['대기 중 확인한 공개 공지'],'legitimate action effects must survive a coincident consequence boundary');
+assert.match(turn.scene_summary,/후속 상황이 발현할 시점/,'a coincident open consequence must become visible instead of being skipped');
+assert.equal(coincidentConsequenceIntent.reconciliationReason,'consequence-boundary','coincident consequence reconciliation must report its boundary');
 const arrivalRelationship={npc_key:'emily',affinity_delta:-1,trust_delta:1,status:'경계 중',reason:'에밀리가 약속 시각에 중앙광장에 도착해 함께 후문을 경계했다'};
 const arrivalKnowledge='에밀리가 약속 시각에 중앙광장에 도착했다.';
 const arrivalMemory={owner:'pc',fact:'에밀리가 약속 시각에 중앙광장에 도착해 후문 경계를 시작했다.',importance:2,secret_level:0};
@@ -674,6 +689,13 @@ assert.equal(turn.state_delta.advance_minutes,30,'an intervening schedule must s
 assert.equal(turn.state_delta.pc_status,null,'the terminal attack result must fail closed before the prefix completes');
 assert.deepEqual(turn.state_delta.items_add,[],'post-attack rewards must not cross the timed-prefix boundary');
 assert.deepEqual(turn.state_delta.stat_progress,[],'post-prefix growth must not cross the intervening schedule');
+turn={scene:[{kind:'narration',text:'한 시간 뒤 중간 마을에 도착하자 갈림길이 나타났다.'}],state_delta:{advance_minutes:60,new_location:'중간 마을',pc_status:'이동 중'},choices:['동쪽 길로 간다','서쪽 길로 간다','마을에서 쉰다'],event_progress:null};
+const earlyTravelStopIntent=applySceneMomentumTimeFloor({action:'이틀 동안 북부 왕도로 간다.',saveState:{world:{date:'1285-03-02',time:'07:20',location:'남부 도로'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,60,'a meaningful early stop must not be replaced by the one-turn travel cap');
+assert.equal(turn.state_delta.new_location,'중간 마을','a real intermediate location must survive an early travel decision');
+assert.deepEqual(turn.choices,['동쪽 길로 간다','서쪽 길로 간다','마을에서 쉰다'],'an early travel decision must preserve player sovereignty');
+assert.equal(earlyTravelStopIntent.runtimeSceneTrusted,true,'an authentic early travel interruption must remain trusted');
+assert.equal(earlyTravelStopIntent.returnedSceneReconciled,false,'an authentic early travel interruption must not be replaced');
 turn={scene:[{kind:'narration',text:'하루 동안 수도를 향해 이동한 끝에 중간 마을에서 밤을 맞았다.'}],state_delta:{advance_minutes:1440,new_location:'중간 마을',pc_status:'이동 중',items_add:['도착 보상']},choices:[],event_progress:null};
 const cappedTravelIntent=applySceneMomentumTimeFloor({action:'48시간 동안 수도로 간다.',saveState:{world:{date:'1285-03-02',time:'07:20',location:'변경 도시'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,1440,'an overlong trip must stop at the one-turn cap');
@@ -692,6 +714,13 @@ assert.equal(longSleepRuntime.total_minutes,2880,'the resumable record must reta
 assert.deepEqual(deriveTimedActionRuntime({timed_action:longSleepRuntime},{},'',{},'auto'),longSleepRuntime,'AUTO must freeze an incomplete timed action');
 assert.deepEqual(deriveTimedActionRuntime({timed_action:longSleepRuntime},{},'',{},'continue'),longSleepRuntime,'CONTINUE must freeze an incomplete timed action');
 assert.deepEqual(deriveTimedActionRuntime({timed_action:longSleepRuntime},{},'',{},'meta'),longSleepRuntime,'META must freeze an incomplete timed action');
+for(const [action,total] of [['이틀에서 사흘 동안 잠을 잔다.',2880],['이틀 넘게 잠을 잔다.',2881],['1시간 훈련하고 이틀 동안 잠을 잔다.',2940]]){
+  turn={scene:[{kind:'narration',text:'하루 동안 요청한 행동을 진행했지만 아직 끝나지 않았다.'}],state_delta:{advance_minutes:1440},choices:[]};
+  const cappedIntent=applySceneMomentumTimeFloor({action,saveState:{world:{date:'1285-03-02',time:'07:20',location:'개인실'},sceneRuntime:{},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+  const runtime=deriveTimedActionRuntime({},cappedIntent,action,turn,'game');
+  assert.equal(runtime.total_minutes,total,`every capped duration form must retain its deterministic minimum: ${action}`);
+  assert.equal(runtime.remaining_minutes,total-1440,`every capped duration form must persist the remaining minimum: ${action}`);
+}
 const resumedLongSleep=classifySceneIntent('계속 잔다.',{location:'개인실',resumeTimedAction:longSleepRuntime});
 assert.equal(resumedLongSleep.resumedTimedAction,true,'an explicit continuation must resume the stored timed action');
 assert.deepEqual(resumedLongSleep.suggestedAdvanceMinutes,[1440,1440],'the resumed sleep must use the full remaining day rather than the ordinary sleep profile');
@@ -734,6 +763,14 @@ turn={scene:[{kind:'narration',text:'한 시간이 흘렀다. 기다리던 복�
 applySceneMomentumTimeFloor({action:'1시간 동안 기다린다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,60,'ordinary elapsed-wait completion prose must enforce the declared wait duration before choices');
 assert.match(turn.scene_summary,/60분.*행동을 마쳤다/,'reconciled wait narration must agree that the declared wait completed');
+turn={scene:[{kind:'narration',text:'한 시간이 흘렀을 때 복도 끝에서 경보가 울렸다.'}],state_delta:{advance_minutes:60},choices:['경보를 확인한다','계속 기다린다','자리를 뜬다'],event_progress:null};
+applySceneMomentumTimeFloor({action:'2시간 동안 기다린다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,60,'a shorter elapsed cue must not complete a longer declared wait');
+assert.deepEqual(turn.choices,['경보를 확인한다','계속 기다린다','자리를 뜬다'],'a genuine interruption before the declared wait completes must preserve its choices');
+turn={scene:[{kind:'narration',text:'두 시간이 흘렀을 때 복도 끝에서 경보가 울렸다.'}],state_delta:{advance_minutes:120},choices:['경보를 확인한다','계속 기다린다','자리를 뜬다'],event_progress:null};
+applySceneMomentumTimeFloor({action:'1시간 동안 훈련하고 2시간 동안 기다린다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,120,'an elapsed cue must satisfy the full compound floor, not only the terminal wait duration');
+assert.deepEqual(turn.choices,['경보를 확인한다','계속 기다린다','자리를 뜬다'],'a compound wait interruption must preserve the remaining committed time');
 turn={scene:[{kind:'narration',text:'10분 뒤 리나가 기다림을 마쳤다.'}],state_delta:{advance_minutes:10},choices:['리나에게 묻는다','계속 기다린다','자리를 뜬다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'1시간 동안 기다린다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'an NPC-owned wait completion must not force the player wait to its declared floor');
