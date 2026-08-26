@@ -348,6 +348,9 @@ assert.equal(classifySceneIntent('12시에 입학식에 참석한다.', { locati
 assert.equal(classifySceneIntent('오늘 아침 8시에 수업을 듣는다.', { location:'강의실',currentTime:'07:00' }).scheduledStartOffsetMinutes,60,'아침 must normalize to an AM clock marker');
 assert.equal(classifySceneIntent('오늘 저녁 8시에 수업을 듣는다.', { location:'강의실',currentTime:'19:00' }).scheduledStartOffsetMinutes,60,'저녁 must normalize to a PM clock marker');
 assert.equal(classifySceneIntent('오늘 밤 10시에 훈련한다.', { location:'훈련장',currentTime:'21:00' }).scheduledStartOffsetMinutes,60,'밤 must normalize to a PM clock marker');
+const daytimeTraining=classifySceneIntent('낮 2시에 1시간 훈련한다.',{location:'훈련장',currentTime:'09:00'});
+assert.equal(daytimeTraining.scheduledStartOffsetMinutes,300,'낮 must normalize an ordinary 2시 clock to 14:00');
+assert.deepEqual(daytimeTraining.suggestedAdvanceMinutes,[360,360],'a daytime scheduled action must include the wait until 14:00 and its explicit duration');
 assert.equal(classifySceneIntent('밤 1시에 잠을 잔다.', { location:'개인실',currentTime:'23:00' }).scheduledStartOffsetMinutes,120,'early-night clocks must roll forward to the next calendar day');
 assert.equal(classifySceneIntent('내일 밤 1시에 잠을 잔다.', { location:'개인실',currentTime:'23:00' }).dateQualifiedStart,true,'a date-qualified early-night clock must preserve the requested future date');
 assert.deepEqual(classifySceneIntent('밤 11시부터 밤 1시까지 잠을 잔다.', { location:'개인실',currentTime:'22:00' }).suggestedAdvanceMinutes,[180,180],'a night interval ending at 1 AM must cross midnight');
@@ -373,6 +376,9 @@ assert.notEqual(classifySceneIntent('잠을 자지 않는다.', { location:'개�
 assert.match(buildSceneMomentumDirective({ action:'잠을 잔다.', saveState:{ world:{ date:'1285-03-02', time:'07:20', location:'개인실' } } }), /완료 시간과 advance_minutes를 TIME_GUIDE 240-480 안에 두며/, 'completed sleep must receive explicit hard profile bounds');
 assert.deepEqual(classifySceneIntent('한 시간 잠을 잔다.').suggestedAdvanceMinutes, [60, 60], 'explicit sleep duration must remain exact');
 assert.deepEqual(classifySceneIntent('1시간 반 동안 잠을 잔다.').suggestedAdvanceMinutes, [90, 90], 'the half-hour suffix must add thirty minutes to an explicit hour duration');
+const halfDaySleep=classifySceneIntent('반나절 동안 잠을 잔다.');
+assert.equal(halfDaySleep.explicitDurationMinutes,720,'반나절 must normalize to an explicit twelve-hour duration');
+assert.deepEqual(halfDaySleep.suggestedAdvanceMinutes,[720,720],'a half-day sleep must not fall back to the ordinary sleep range');
 for(const nap of ['낮잠을 잔다.','쪽잠을 잔다.','선잠을 잔다.','토막잠을 잔다.']){
   const napIntent=classifySceneIntent(nap);
   assert.equal(napIntent.timeProfile,'rest',`a named nap must use the short-rest profile: ${nap}`);
@@ -387,6 +393,18 @@ assert.equal(classifySceneIntent('하루를 초과해서 잠을 잔다.').turnLi
 const strictTraining=classifySceneIntent('2시간 넘게 훈련한다.');
 assert.equal(strictTraining.explicitDurationMinutes,null,'a strict training bound must not be emitted as exact');
 assert.deepEqual(strictTraining.suggestedAdvanceMinutes,[121,121],'strict training must run beyond the declared lower bound');
+for(const action of ['30분 이상 훈련한다.','최소 30분 훈련한다.','적어도 30분 훈련한다.']){
+  const inclusiveTraining=classifySceneIntent(action);
+  assert.equal(inclusiveTraining.explicitDurationMinutes,null,`an inclusive minimum must not become exact: ${action}`);
+  assert.equal(inclusiveTraining.strictDurationLowerBoundMinutes,30,`an inclusive minimum must retain its declared bound: ${action}`);
+  assert.equal(inclusiveTraining.strictDurationLowerBoundInclusive,true,`the lower-bound inclusivity must remain explicit: ${action}`);
+  assert.deepEqual(inclusiveTraining.suggestedAdvanceMinutes,[30,120],`an inclusive minimum must retain the natural activity maximum: ${action}`);
+}
+const inclusiveSchedule={id:'inclusive-class',title:'기사과 필수 수업',date:'1285-03-01',time:'09:45',kind:'academic',status:'scheduled'},inclusiveScheduleSave={pc:{department:'기사과'},world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduledEvents:[inclusiveSchedule],scheduleContext:{due:[],upcoming:[inclusiveSchedule]}};
+assert.match(buildSceneMomentumDirective({action:'30분 이상 훈련한다.',saveState:inclusiveScheduleSave}),/SCHEDULE_CAP=45min/,'a required schedule inside the open training range must remain visible as a non-stretching cap');
+const inclusivePrefixRest=classifySceneIntent('최소 90분 훈련하고 1시간 쉰다.');
+assert.deepEqual(inclusivePrefixRest.precedingActivityRangeMinutes,[90,120],'an inclusive minimum on a preceding activity must retain its natural maximum');
+assert.deepEqual(inclusivePrefixRest.suggestedAdvanceMinutes,[150,180],'a compound action must add the terminal duration after the preceding inclusive range');
 const overlongRest=classifySceneIntent('48시간 쉰다.');
 assert.equal(overlongRest.minAdvanceMinutes,1440,'a declared duration beyond one turn must cap its deterministic floor');
 assert.deepEqual(overlongRest.suggestedAdvanceMinutes,[1440,1440],'an overlong declared duration must never emit a guide beyond the canonical turn limit');

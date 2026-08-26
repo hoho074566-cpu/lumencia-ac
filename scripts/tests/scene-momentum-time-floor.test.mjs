@@ -47,6 +47,14 @@ assert.equal(shortTravelTurn.state_delta.advance_minutes,0,'post-processing must
 
 const boundarySave={world:{date:'1285-03-01',time:'09:50'},scheduleContext:{due:[],upcoming:[{id:'class',date:'1285-03-01',time:'10:00'}]}};
 assert.equal(nextScheduleBoundaryMinutes(boundarySave),10,'next schedule boundary should be ten minutes away');
+const halfDayBoundarySave={pc:{department:'기사과'},world:{date:'1285-03-01',time:'09:00',location:'개인실'},scheduledEvents:[{id:'evening-class',title:'기사과 필수 수업',date:'1285-03-01',time:'18:00',kind:'academic',status:'scheduled'}],scheduleContext:{due:[],upcoming:[{id:'evening-class',title:'기사과 필수 수업',date:'1285-03-01',time:'18:00',kind:'academic',status:'scheduled'}]}};
+assert.match(buildSceneMomentumDirective({action:'반나절 동안 잠을 잔다.',saveState:halfDayBoundarySave}),/SCHEDULE_BOUNDARY=540min/,'a schedule inside a half-day sleep must interrupt the explicit twelve-hour duration');
+const daytimeBoundarySave={pc:{department:'기사과'},world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduledEvents:[{id:'noon-class',title:'기사과 필수 수업',date:'1285-03-01',time:'12:00',kind:'academic',status:'scheduled'}],scheduleContext:{due:[],upcoming:[{id:'noon-class',title:'기사과 필수 수업',date:'1285-03-01',time:'12:00',kind:'academic',status:'scheduled'}]}};
+assert.match(buildSceneMomentumDirective({action:'낮 2시에 1시간 훈련한다.',saveState:daytimeBoundarySave}),/SCHEDULE_BOUNDARY=180min/,'a noon schedule must interrupt the wait before a 낮 2시 committed activity');
+const twoAmClass={id:'two-am-class',title:'기사과 새벽 수업',date:'1285-03-02',time:'02:00',kind:'academic',status:'scheduled'},twoAmSave={pc:{department:'기사과'},world:{date:'1285-03-02',time:'01:00',location:'훈련장'},scheduledEvents:[twoAmClass],scheduleContext:{due:[],upcoming:[twoAmClass]}};
+let daytimeMentionTurn={scene_title:'기사과 새벽 수업',scene:[{kind:'narration',text:'낮 2시를 알리는 종이 울렸다.'}],state_delta:{advance_minutes:10},choices:['훈련을 계속한다','교관에게 묻는다','자리를 뜬다'],event_progress:null};
+applySceneMomentumTimeFloor({action:'2시간 훈련한다.',saveState:twoAmSave},daytimeMentionTurn,'game');
+assert.equal(daytimeMentionTurn.state_delta.advance_minutes,10,'낮 2시 narration must not be mistaken for an authoritative 02:00 boundary');
 const boundedRestDirective=buildSceneMomentumDirective({action:'두 시간 쉰다.',saveState:boundarySave});
 assert.match(boundedRestDirective,/SCHEDULE_BOUNDARY=10min/,'the model must receive the exact upcoming schedule boundary');
 assert.match(boundedRestDirective,/120분 휴식을 경계 너머까지 실행하지 말고 10분 뒤 일정 시작 순간에서 멈춘다/,'the earlier mandatory schedule must override the longer downtime duration');
