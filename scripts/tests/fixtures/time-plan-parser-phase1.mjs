@@ -63,4 +63,16 @@ export const TIME_PLAN_PHASE1_CORPUS = [
     context: { currentTime: '09:00', actorName: '카인', location: '훈련장' },
     expected: { types: ['training'], committed: [false], hypothetical: [true], durations: [[60, 60]] },
   },
+  {
+    id: 'east-asian-quoted-action',
+    action: '「1시간 훈련한다」고 에밀리가 말했다',
+    context: { currentTime: '09:00', actorName: '카인', location: '훈련장' },
+    expected: { types: ['training'], actors: ['unknown'], committed: [false], quoted: [true], durations: [[60, 60]] },
+  },
+  {
+    id: 'full-euro-particle-destination',
+    action: '방으로 간다',
+    context: { currentTime: '09:00', actorName: '카인', location: 'A동 개인실' },
+    expected: { types: ['travel'], committed: [true], durations: [[2, 8]], destinations: ['방'] },
+  },
 ];

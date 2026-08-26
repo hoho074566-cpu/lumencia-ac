@@ -6,10 +6,13 @@ Narrative Engine continuation — Adaptive Time Scale V2 checkpoint closure and 
 ## Current GitHub State
 - Repo: `hoho074566-cpu/lumencia-ac`
 - Main: `1018d8c27c451dc122982fb14bf7d3e3902c70ca` (PR #53 merge).
-- Working branch: `codex/time-plan-parser-phase1`, stacked on PR #54 docs checkpoint `761d257dec265215e865c119075ea13f7024bf02`.
+- Working branch: `codex/time-plan-parser-phase2`, stacked on reviewed Phase 1 head `2ad5e28321b274c36a20a9ae52c1141d55d6d384`.
 - Current Adaptive Time Scale V2 runtime code head: `24407193b59d0f9e9cf2f9d8f1a4589b4b92c95c`; local focused/full regression, Safety run `32947576791`, Vercel, current-base `1018d8c...`, behind 0, and conflict-free mergeability pass. Fresh exact-head review `5028340142` reports four remaining P1s, all caused by the wording-specific string parser. PR #54 is therefore a stable checkpoint but is not merge-ready.
 - TPP Phase 1 is implemented locally as a shadow-only structured parser. It emits ordered clauses with actor, action type, start/date/clock, duration/range, destination, deadline, sequence relation, commitment/completion, hypothetical, quoted, and third-party fields. Legacy `classifySceneIntent` and every execution/arbitration/mutation path remain authoritative.
 - A compact runtime comparison reports only clause counts/types and terminal legacy agreement; raw player input and actor names are not echoed. Input is bounded and parser failure degrades to diagnostic telemetry instead of failing the turn. No save root, schema, model call, route, or budget changes exist.
+- Phase 1 exact head `2ad5e283...` is published as protected stacked PR #55. Vercel is Ready, the stack is conflict-free/mergeable, and fresh review `5028544740` reports direct P0/P1=0. Fourteen P2 parser completeness findings are preserved as later normalization/boundary corpus; they are not execution blockers for shadow Phase 1. GitHub Safety is main-target-only and therefore cannot run on the current stacked base.
+- Phase 2 now consumes only a confidence-gated subset of the structured plan: elapsed/future relative-date starts, committed terminal action recovery, and a single regional-travel prefix. Explicit duration/range/deadline and all uncertain inputs stay on the legacy path. Sentence ownership, partial-clock confidence, same-day/ambiguous-night fallback, and predicate negation prevent incomplete plans from taking authority.
+- Dedicated Phase 2, Phase 1, Adaptive Time Scale, Scene Momentum correctness/time-floor, syntax/static, and full repository regressions pass. Schedule/consequence arbitration, mutation, narration, boundary reconciliation, API routing, one-call behavior, saves, canon, cache, and budgets remain unchanged.
 - PR #53 is **merged** from final reviewed/accepted head `eae16c036c51767f2059b86cd5f0ef077764a3c8`; merge and reviewed-head trees both equal `e2a4b99a89640a553dfbf0fa7f1748a201c039f3`.
 - PR #53 post-merge main Vercel, production `/api/health` on app `1.5.6` / adapter `0.8.5`, and merged-main clean-LF full regression pass.
 - Adaptive Time Scale V2 extends the existing deterministic Scene Momentum intent layer with dialogue `2–10`, meal `20–45`, training `30–120`, class `45–120`, sleep `240–480`, within-building travel `2–8`, campus travel `5–20`, and regional travel `15–60` minute guides.
@@ -471,10 +474,10 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 
 ## NEXT ACTION
 1. Keep PR #54 runtime frozen at `24407193...`; its direct parsing P1=4 remains `MERGE_GATE: FAIL`. Do not add wording-specific patches there.
-2. Finish the substantive Phase 1 regression/architecture review on `codex/time-plan-parser-phase1`, run the data-driven TPP corpus plus all affected/full repository checks, and commit/push the focused shadow implementation.
-3. Open a stacked protected-path PR with base `codex/adaptive-time-scale-v2`. Require its exact-head Safety/Vercel/current-base/mergeability checks and fresh Codex P0/P1=0; Codex must not merge it.
-4. Phase 1 acceptance requires all four transferred reproductions to parse structurally, all pre-existing PR #54 tests to remain green, compact telemetry to contain no raw action/actor names, and parser failure to leave legacy execution unaffected.
-5. Only after Phase 1 is reviewed may Phase 2 migrate duration/start/deadline/compound calculation to structured plans. Schedule/consequence arbitration, state mutation, narrative reconciliation, and legacy cleanup remain later isolated phases.
+2. Finish the Phase 2 exact diff/architecture review on `codex/time-plan-parser-phase2`, commit/push, and rerun focused plus full regression on the committed exact head.
+3. Open a protected stacked Phase 2 PR against `codex/time-plan-parser-phase1`; require Vercel, current-stack mergeability, and fresh exact-head P0/P1=0. Main-only Safety remains pending until the stack is resolved. Codex must not merge.
+4. Keep migration confidence-gated. Any new P0/P1 must be fixed at structured clause ownership/normalization boundaries; do not resume PR #54 wording-specific patches or allow known Phase 1 P2 cases into execution prematurely.
+5. Once Phase 2 is stable, start Phase 3 separately for plan-based schedule/consequence/decision boundary reconciliation. Preserve completed prefix effects, strip only unfinished suffix effects, and align narration with authoritative time. Phase 4 legacy cleanup waits for full permanent regression and Exact Preview evidence.
 
 ## Stop Record
 - Completed: PR #33 guarded merge; latest-main fetch; exact merge-tree verification; full post-merge regression; main Vercel success; production `/api/health` smoke.
@@ -520,4 +523,4 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Completed: PR #51 final reviewed/accepted head `68c9e84...` merged as `2ce8d0b...`; trees are identical, production health is green, and merged-main clean-LF full regression passes.
 - Completed: Living World V1 final reviewed/accepted head `10de71a...` merged in PR #52 as `4bbe3fb...`; reviewed and merged trees are identical, production health is green, and merged-main clean-LF regression passes.
 - Completed: Event Director V3 final reviewed/accepted head `eae16c0...` merged in PR #53 as `1018d8c...`; reviewed and merged trees are identical, production health is green, and merged-main clean-LF regression passes.
-- Current active candidate: stacked TPP Phase 1 on `codex/time-plan-parser-phase1` from #54 docs checkpoint `761d257...`. The structured parser/corpus/compact telemetry are implemented locally in shadow mode and all focused plus full repository regressions pass; final diff review, commit/push, stacked PR creation, and hosted exact-head authority remain.
+- Current active candidate: TPP Phase 2 on `codex/time-plan-parser-phase2`, stacked from reviewed Phase 1 exact head `2ad5e283...` / PR #55. The first confidence-gated calculation migration and permanent regressions pass locally; final diff review, commit/push, stacked PR creation, Vercel, and fresh exact-head review remain.

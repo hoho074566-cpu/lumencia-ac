@@ -79,7 +79,7 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Production `/api/health`: healthy; app `1.5.6`, canonical `/api/chat`, adapter `/api/chat-router`, `24h` prompt-cache retention.
 - Full post-merge `node scripts/lumensia-pr-check.mjs`: **PASS**.
 
-## Current active work — Time Plan Parser Phase 1
+## Current active work — Time Plan Parser Phase 2
 - PR #54 is open on `codex/adaptive-time-scale-v2`, based directly on verified PR #53 merge `1018d8c...`. Runtime code head `24407193b59d0f9e9cf2f9d8f1a4589b4b92c95c` passes full local regression, Safety run `32947576791`, Vercel, behind 0, and conflict-free mergeability, but fresh exact-head review `5028340142` has four direct parsing P1s.
 - The change extends the proven deterministic Scene Momentum layer instead of adding another model pass or rewriting canonical cores.
 - Action profiles cover dialogue, meal, training, class attendance, long sleep, and location-aware travel. Explicit durations, earlier required schedules, and due consequences remain authoritative boundaries.
@@ -90,6 +90,10 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - `codex/time-plan-parser-phase1` now contains the local Phase 1 implementation. `lib/time-plan-parser.js` creates ordered structured clauses with actor, action type, start/date/clock, duration/range, destination, deadline, sequence, commitment/completion, hypothetical, quoted, and third-party fields.
 - The four transferred #54 P1 reproductions plus actor separation, quoted-action, and hypothetical-action guards are a data-driven permanent corpus. Existing Adaptive Time Scale and repository regressions remain unchanged and green.
 - The parser is shadow-only. `applySceneMomentumTimeFloor`, schedule/consequence arbitration, world mutation, narration, and stop points do not consume it. Compact pipeline telemetry omits raw input/actor names; bounded input and a fail-safe keep parser diagnostics from blocking a turn.
+- Phase 1 is committed at exact head `2ad5e28321b274c36a20a9ae52c1141d55d6d384` and published as protected stacked PR #55, base `codex/adaptive-time-scale-v2`. Vercel is Ready, GitHub reports the stack conflict-free/mergeable, and fresh exact-head review `5028544740` has direct P0/P1=0. Its fourteen P2 findings remain non-blocking Phase 2/3 corpus. The official Safety workflow runs only for PRs targeting `main`, so PR #55 cannot receive that hosted signal until the stack is rebased/retargeted after #54 resolution.
+- Phase 2 is active on `codex/time-plan-parser-phase2`, based exactly on reviewed Phase 1 head `2ad5e283...`. It introduces a confidence-gated structured timing candidate beside the legacy classifier. Only three reviewed slices migrate: elapsed/future relative-date starts, committed terminal action type recovery, and one ordered regional-travel prefix. Explicit duration/range/deadline calculation, uncertain clocks, actor ambiguity, schedule/consequence arbitration, state mutation, narration, and boundary reconciliation still fall back to the proven path.
+- Structured migration fails closed for diagnostics, unknown/third-party/quoted/hypothetical/negated clauses, partial clocks, ambiguous `밤`/`새벽` clocks, same-day clocks, and date tokens outside the terminal action clause. The parser now preserves sentence ownership, clock parse confidence, date-day offset, and predicate negation so unsafe partial interpretations cannot enter execution.
+- Phase 2 dedicated tests plus Phase 1 corpus, Adaptive Time Scale V2, Scene Momentum correctness/time-floor, syntax/static checks, and full `scripts/lumensia-pr-check.mjs` pass. No API/core/model call, save/schema, route/budget, canon, cache, or persistence behavior changed.
 
 ## Completed active predecessor — Awakening / Talent Evolution V1
 - Final reviewed head `1eb316b498d892c1d5fbb816a8a5464831d2f112` merged in PR #50 as `88ce7b4c17ceb6ab1234c5cedc8bc86c5c3e1dbe`; reviewed and merged trees are identical.
@@ -762,10 +766,10 @@ Gameplay roadmap discussed:
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
 2. Confirm main remains PR #53 merge `1018d8c27c451dc122982fb14bf7d3e3902c70ca`; merge and reviewed-head trees must remain equal. Do **not** redo completed HF1/HF2/HF3 through Event Director V3.
 3. Preserve PR #54 runtime checkpoint `24407193b59d0f9e9cf2f9d8f1a4589b4b92c95c` and direct parsing P1=4. Do not add another wording-specific patch and do not merge PR #54.
-4. On `codex/time-plan-parser-phase1`, finish final diff/architecture review, run the data-driven TPP corpus, affected suites, syntax/static checks, and full `scripts/lumensia-pr-check.mjs`, then commit/push.
-5. Open the Phase 1 PR stacked on base `codex/adaptive-time-scale-v2`. Require exact-head Safety, Vercel, mergeability/current-base, and fresh P0/P1=0. It changes `api/**`, so merge is human-only.
-6. Confirm the Phase 1 parser remains shadow/diagnostic only: no consumer may use it for schedule, consequence, state mutation, narration, stop points, growth, or persistence. Preserve one canonical model call, stable routing, `store:false`, prompt cache/retention, Context Router budgets, canon, player sovereignty, freeze paths, and the 1440-minute cap.
-7. Do not start Phase 2 calculation migration until Phase 1 is reviewed. Phase 2, Phase 3 boundary reconciliation, and Phase 4 legacy cleanup remain separate focused changes.
+4. On `codex/time-plan-parser-phase2`, complete final diff/architecture review, commit/push the confidence-gated calculation migration, and rerun the full regression on the committed exact head.
+5. Open Phase 2 as a protected stacked PR with base `codex/time-plan-parser-phase1`. Require Vercel, mergeability/current-stack, and fresh exact-head P0/P1=0. The main-only Safety signal remains pending until stack resolution; Codex must not merge protected paths.
+6. If fresh review finds an execution P0/P1, fix at the structured ownership/confidence boundary rather than adding PR #54 wording patches. Keep the Phase 1 P2 corpus out of execution until its normalization is implemented and reviewed.
+7. After Phase 2 is stable, begin a separate Phase 3 branch for plan-based schedule/consequence/decision boundary reconciliation: preserve completed prefix effects, remove only post-boundary effects, and align authoritative time with narration. Phase 4 legacy cleanup remains blocked until permanent regression and Preview acceptance pass.
 
 ---
 

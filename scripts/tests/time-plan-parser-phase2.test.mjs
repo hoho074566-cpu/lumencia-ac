@@ -1,0 +1,65 @@
+import assert from 'node:assert/strict';
+import { buildSceneMomentumDirective, classifySceneIntent } from '../../lib/scene-momentum.js';
+import { deriveStructuredTimingCandidate, parseTimePlan } from '../../lib/time-plan-parser.js';
+
+const context = { currentDate: '1285-03-05', currentTime: '09:00', currentWeekday: '수요일', actorName: '카인', location: '훈련장' };
+
+const elapsed = classifySceneIntent('어제 오전 10시에 1시간 훈련한다', context);
+assert.equal(elapsed.kind, 'decision-sensitive', 'a committed action with an elapsed relative-date start must fail closed');
+assert.equal(elapsed.elapsedScheduledStart, true, 'the structured elapsed start is exposed to reconciliation');
+assert.deepEqual(elapsed.suggestedAdvanceMinutes, [0, 0], 'an impossible past start cannot advance authoritative time');
+assert.deepEqual(elapsed.structuredTimePlanApplied, ['relative-date-start'], 'elapsed migration records structured provenance');
+
+const future = classifySceneIntent('3일 후 오전 10시에 1시간 훈련한다', context);
+assert.equal(future.kind, 'training', 'relative day plus clock remains a committed training action');
+assert.equal(future.dateQualifiedStart, true, 'a multi-day relative start is represented as date-qualified');
+assert.equal(future.dateQualifiedStartOffsetMinutes, 4380, 'the relative date and requested clock are composed before execution');
+assert.equal(future.turnLimitTruncated, true, 'a start beyond the one-turn cap remains resumable rather than executing early');
+assert.ok(future.structuredTimePlanApplied.includes('relative-date-start'), 'future start migration records structured provenance');
+const missingClockContext = deriveStructuredTimingCandidate(parseTimePlan('3일 후 오전 10시에 1시간 훈련한다', { ...context, currentTime: '' }));
+assert.equal(missingClockContext.relative_date_start_offset_minutes, null, 'date-plus-clock execution requires an authoritative current clock');
+
+const inheritedDate = classifySceneIntent('내일 9시에 아침을 먹고 10시에 수업을 듣는다.', { ...context, currentTime: '08:00', location: '여관' });
+assert.equal(inheritedDate.scheduledStartOffsetMinutes, null, 'a date qualifier owned by an earlier clause cannot promote the terminal clock onto today');
+assert.ok(!inheritedDate.structuredTimePlanApplied.includes('relative-date-start'), 'a clock-only terminal clause stays on the legacy fallback path');
+const partialClock = classifySceneIntent('오늘 오후 3시 반에 수업을 듣는다.', { ...context, currentTime: '14:00', location: '강의실' });
+assert.equal(partialClock.scheduledStartOffsetMinutes, 90, 'an unsupported partial structured clock must fall back to the established clock parser');
+assert.ok(!partialClock.structuredTimePlanApplied.includes('relative-date-start'), 'partial structured clocks cannot enter execution');
+const sameDaySleep = classifySceneIntent('오늘 오후 11시에 잠을 잔다.', { ...context, currentTime: '00:00', location: '개인실' });
+assert.deepEqual(sameDaySleep.suggestedAdvanceMinutes, [1440, 1440], 'a same-day clock stays in the legacy start-plus-duration cap calculation');
+assert.ok(!sameDaySleep.structuredTimePlanApplied.includes('relative-date-start'), 'same-day clock offsets are not future-date migration candidates');
+const ambiguousNight = classifySceneIntent('내일 밤 1시에 잠을 잔다.', { ...context, currentTime: '23:00', location: '기숙사' });
+assert.equal(ambiguousNight.scheduledStartOffsetMinutes, 120, 'an ambiguous early-night clock stays on the established overnight parser');
+assert.ok(!ambiguousNight.structuredTimePlanApplied.includes('relative-date-start'), 'ambiguous night and dawn periods cannot enter structured execution before normalization migrates');
+const separateSentence = classifySceneIntent('내일. 지금 30분 동안 기다린다.', { ...context, currentTime: '09:00', location: '광장' });
+assert.equal(separateSentence.dateQualifiedStart, false, 'a date in a completed sentence cannot qualify the following action clause');
+assert.deepEqual(separateSentence.suggestedAdvanceMinutes, [30, 30], 'the following immediate wait retains its own duration');
+
+const propositive = classifySceneIntent('1시간 훈련하자', context);
+assert.equal(propositive.kind, 'training', 'a propositive committed training action is no longer generic');
+assert.equal(propositive.explicitDurationMinutes, 60, 'legacy duration execution consumes the promoted structured action type');
+assert.deepEqual(propositive.suggestedAdvanceMinutes, [60, 60], 'the explicit training duration remains exact');
+assert.ok(propositive.structuredTimePlanApplied.includes('terminal-action'), 'terminal action migration records structured provenance');
+
+const compoundAction = '왕도로 가서 1시간 훈련한다';
+const compound = classifySceneIntent(compoundAction, { ...context, location: 'A동 기숙사 개인실' });
+assert.equal(compound.kind, 'training', 'the terminal action remains training');
+assert.deepEqual(compound.precedingActivityRangeMinutes, [15, 60], 'the regional travel prefix keeps its destination-aware range');
+assert.deepEqual(compound.suggestedAdvanceMinutes, [75, 120], 'compound timing sums regional travel and exact training');
+assert.ok(compound.structuredTimePlanApplied.includes('regional-travel-prefix'), 'compound migration records structured provenance');
+const boundarySave = { pc: { name: '카인' }, world: { date: '1285-03-05', time: '09:00', location: 'A동 기숙사 개인실' }, scheduleContext: { due: [], upcoming: [{ id: 'required-meeting', title: '필수 면담', date: '1285-03-05', time: '10:10', pc_required: true }] } };
+assert.match(buildSceneMomentumDirective({ action: compoundAction, saveState: boundarySave }), /SCHEDULE_BOUNDARY=70min/, 'an intervening required schedule is visible inside the structured compound range');
+
+const quotedCandidate = deriveStructuredTimingCandidate(parseTimePlan('「어제 오전 10시에 1시간 훈련한다」고 말했다', context));
+assert.equal(quotedCandidate.eligible, false, 'quoted relative-date actions cannot enter structured execution');
+const uncertainCandidate = deriveStructuredTimingCandidate(parseTimePlan('이번에는 1시간 훈련한다', context));
+assert.equal(uncertainCandidate.eligible, false, 'known actor ambiguity falls back to legacy execution');
+assert.equal(classifySceneIntent('이번에는 1시간 훈련한다', context).kind, 'training', 'legacy fallback preserves an existing valid committed action');
+for (const negatedAction of ['나는 안 기다린다.', '못 기다린다.']) {
+  const negatedPlan = parseTimePlan(negatedAction, context), negatedCandidate = deriveStructuredTimingCandidate(negatedPlan);
+  assert.equal(negatedPlan.clauses[0].negated, true, 'explicit predicate negation is represented in the structured clause');
+  assert.equal(negatedCandidate.eligible, false, 'a negated action cannot enter structured execution');
+  assert.equal(classifySceneIntent(negatedAction, context).kind, 'generic', 'legacy negation suppression remains authoritative');
+}
+
+console.log('PASS Time Plan Parser Phase 2 confidence-gated start/action/compound migration and sovereignty regressions');
