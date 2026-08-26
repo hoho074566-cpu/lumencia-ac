@@ -350,6 +350,9 @@ applySceneMomentumTimeFloor({action:'1시간 대화하고 8시간 잔다',saveSt
 assert.deepEqual(turn.state_delta.npc_schedule_updates,[prefixMeeting],'a visibly arranged future NPC schedule survives from the completed dialogue prefix');
 assert.deepEqual(turn.state_delta.hooks_add,[prefixHook],'only the evidence-attributed prefix hook survives');
 assert.deepEqual(turn.state_delta.delayed_consequences_add,[prefixConsequence],'only the evidence-attributed prefix consequence survives');
+turn={scene_title:'대화 뒤 수면 중 선택',scene:[{kind:'narration',text:'한 시간 대화를 마쳤고 에밀리는 대화 완료 상태가 되었다.'},{kind:'dialogue',speaker_key:'artemis',text:'잠든 지 얼마 안 됐지만 지금 경계 임무를 맡겠나?'}],choices:['경계 임무를 맡는다.','계속 잔다.','상황을 묻는다.'],state_delta:{advance_minutes:90,npc_state_updates:[{npc_key:'emily',status:'대화 완료',current_goal:'8시간 취침',next_activity:'잠자기'}],items_add:['숙면 보상']}};
+applySceneMomentumTimeFloor({action:'1시간 대화하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'상담실'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
+assert.deepEqual(turn.state_delta.npc_state_updates,[{npc_key:'emily',status:'대화 완료'}],'a mixed NPC state row preserves only fields visibly owned by the completed prefix');
 turn={scene_title:'왕도 도착 뒤 선택',scene:[{kind:'narration',text:'왕도에 도착해 성문 안으로 들어왔다.'},{kind:'dialogue',speaker_key:'artemis',text:'잠들기 전에 지금 경계 임무를 맡겠나?'}],choices:['경계 임무를 맡는다.','여관에서 잔다.','상황을 묻는다.'],state_delta:{advance_minutes:60,new_location:'왕도',items_add:['숙면 보상']}};
 applySceneMomentumTimeFloor({action:'왕도로 이동하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'남부 도로'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
 assert.equal(turn.state_delta.new_location,'왕도','a verified short structured travel destination survives suffix reconciliation');
