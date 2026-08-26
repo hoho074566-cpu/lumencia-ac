@@ -111,6 +111,16 @@ assert.deepEqual(classifySceneIntent('90분간 쉰다.').suggestedAdvanceMinutes
 assert.deepEqual(classifySceneIntent('90분 정도 기다린다.').suggestedAdvanceMinutes,[90,90],'spaced approximate duration suffixes must remain consistent for waiting');
 const suffixedBoundarySave={pc:{department:'기사과'},world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduledEvents:[{id:'suffix-class',title:'기사과 필수 수업',date:'1285-03-01',time:'10:00',kind:'academic'}],scheduleContext:{due:[],upcoming:[{id:'suffix-class',title:'기사과 필수 수업',date:'1285-03-01',time:'10:00',kind:'academic'}]}};
 assert.match(buildSceneMomentumDirective({action:'훈련을 90분간 한다.',saveState:suffixedBoundarySave}),/SCHEDULE_BOUNDARY=60min/,'a suffixed explicit duration must still expose an earlier authoritative schedule boundary');
+const postObjectRelativeTraining=classifySceneIntent('훈련을 1시간 후 한다.',{location:'훈련장',currentTime:'08:00'});
+assert.equal(postObjectRelativeTraining.kind,'training','a relative start after the training object must retain the training profile');
+assert.equal(postObjectRelativeTraining.scheduledStartOffsetMinutes,60,'a relative start after the training object must remain a start offset');
+assert.equal(postObjectRelativeTraining.explicitDurationMinutes,null,'a relative start after the training object must not become the activity duration');
+assert.deepEqual(postObjectRelativeTraining.suggestedAdvanceMinutes,[90,180],'post-object relative training must include the wait and natural training range');
+const postObjectRelativeClass=classifySceneIntent('수업을 30분 뒤에 듣는다.',{location:'강의실',currentTime:'08:00'});
+assert.equal(postObjectRelativeClass.kind,'class-attendance','a relative start after the class object must retain the class profile');
+assert.equal(postObjectRelativeClass.scheduledStartOffsetMinutes,30,'a post-object class start must preserve its relative delay');
+const postObjectRelativeBoundarySave={pc:{department:'기사과'},world:{date:'1285-03-01',time:'08:00',location:'훈련장'},scheduledEvents:[{id:'relative-class',title:'기사과 필수 수업',date:'1285-03-01',time:'08:30',kind:'academic'}],scheduleContext:{due:[],upcoming:[{id:'relative-class',title:'기사과 필수 수업',date:'1285-03-01',time:'08:30',kind:'academic'}]}};
+assert.match(buildSceneMomentumDirective({action:'훈련을 1시간 후 한다.',saveState:postObjectRelativeBoundarySave}),/SCHEDULE_BOUNDARY=30min/,'an earlier required schedule must interrupt a post-object relative start');
 const rangedTraining=classifySceneIntent('1시간에서 2시간 동안 훈련한다.', { location:'훈련장' });
 assert.equal(rangedTraining.explicitDurationMinutes,null,'duration range endpoints must not be summed into one exact duration');
 assert.deepEqual(rangedTraining.explicitDurationRangeMinutes,[60,120],'the declared training duration range must remain explicit');
@@ -270,6 +280,10 @@ const nextWeekFriday=classifySceneIntent('다음 주 금요일 오전 10시에 1
 assert.equal(nextWeekFriday.dateQualifiedStart,true,'a next-week weekday must remain a future date');
 assert.deepEqual(nextWeekFriday.suggestedAdvanceMinutes,[0,1440],'a next-week weekday must remain outside the current turn window');
 assert.equal(classifySceneIntent('이번 주 월요일 오전 10시에 1시간 훈련한다.',{location:'훈련장',currentDate:'1285-03-01',currentWeekday:'수요일',currentTime:'08:00'}).kind,'decision-sensitive','an elapsed weekday in the explicitly current week must not execute now');
+assert.equal(classifySceneIntent('이번 월요일 오전 10시에 1시간 훈련한다.',{location:'훈련장',currentDate:'1285-03-01',currentWeekday:'수요일',currentTime:'08:00'}).kind,'decision-sensitive','bare 이번 must preserve the explicitly elapsed current-week weekday');
+const bareNextMonday=classifySceneIntent('다음 월요일 오전 10시에 1시간 훈련한다.',{location:'훈련장',currentDate:'1285-03-06',currentWeekday:'월요일',currentTime:'08:00'});
+assert.equal(bareNextMonday.dateQualifiedStart,true,'bare 다음 must preserve a next-week weekday rather than resolving to today');
+assert.deepEqual(bareNextMonday.suggestedAdvanceMinutes,[0,1440],'a bare next-week weekday must remain deferred beyond the current turn');
 const weekdayBoundaryDirective=buildSceneMomentumDirective({action:'이번 주 금요일 오전 10시에 1시간 훈련한다.',saveState:{world:{date:'1285-03-01',weekday:'수요일',time:'08:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[{id:'today-class',title:'필수 수업',kind:'academic',date:'1285-03-01',time:'09:00'}]}}});
 assert.match(weekdayBoundaryDirective,/SCHEDULE_BOUNDARY=60min/,'an intervening schedule must remain authoritative before a weekday-qualified action');
 const reachableNextDayClass=classifySceneIntent('내일 오전 1시에 수업을 듣는다.', { location:'여관',currentTime:'23:30' });
@@ -309,6 +323,17 @@ assert.equal(topicQualifiedClass.scheduledStartOffsetMinutes,1380,'a topic-quali
 assert.equal(topicQualifiedClass.compression,true,'a topic-qualified next-day class with a reachable lower range must enforce its start floor');
 assert.deepEqual(topicQualifiedClass.suggestedAdvanceMinutes,[1425,1440]);
 assert.equal(classifySceneIntent('모레는 오전 8시에 수업을 듣는다.', { location:'기숙사',currentTime:'09:00' }).dateQualifiedStart,true,'모레는 must remain a future date qualifier');
+const dateOnlyFutureSleep=classifySceneIntent('모레 8시간 잠을 잔다.',{location:'개인실',currentDate:'1285-03-01',currentTime:'08:00'});
+assert.equal(dateOnlyFutureSleep.dateQualifiedStart,true,'a date-only future action must remain date-qualified');
+assert.equal(dateOnlyFutureSleep.dateQualifiedStartOffsetMinutes,2880,'a date-only future action must retain the full wait at the current wall-clock time');
+assert.deepEqual(dateOnlyFutureSleep.suggestedAdvanceMinutes,[0,1440],'a date-only future action beyond the turn cap must stay deferred');
+for(const [action,minutes] of [['1개월 동안 잠을 잔다.',43200],['한 달 동안 잠을 잔다.',43200],['1년 동안 수련한다.',525600]]){
+  const longDuration=classifySceneIntent(action,{location:'개인실',currentDate:'1285-03-01',currentTime:'08:00'});
+  assert.equal(longDuration.explicitDurationMinutes,minutes,`month/year durations must normalize deterministically: ${action}`);
+  assert.deepEqual(longDuration.suggestedAdvanceMinutes,[1440,1440],`month/year durations must enter the one-turn resumable path: ${action}`);
+  assert.equal(longDuration.turnLimitTruncated,true,`month/year durations must remain incomplete after one turn: ${action}`);
+}
+assert.equal(classifySceneIntent('1285년 3월 2일 훈련한다.',{location:'훈련장',currentDate:'1285-03-01',currentTime:'08:00'}).explicitDurationMinutes,null,'the year in an absolute calendar date must not become a multi-century activity duration');
 assert.equal(classifySceneIntent('정오에 수업을 듣는다.', { location:'강의실',currentTime:'09:00' }).scheduledStartOffsetMinutes,180,'noon must normalize to the same-day 12:00 start');
 assert.deepEqual(classifySceneIntent('정오부터 1시까지 수업을 듣는다.', { location:'강의실',currentTime:'11:00' }).suggestedAdvanceMinutes,[120,120],'an unmarked 1 o’clock end after noon must mean the same-day afternoon');
 assert.deepEqual(classifySceneIntent('정오부터 오후 1시까지 수업을 듣는다.', { location:'강의실',currentTime:'11:00' }).suggestedAdvanceMinutes,[120,120],'the inferred noon interval must match its explicit PM equivalent');

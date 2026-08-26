@@ -768,12 +768,27 @@ const cappedScheduledSleepRuntime=deriveTimedActionRuntime({},cappedScheduledSle
 assert.equal(cappedScheduledSleepRuntime.total_minutes,1620,'same-day scheduled actions must include their start delay in resumable totals');
 assert.equal(cappedScheduledSleepRuntime.remaining_wait_minutes,0,'elapsed time through the scheduled start must consume the saved wait first');
 assert.equal(cappedScheduledSleepRuntime.remaining_activity_minutes,180,'only the unfinished scheduled activity duration should remain');
+turn={scene:[{kind:'narration',text:'하루가 지났지만 모레로 정한 수면 시각은 아직 오지 않았다.'}],state_delta:{advance_minutes:1440},choices:[]};
+const dateOnlyDeferredSleepAction='모레 8시간 잠을 잔다.';
+const dateOnlyDeferredSleepIntent=applySceneMomentumTimeFloor({action:dateOnlyDeferredSleepAction,saveState:{world:{date:'1285-03-01',time:'08:00',location:'개인실'},sceneRuntime:{},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+const dateOnlyDeferredSleepRuntime=deriveTimedActionRuntime({},dateOnlyDeferredSleepIntent,dateOnlyDeferredSleepAction,turn,'game');
+assert.equal(dateOnlyDeferredSleepRuntime.total_minutes,3360,'a date-only deferred action must retain its two-day wait plus activity duration');
+assert.equal(dateOnlyDeferredSleepRuntime.remaining_wait_minutes,1440,'the first capped turn must leave the second day of date-only waiting intact');
+assert.equal(dateOnlyDeferredSleepRuntime.remaining_activity_minutes,480,'date-only waiting must not consume the deferred activity duration');
+assert.equal(dateOnlyDeferredSleepRuntime.remaining_minutes,1920,'the resumable date-only timeline must retain both waiting and activity time');
 for(const [action,total] of [['이틀에서 사흘 동안 잠을 잔다.',2880],['이틀 넘게 잠을 잔다.',2881],['이틀 이상 잠을 잔다.',2880],['1시간 훈련하고 이틀 동안 잠을 잔다.',2940]]){
   turn={scene:[{kind:'narration',text:'하루 동안 요청한 행동을 진행했지만 아직 끝나지 않았다.'}],state_delta:{advance_minutes:1440},choices:[]};
   const cappedIntent=applySceneMomentumTimeFloor({action,saveState:{world:{date:'1285-03-02',time:'07:20',location:'개인실'},sceneRuntime:{},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
   const runtime=deriveTimedActionRuntime({},cappedIntent,action,turn,'game');
   assert.equal(runtime.total_minutes,total,`every capped duration form must retain its deterministic minimum: ${action}`);
   assert.equal(runtime.remaining_minutes,total-1440,`every capped duration form must persist the remaining minimum: ${action}`);
+}
+for(const [action,total] of [['1개월 동안 잠을 잔다.',43200],['1년 동안 수련한다.',525600]]){
+  turn={scene:[{kind:'narration',text:'하루의 진행 한계에 도달했지만 요청한 장기 행동은 아직 끝나지 않았다.'}],state_delta:{advance_minutes:1440},choices:[]};
+  const cappedIntent=applySceneMomentumTimeFloor({action,saveState:{world:{date:'1285-03-02',time:'07:20',location:'개인실'},sceneRuntime:{},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+  const runtime=deriveTimedActionRuntime({},cappedIntent,action,turn,'game');
+  assert.equal(runtime.total_minutes,total,`month/year actions must persist their full deterministic duration: ${action}`);
+  assert.equal(runtime.remaining_minutes,total-1440,`month/year actions must retain all time beyond the first turn: ${action}`);
 }
 const resumedLongSleep=classifySceneIntent('계속 잔다.',{location:'개인실',resumeTimedAction:longSleepRuntime});
 assert.equal(resumedLongSleep.resumedTimedAction,true,'an explicit continuation must resume the stored timed action');
