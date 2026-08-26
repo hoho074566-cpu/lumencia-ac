@@ -49,6 +49,10 @@ assert.deepEqual(compound.suggestedAdvanceMinutes, [75, 120], 'compound timing s
 assert.ok(compound.structuredTimePlanApplied.includes('regional-travel-prefix'), 'compound migration records structured provenance');
 const boundarySave = { pc: { name: '카인' }, world: { date: '1285-03-05', time: '09:00', location: 'A동 기숙사 개인실' }, scheduleContext: { due: [], upcoming: [{ id: 'required-meeting', title: '필수 면담', date: '1285-03-05', time: '10:10', pc_required: true }] } };
 assert.match(buildSceneMomentumDirective({ action: compoundAction, saveState: boundarySave }), /SCHEDULE_BOUNDARY=70min/, 'an intervening required schedule is visible inside the structured compound range');
+for (const delayedPrefix of ['내일 왕도로 가서 1시간 훈련한다', '30분 후 왕도로 가서 1시간 훈련한다']) {
+  const delayed = classifySceneIntent(delayedPrefix, { ...context, location: '기숙사' });
+  assert.ok(!delayed.structuredTimePlanApplied?.includes('regional-travel-prefix'), 'a delayed travel prefix must stay on the legacy calculation path');
+}
 
 const quotedCandidate = deriveStructuredTimingCandidate(parseTimePlan('「어제 오전 10시에 1시간 훈련한다」고 말했다', context));
 assert.equal(quotedCandidate.eligible, false, 'quoted relative-date actions cannot enter structured execution');
@@ -60,6 +64,15 @@ for (const negatedAction of ['나는 안 기다린다.', '못 기다린다.']) {
   assert.equal(negatedPlan.clauses[0].negated, true, 'explicit predicate negation is represented in the structured clause');
   assert.equal(negatedCandidate.eligible, false, 'a negated action cannot enter structured execution');
   assert.equal(classifySceneIntent(negatedAction, context).kind, 'generic', 'legacy negation suppression remains authoritative');
+}
+for (const [nonCommittedAction, expectedKind] of [
+  ['어제 1시간 훈련했다. 지금 공격한다', 'committed-consequence'],
+  ['1시간 훈련한다고 들었다', 'generic'],
+  ['1시간 훈련했다', 'generic'],
+]) {
+  const plan = parseTimePlan(nonCommittedAction, context), candidate = deriveStructuredTimingCandidate(plan);
+  assert.equal(candidate.eligible, false, `${nonCommittedAction}: non-committed or partially parsed terminal text cannot enter execution`);
+  assert.equal(classifySceneIntent(nonCommittedAction, context).kind, expectedKind, `${nonCommittedAction}: legacy intent remains authoritative`);
 }
 
 console.log('PASS Time Plan Parser Phase 2 confidence-gated start/action/compound migration and sovereignty regressions');
