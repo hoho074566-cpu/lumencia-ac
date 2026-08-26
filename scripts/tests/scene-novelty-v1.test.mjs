@@ -81,6 +81,9 @@ assert.match(guard,/목록/);
 const question=buildSceneNoveltyDirective({action:'기량평가가 언제 시작할까?',saveState,recentTurns:[repeatedTurn]});
 assert.match(question,/QUESTION BOUNDARY/);
 assert.doesNotMatch(question,/중요한 선택점이 아니라면 기존 NPC 목표/,'a question must not be used to force world progression');
+const elapsedStartNovelty=buildSceneNoveltyDirective({action:'오늘 오전 1시에 훈련한다.',saveState:{...saveState,world:{...saveState.world,time:'09:00'}},recentTurns:[repeatedTurn]});
+assert.match(elapsedStartNovelty,/QUESTION BOUNDARY/,'novelty must share the elapsed-start freeze produced by the canonical current time');
+assert.doesNotMatch(elapsedStartNovelty,/현재 USER ACTION과 고정 일정\/진행 사건을 우선 완료한다/,'novelty must not tell the model to complete an elapsed today-start action');
 
 const recap=buildSceneNoveltyDirective({action:'게시판 내용을 다시 설명해 줘',saveState,recentTurns:[repeatedTurn]});
 assert.match(recap,/REQUESTED RECAP/);
@@ -98,12 +101,14 @@ assert.doesNotMatch(frozen,/REPEAT_GUARD/);
 
 const router=fs.readFileSync(new URL('../../api/chat-router.js',import.meta.url),'utf8');
 const context=fs.readFileSync(new URL('../../api/lib/context-router.js',import.meta.url),'utf8');
+const noveltySource=fs.readFileSync(new URL('../../lib/scene-novelty.js',import.meta.url),'utf8');
 const health=fs.readFileSync(new URL('../../api/health.js',import.meta.url),'utf8');
 const runtime=fs.readFileSync(new URL('../../app-runtime.js',import.meta.url),'utf8');
 assert.match(router,/deriveSceneNovelty/);
 assert.match(router,/scene_novelty_v1:true/);
 assert.match(router,/novelty,scene_delta:sceneDelta/);
 assert.match(context,/buildSceneNoveltyDirective/);
+assert.match(noveltySource,/classifySceneIntent\(rawAction,\{location:saveState\?\.world\?\.location\|\|'',currentTime:saveState\?\.world\?\.time\|\|''/,'novelty intent classification must receive the canonical current time');
 assert.match(context,/DETERMINISTIC SCENE NOVELTY V1/);
 assert.doesNotMatch(context,/actionTextLimit=noveltyDirective/,'novelty context must not independently truncate a user action already covered by the routed input budget');
 assert.match(health,/sceneNovelty:/);

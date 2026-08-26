@@ -73,6 +73,10 @@ for(const food of ['빵','스테이크']){
 assert.deepEqual(classifySceneIntent('빵을 30분 동안 먹는다.',{location:'식당'}).suggestedAdvanceMinutes,[30,30],'object-first timed eating must retain the same exact meal duration');
 assert.equal(classifySceneIntent('에밀리가 30분 동안 빵을 먹는다.',{location:'식당'}).kind,'generic','a timed food object must not execute a third-party meal as the PC');
 assert.equal(classifySceneIntent('30분 후에 빵을 먹는다.',{location:'식당'}).kind,'generic','a future eating start without a declared eating duration must not become a timed meal');
+const scheduledFood=classifySceneIntent('오전 10시에 빵을 먹는다.',{location:'식당',currentTime:'08:00'});
+assert.equal(scheduledFood.kind,'meal','a food-object action with an authoritative clock must use the meal profile');
+assert.equal(scheduledFood.scheduledStartOffsetMinutes,120,'a scheduled food-object meal must retain its real start offset');
+assert.deepEqual(scheduledFood.suggestedAdvanceMinutes,[140,165],'scheduled food-object eating must include its wait and natural meal duration');
 
 const training = classifySceneIntent('검술을 훈련한다.', { location:'훈련장' });
 assert.equal(training.kind, 'training');
