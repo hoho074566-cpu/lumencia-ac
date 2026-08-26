@@ -242,6 +242,8 @@ const precedingClass={id:'preceding-class',title:'기사과 기초 수업',date:
 assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,classThenSleep),true,'an explicitly requested schedule in a preceding compound clause must not become an unrelated boundary');
 assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,'오전 10시에 기사과 기초 수업을 듣고, 8시간 동안 잠을 잔다.'),true,'punctuation after a preceding connector must not break requested-schedule identity');
 assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,'오전 10시에 기사과 기초 수업을 들은 후 8시간 동안 잠을 잔다.'),true,'a preceding 후 clause must remain attributable to its requested schedule');
+const absoluteDatedClass={...precedingClass,date:'1285-03-02'},absoluteDatedClassSave={...precedingClassSave,world:{...precedingClassSave.world,date:'1285-03-01'},scheduledEvents:[absoluteDatedClass],scheduleContext:{due:[],upcoming:[absoluteDatedClass]}};
+assert.equal(isRequestedScheduledActivity(absoluteDatedClassSave,absoluteDatedClass,'3월 2일 오전 10시에 기사과 기초 수업을 듣는다.'),true,'an absolute calendar start must match the saved event on its resolved world date');
 const durationQualifiedClassAction='오전 10시에 기사과 기초 수업을 1시간 동안 듣는다.';
 assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,durationQualifiedClassAction),true,'duration glue must not make the requested schedule look unrelated');
 assert.equal(isRequestedScheduledActivity(precedingClassSave,precedingClass,'오전 10시에 기사과 기초수업을 듣는다.'),true,'Korean spacing alone must not make the requested schedule look unrelated');
@@ -325,6 +327,11 @@ assert.equal(oneDaySleep.turnLimitTruncated,false,'an exact one-day request may 
 const twoDaySleep=classifySceneIntent('이틀 동안 잠을 잔다.');
 assert.equal(twoDaySleep.explicitDurationMinutes,2880,'이틀 must normalize to two days');
 assert.equal(twoDaySleep.turnLimitTruncated,true,'an 이틀 sleep must remain unfinished after one turn');
+const oneAndHalfDaySleep=classifySceneIntent('하루 반 동안 잠을 잔다.');
+assert.equal(oneAndHalfDaySleep.explicitDurationMinutes,2160,'하루 반 must retain the additional half day');
+assert.deepEqual(oneAndHalfDaySleep.suggestedAdvanceMinutes,[1440,1440],'a one-and-a-half-day sleep must stop at the canonical one-turn cap');
+assert.equal(oneAndHalfDaySleep.turnLimitTruncated,true,'a one-and-a-half-day sleep must remain unfinished after one turn');
+assert.equal(classifySceneIntent('1일 반 동안 쉰다.').explicitDurationMinutes,2160,'numeric day-and-a-half durations must use the same normalization');
 const twoDayTravel=classifySceneIntent('2일 동안 수도로 간다.',{location:'중앙광장'});
 assert.equal(twoDayTravel.kind,'travel','a leading day duration must retain travel intent');
 assert.equal(twoDayTravel.semanticTarget,'수도','a leading day duration must not pollute the destination');
@@ -448,6 +455,24 @@ assert.equal(reachableDatedDeadline.turnLimitTruncated,false,'a reachable dated 
 const calendarClockTraining=classifySceneIntent('3월 1일 오전 10시에 훈련한다.',{currentTime:'09:00'});
 assert.equal(calendarClockTraining.explicitDurationMinutes,null,'a calendar day followed by a clock must not become an activity duration');
 assert.deepEqual(calendarClockTraining.suggestedAdvanceMinutes,[90,180],'the clock after a calendar date must retain normal scheduled-training timing');
+const deferredAbsoluteDateTraining=classifySceneIntent('3월 1일 오전 10시에 훈련한다.',{currentDate:'1285-02-28',currentTime:'08:00'});
+assert.equal(deferredAbsoluteDateTraining.dateQualifiedStart,true,'an absolute calendar date must resolve against the saved world date');
+assert.equal(deferredAbsoluteDateTraining.compression,false,'an absolute start beyond one turn must remain deferred');
+assert.equal(deferredAbsoluteDateTraining.scheduledStartOffsetMinutes,null,'a future absolute date must not collapse onto today\'s matching clock');
+assert.deepEqual(deferredAbsoluteDateTraining.suggestedAdvanceMinutes,[0,1440],'an out-of-window absolute start must preserve the one-turn lookahead without executing the action');
+assert.equal(deferredAbsoluteDateTraining.turnLimitTruncated,true,'an out-of-window absolute start must remain unfinished');
+const reachableAbsoluteDateTraining=classifySceneIntent('3월 1일 오전 10시에 훈련한다.',{currentDate:'1285-02-28',currentTime:'20:00'});
+assert.equal(reachableAbsoluteDateTraining.scheduledStartOffsetMinutes,840,'a reachable absolute calendar start must include the date boundary');
+assert.deepEqual(reachableAbsoluteDateTraining.suggestedAdvanceMinutes,[870,960],'a reachable absolute start must add its next-day wait to the training range');
+const elapsedAbsoluteDateTraining=classifySceneIntent('1285년 3월 1일 오전 10시에 훈련한다.',{currentDate:'1285-03-02',currentTime:'08:00'});
+assert.equal(elapsedAbsoluteDateTraining.kind,'decision-sensitive','an elapsed absolute start must fail closed instead of replaying the clock today');
+assert.equal(elapsedAbsoluteDateTraining.elapsedScheduledStart,true,'an elapsed absolute start must be exposed to deterministic reconciliation');
+const yearBoundaryTraining=classifySceneIntent('1월 1일 오전 10시에 훈련한다.',{currentDate:'1285-12-31',currentTime:'20:00'});
+assert.equal(yearBoundaryTraining.scheduledStartOffsetMinutes,840,'an omitted calendar year must resolve to the next valid occurrence across a year boundary');
+const absoluteDateTravel=classifySceneIntent('3월 1일 오전 10시에 도서관으로 간다.',{location:'A동 개인실',currentDate:'1285-02-28',currentTime:'20:00'});
+assert.equal(absoluteDateTravel.semanticTarget,'도서관','an absolute departure date must not pollute the travel destination');
+assert.equal(absoluteDateTravel.scheduledStartOffsetMinutes,840,'an absolute departure date must retain the next-day boundary');
+assert.match(buildSceneMomentumDirective({action:'3월 1일 오전 10시에 훈련한다.',saveState:{world:{date:'1285-02-28',time:'08:00',location:'훈련장'}}}),/날짜 지정 시작 규칙:[\s\S]*요청한 날짜를 오늘로 당기거나/,'the saved world date must reach the model-facing deferred-start directive');
 
 const boundarySave = {
   pc:{ department:'기사과' },
