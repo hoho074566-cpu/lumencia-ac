@@ -473,6 +473,11 @@ assert.deepEqual(turn.state_delta.skill_experience,[multiPrefixGrowth],'the stru
 assert.match(turn.scene.map(item=>item.text).join(' '),/이 임무를 받아들이겠나/,'the declared final decision item owns the choices');
 assert.doesNotMatch(turn.scene.map(item=>item.text).join(' '),/누가 이 흔적/,'an earlier rhetorical question is not rebound to the choices');
 
+turn={scene_title:'걱정스러운 선택',scene:[{kind:'narration',text:'한 시간 훈련을 마쳤다.'},{kind:'dialogue',speaker_key:'emily',text:'지금 임무를 맡겠어?',expression:'worried'}],choices:['맡는다.','잔다.','묻는다.'],emotion_updates:[{npc_key:'emily',expression:'worried'},{npc_key:'lena',expression:'smile'}],state_delta:{advance_minutes:60}};
+turn.time_execution=choiceExecution(turn,{owners:[]});
+applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:structuralCompoundSave},turn,'game');
+assert.deepEqual(turn.emotion_updates,[{npc_key:'emily',expression:'worried'}],'only the NPC emotion attached to retained decision dialogue survives boundary reconciliation');
+
 turn={scene_title:'무구두점 선택',scene:[{kind:'narration',text:'한 시간 훈련을 마치고 기록표를 받았는데 지금 임무를 맡겠나?'}],choices:['맡는다.','잔다.','묻는다.'],state_delta:{advance_minutes:60,items_add:['훈련 기록표']}};
 turn.time_execution=choiceExecution(turn,{owners:[effectOwner('items_add',0)]});
 applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:structuralCompoundSave},turn,'game');

@@ -764,7 +764,8 @@ function reconcileReturnedTimedTurn(turn,{reason='profile-cap',elapsed=0,boundar
   const text=`${prefix}${detail}${completedAtRaisedFloor?'':' 그 이후 과정은 아직 확정되지 않았다.'}`;
   turn.scene_title=reason==='schedule-boundary'?'일정 경계':reason==='consequence-boundary'?'후속 상황 경계':reason==='decision-boundary'?'선택 지점':reason==='turn-limit'?'진행 중':reason==='explicit-zero'?'행동 보류':completedAtRaisedFloor?'행동 완료':'행동 진행 중';
   const preservedChoices=reason==='decision-boundary'?array(turn.choices).slice(0,3):[],decisionCandidates=reason==='decision-boundary'?array(turn.scene).filter(item=>String(item?.text||'').trim()):[],prompt=String(decisionPromptText||'').trim(),promptRows=prompt?decisionCandidates.filter(item=>String(item?.text||'').includes(prompt)).map(item=>({...object(item),text:prompt})):[],questionRows=decisionCandidates.filter(item=>/[?？]/.test(String(item?.text||''))),decisionRows=(promptRows.length?promptRows:questionRows.length?questionRows:decisionCandidates.filter(item=>String(item?.kind||'')==='dialogue')).slice(-2);
-  turn.scene_summary=text;turn.scene=[{kind:'narration',text},...decisionRows];turn.choices=preservedChoices;turn.emotion_updates=[];turn.cg_id=null;turn.director=null;
+  const decisionSpeakerKeys=new Set(decisionRows.map(item=>String(item?.speaker_key||'').trim()).filter(Boolean)),retainedEmotionUpdates=reason==='decision-boundary'?array(turn.emotion_updates).filter(row=>decisionSpeakerKeys.has(String(row?.npc_key||row?.key||row?.speaker_key||'').trim())):[];
+  turn.scene_summary=text;turn.scene=[{kind:'narration',text},...decisionRows];turn.choices=preservedChoices;turn.emotion_updates=retainedEmotionUpdates;turn.cg_id=null;turn.director=null;
   return true;
 }
 function reconcileReturnedRaisedFloorContinuation(turn,{elapsed=0}={}){

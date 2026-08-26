@@ -835,6 +835,12 @@ Fresh direct review `PRR_kwDOT8LCAs8AAAABK_gmWA` / `5032650328` on exact head `6
 
 The correction keeps the boundary authority outside the returned claim. Choice events must match the saved/promoted event, pre-routed resumable IDs, an exactly reached schedule/consequence, or the Director occurrence selected before the response. Returned event IDs never populate their own allowlist. Structural projection now returns the validated turn-owned value and restores it after scene reconciliation for Director and non-Director events alike; Director metadata requires matching owned progress. Permanent regressions reject an invented `director:*` reward/progress claim and preserve a real active non-Director event. Focused Phase 3/time-floor/HF1 integration/event-progress suites and the full repository check pass.
 
+Fresh direct review `PRR_kwDOT8LCAs8AAAABK_tAeg` / `5032853626` on exact head `8279588d848556bd7d8222d091b099abc27e7f3f` found P0=0 / P1=2:
+- Event Consequence lifecycle moved/compacted `hooks_update` rows without remapping their receipt indexes;
+- deterministic choice narration retained the decision speaker but cleared the matching persistent emotion update.
+
+The correction reuses the non-serializing exact source-row marker for raw hook patches and performs owner remapping in the same lifecycle replacement. Only a selected consequence row deterministically rewritten from a raw row carries that source; runtime-created expiry rows do not inherit model ownership. Decision reconciliation preserves emotion rows only for NPC keys in the retained decision dialogue and continues to clear all post-boundary/unretained speakers. Permanent regressions cover both findings. Event Consequence, Phase 3/time-floor/HF1 focused suites and the full repository check pass.
+
 ---
 
 # 12. NEXT ACTION — CURRENT START POINT
@@ -842,7 +848,7 @@ The correction keeps the boundary authority outside the returned claim. Choice e
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
 2. Confirm main remains PR #53 merge `1018d8c27c451dc122982fb14bf7d3e3902c70ca`; merge and reviewed-head trees must remain equal. Do **not** redo completed HF1/HF2/HF3 through Event Director V3.
 3. Preserve PR #54 runtime checkpoint `24407193b59d0f9e9cf2f9d8f1a4589b4b92c95c` and direct parsing P1=4. Do not add another wording-specific patch and do not merge PR #54.
-4. Commit/push the PR #57 correction following fresh review `5032650328`, then require exact-current-HEAD Vercel and another fresh direct P0/P1=0 review. Any new P0/P1 starts the next correction immediately; cycle counts and reports are not stop conditions. Repeated narration/wording/effect-attribution findings must be fixed through clause/effect ownership, not new wording regexes.
+4. Commit/push the PR #57 correction following fresh review `5032853626`, then require exact-current-HEAD Vercel and another fresh direct P0/P1=0 review. Any new P0/P1 starts the next correction immediately; cycle counts and reports are not stop conditions. Repeated narration/wording/effect-attribution findings must be fixed through clause/effect ownership, not new wording regexes.
 5. Reconfirm the stacked base/merge-base is reviewed Phase 2 exact `f0971430...`, behind 0, conflict-free/mergeable. Main remains `1018d8c...`; the main-only Safety workflow is absent on a stacked PR and cannot be treated as a synthetic pass.
 6. After direct P0/P1=0, run the Phase 3 Exact Preview boundary corpus without reading protection tokens/cookies/storage or bypassing protection. PR #57 changes `api/**`, so it remains human-merge-only and must not be merged by Codex.
 7. Phase 4 remains blocked until permanent regression and Phase 3 Exact Preview evidence pass. When it starts, it is **legacy-cleanup only**: prove one TPP-authoritatively replaced fallback with permanent regression, remove it, rerun focused/full regression, then move to the next removal. Add no feature, natural-language coverage, regex coverage, or new reconciliation policy. A removal regression must first be classified as evidence that legacy is still required or Phase 3 is incomplete; do not patch Phase 3 design flaws inside Phase 4.
