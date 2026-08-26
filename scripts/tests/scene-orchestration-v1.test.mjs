@@ -81,6 +81,22 @@ assert.match(scheduleDirective, /TRIGGER_MINUTES=30/);
 assert.match(scheduleDirective, /PRIMARY를 TRIGGER_MINUTES의 경계까지만 진행한 뒤 SECONDARY를 처리/,
   'an interrupting boundary must cut off compressed primary action instead of waiting for its full completion');
 
+const resumedTimedScheduleBoundary=deriveSceneOrchestrationPlan({
+  mode:'game',
+  action:'계속한다.',
+  saveState:{
+    world:{date:'1285-03-01',time:'09:00',location:'개인실'},
+    pc:{name:'카인',department:'기사과'},
+    scheduledEvents:[{id:'resumed-class',title:'기사과 필수 수업',kind:'academic',date:'1285-03-01',time:'10:00',status:'scheduled'}],
+    scheduleContext:{due:[],upcoming:[{id:'resumed-class',title:'기사과 필수 수업',kind:'academic',date:'1285-03-01',time:'10:00',status:'scheduled'}]},
+    sceneRuntime:{timed_action:{kind:'downtime',remaining_minutes:1440}},
+  },
+  directorTelemetry:{result:'NO_RANDOM_EVENT_DUE'},
+});
+assert.equal(resumedTimedScheduleBoundary.intent,'downtime','orchestration must classify a resumable timed action with the saved runtime record');
+assert.equal(resumedTimedScheduleBoundary.secondary,'schedule-boundary','a required schedule must interrupt a resumed timed action');
+assert.equal(resumedTimedScheduleBoundary.trigger_minutes,60,'the resumed orchestration boundary must use the authoritative schedule offset');
+
 const requestedClass={id:'basic-class',title:'기사과 기초 수업',kind:'academic',date:'1285-03-01',time:'10:00',status:'scheduled'};
 const ownScheduledActivity=deriveSceneOrchestrationPlan({
   mode:'game',
