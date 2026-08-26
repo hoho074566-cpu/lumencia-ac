@@ -485,23 +485,28 @@ function reconcileExplicitZeroTurn(turn){
   turn.state_delta={...frozen,advance_minutes:0,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0};
   delete turn.event_progress;
 }
-function timedActionCompletionEvidence(turn,intent={},action=''){
+function timedActionCompletionEvidence(turn,intent={},action='',actorName=''){
   const segments=[turn?.scene_title,turn?.scene_summary,...array(turn?.scene).filter(item=>String(item?.kind||'')!=='dialogue').map(item=>item?.text)].filter(Boolean).flatMap(value=>String(value).split(/(?<=[.!?。！？])|\n+/)).map(value=>value.trim()).filter(Boolean),kind=String(intent?.kind||'');if(!segments.length)return false;
   const patterns={
     downtime:/(?:잠에서\s*깨어|눈을\s*떴|잠을\s*(?:푹\s*)?잤|수면을\s*마쳤|휴식을\s*마쳤|충분히\s*쉬었)/,
-    wait:/(?:기다림을\s*마쳤|대기를\s*마쳤|요청한\s*시간이\s*(?:흘렀|지났)|(?:\d+(?:\.\d+)?|한|두|세|네|다섯|여섯|일곱|여덟|아홉|열)\s*(?:분|시간)(?:이|가)?\s*(?:흘렀|지났)|시간을\s*보낸\s*뒤)/,
+    wait:/(?:기다림을\s*마쳤|대기를\s*마쳤|요청한\s*시간이\s*(?:흘렀|지났)(?!다고|다는|는지|을지|을까)|(?:\d+(?:\.\d+)?|한|두|세|네|다섯|여섯|일곱|여덟|아홉|열)\s*(?:분|시간)(?:이|가)?\s*(?:흘렀|지났)(?!다고|다는|는지|을지|을까)|시간을\s*보낸\s*뒤)/,
     meal:/(?:식사를\s*(?:마쳤|끝냈)|밥을\s*다\s*먹었|식사\s*후)/,
     training:/(?:훈련|연습|수련|단련)(?:을|를)?\s*(?:마쳤|끝냈|완료했|마무리했)/,
     'class-attendance':/(?:수업|강의|세미나|실습|오리엔테이션|교육|입학식)(?:을|를)?\s*(?:마쳤|끝냈|완료했|수료했)|(?:수업|강의|세미나|실습|오리엔테이션|교육|입학식)(?:이|가)\s*(?:끝났|종료되었|종료됐다)/,
     dialogue:/(?:대화|이야기|질문|답변|설명|상담|논의|면담|회의|브리핑)(?:을|를)?\s*(?:마쳤|끝냈|마무리했)|(?:대화|이야기|질문|답변|설명|상담|논의|면담|회의|브리핑)(?:이|가)\s*(?:끝났|마무리되었)/,
-    travel:/(?:목적지|행선지|[^\s]{2,24})(?:에|로)\s*(?:도착했|도착했다|도착했다가|닿았|다다랐)/,
     explore:/(?:탐색|구경|둘러보기|순회)(?:를)?\s*(?:마쳤|끝냈|마무리했)/,
     'exit-exterior':/(?:건물|기숙사|방)\s*밖(?:에|으로)\s*(?:나왔|도착했)/,
   };
   const hypothetical=/(?:다면|라면|했으면|했을\s*경우|했는지|했을지|했을까|했을\s*(?:것인가|텐가)|아직|않았|못했|미완료|가정|예정|계획|[?？])/;
+  const uncertainWait=/(?:흘렀|지났)(?:는지|을지|을까)|(?:흘렀|지났)(?:다고|다는)\s*(?:착각|오해|생각|믿|여겼|추측|주장|말|소문)|(?:흐르|지나)지\s*(?:않|못)|(?:안|못)\s*(?:흘렀|지났)/;
   const foodObject=[...String(action||'').matchAll(/([가-힣A-Za-z0-9_]{1,24})(?:을|를)[^\n,.!?。！？]{0,32}(?:먹는다|먹겠다|먹을게)\s*[.!。！]*$/gi)].at(-1)?.[1]?.toLowerCase()||'',foodCompletion=foodObject?new RegExp(`${foodObject}\\s*(?:을|를)\\s*(?:(?:다|모두|전부|남김없이)\\s*)?(?:먹었|먹어\\s*치웠|비웠|해치웠)`):null;
+  if(kind==='travel'){
+    if(travelDestinationReachedForReconciliation(turn?.state_delta?.new_location,intent?.semanticTarget))return true;
+    const allowedSubjects=new Set(['나','내','저','제','우리','저희',String(actorName||'').trim().toLowerCase()].filter(Boolean)),arrival=/(?:목적지|행선지|[^\s]{2,24})(?:에|로)\s*(?:도착했|도착했다|도착했다가|닿았|다다랐)/;
+    return segments.some(segment=>{if(hypothetical.test(segment)||!arrival.test(segment)||!travelDestinationReachedForReconciliation(segment,intent?.semanticTarget))return false;const before=segment.slice(0,segment.search(arrival)),subjects=[...before.matchAll(/(?:^|[\s,])([^\s,]{1,32}?)(?:가|이|은|는|께서)\s+/gu)].map(match=>String(match[1]||'').trim().toLowerCase()),subject=subjects.at(-1);return!subject||allowedSubjects.has(subject);});
+  }
   if(!patterns[kind])return false;
-  return segments.some(segment=>{if(hypothetical.test(segment))return false;if(patterns[kind].test(segment))return true;return Boolean(kind==='meal'&&foodCompletion?.test(segment.toLowerCase()));});
+  return segments.some(segment=>{if(hypothetical.test(segment)||kind==='wait'&&uncertainWait.test(segment))return false;if(patterns[kind].test(segment))return true;return Boolean(kind==='meal'&&foodCompletion?.test(segment.toLowerCase()));});
 }
 function travelDestinationReachedForReconciliation(location='',target=''){
   const compact=(value)=>String(value||'').toLowerCase().replace(/[\s\p{P}\p{S}]+/gu,''),actual=compact(location),expected=compact(target);if(!actual||!expected)return false;if(expected.length>=2&&actual.includes(expected))return true;
@@ -534,7 +539,7 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   const reachedScheduledBoundary=surfacedScheduledBoundary||crossedScheduledBoundary;
   const previousEventId=String(incoming?.saveState?.sceneRuntime?.eventProgress?.eventInstanceId||incoming?.saveState?.sceneRuntime?.eventProgress?.event_instance_id||'').trim().toLowerCase();
   const structuredInterruption=Boolean(eventId.startsWith('director:')&&eventId!==previousEventId&&!structuredBoundary&&eventId!==String(consequenceLifecycle?.selected_id||'').trim().toLowerCase());
-  const completionEvidence=timedActionCompletionEvidence(turn,intent,incoming?.action||''),completedBeforeChoice=!hasMeaningfulStop||completionEvidence,earlierInterruptionBeforeConsequence=Boolean(consequenceWithinProfile&&current<consequenceBoundary&&(structuredInterruption||(hasMeaningfulStop&&!completedBeforeChoice)));
+  const completionEvidence=timedActionCompletionEvidence(turn,intent,incoming?.action||'',incoming?.saveState?.pc?.name||''),completedBeforeChoice=!hasMeaningfulStop||completionEvidence,earlierInterruptionBeforeConsequence=Boolean(consequenceWithinProfile&&current<consequenceBoundary&&(structuredInterruption||(hasMeaningfulStop&&!completedBeforeChoice)));
   const reachedConsequenceBoundary=consequenceWithinProfile&&!earlierInterruptionBeforeConsequence&&(current>=consequenceBoundary||consequenceLifecycle?.status==='resolved'),manifestedConsequenceBoundary=Boolean(reachedConsequenceBoundary&&consequenceLifecycle?.status==='resolved');
   const reachedBoundaries=[reachedScheduledBoundary?scheduleBoundary:null,reachedConsequenceBoundary?consequenceBoundary:null].filter(value=>value!=null&&Number.isFinite(Number(value))).map(Number),reachedBoundary=reachedBoundaries.length?Math.min(...reachedBoundaries):null;
   const appliedScheduleBoundary=reachedScheduledBoundary&&scheduleBoundary===reachedBoundary,appliedConsequenceBoundary=manifestedConsequenceBoundary&&consequenceBoundary===reachedBoundary;

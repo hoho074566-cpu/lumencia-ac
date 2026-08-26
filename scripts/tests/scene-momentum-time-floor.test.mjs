@@ -673,6 +673,17 @@ turn={scene:[{kind:'narration',text:'한 시간이 흘렀다. 기다리던 복�
 applySceneMomentumTimeFloor({action:'1시간 동안 기다린다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,60,'ordinary elapsed-wait completion prose must enforce the declared wait duration before choices');
 assert.match(turn.scene_summary,/60분.*행동을 마쳤다/,'reconciled wait narration must agree that the declared wait completed');
+for(const uncertain of ['한 시간이 지났는지 알 수 없다.','한 시간이 지났다고 착각했다.','한 시간이 지났다는 오해가 있었다.','한 시간이 지났다고 들었다.','한 시간이 지났다고 생각했지만 시계가 멈춰 있었다.']){
+  turn={scene:[{kind:'narration',text:uncertain}],state_delta:{advance_minutes:10},choices:['계속 기다린다','시계를 확인한다','자리를 뜬다'],event_progress:null};
+  applySceneMomentumTimeFloor({action:'1시간 동안 기다린다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+  assert.equal(turn.state_delta.advance_minutes,10,`uncertain or mistaken elapsed-time narration must not force wait completion: ${uncertain}`);
+}
+turn={scene:[{kind:'narration',text:'전령의 편지가 먼저 왕도에 도착했다.'}],state_delta:{advance_minutes:10,new_location:null},choices:['편지를 추적한다','여행을 계속한다','멈춘다'],event_progress:null};
+applySceneMomentumTimeFloor({action:'1시간 동안 왕도로 간다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-02',time:'07:20',location:'남부 도로'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,10,'a third-party arrival at the destination must not complete the player travel');
+turn={scene:[{kind:'narration',text:'왕도에 도착했다.'}],state_delta:{advance_minutes:10,new_location:'왕도'},choices:['성문으로 간다','주변을 본다','쉰다'],event_progress:null};
+applySceneMomentumTimeFloor({action:'1시간 동안 왕도로 간다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-02',time:'07:20',location:'남부 도로'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,60,'a player location change plus subjectless arrival may prove requested travel completion');
 turn={scene:[{kind:'narration',text:'회의를 마쳤고 다음 의제를 고르라고 했다.'}],state_delta:{advance_minutes:10},choices:['조사를 계속한다','휴식한다','자리를 뜬다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'1시간 동안 회의를 한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,60,'all dialogue activity vocabulary must share the same completion evidence');
