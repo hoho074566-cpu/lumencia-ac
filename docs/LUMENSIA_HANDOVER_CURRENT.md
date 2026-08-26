@@ -812,6 +812,21 @@ Permanent regressions now cover all eight review cases plus missing interruption
 
 The health/telemetry authority-label P2 remains a non-gameplay backlog item and is not part of P0/P1 closure.
 
+Fresh direct review `PRR_kwDOT8LCAs8AAAABK_TsLA` / `5032438828` on exact head `59fde00b738d8025c217814cff906e5382afe50a` found P0=0 / P1=4:
+- boundary-event ownership was checked only against the model's own event ID, not a real runtime boundary;
+- growth validators compacted arrays without remapping the raw effect-owner indexes;
+- aggregate fatigue/currency scalars could not separate completed and interrupted clause contributions;
+- a model choice at minute 1440 could outrank the canonical turn limit and lose resumable work.
+
+Structural closure checkpoint `f3906b2` fixes all four without narration/regex inference:
+- schedule/consequence/Director boundary IDs and times must match the authoritative runtime boundary before boundary-owned effects can survive;
+- every growth/learning/awakening filtering pass replaces accepted rows and remaps ownership in the same operation;
+- `scalar_contributions` records per-clause/per-event fatigue and currency amounts, validates their aggregate and canonical limits, and projects only completed/verified contributions;
+- an incomplete long plan at minute 1440 requires `turn-limit`; model choices are deferred and the timed action remains resumable;
+- the same structural path now covers single-action as well as compound-action interruptions, and every response with choices must identify the final scene row as the decision owner.
+
+Permanent regressions reproduce the four review findings plus invented boundary IDs, invalid scalar aggregates/limits, filtered-row index compaction, and single-clause interruption. Focused Phase 3/time-floor/Combat Growth/Skill Learning/HF1 integration tests and the full `node scripts/lumensia-pr-check.mjs` pass. The second review found no new model call, routing, freeze, canon, or player-sovereignty drift.
+
 ---
 
 # 12. NEXT ACTION — CURRENT START POINT
@@ -819,7 +834,7 @@ The health/telemetry authority-label P2 remains a non-gameplay backlog item and 
 1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
 2. Confirm main remains PR #53 merge `1018d8c27c451dc122982fb14bf7d3e3902c70ca`; merge and reviewed-head trees must remain equal. Do **not** redo completed HF1/HF2/HF3 through Event Director V3.
 3. Preserve PR #54 runtime checkpoint `24407193b59d0f9e9cf2f9d8f1a4589b4b92c95c` and direct parsing P1=4. Do not add another wording-specific patch and do not merge PR #54.
-4. Commit/push the PR #57 docs checkpoint following structural code `334c659`, then require exact-current-HEAD Vercel and a fresh direct P0/P1=0 review. Any new P0/P1 starts the next correction immediately; cycle counts and reports are not stop conditions. Repeated narration/wording/effect-attribution findings must be fixed through clause/effect ownership, not new wording regexes.
+4. Commit/push the PR #57 docs checkpoint following structural closure code `f3906b2`, then require exact-current-HEAD Vercel and a fresh direct P0/P1=0 review. Any new P0/P1 starts the next correction immediately; cycle counts and reports are not stop conditions. Repeated narration/wording/effect-attribution findings must be fixed through clause/effect ownership, not new wording regexes.
 5. Reconfirm the stacked base/merge-base is reviewed Phase 2 exact `f0971430...`, behind 0, conflict-free/mergeable. Main remains `1018d8c...`; the main-only Safety workflow is absent on a stacked PR and cannot be treated as a synthetic pass.
 6. After direct P0/P1=0, run the Phase 3 Exact Preview boundary corpus without reading protection tokens/cookies/storage or bypassing protection. PR #57 changes `api/**`, so it remains human-merge-only and must not be merged by Codex.
 7. Phase 4 remains blocked until permanent regression and Phase 3 Exact Preview evidence pass. When it starts, it is **legacy-cleanup only**: prove one TPP-authoritatively replaced fallback with permanent regression, remove it, rerun focused/full regression, then move to the next removal. Add no feature, natural-language coverage, regex coverage, or new reconciliation policy. A removal regression must first be classified as evidence that legacy is still required or Phase 3 is incomplete; do not patch Phase 3 design flaws inside Phase 4.
