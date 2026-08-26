@@ -29,10 +29,13 @@ assert.equal(deriveStructuredExecutionPlan(parseTimePlan('1시간 훈련하고 �
 for(const action of ['에밀리도 1시간 훈련하고 나는 8시간 잔다','에밀리는, 1시간 훈련하고 나는 8시간 잔다','에밀리가, 1시간 훈련하고 나는 8시간 잔다']){
   assert.equal(deriveStructuredExecutionPlan(parseTimePlan(action,context)).eligible,false,`${action}: a punctuated or additive named third party cannot enter the PC execution plan`);
 }
-for(const action of ['적어도 1시간 훈련하고 8시간 잔다','1시간 정도 훈련하고 8시간 잔다','이번에도 1시간 훈련하고 8시간 잔다']){
+const unboundedLower=parseTimePlan('적어도 1시간 훈련하고 8시간 잔다',context);
+assert.equal(unboundedLower.clauses[0].actor.kind,'pc','적어도 remains an additive timing adverb, not an NPC actor');
+assert.equal(unboundedLower.clauses[0].duration.upper_bounded,false,'a lower-bound-only duration remains explicitly unbounded');
+assert.equal(deriveStructuredExecutionPlan(unboundedLower).eligible,false,'an invented profile maximum cannot grant exact timeline authority');
+for(const action of ['1시간 정도 훈련하고 8시간 잔다','이번에도 1시간 훈련하고 8시간 잔다']){
   assert.equal(classifySceneIntent(action,context).structuredExecutionPlan?.eligible,true,`${action}: additive timing adverbs cannot become NPC actors`);
 }
-assert.deepEqual([classifySceneIntent('적어도 1시간 훈련하고 8시간 잔다',context).structuredExecutionPlan.total_min_minutes,classifySceneIntent('적어도 1시간 훈련하고 8시간 잔다',context).structuredExecutionPlan.total_max_minutes],[540,600],'a lower-bound qualifier remains aligned with the legacy activity range');
 
 for(const action of ['준비되면 1시간 훈련하자','에밀리가 1시간 훈련하고 나는 8시간 잔다','「1시간 훈련하고 8시간 자라」고 말했다']){
   assert.equal(deriveStructuredExecutionPlan(parseTimePlan(action,context)).eligible,false,`${action}: conditional, third-party, and quoted plans fail closed`);
