@@ -355,6 +355,15 @@ const twoDayRest=classifySceneIntent('2일 동안 쉰다.');
 assert.equal(twoDayRest.explicitDurationMinutes,2880,'numeric day durations must normalize to minutes');
 assert.deepEqual(twoDayRest.suggestedAdvanceMinutes,[1440,1440],'a multi-day rest must stop at the canonical one-turn cap');
 assert.equal(twoDayRest.turnLimitTruncated,true,'a multi-day rest must remain unfinished after one turn');
+for(const [word,minutes] of [['사흘',4320],['나흘',5760],['닷새',7200],['엿새',8640],['이레',10080],['여드레',11520],['아흐레',12960],['열흘',14400],['보름',21600]]){
+  const nativeDaySleep=classifySceneIntent(`${word} 동안 잠을 잔다.`);
+  assert.equal(nativeDaySleep.explicitDurationMinutes,minutes,`${word} must normalize to its native Korean day count`);
+  assert.deepEqual(nativeDaySleep.suggestedAdvanceMinutes,[1440,1440],`${word} must stop at the canonical one-turn cap`);
+  assert.equal(nativeDaySleep.turnLimitTruncated,true,`${word} must remain unfinished after one turn`);
+}
+const nativeDayWait=classifySceneIntent('나흘 동안 기다린다.');
+assert.equal(nativeDayWait.explicitDurationMinutes,5760,'native multi-day waits must not fall back to the ordinary short wait profile');
+assert.equal(nativeDayWait.turnLimitTruncated,true,'a native multi-day wait must remain unfinished at the turn cap');
 const oneDaySleep=classifySceneIntent('하루 동안 잠을 잔다.');
 assert.equal(oneDaySleep.explicitDurationMinutes,1440,'하루 must normalize to one day');
 assert.deepEqual(oneDaySleep.suggestedAdvanceMinutes,[1440,1440],'a one-day sleep must fit exactly at the turn cap');

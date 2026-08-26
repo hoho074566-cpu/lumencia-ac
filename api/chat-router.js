@@ -451,6 +451,26 @@ function reconcileReachedScheduleStart(turn,boundaryRows=[]){
   if(Number(delta.fatigue_delta||0)!==0&&completionSegments.some(segment=>/(?:피로|지쳤|지침|탈진|기력|힘이\s*빠)/.test(segment)))delta.fatigue_delta=0;
   return true;
 }
+function reconcileReturnedScheduleBoundary(turn,boundaryRows=[],elapsed=0){
+  if(!turn||typeof turn!=='object')return false;
+  const rows=array(boundaryRows),source=array(turn.scene);if(!rows.length||!source.length)return false;
+  const kept=[];let foundBoundary=false,postBoundary=false;
+  for(let rowIndex=0;rowIndex<source.length;rowIndex+=1){
+    const item=source[rowIndex],segments=String(item?.text||'').split(/(?<=[.!?。！？])|\n+/).map(value=>value.trim()).filter(Boolean);
+    if(foundBoundary){if(segments.length)postBoundary=true;continue;}
+    const keptSegments=[];
+    for(let segmentIndex=0;segmentIndex<segments.length;segmentIndex+=1){
+      const segment=segments[segmentIndex];keptSegments.push(segment);
+      const boundaryTurn={scene_title:turn.scene_title,scene:[...kept,{...object(item),text:segment}],choices:[]};
+      if(rows.some(row=>scheduleBoundaryOccurred(boundaryTurn,row))){foundBoundary=true;if(segmentIndex<segments.length-1||rowIndex<source.length-1)postBoundary=true;break;}
+    }
+    if(keptSegments.length)kept.push({...object(item),text:keptSegments.join(' ')});
+  }
+  if(!foundBoundary||!postBoundary)return false;
+  const minutes=Math.max(0,Math.trunc(Number(elapsed)||0)),title=String(rows[0]?.title||'예정된 일정').trim()||'예정된 일정';
+  turn.scene_title=`${title} 시작`;turn.scene_summary=`${minutes}분 뒤 ${title} 시작 시점에 도달했다.`;turn.scene=kept;turn.choices=[];turn.emotion_updates=[];turn.director=null;
+  return true;
+}
 function precedingActivityEffectsForShortening(turn,action,intent={},applied=0){
   const completedAt=Math.max(0,Number(array(intent?.precedingActivityRangeMinutes)[0]??intent?.precedingActivityMinutes??0));if(completedAt<=0||Number(applied)<completedAt)return{preserved_delta:{},npc_state_updates:[],new_location:'',pc_status:''};
   const raw=String(action||'').toLowerCase(),terminalTokens={downtime:['잠','수면','휴식','쉬'],wait:['기다','대기'],meal:['식사','아침','점심','저녁','밥'],training:['훈련','연습','수련','단련'], 'class-attendance':['수업','강의','세미나','실습','오리엔테이션','교육','입학식'],dialogue:['대화','이야기','질문','답변','설명','상담','논의','면담','회의','브리핑'],travel:['간다','이동한다','향한다','가본다']}[String(intent?.kind||'')]||[],terminalIndex=terminalTokens.reduce((latest,token)=>Math.max(latest,raw.lastIndexOf(token)),-1),prefixText=terminalIndex>0?raw.slice(0,terminalIndex):'';
@@ -485,6 +505,14 @@ function reconcileExplicitZeroTurn(turn){
   turn.state_delta={...frozen,advance_minutes:0,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0};
   delete turn.event_progress;
 }
+function completionSegmentAttributedToPc(segment='',matchIndex=0,kind='',actorName=''){
+  const allowedSubjects=new Set(['나','내','저','제','우리','저희',String(actorName||'').trim().toLowerCase()].filter(Boolean));
+  const activitySubjects={downtime:new Set(['잠','수면','휴식']),meal:new Set(['식사','밥','아침','점심','저녁']),training:new Set(['훈련','연습','수련','단련']),'class-attendance':new Set(['수업','강의','세미나','실습','오리엔테이션','교육','입학식']),dialogue:new Set(['대화','이야기','질문','답변','설명','상담','논의','면담','회의','브리핑'])}[kind]||new Set();
+  let prefix=String(segment||'').slice(0,Math.max(0,Number(matchIndex)||0)).toLowerCase();
+  const clauseBreaks=[...prefix.matchAll(/(?:해서|하여|하니|라서|어서|아서|기에|때문에|지만|는데|더니|고서)\s+/gu)],lastBreak=clauseBreaks.at(-1);if(lastBreak)prefix=prefix.slice((lastBreak.index||0)+lastBreak[0].length);
+  const subjects=[...prefix.matchAll(/(?:^|[\s,])([^\s,]{1,32}?)(?:가|이|은|는|께서)\s+/gu)].map(match=>String(match[1]||'').trim().toLowerCase()),subject=subjects.at(-1);
+  return !subject||allowedSubjects.has(subject)||activitySubjects.has(subject);
+}
 function timedActionCompletionEvidence(turn,intent={},action='',actorName=''){
   const segments=[turn?.scene_title,turn?.scene_summary,...array(turn?.scene).filter(item=>String(item?.kind||'')!=='dialogue').map(item=>item?.text)].filter(Boolean).flatMap(value=>String(value).split(/(?<=[.!?。！？])|\n+/)).map(value=>value.trim()).filter(Boolean),kind=String(intent?.kind||'');if(!segments.length)return false;
   const patterns={
@@ -506,7 +534,8 @@ function timedActionCompletionEvidence(turn,intent={},action='',actorName=''){
     return segments.some(segment=>{if(hypothetical.test(segment)||!arrival.test(segment)||!travelDestinationReachedForReconciliation(segment,intent?.semanticTarget))return false;const before=segment.slice(0,segment.search(arrival)),subjects=[...before.matchAll(/(?:^|[\s,])([^\s,]{1,32}?)(?:가|이|은|는|께서)\s+/gu)].map(match=>String(match[1]||'').trim().toLowerCase()),subject=subjects.at(-1);return!subject||allowedSubjects.has(subject);});
   }
   if(!patterns[kind])return false;
-  return segments.some(segment=>{if(hypothetical.test(segment)||kind==='wait'&&uncertainWait.test(segment))return false;if(patterns[kind].test(segment))return true;return Boolean(kind==='meal'&&foodCompletion?.test(segment.toLowerCase()));});
+  const pcAttributedKinds=new Set(['downtime','meal','training','class-attendance','dialogue']);
+  return segments.some(segment=>{if(hypothetical.test(segment)||kind==='wait'&&uncertainWait.test(segment))return false;const match=patterns[kind].exec(segment);if(match)return!pcAttributedKinds.has(kind)||completionSegmentAttributedToPc(segment,match.index,kind,actorName);const foodMatch=kind==='meal'&&foodCompletion?foodCompletion.exec(segment.toLowerCase()):null;return Boolean(foodMatch&&completionSegmentAttributedToPc(segment,foodMatch.index,kind,actorName));});
 }
 function travelDestinationReachedForReconciliation(location='',target=''){
   const compact=(value)=>String(value||'').toLowerCase().replace(/[\s\p{P}\p{S}]+/gu,''),actual=compact(location),expected=compact(target);if(!actual||!expected)return false;if(expected.length>=2&&actual.includes(expected))return true;
@@ -548,7 +577,7 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   if(reachedBoundary!=null)applied=reachedBoundary;
   else if(current>profileMax)applied=profileMax;
   else if(!structuredInterruption&&completedBeforeChoice)applied=Math.min(profileMax,Math.max(current,boundedFloor));
-  const boundaryTruncatesAction=Boolean(reachedBoundary!=null&&reachedBoundary<requestedFloor),preserveSurfacedScheduleScene=Boolean(appliedScheduleBoundary&&boundaryTruncatesAction&&surfacedScheduledBoundary&&!completionEvidence&&!boundaryProgressTerminal),unsurfacedScheduleCapsFloor=Boolean(scheduleBoundary!=null&&scheduleBoundary===floorBoundary&&!reachedScheduledBoundary&&scheduleBoundary<requestedFloor&&applied===scheduleBoundary),unresolvedConsequenceCapsFloor=Boolean(consequenceBoundary!=null&&consequenceBoundary===floorBoundary&&!reachedConsequenceBoundary&&consequenceBoundary<requestedFloor&&applied===consequenceBoundary),overrunStartBoundary=Boolean(intent.scheduledStartOverrun&&Number(intent.scheduledStartOffsetMinutes||0)>0&&applied===Number(intent.scheduledStartOffsetMinutes)),startOnlyBoundary=Boolean(intent.scheduledStartBoundaryOnly&&Number(intent.scheduledStartOffsetMinutes||0)>0&&applied===Number(intent.scheduledStartOffsetMinutes)),reconcileTruncatedTurn=applied<current||boundaryTruncatesAction||unsurfacedScheduleCapsFloor||unresolvedConsequenceCapsFloor||overrunStartBoundary||startOnlyBoundary;
+  const boundaryTruncatesAction=Boolean(reachedBoundary!=null&&reachedBoundary<requestedFloor),preserveStartedScheduleState=Boolean(appliedScheduleBoundary&&boundaryTruncatesAction&&surfacedScheduledBoundary&&!completionEvidence&&!boundaryProgressTerminal),preserveSurfacedScheduleScene=Boolean(preserveStartedScheduleState&&visibleBoundary),unsurfacedScheduleCapsFloor=Boolean(scheduleBoundary!=null&&scheduleBoundary===floorBoundary&&!reachedScheduledBoundary&&scheduleBoundary<requestedFloor&&applied===scheduleBoundary),unresolvedConsequenceCapsFloor=Boolean(consequenceBoundary!=null&&consequenceBoundary===floorBoundary&&!reachedConsequenceBoundary&&consequenceBoundary<requestedFloor&&applied===consequenceBoundary),overrunStartBoundary=Boolean(intent.scheduledStartOverrun&&Number(intent.scheduledStartOffsetMinutes||0)>0&&applied===Number(intent.scheduledStartOffsetMinutes)),startOnlyBoundary=Boolean(intent.scheduledStartBoundaryOnly&&Number(intent.scheduledStartOffsetMinutes||0)>0&&applied===Number(intent.scheduledStartOffsetMinutes)),reconcileTruncatedTurn=applied<current||boundaryTruncatesAction||unsurfacedScheduleCapsFloor||unresolvedConsequenceCapsFloor||overrunStartBoundary||startOnlyBoundary;
   const ambiguousAppliedConsequence=Boolean(appliedConsequenceBoundary&&!consequenceAttributionSafe);
   if((reconcileTruncatedTurn||ambiguousAppliedConsequence)&&consequenceLifecycle?.status==='resolved'&&(!appliedConsequenceBoundary||ambiguousAppliedConsequence)){
     if(!consequenceAttributionSafe){const id=String(consequenceLifecycle.selected_id||'');turn.state_delta.hooks_update=[...array(turn.state_delta.hooks_update).filter(row=>String(row?.id||'')!==id),{id,status:'open',reason:'발현 시각 도달; NPC 경계 효과 귀속 대기'}].slice(0,8);consequenceLifecycle.evidence='ambiguous-npc-effect';}
@@ -557,11 +586,12 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   }
   const preserveAttributedConsequence=Boolean(appliedConsequenceBoundary&&consequenceAttributionSafe),turnLimitCompletion=Boolean(intent.turnLimitTruncated&&(applied>=1440||completionEvidence||(intent.kind==='travel'&&Boolean(turn?.state_delta?.new_location)))),preserveIntermediateLocation=intent.turnLimitTruncated&&intent.kind==='travel'&&applied>=1440&&!completionEvidence&&!travelDestinationReachedForReconciliation(turn?.state_delta?.new_location,intent.semanticTarget)?turn?.state_delta?.new_location:'',reconcileTimedTurn=reconcileTruncatedTurn||ambiguousAppliedConsequence||turnLimitCompletion;
   let rewoundScheduleCompletion=false;
-  if(reconcileTimedTurn){const prefixEffects=precedingActivityEffectsForShortening(turn,incoming?.action||'',intent,applied);reconcileShortenedTimedTurn(turn,{preserveConsequenceId:preserveAttributedConsequence||consequenceLifecycle?.evidence==='ambiguous-npc-effect'?consequenceLifecycle?.selected_id:'',preserveNpcStateUpdates:mergePreservedRows(prefixEffects.npc_state_updates,preserveAttributedConsequence?consequenceLifecycle?.npc_state_updates:[]),preserveNpcScheduleUpdates:preserveAttributedConsequence?consequenceLifecycle?.npc_schedule_updates:[],preserveDelta:mergePreservedDeltas(prefixEffects.preserved_delta,preserveAttributedConsequence?consequenceLifecycle?.preserved_delta:{}),preserveIntermediateLocation:(preserveAttributedConsequence?consequenceLifecycle?.new_location:'')||prefixEffects.new_location||preserveIntermediateLocation,preservePcStatus:(preserveAttributedConsequence?consequenceLifecycle?.pc_status:'')||prefixEffects.pc_status});if(preserveSurfacedScheduleScene){turn.state_delta.active_events_add=trustedScheduleActiveAdds;turn.state_delta.scheduled_events_remove=trustedSchedulePendingRemovals;if(trustedScheduleProgress)turn.event_progress=trustedScheduleProgress;}}
+  if(reconcileTimedTurn){const prefixEffects=precedingActivityEffectsForShortening(turn,incoming?.action||'',intent,applied);reconcileShortenedTimedTurn(turn,{preserveConsequenceId:preserveAttributedConsequence||consequenceLifecycle?.evidence==='ambiguous-npc-effect'?consequenceLifecycle?.selected_id:'',preserveNpcStateUpdates:mergePreservedRows(prefixEffects.npc_state_updates,preserveAttributedConsequence?consequenceLifecycle?.npc_state_updates:[]),preserveNpcScheduleUpdates:preserveAttributedConsequence?consequenceLifecycle?.npc_schedule_updates:[],preserveDelta:mergePreservedDeltas(prefixEffects.preserved_delta,preserveAttributedConsequence?consequenceLifecycle?.preserved_delta:{}),preserveIntermediateLocation:(preserveAttributedConsequence?consequenceLifecycle?.new_location:'')||prefixEffects.new_location||preserveIntermediateLocation,preservePcStatus:(preserveAttributedConsequence?consequenceLifecycle?.pc_status:'')||prefixEffects.pc_status});if(preserveStartedScheduleState){turn.state_delta.active_events_add=trustedScheduleActiveAdds;turn.state_delta.scheduled_events_remove=trustedSchedulePendingRemovals;if(trustedScheduleProgress)turn.event_progress=trustedScheduleProgress;}}
   else if(appliedScheduleBoundary)rewoundScheduleCompletion=reconcileReachedScheduleStart(turn,boundaryRows);
   turn.state_delta.advance_minutes=applied;
-  const raisedElapsedTime=applied>current,returnedSceneReconciled=Boolean(rewoundScheduleCompletion||!preserveSurfacedScheduleScene&&(reconcileTimedTurn||raisedElapsedTime)),reconciliationReason=appliedScheduleBoundary||unsurfacedScheduleCapsFloor||overrunStartBoundary||rewoundScheduleCompletion?'schedule-boundary':appliedConsequenceBoundary||unresolvedConsequenceCapsFloor||ambiguousAppliedConsequence?'consequence-boundary':turnLimitCompletion||startOnlyBoundary?'turn-limit':raisedElapsedTime?'profile-floor':'profile-cap',runtimeTrustedConsequenceScene=returnedSceneReconciled&&preserveAttributedConsequence?array(consequenceVisibleScene):[];
-  if(returnedSceneReconciled){if(preserveAttributedConsequence&&array(consequenceVisibleScene).length)reconcileReturnedConsequenceTurn(turn,{elapsed:applied,scene:consequenceVisibleScene});else reconcileReturnedTimedTurn(turn,{reason:reconciliationReason,elapsed:applied});}
+  const trimmedSurfacedScheduleScene=Boolean(preserveSurfacedScheduleScene&&reconcileReturnedScheduleBoundary(turn,boundaryRows,applied));
+  const raisedElapsedTime=applied>current,returnedSceneReconciled=Boolean(trimmedSurfacedScheduleScene||rewoundScheduleCompletion||!preserveSurfacedScheduleScene&&(reconcileTimedTurn||raisedElapsedTime)),reconciliationReason=appliedScheduleBoundary||unsurfacedScheduleCapsFloor||overrunStartBoundary||rewoundScheduleCompletion?'schedule-boundary':appliedConsequenceBoundary||unresolvedConsequenceCapsFloor||ambiguousAppliedConsequence?'consequence-boundary':turnLimitCompletion||startOnlyBoundary?'turn-limit':raisedElapsedTime?'profile-floor':'profile-cap',runtimeTrustedConsequenceScene=returnedSceneReconciled&&preserveAttributedConsequence?array(consequenceVisibleScene):[];
+  if(returnedSceneReconciled&&!trimmedSurfacedScheduleScene){if(preserveAttributedConsequence&&array(consequenceVisibleScene).length)reconcileReturnedConsequenceTurn(turn,{elapsed:applied,scene:consequenceVisibleScene});else reconcileReturnedTimedTurn(turn,{reason:reconciliationReason,elapsed:applied});}
   return{...intent,runtimeSceneTrusted:preserveSurfacedScheduleScene||!returnedSceneReconciled,runtimeTrustedConsequenceScene,returnedSceneReconciled,reconciliationReason:returnedSceneReconciled?reconciliationReason:null};
 }
 function runtimeSynthesisTurn(turn,intent={}){

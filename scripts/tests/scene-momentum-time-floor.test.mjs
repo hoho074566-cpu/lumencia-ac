@@ -74,6 +74,47 @@ assert.strictEqual(turn.scene,interruptedScheduleScene,'validated schedule-start
 assert.deepEqual(turn.choices,['수업에 참석한다','조금 더 눕는다','상황을 확인한다'],'the schedule response choices must remain available');
 assert.equal(interruptedSleepIntent.runtimeSceneTrusted,true,'validated schedule-start context must reach runtime synthesis');
 assert.equal(interruptedSleepIntent.returnedSceneReconciled,false,'a trusted surfaced schedule scene must not be replaced by a generic boundary');
+const overrunScheduleScene=[
+  {kind:'narration',text:'잠이 들고 한 시간이 흘렀다.'},
+  {kind:'narration',text:'10시를 알리는 종이 울리고 기사과 필수 수업이 시작되었다.'},
+  {kind:'narration',text:'두 시간이 더 흐른 뒤 왕도로 이동했다.'},
+  {kind:'dialogue',speaker_key:'emily',text:'에밀리가 왕도에서 말을 걸었다.'},
+];
+turn={scene_title:'왕도에서의 대화',scene_summary:'수업 뒤 왕도로 가서 에밀리와 만났다.',scene:overrunScheduleScene,state_delta:{advance_minutes:180,new_location:'왕도',npc_state_updates:[{npc_key:'emily',location:'왕도'}],active_events_add:['morning-class'],scheduled_events_remove:['morning-class']},choices:['에밀리에게 답한다','왕도를 둘러본다'],event_progress:{event_instance_id:'morning-class',active_beat:'start',completed_beats:[]}};
+const trimmedScheduleIntent=applySceneMomentumTimeFloor({action:'8시간 동안 잠을 잔다.',saveState:interruptedSleepSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,60,'a surfaced schedule must rewind the clock before later generated scene rows');
+assert.equal(turn.state_delta.new_location,null,'post-boundary travel must not survive schedule reconciliation');
+assert.deepEqual(turn.state_delta.npc_state_updates,[],'post-boundary NPC effects must not survive schedule reconciliation');
+assert.equal(turn.scene.length,2,'only pre-boundary and validated boundary narration may remain visible');
+assert.match(turn.scene.at(-1).text,/필수 수업이 시작되었다/,'the validated schedule-start row must remain visible');
+assert.doesNotMatch(JSON.stringify(turn.scene),/왕도로 이동|왕도에서 말을/,'post-boundary narration must be removed');
+assert.deepEqual(turn.choices,[],'choices produced after the boundary must be removed');
+assert.equal(turn.scene_title,'기사과 필수 수업 시작','a trimmed response must expose the authoritative boundary title');
+assert.equal(trimmedScheduleIntent.runtimeSceneTrusted,true,'the trimmed schedule prefix remains safe for runtime synthesis');
+assert.equal(trimmedScheduleIntent.returnedSceneReconciled,true,'removing post-boundary rows must be reported as visible reconciliation');
+turn={scene_title:'왕도 도착',scene_summary:'왕도에서 에밀리를 만났다.',scene:[{kind:'narration',text:'세 시간이 지나 왕도에 도착했다.'}],state_delta:{advance_minutes:180,new_location:'왕도',active_events_add:['morning-class'],scheduled_events_remove:['morning-class']},choices:['에밀리에게 말한다'],event_progress:{event_instance_id:'morning-class',active_beat:'start',completed_beats:[]}};
+const structuredOnlyScheduleIntent=applySceneMomentumTimeFloor({action:'8시간 동안 잠을 잔다.',saveState:interruptedSleepSave},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,60,'structured schedule progress must still establish the exact boundary');
+assert.equal(turn.event_progress.event_instance_id,'morning-class','validated structured schedule progress must survive even when its narration is absent');
+assert.equal(structuredOnlyScheduleIntent.runtimeSceneTrusted,false,'structured progress alone must not make unrelated visible narration trustworthy');
+assert.equal(turn.scene_title,'일정 경계','an unsurfaced structured boundary must use deterministic visible reconciliation');
+assert.doesNotMatch(JSON.stringify(turn.scene),/왕도|에밀리/,'post-boundary narration must be removed when no boundary scene can be validated');
+
+for(const [action,prose,elapsed] of [
+  ['1시간 동안 훈련한다.','리나는 먼저 훈련을 마쳤다.',10],
+  ['8시간 동안 잠을 잔다.','리나는 먼저 잠에서 깨어났다.',60],
+  ['30분 동안 식사를 한다.','리나는 먼저 식사를 마쳤다.',10],
+  ['1시간 동안 수업을 듣는다.','리나는 먼저 수업을 마쳤다.',10],
+  ['1시간 동안 회의를 한다.','리나는 먼저 회의를 마쳤다.',10],
+  ['30분 동안 빵을 먹는다.','리나는 먼저 빵을 모두 먹었다.',10],
+]){
+  turn={scene:[{kind:'narration',text:prose}],state_delta:{advance_minutes:elapsed},choices:['계속한다','상황을 본다','그만둔다']};
+  applySceneMomentumTimeFloor({action,saveState:{pc:{name:'카인'},world:{date:'1285-03-01',time:'09:00'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+  assert.equal(turn.state_delta.advance_minutes,elapsed,`third-party completion must not complete the player's timed action: ${prose}`);
+}
+turn={scene:[{kind:'narration',text:'카인은 훈련을 마쳤다.'}],state_delta:{advance_minutes:10},choices:['다음 훈련을 고른다']};
+applySceneMomentumTimeFloor({action:'1시간 동안 훈련한다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-01',time:'09:00'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,60,'the saved player subject must remain valid completion evidence');
 
 const ownClass={id:'basic-class',title:'기사과 기초 수업',date:'1285-03-01',time:'10:00',kind:'academic',status:'scheduled'};
 const ownClassSave={pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'기숙사'},scheduleContext:{due:[],upcoming:[ownClass]},scheduledEvents:[ownClass]};
