@@ -486,6 +486,11 @@ assert.deepEqual(classifySceneIntent('두세 시간 동안 훈련한다.').sugge
 
 assert.deepEqual(classifySceneIntent('오전 10시까지 잠을 잔다.',{currentTime:'08:00'}).suggestedAdvanceMinutes,[120,120],'a single end clock must define exact remaining sleep time');
 assert.deepEqual(classifySceneIntent('오전 10시까지 기다린다.',{currentTime:'08:00'}).suggestedAdvanceMinutes,[120,120],'a single end clock must define exact remaining wait time');
+assert.deepEqual(classifySceneIntent('오전 9시까지 잠을 잔다.',{currentTime:'23:00'}).suggestedAdvanceMinutes,[600,600],'an undated elapsed morning deadline must roll to its next occurrence');
+const nextMorningTraining=classifySceneIntent('오전 9시에 훈련한다.',{currentTime:'23:00'});
+assert.equal(nextMorningTraining.scheduledStartOffsetMinutes,600,'an undated elapsed morning start must roll to the next morning');
+assert.deepEqual(nextMorningTraining.suggestedAdvanceMinutes,[630,720],'the next-morning start must include the following training duration');
+assert.equal(classifySceneIntent('오늘 오전 9시까지 잠을 잔다.',{currentTime:'23:00'}).kind,'decision-sensitive','an explicitly same-day elapsed morning deadline must not roll forward');
 assert.deepEqual(classifySceneIntent('자정까지 잠을 잔다.',{currentTime:'23:00'}).suggestedAdvanceMinutes,[60,60],'a named-midnight deadline must roll to the next boundary');
 assert.equal(classifySceneIntent('내일 오전 10시까지 잠을 잔다.',{currentTime:'08:00'}).turnLimitTruncated,true,'a deadline beyond one turn must preserve the 1440-minute incomplete cap');
 const reachableDatedDeadline=classifySceneIntent('내일 오전 10시까지 기다린다.',{currentTime:'23:00'});
