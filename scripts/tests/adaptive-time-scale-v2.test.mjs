@@ -142,6 +142,9 @@ const upperBoundDirective=buildSceneMomentumDirective({action:'30분 미만 기�
 assert.doesNotMatch(upperBoundDirective,/SCHEDULE_BOUNDARY=25min/,'a schedule inside an upper bound must not become a mandatory completion target');
 assert.match(upperBoundDirective,/EXPLICIT_DURATION_UPPER_BOUND=29min/,'the model directive must distinguish the upper bound from an exact duration');
 assert.deepEqual(classifySceneIntent('문 앞에서는 기다리지 않고 로비에서 1시간 동안 기다린다.').suggestedAdvanceMinutes,[60,60],'a negated earlier wait must not cancel a committed terminal wait');
+assert.deepEqual(classifySceneIntent('1시간 훈련하지 않고 30분 쉰다.').suggestedAdvanceMinutes,[30,30],'a duration owned by a negated training clause must not extend the committed rest');
+assert.deepEqual(classifySceneIntent('2시간 잠을 자지 않고 1시간 훈련한다.').suggestedAdvanceMinutes,[60,60],'a duration owned by a negated sleep clause must not extend the committed training');
+assert.deepEqual(classifySceneIntent('1시간 동안 쉬지 않고 훈련한다.').suggestedAdvanceMinutes,[60,60],'a single duration spanning a negated bridge and terminal action must remain attached to the committed action');
 assert.deepEqual(classifySceneIntent('피로가 풀리도록 8시간 동안 잠을 잔다.').suggestedAdvanceMinutes,[480,480],'a subordinate purpose subject must not replace the omitted PC sleep subject');
 assert.deepEqual(classifySceneIntent('친구가 올 때까지 1시간 동안 기다린다.').suggestedAdvanceMinutes,[60,60],'a subordinate arrival subject must not replace the omitted PC wait subject');
 assert.deepEqual(classifySceneIntent('배가 고프므로 30분 동안 식사를 한다.').suggestedAdvanceMinutes,[30,30],'a subordinate cause subject must not replace the omitted PC meal subject');
@@ -496,6 +499,11 @@ assert.equal(markedDestinationFirstTravel.kind,'travel','a marked scheduled cloc
 assert.equal(markedDestinationFirstTravel.semanticTarget,'도서관','a marked post-destination clock must not pollute the destination');
 assert.equal(markedDestinationFirstTravel.scheduledStartOffsetMinutes,120,'a marked post-destination clock must retain its departure offset');
 assert.deepEqual(markedDestinationFirstTravel.suggestedAdvanceMinutes,[125,140],'scheduled destination-first travel must include its departure wait and natural travel time');
+const destinationFirstRelativeTravel=classifySceneIntent('왕도에 2시간 후 간다.',{location:'중앙광장',currentTime:'09:00'});
+assert.equal(destinationFirstRelativeTravel.kind,'travel','a post-destination relative start must preserve committed travel intent');
+assert.equal(destinationFirstRelativeTravel.semanticTarget,'왕도','a post-destination relative start must not pollute the destination');
+assert.equal(destinationFirstRelativeTravel.scheduledStartOffsetMinutes,120,'a post-destination relative start must retain its departure delay');
+assert.deepEqual(destinationFirstRelativeTravel.suggestedAdvanceMinutes,[135,180],'post-destination relative travel must add the delay to its natural travel range');
 const nextDayTravel=classifySceneIntent('내일 10시에 도서관으로 간다.', { location:'A동 개인실',currentTime:'09:00' });
 assert.equal(nextDayTravel.semanticTarget,'도서관','a future date qualifier must not pollute the travel destination');
 assert.equal(nextDayTravel.compression,false,'next-day travel must not inherit a same-day deterministic travel floor');
@@ -573,6 +581,12 @@ assert.equal(deferredAbsoluteDateTraining.compression,false,'an absolute start b
 assert.equal(deferredAbsoluteDateTraining.scheduledStartOffsetMinutes,null,'a future absolute date must not collapse onto today\'s matching clock');
 assert.deepEqual(deferredAbsoluteDateTraining.suggestedAdvanceMinutes,[0,1440],'an out-of-window absolute start must preserve the one-turn lookahead without executing the action');
 assert.equal(deferredAbsoluteDateTraining.turnLimitTruncated,true,'an out-of-window absolute start must remain unfinished');
+const deferredRelativeYearTraining=classifySceneIntent('1년 뒤 오전 10시에 1시간 훈련한다.',{currentDate:'1285-03-01',currentTime:'08:00'});
+assert.equal(deferredRelativeYearTraining.dateQualifiedStart,true,'a year-relative activity start must remain date-qualified');
+assert.equal(deferredRelativeYearTraining.compression,false,'a year-relative activity beyond one turn must remain deferred');
+assert.equal(deferredRelativeYearTraining.scheduledStartOffsetMinutes,null,'a year-relative clock must not collapse onto today');
+assert.equal(deferredRelativeYearTraining.explicitDurationMinutes,60,'the duration after a year-relative start must remain the activity duration');
+assert.deepEqual(deferredRelativeYearTraining.suggestedAdvanceMinutes,[0,1440],'a year-relative start must preserve only the bounded lookahead');
 const deferredIsoDateTraining=classifySceneIntent('1285-03-01 오전 10시에 30분 훈련한다.',{currentDate:'1285-02-28',currentTime:'08:00'});
 assert.equal(deferredIsoDateTraining.dateQualifiedStart,true,'an ISO calendar date must resolve against the saved world date');
 assert.equal(deferredIsoDateTraining.scheduledStartOffsetMinutes,null,'an ISO date beyond one turn must not collapse onto today\'s matching clock');

@@ -770,6 +770,13 @@ assert.equal(turn.state_delta.advance_minutes,5,'hypothetical completion in narr
 turn={scene:[{kind:'narration',text:'훈련을 마쳤고 교관이 다음 과정을 고르라고 했다.'}],state_delta:{advance_minutes:10},choices:['대련한다','쉰다','돌아간다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'검술을 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,30,'a clearly completed activity may still raise an underreported clock before post-completion choices');
+turn={scene:[{kind:'narration',text:'어제 훈련을 마쳤다는 기록을 확인했다.'}],state_delta:{advance_minutes:10},choices:['훈련을 계속한다','기록을 읽는다','자리를 뜬다'],event_progress:null};
+applySceneMomentumTimeFloor({action:'1시간 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,10,'historical completion narration must not complete the current timed action');
+assert.deepEqual(turn.choices,['훈련을 계속한다','기록을 읽는다','자리를 뜬다'],'a historical record must preserve the current interruption choices');
+turn={scene:[{kind:'narration',text:'지난 한 시간의 훈련을 마쳤다.'}],state_delta:{advance_minutes:10},choices:['대련한다','쉰다','돌아간다'],event_progress:null};
+applySceneMomentumTimeFloor({action:'1시간 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,60,'a current completion must remain valid when 지난 modifies the elapsed duration rather than a historical date');
 turn={scene:[{kind:'narration',text:'한 시간이 흘렀다. 기다리던 복도에 새로운 공지가 붙었다.'}],state_delta:{advance_minutes:10},choices:['공지를 본다','자리를 뜬다','조금 더 기다린다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'1시간 동안 기다린다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,60,'ordinary elapsed-wait completion prose must enforce the declared wait duration before choices');
