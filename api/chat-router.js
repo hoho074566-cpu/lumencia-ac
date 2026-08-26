@@ -509,7 +509,7 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   const current=Math.max(0,Number(turn.state_delta.advance_minutes||0));
   const requestedFloor=Math.min(1440,Math.max(0,Number(intent.minAdvanceMinutes||0)));
   const explicitZeroRange=array(intent.explicitDurationRangeMinutes).length===2&&intent.explicitDurationRangeMinutes.every(value=>Number(value)===0);
-  if((intent.explicitDurationMinutes===0||explicitZeroRange)&&requestedFloor<=0&&boundaryLookahead<=0&&Number(intent.scheduledStartOffsetMinutes||0)<=0){reconcileExplicitZeroTurn(turn);return{...intent,runtimeSceneTrusted:false};}
+  if((intent.explicitDurationMinutes===0||explicitZeroRange)&&requestedFloor<=0&&boundaryLookahead<=0&&Number(intent.scheduledStartOffsetMinutes||0)<=0){reconcileExplicitZeroTurn(turn);reconcileReturnedTimedTurn(turn,{reason:'explicit-zero',elapsed:0});return{...intent,runtimeSceneTrusted:false,returnedSceneReconciled:true,reconciliationReason:'explicit-zero'};}
   const requestedMaximum=Math.min(1440,Math.max(requestedFloor,Number(array(intent.suggestedAdvanceMinutes)[1]||0)));
   if(requestedFloor<=0&&boundaryLookahead<=0&&requestedMaximum<=0)return intent;
   const profileMax=boundaryLookahead>0?boundaryLookahead:requestedMaximum;
@@ -548,7 +548,7 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   if(reconcileTimedTurn){const prefixEffects=precedingActivityEffectsForShortening(turn,incoming?.action||'',intent,applied);reconcileShortenedTimedTurn(turn,{preserveConsequenceId:preserveAttributedConsequence||consequenceLifecycle?.evidence==='ambiguous-npc-effect'?consequenceLifecycle?.selected_id:'',preserveNpcStateUpdates:mergePreservedRows(prefixEffects.npc_state_updates,preserveAttributedConsequence?consequenceLifecycle?.npc_state_updates:[]),preserveNpcScheduleUpdates:preserveAttributedConsequence?consequenceLifecycle?.npc_schedule_updates:[],preserveDelta:mergePreservedDeltas(prefixEffects.preserved_delta,preserveAttributedConsequence?consequenceLifecycle?.preserved_delta:{}),preserveIntermediateLocation:(preserveAttributedConsequence?consequenceLifecycle?.new_location:'')||prefixEffects.new_location||preserveIntermediateLocation,preservePcStatus:(preserveAttributedConsequence?consequenceLifecycle?.pc_status:'')||prefixEffects.pc_status});}
   else if(appliedScheduleBoundary)rewoundScheduleCompletion=reconcileReachedScheduleStart(turn,boundaryRows);
   turn.state_delta.advance_minutes=applied;
-  const returnedSceneReconciled=Boolean(reconcileTimedTurn||rewoundScheduleCompletion),reconciliationReason=appliedScheduleBoundary||unsurfacedScheduleCapsFloor||overrunStartBoundary||rewoundScheduleCompletion?'schedule-boundary':appliedConsequenceBoundary||unresolvedConsequenceCapsFloor||ambiguousAppliedConsequence?'consequence-boundary':turnLimitCompletion||startOnlyBoundary?'turn-limit':'profile-cap';
+  const raisedElapsedTime=applied>current,returnedSceneReconciled=Boolean(reconcileTimedTurn||rewoundScheduleCompletion||raisedElapsedTime),reconciliationReason=appliedScheduleBoundary||unsurfacedScheduleCapsFloor||overrunStartBoundary||rewoundScheduleCompletion?'schedule-boundary':appliedConsequenceBoundary||unresolvedConsequenceCapsFloor||ambiguousAppliedConsequence?'consequence-boundary':turnLimitCompletion||startOnlyBoundary?'turn-limit':raisedElapsedTime?'profile-floor':'profile-cap';
   if(returnedSceneReconciled){if(preserveAttributedConsequence&&array(consequenceVisibleScene).length)reconcileReturnedConsequenceTurn(turn,{elapsed:applied,scene:consequenceVisibleScene});else reconcileReturnedTimedTurn(turn,{reason:reconciliationReason,elapsed:applied});}
   return{...intent,runtimeSceneTrusted:!returnedSceneReconciled,returnedSceneReconciled,reconciliationReason:returnedSceneReconciled?reconciliationReason:null};
 }
@@ -559,9 +559,9 @@ function runtimeSynthesisTurn(turn,intent={}){
 function reconcileReturnedTimedTurn(turn,{reason='profile-cap',elapsed=0}={}){
   if(!turn||typeof turn!=='object')return false;
   const minutes=Math.max(0,Math.trunc(Number(elapsed)||0)),prefix=minutes>0?`${minutes}분 동안 행동을 진행한 뒤, `:'행동을 시작하려던 순간, ';
-  const detail=reason==='schedule-boundary'?'예정된 일정의 시작 시점에 도달했다.':reason==='consequence-boundary'?'후속 상황이 발현할 시점에 도달했다.':reason==='turn-limit'?'한 턴의 진행 한계에 도달했다.':'요청한 시간 범위의 끝에 도달했다.';
+  const detail=reason==='schedule-boundary'?'예정된 일정의 시작 시점에 도달했다.':reason==='consequence-boundary'?'후속 상황이 발현할 시점에 도달했다.':reason==='turn-limit'?'한 턴의 진행 한계에 도달했다.':reason==='explicit-zero'?'요청한 지속시간이 0분이므로 행동 결과는 발생하지 않았다.':reason==='profile-floor'?'요청한 행동이 완료될 수 있는 최소 시간까지 진행했다.':'요청한 시간 범위의 끝에 도달했다.';
   const text=`${prefix}${detail} 그 이후 과정은 아직 확정되지 않았다.`;
-  turn.scene_title=reason==='schedule-boundary'?'일정 경계':reason==='consequence-boundary'?'후속 상황 경계':reason==='turn-limit'?'진행 중':'행동 진행 중';
+  turn.scene_title=reason==='schedule-boundary'?'일정 경계':reason==='consequence-boundary'?'후속 상황 경계':reason==='turn-limit'?'진행 중':reason==='explicit-zero'?'행동 보류':'행동 진행 중';
   turn.scene_summary=text;turn.scene=[{kind:'narration',text}];turn.choices=[];turn.emotion_updates=[];turn.director=null;
   return true;
 }

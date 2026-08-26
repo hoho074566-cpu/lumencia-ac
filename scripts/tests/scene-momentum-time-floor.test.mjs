@@ -189,7 +189,8 @@ turn={scene_title:'수업 완료 예정',scene:[{kind:'narration',text:'10시가
 const hypotheticalCompletionIntent=applySceneMomentumTimeFloor({action:'4시간 동안 검술을 훈련한다.',saveState:exactTrainingBoundarySave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,240,'a future completion plan must not masquerade as an occurred schedule boundary');
 assert.deepEqual(turn.state_delta.pc_knowledge_add,['복도 공지 확인'],'a speculative completion mention must not trigger boundary-owned cleanup');
-assert.equal(hypotheticalCompletionIntent.runtimeSceneTrusted,true,'a speculative completion mention must not be treated as an occurred schedule completion');
+assert.equal(hypotheticalCompletionIntent.runtimeSceneTrusted,false,'raising an underreported clock must reconcile visible timing without treating speculative schedule prose as completion');
+assert.equal(hypotheticalCompletionIntent.reconciliationReason,'profile-floor','a speculative schedule mention must remain distinct from a real schedule boundary');
 const omittedBoundaryClass={id:'omitted-class',title:'기사과 필수 수업',date:'1285-03-01',time:'10:00',kind:'academic',status:'scheduled'};
 const omittedBoundarySave={pc:knightPc,world:{date:'1285-03-01',time:'09:30',location:'훈련장'},scheduleContext:{due:[],upcoming:[omittedBoundaryClass]},scheduledEvents:[omittedBoundaryClass]};
 turn={scene_title:'두 시간 훈련 완료',scene:[{kind:'narration',text:'두 시간의 검술 훈련을 모두 마치고 자세를 바로잡았다.'}],choices:[],state_delta:{advance_minutes:10,fatigue_delta:2,skill_experience:[{skill:'검술',amount:1,reason:'두 시간 훈련 완료'}],pc_knowledge_add:['두 시간 훈련의 교정법']}};
@@ -658,8 +659,8 @@ turn={scene:[{kind:'narration',text:'잠에서 깨어나 몸을 일으켰다.'}]
 applySceneMomentumTimeFloor({action:'잠을 잔다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,240,'a normal newly structured scene must not be mistaken for a Director interruption');
 
-turn={event_progress:{event_instance_id:'active:training',active_beat:'complete',completed_beats:['drill','complete']},state_delta:{advance_minutes:60,new_location:'훈련장',pc_status:'훈련 완료',fatigue_delta:3,gold_delta:-10,relationship_changes:[{npc_key:'artemis',affinity_delta:1}],stat_progress:[{stat:'신체',amount:1}],skill_experience:[{skill:'검술',amount:1}],items_add:['훈련 증표'],items_remove:['낡은 목검'],npc_state_updates:[{npc_key:'artemis',location:'훈련장'}],hooks_update:[{id:'future',status:'resolved'}]},choices:[]};
-applySceneMomentumTimeFloor({action:'0분 동안 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+turn={scene_title:'훈련 완료',scene_summary:'훈련을 끝내고 검술이 늘었다.',scene:[{kind:'narration',text:'훈련을 마치고 증표를 챙겼다.'}],event_progress:{event_instance_id:'active:training',active_beat:'complete',completed_beats:['drill','complete']},state_delta:{advance_minutes:60,new_location:'훈련장',pc_status:'훈련 완료',fatigue_delta:3,gold_delta:-10,relationship_changes:[{npc_key:'artemis',affinity_delta:1}],stat_progress:[{stat:'신체',amount:1}],skill_experience:[{skill:'검술',amount:1}],items_add:['훈련 증표'],items_remove:['낡은 목검'],npc_state_updates:[{npc_key:'artemis',location:'훈련장'}],hooks_update:[{id:'future',status:'resolved'}]},choices:['증표를 확인한다']};
+const explicitZeroIntent=applySceneMomentumTimeFloor({action:'0분 동안 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,0,'an explicitly zero-minute compressed action must clamp model time to zero');
 assert.equal(turn.state_delta.new_location,null,'explicit zero minutes must reject model-produced travel');
 assert.equal(turn.state_delta.pc_status,null,'explicit zero minutes must reject model-produced completion status');
@@ -669,12 +670,26 @@ for(const field of ['relationship_changes','stat_progress','skill_experience','i
 assert.deepEqual(turn.state_delta.npc_state_updates,[],'future NPC state must not survive an explicit zero-minute clamp');
 assert.deepEqual(turn.state_delta.hooks_update,[],'future hook state must not survive an explicit zero-minute clamp');
 assert.equal(turn.event_progress,undefined,'explicit zero minutes must reject model-produced event progress');
+assert.equal(explicitZeroIntent.returnedSceneReconciled,true,'explicit zero minutes must reconcile the visible response as well as state');
+assert.equal(explicitZeroIntent.runtimeSceneTrusted,false,'explicit zero-minute completion prose must not enter runtime synthesis');
+assert.match(turn.scene_summary,/0분.*행동 결과는 발생하지 않았다/,'explicit zero minutes must replace contradictory completion prose');
+assert.doesNotMatch(JSON.stringify(turn.scene),/훈련을 마치고|증표를 챙겼다/,'explicit zero minutes must remove visible completion effects');
+assert.deepEqual(turn.choices,[],'explicit zero minutes must remove choices based on effects that never happened');
 const priorZeroProgress={eventInstanceId:'active:training',activeBeat:'drill',completedBeats:['setup'],paused:false};
 const zeroProgressState=mergeRoutedEventProgressState(priorZeroProgress,{},turn.event_progress);
 assert.equal(zeroProgressState.eventProgress?.eventInstanceId,priorZeroProgress.eventInstanceId,'rejected zero-minute progress must preserve the authoritative prior event identity');
 assert.equal(zeroProgressState.eventProgress?.activeBeat,priorZeroProgress.activeBeat,'rejected zero-minute progress must preserve the authoritative prior active beat');
 assert.deepEqual(zeroProgressState.eventProgress?.completedBeats,priorZeroProgress.completedBeats,'rejected zero-minute progress must preserve authoritative completed beats');
 assert.equal(mergeRoutedEventProgressState(null,{},turn.event_progress).eventProgress,null,'rejected zero-minute progress must not start a new event');
+
+turn={scene_title:'한 시간 뒤',scene_summary:'한 시간 잠을 잤다.',scene:[{kind:'narration',text:'60분 뒤 잠에서 깨어났다.'}],state_delta:{advance_minutes:60,fatigue_delta:-2},choices:['일어난다']};
+const raisedFloorIntent=applySceneMomentumTimeFloor({action:'잠을 잔다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.state_delta.advance_minutes,240,'a completed sleep must still rise to its deterministic minimum');
+assert.equal(turn.state_delta.fatigue_delta,-2,'raising elapsed time must preserve completion effects that remain in scope');
+assert.equal(raisedFloorIntent.returnedSceneReconciled,true,'raising elapsed time must reconcile contradictory visible timing');
+assert.equal(raisedFloorIntent.runtimeSceneTrusted,false,'underreported completion prose must not enter runtime synthesis');
+assert.match(turn.scene_summary,/240분.*최소 시간/,'raised-floor narration must state the authoritative elapsed time');
+assert.doesNotMatch(JSON.stringify(turn.scene),/한 시간|60분/,'raised-floor narration must remove the underreported model duration');
 
 turn={state_delta:{advance_minutes:60,skill_experience:[{skill:'검술',amount:1}]},choices:[]};
 applySceneMomentumTimeFloor({action:'1시간 동안 훈련을 하고 0분 동안 잠을 잔다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');

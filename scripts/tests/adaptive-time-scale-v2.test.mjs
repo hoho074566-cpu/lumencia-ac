@@ -430,6 +430,12 @@ assert.deepEqual(classifySceneIntent('30분씩 2시간 훈련한다.').suggested
 const rangedCadenceTraining=classifySceneIntent('30분에서 1시간마다 3시간 훈련한다.');
 assert.equal(rangedCadenceTraining.explicitDurationRangeMinutes,null,'a cadence-qualified range must not become the activity duration range');
 assert.deepEqual(rangedCadenceTraining.suggestedAdvanceMinutes,[180,180],'a cadence-qualified range must leave the declared total training duration authoritative');
+assert.deepEqual(classifySceneIntent('10분짜리 루틴을 1시간 동안 연습한다.').suggestedAdvanceMinutes,[60,60],'an object duration modifier must not be added to the activity duration');
+assert.deepEqual(classifySceneIntent('10분에서 20분짜리 루틴을 1시간 동안 연습한다.').suggestedAdvanceMinutes,[60,60],'a ranged object duration modifier must not be added to the activity duration');
+const compactHourRange=classifySceneIntent('한두 시간 동안 훈련한다.');
+assert.deepEqual(compactHourRange.explicitDurationRangeMinutes,[60,120],'a colloquial compact hour range must retain both endpoints');
+assert.deepEqual(compactHourRange.suggestedAdvanceMinutes,[60,120],'a colloquial compact hour range must drive the activity bounds');
+assert.deepEqual(classifySceneIntent('두세 시간 동안 훈련한다.').suggestedAdvanceMinutes,[120,180],'a second colloquial compact hour range must retain both endpoints');
 
 assert.deepEqual(classifySceneIntent('오전 10시까지 잠을 잔다.',{currentTime:'08:00'}).suggestedAdvanceMinutes,[120,120],'a single end clock must define exact remaining sleep time');
 assert.deepEqual(classifySceneIntent('오전 10시까지 기다린다.',{currentTime:'08:00'}).suggestedAdvanceMinutes,[120,120],'a single end clock must define exact remaining wait time');
