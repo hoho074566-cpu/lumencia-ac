@@ -1,6 +1,7 @@
 import { ASSETS } from './assets.js';
 import { migrateLegacyNpcKeys } from './save-migrations.js';
 import { createFreeCharacterCreation, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation } from './lib/fate-start.js';
+import { createFateProgressionState, normalizeFateProgressionState } from './lib/fate-inheritance.js';
 
 const APP_VERSION = '1.4.8';
 const SAVE_KEY = 'lumensia.save.v1';
@@ -123,6 +124,7 @@ const defaultSave = () => ({
     location: '루멘시아 아카데미 대강당 앞',
   },
   creation: createFreeCharacterCreation(),
+  fateProgression: createFateProgressionState(),
   pc: {
     // 스키마 기본값은 특정 프리셋이 아닌 완전 중립값이어야 한다.
     // 새 캐릭터의 스킬/장비는 생성창에 사용자가 입력한 것만 저장한다.
@@ -190,6 +192,7 @@ function normalizeSave(raw) {
   next.appVersion = APP_VERSION;
   next.world = { ...base.world, ...(next.world || {}) };
   next.creation = normalizeCharacterCreation(next.creation);
+  next.fateProgression = normalizeFateProgressionState(next.fateProgression);
   next.pc = { ...base.pc, ...(next.pc || {}) };
   next.pc.stats = { ...base.pc.stats, ...(next.pc.stats || {}) };
   next.pc.skills = (next.pc.skills && typeof next.pc.skills === 'object' && !Array.isArray(next.pc.skills)) ? { ...next.pc.skills } : {};
@@ -501,8 +504,10 @@ function renderInfo() {
   const stats = Object.entries(save.pc.stats || {}).map(([k,v]) => `- ${k}: ${v.grade} [${v.progress}/100]`).join('\n');
   const fateOrigin=save.creation?.mode==='fate'?save.creation?.fateStart?.origin:null;
   const fateStory=Array.isArray(fateOrigin?.originStory)?fateOrigin.originStory.join('\n'):'';
+  const fateProgression=normalizeFateProgressionState(save.fateProgression),inheritanceReceipt=save.creation?.mode==='fate'?save.creation?.fateStart?.inheritance:null;
+  const inheritanceText=inheritanceReceipt?`\n계승: ${fateProgression.points}P 보유 · 누적 ${fateProgression.totalEarned}P / 사용 ${fateProgression.totalSpent}P · 현재 회차 최종평가 ${inheritanceReceipt.finalEvaluation?.realm||save.pc.realm}`:'';
   $('infoContent').textContent = `PC: ${save.pc.name} (${save.pc.age}세 / ${save.pc.gender})
-출신: ${save.pc.origin || '-'} | 신분: ${save.pc.socialStatus || '-'} | 입학: ${save.pc.admission || '-'}${fateStory?`\n운명 배경:\n${fateStory}\n---------`:''}
+출신: ${save.pc.origin || '-'} | 신분: ${save.pc.socialStatus || '-'} | 입학: ${save.pc.admission || '-'}${fateStory?`\n운명 배경:\n${fateStory}${inheritanceText}\n---------`:''}
 경지: ${save.pc.realm} | 소속: 루멘시아 아카데미\n---------\n직위: ${save.pc.department} | 상황: 🟢\n---------\n스킬: ${skills}\n---------\n스탯:\n${stats}\n---------\n🔮[魔] ${save.pc.talents.magic} | ⚔️[武] ${save.pc.talents.martial} | 🌟[魂] ${save.pc.talents.soul} | 📘[智] ${save.pc.talents.knowledge}\n---------\n상태: ${save.pc.status} | 피로 ${save.pc.fatigue}/100\n💼: ${(save.pc.inventory||[]).join(', ') || '-'} | 금화 ${save.pc.gold}G\n관계: ${rel}\n친밀도(성인모드): ${intimacy}\n---------\n진행 사건: ${save.activeEvents.join(', ') || '-'}\n토큰 누적: 입력 ${save.usage.inputTokens || 0} / 캐시 ${save.usage.cachedTokens || 0} / 출력 ${save.usage.outputTokens || 0} / 추론 ${save.usage.reasoningTokens || 0}\n직전 턴: 입력 ${save.usage.lastInputTokens || 0} / 출력 ${save.usage.lastOutputTokens || 0} / 캐시 적중 ${Math.round(Number(save.usage.lastCacheHitRate || 0)*100)}% / 비용 $${Number(save.usage.lastTurnUsd || 0).toFixed(4)}\n누적 API 비용(추정): $${Number(save.usage.estimatedUsd || 0).toFixed(4)}\n영구 타임라인: ${save.timeline?.length || 0}건 | NPC 감정상태: ${Object.keys(save.emotionStates || {}).length}명
 예약 일정: ${(save.scheduledEvents||[]).filter(x=>x.status!=='completed'&&x.status!=='cancelled').length}건 | 훅: ${(save.hooks||[]).filter(x=>!['resolved','expired'].includes(x.status)).length}건 | 기억: ${(save.memories?.global||[]).length + Object.values(save.memories?.npc||{}).reduce((n,x)=>n+(x?.length||0),0)}건`;
 }
@@ -1125,11 +1130,13 @@ function openPcCreator() {
 }
 function createNewSaveFromCreator() {
   const base=defaultSave();
+  base.fateProgression=normalizeFateProgressionState(save.fateProgression);
   if($('pcCreationMode').value==='fate') {
     const generated=generateFateStartingCharacter({
       gender:$('fateGender').value,
       socialClass:$('fateSocialClass').value,
       department:$('fateDepartment').value,
+      inheritance:base.fateProgression,
     });
     const labels=fateStartLabels(generated.creation.fateStart);
     base.creation=generated.creation;
