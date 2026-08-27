@@ -247,6 +247,7 @@ assert.equal(ordinaryCombat.telemetry.event_director_v2?.result, 'ACTIVE_COMBAT_
 
 const routerSource = readFileSync(new URL('../../api/lib/context-router.js', import.meta.url), 'utf8');
 const adapterSource = readFileSync(new URL('../../api/chat-router.js', import.meta.url), 'utf8');
+const coreSource = readFileSync(new URL('../../api/chat.js', import.meta.url), 'utf8');
 const appSource = readFileSync(new URL('../../app.js', import.meta.url), 'utf8');
 assert.doesNotMatch(routerSource, /responses\.create|chat\.completions|new OpenAI/, 'Setup -> Payoff routing must not add a model call');
 assert.equal((adapterSource.match(/=>coreHandler\(/g) || []).length, 1, 'the adapter must retain one canonical core call');
@@ -254,6 +255,9 @@ assert.match(adapterSource, /reconcileSetupPayoffTurn/, 'the returned semantic t
 assert.ok((adapterSource.match(/reconcileSetupPayoffTurn/g) || []).length >= 3, 'the adapter must validate before and after final time reconciliation');
 assert.ok(adapterSource.lastIndexOf('restoreSetupPayoffOpportunity') > adapterSource.indexOf('const sceneIntent=applySceneMomentumTimeFloor'), 'accepted opportunity ownership must be restored only after the final time rewrite');
 assert.match(adapterSource, /setupPayoffLifecycle\.reject_turn[\s\S]*SETUP_PAYOFF_LIFECYCLE_REJECTED/, 'a rejected payoff must fail the complete response before its narration or state delta can persist');
+assert.match(coreSource, /const ResolutionLog = z\.object\([\s\S]*outcome: z\.enum\(\['none', 'success', 'partial', 'failure'\]\)[\s\S]*resolution_log: ResolutionLog/, 'the canonical core response schema must carry the structured failure outcome used by lifecycle validation');
+assert.match(coreSource, /turn\.resolution_log = \{[\s\S]*outcome: resolutionTriggered && allowedOutcomes\.has\(rawResolution\.outcome\)/, 'canonical sanitization must preserve a schema-valid explicit failure outcome');
+assert.match(coreSource, /payoff\/aftermath[\s\S]*outcome='failure'/, 'canonical GM authority must require retrying payoff failures to report the structured failure outcome');
 assert.match(appSource, /callback_phase[\s\S]*payoff_opportunity[\s\S]*payoff[\s\S]*resolved/, 'V1 must reuse the existing callback lifecycle instead of adding a save root');
 assert.doesNotMatch(adapterSource, /setupPayoffMemory\s*=|setup_payoff_memory_add/, 'V1 must not create parallel persistent setup authority');
 
