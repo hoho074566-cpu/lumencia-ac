@@ -27,7 +27,20 @@ Repository: `hoho074566-cpu/lumencia-ac`
 
 ---
 
-# 0. TIME STACK POST-MERGE CLOSURE — AUTHORITATIVE
+# 0. ACTIVE THREADS V1 POST-MERGE CLOSURE — AUTHORITATIVE
+
+- PR #64 `Active Threads V1`은 reviewed exact head `4727a468f15c0f8e2990c4ae55cb688e12cc5ec6`에서 사람 병합됐다. 최신 `origin/main`은 merge commit `609c2bc0e4dd7931156687c32e59ed2ed2f28fa6`다.
+- Merged main tree와 reviewed exact-head tree는 모두 `ce54953f9185642cd294a5bccfe401e002745a42`로 정확히 같다.
+- Production Vercel은 main merge commit에서 PASS이고 `https://lumencia-ac.vercel.app/api/health`는 HTTP 200 / configured / adapter `0.8.7` / canonical `/api/chat` / stable `/api/chat-router` / `24h` cache / preserved HF1 budgets를 반환한다. 관측 app metadata `1.5.6`은 저장소의 stable app 계약 `1.5.4`를 바꾸지 않는다.
+- Merged-main full `scripts/lumensia-pr-check.mjs`와 Active Threads focused lifecycle/routing/freeze corpus가 PASS한다. One canonical model call, `store:false`, prompt cache/retention, Context Router budgets, canon, player sovereignty, META/AUTO/CONTINUE freeze가 유지된다.
+- Production 대표 runtime acceptance는 08:40 대강당 앞에서 입학식 진행을 시작해 09:00에 환영사와 안내를 완료했다. 이어 AUTO는 완료된 입학식을 재시작하지 않고 09:10의 다음 장면으로 진행했으며, 기사과/마법과/신학부 선택점에서 비활성화되어 control을 플레이어에게 반환했다.
+- Active Threads V1은 기존 `activeEvents`, hooks, schedules, world arcs, Director callbacks, current/paused event progress, `completedEvents`에서 read-only derived view를 만들며 새 save root나 model call을 추가하지 않는다.
+- PR #64 fresh exact-head review의 unresolved 항목은 모두 P2 backlog다. 숨김/중복/우선순위/슬롯 편중/반복 occurrence 관련 후속은 이번 post-merge closure에서 수정하지 않았고 새 correction을 시작하지 않는다.
+- Active Threads V1은 완료된 Narrative Engine 기반 작업이다. 시간 엔진/TPP로 돌아가지 않는다. Longer roadmap에서 다음 미완료 항목은 **Setup -> Payoff Memory V1**이다.
+
+---
+
+# 0. TIME STACK POST-MERGE CLOSURE — AUTHORITATIVE PREDECESSOR
 
 - PR #62 `Narrative Time + TPP stack integration`은 reviewed exact head `c58ce40bd970ab9032bfc2441310bd226eafa9c1`에서 병합됐다. 최신 `origin/main`은 merge commit `113cd14b3857f73eba1be3bdd24297ceeaa6681d`다.
 - Merged main tree와 reviewed integration tree는 모두 `66bc75a0ef3bc222f0a2e2ac541988453bfa7a33`로 정확히 같다.
@@ -36,7 +49,7 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - PR #54/#55/#56/#57/#58/#61은 PR #62를 통해 main에 통합되었고 별도 병합 대상이 아니다. GitHub에 integrated/superseded 기록을 남기고 모두 닫았다.
 - PR #59 head `4325d604edff3b2a7bd2cab11bb40b95087b5819`와 PR #60 head `1a623867ec58fb1fd7dbba1a644efa889a24524f`는 closed-unmerged 상태다. 각각 safe tree 전용 29개/6개 커밋 중 merged main에 포함된 커밋은 0개다.
 - 시간 시스템은 완료된 Narrative Engine 기반 작업으로 취급한다. 기존 P2/P3 backlog 때문에 새 TPP/Narrative Time correction이나 phase를 시작하지 않는다.
-- Event Consequence V1이 bounded consequence queue/lifetime을 이미 완료했으므로 다음 미완료 Narrative Engine 항목은 **Active Threads V1**이다.
+- Event Consequence V1의 bounded consequence queue/lifetime과 Active Threads V1이 완료됐다. 다음 미완료 Narrative Engine 항목은 **Setup -> Payoff Memory V1**이다.
 
 ---
 
@@ -926,14 +939,14 @@ Fresh direct review `5037414704` on initial PR #61 exact head `4dc7f4f3768b4635e
 
 # 12. NEXT ACTION — CURRENT START POINT
 
-1. Fetch and verify the latest `origin/main`, then continue Active Threads V1 on its focused branch/PR; do not branch from a fixed historical SHA and do not reopen Adaptive Time/TPP/Narrative Time work.
-2. First perform a read-only inventory of existing `activeEvents`, unresolved hooks, scheduled events, world arcs, Director callbacks, `sceneRuntime.eventProgress`, paused `sceneRuntime.eventProgressByInstance`, and `completedEvents`. Reuse them rather than adding a parallel save root; cover pause/resume and completed-occurrence suppression in lifecycle tests.
-3. Define a bounded canonical thread view that ranks only already-authoritative unresolved story pressure, keeps player choice and event completion semantics intact, and adds no model call. Gate every entry by PC knowledge/visibility; omit L5/player-hidden canon, mask `secret_level >= 3` causes, and add permanent leakage tests for hidden consequence/world-arc material.
-4. Implement Active Threads in a separate focused branch/PR after the analysis plan. Preserve canon, one-call routing, existing save compatibility, and all freeze modes.
-5. Keep the four PR #62 P2 findings and closed #59/#60 semantic corpus as backlog; they are not Active Threads scope.
+1. Fetch and verify the latest `origin/main`, then begin **Setup -> Payoff Memory V1** on a separate focused branch; do not reopen Adaptive Time/TPP/Narrative Time or Active Threads P2 hardening.
+2. First perform a read-only inventory of existing hooks, Director callbacks, event consequence sources, visible world-result facts, recent-turn memory, event progress/completion, and routed context. Identify which existing authority can represent a setup, its public knowledge boundary, payoff eligibility, and terminal consumption without a parallel save root.
+3. Produce a bounded design for setup registration, deterministic payoff eligibility/priority, once-only consumption, expiry/cancellation, player-choice protection, secret/canon boundaries, routing budget, and META/AUTO/CONTINUE behavior. Prefer existing hook/callback/event IDs and evidence over free-form narration inference.
+4. Preserve one canonical model call, stable routing, `store:false`, prompt cache/retention, Context Router budgets, save compatibility, canon, and player sovereignty. Do not make the model invent a payoff merely because a setup is old; uncertain or hidden ownership fails closed.
+5. Add focused permanent regressions before implementation: setup survives unrelated turns, payoff requires causal evidence and PC visibility, consumed/cancelled setup does not replay, unrelated hooks do not fire, meaningful payoff choice stops AUTO, and META/CONTINUE remain frozen. Then run full repository regression and hosted exact-head review/Preview on the focused PR.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> Read both progress documents first. PR #62 merged reviewed time stack head `c58ce40...` as main `113cd14...`; reviewed and merged trees are identical and production/full regression pass. PR #54/#55/#56/#57/#58/#61 are integrated/superseded and closed. PR #59/#60 remain closed-unmerged with zero exclusive commits in main. Do not continue time-engine hardening. The current Narrative Engine NEXT ACTION is Active Threads V1, beginning with read-only reuse analysis of existing event/hook/schedule/arc/callback/current-and-paused-progress/completed-event authority and no parallel save root or second model call.
+> Read both progress documents first. PR #64 merged reviewed Active Threads head `4727a468...` as main `609c2bc...`; reviewed and merged trees are identical and production/full regression/runtime acceptance pass. Active Threads V1 and the PR #62 time stack are completed foundations. PR #59/#60 remain closed-unmerged. Do not continue time-engine or Active Threads P2 hardening. The current Narrative Engine NEXT ACTION is Setup -> Payoff Memory V1, beginning with read-only reuse analysis of existing hook/callback/event/consequence/memory authority and no parallel save root or second model call.
