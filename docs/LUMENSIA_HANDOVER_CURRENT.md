@@ -18,7 +18,8 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Branch: `codex/setup-payoff-memory-v1`.
 - Runtime code checkpoint: `4cdaf6c8ce278141ddb4a961af523c612d4a672d`.
 - Reviewed code/docs checkpoint: `4ad566d83c4d201fac5b4904a1605b191eeae4b6`.
-- Current main/base/merge-base: `9de2b595555000dc462d3db67f4db5c9aff79750`; branch ahead 13 / behind 0 at the reviewed checkpoint.
+- Final canonical-response correction checkpoint: `d462ba792a084edd539644b623bfe4b88cd729c0`.
+- Current main/base/merge-base: `9de2b595555000dc462d3db67f4db5c9aff79750`; behind 0 at the correction checkpoint.
 - The final documentation commit containing this checkpoint necessarily has a later SHA; report and verify that exact SHA separately after push.
 
 ## Completed remediation and validation
@@ -30,15 +31,21 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Exact hosted checkpoint `4ad566d...`: Safety run `33060466829` / #512 PASS; Vercel Ready; fresh Codex result `5437381146` reports no major issues on reviewed commit `4ad566d83c`; Merge Readiness reports Safety PASS, Vercel PASS, Codex COMPLETE, current P0/P1=0, and no conflict.
 - Exact Preview compressed case PASS: an isolated 10:00 two-hour preparation action reached 12:00, exposed three meaningful choices, and retained callback `rival-proof` as `opportunity`, T9→T13, with beat/phase `payoff_opportunity`. No choice was selected.
 - Exact Preview explicit-failure case PASS: an isolated invalid no-attack attempt advanced 10:05→10:06, produced three retry/exit choices, and retained the same callback as `opportunity`, T9→T13, with beat/phase `payoff_opportunity`. No choice was selected.
+- Current-head P1 `3870781970` identified that the production canonical `api/chat.js` response schema/sanitizer did not preserve the `resolution_log` consumed by lifecycle validation. The final bounded correction adds the existing structured outcome contract to the canonical response, sanitizes it without prose inference, and requires failed payoff/aftermath attempts with retries to emit `outcome='failure'`.
+- Correction checkpoint `d462ba7...` passes focused Setup/Payoff, Combat Growth, Turn Hook, Scene Continuity, core-invariant, syntax/static and full repository regression. Safety run #515 and Vercel PASS.
+- Post-correction Exact Preview explicit-failure PASS: the canonical response produced a failed no-attack result with three retry/exit choices; callback `rival-proof` remained `opportunity`, T9→T13, beat/phase `payoff_opportunity`. No choice was selected.
+- Fresh exact-head review `5039735900` on `d462ba7...` reports P0=0/P1=2. P1 `3870867335` shows that the canonical sanitizer still rewrites schema-valid `triggered=false, outcome='failure'` to `none`, which can hide a non-ability payoff failure. P1 `3870867341` shows that production Context Router instructions replace canonical `GM_RULES`, so the new payoff-failure outcome instruction is absent from the actual routed prompt.
+- Merge Readiness is authoritative BLOCKED on exact `d462ba7...` despite Safety #515, Vercel, full regression and the representative Preview passing. These are structured production-path gaps and must not be hidden by the passing sample.
 - Architecture remains one canonical core/model call with stable `/api/chat-router -> api/chat.js`, `store:false`, prompt cache/retention, existing Context Router budgets, no new save root/schema/migration, no prose regex/allowlist expansion, and no automatic player choice.
 - Current non-blocking P2 `3870553612` (reserve selected callback context under extreme routing pressure) remains backlog. It is not promoted by current policy and receives no change in this closure.
 
 ## Current blocker / NEXT ACTION
 
-1. Commit and push this final documentation checkpoint; verify local HEAD equals the remote branch, base/merge-base remain current main, behind remains 0, and the worktree is clean.
-2. Require exact-final-docs-HEAD Safety/Repository and Vercel PASS plus a fresh direct Codex completion. If any current P0/P1 appears, resume only the focused repository-authorized remediation loop.
-3. Keep PR #66 open and unmerged. Do not auto-select any pending Preview choice or restart already-passed lifecycle/Preview analysis.
-4. After the exact final docs HEAD is green, hand off as ready for an explicit human expected-head merge decision. **Do not merge or close PR #66 in this Work.**
+1. Commit and push this blocker documentation checkpoint; verify local HEAD equals the remote branch, base/merge-base remain current main, behind remains 0, and the worktree is clean.
+2. The repository-authorized general local two-cycle remediation cap is consumed. Do not patch `3870867335` or `3870867341` without explicit new authority for a further bounded structural correction or trusted-controller continuation.
+3. Any authorized follow-up must preserve explicit failure independently of ability-trigger metadata and place the same structured outcome contract in the actual routed prompt. Do not infer failure from prose or add wording regex.
+4. After a future fix: focused/full regression -> isolated failure/no-ability Preview -> Safety/Vercel -> fresh exact-current-HEAD review. Until then MERGE_GATE remains FAIL.
+5. Keep PR #66 open and unmerged. Do not auto-select any pending Preview choice or restart already-passed lifecycle/Preview analysis. **Do not merge or close PR #66 in this Work.**
 
 ---
 

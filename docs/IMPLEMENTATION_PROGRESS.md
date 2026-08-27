@@ -13,13 +13,20 @@
 - Exact Preview compressed-decision PASS: an isolated 10:00 two-hour preparation action reached 12:00, exposed three meaningful choices, and retained `rival-proof` as `opportunity`, T9→T13, beat/phase `payoff_opportunity`.
 - Exact Preview explicit-failure PASS: an isolated invalid no-attack attempt reached 10:06, exposed three retry/exit choices, and retained `rival-proof` as `opportunity`, T9→T13, beat/phase `payoff_opportunity` rather than resolving it.
 - No meaningful Preview choice was selected and AUTO remained unused. P2 `3870553612` remains ordinary non-blocking routing-context backlog.
+- Exact final-docs review on `3994e886...` produced P1 `3870781970`: production canonical `api/chat.js` omitted `resolution_log` from `TurnSchema` and `sanitizeTurn`, so the retry-aware failure guard could not observe an explicit failure on the real one-call path.
+- Final bounded correction checkpoint `d462ba792a084edd539644b623bfe4b88cd729c0` adds the existing structured resolution contract to the canonical response schema, preserves its bounded outcome through sanitization, and directs failed payoff/aftermath attempts with retry choices to emit `outcome='failure'`. No prose inference, save root, model call, route, budget, time rule, or combat redesign was added.
+- Focused Setup/Payoff, Combat Growth, Turn Hook, Scene Continuity, core invariant and syntax checks PASS; full `node scripts/lumensia-pr-check.mjs origin/main HEAD` PASS; Safety #515 and Vercel PASS.
+- Post-correction failure/retry Preview PASS at 10:05→10:06: three meaningful retry/exit choices were exposed and `rival-proof` remained `opportunity`, T9→T13, beat/phase `payoff_opportunity`. No choice was selected and AUTO remained disabled.
+- Fresh direct review `5039735900` on exact `d462ba7...` reports P0=0/P1=2. Finding `3870867335` identifies that `sanitizeTurn` discards an explicit failure when `triggered=false`; finding `3870867341` identifies that production `ROUTER_GM_RULES` replaces the canonical instruction containing the new payoff-failure outcome rule.
+- Merge Readiness is BLOCKED on the current runtime checkpoint. Passing deterministic tests and the representative Preview do not close these production-path counterexamples.
 
 ### NEXT ACTION
 
-1. Commit and push this final documentation checkpoint; verify exact local/remote equality, current main/base/merge-base, behind 0, clean worktree, and PR #66 still open/unmerged.
-2. Require exact-final-docs-HEAD Safety/Repository and Vercel PASS plus a fresh direct Codex completion. Prior-head approval is not reused for the docs-only HEAD.
-3. If a current-head P0/P1 appears, perform only the repository-authorized focused remediation cycle and rerun focused/full/Preview checks. P2/P3 remain backlog unless repository policy promotes them.
-4. When the final docs HEAD is green, hand off for an explicit human expected-head merge decision. **Do not merge or close PR #66 in this Work.**
+1. Commit and push this blocker checkpoint; verify exact local/remote equality, current main/base/merge-base, behind 0, clean worktree, and PR #66 still open/unmerged.
+2. The general local two-cycle remediation cap is consumed. Do not patch current P1 `3870867335` or `3870867341` without explicit new authority for another bounded structural correction or trusted-controller continuation.
+3. A future authorized correction must preserve explicit failure independently of ability-trigger metadata and route the same structured outcome rule through the actual production instructions. Do not add prose failure inference or Korean wording regex.
+4. After any authorized fix, rerun focused/full regression, a no-ability failure/retry Preview, Safety/Vercel, and fresh exact-current-HEAD review. Keep MERGE_GATE FAIL until current P0/P1=0.
+5. **Do not merge or close PR #66.** Protected `api/**` remains human-merge only even after a future green gate.
 
 ## 2026-08-27 Phone Cloud Work Final Checkpoint — AUTHORITATIVE
 
