@@ -19,7 +19,7 @@ Narrative Engine continuation — time stack post-merge closure complete; Active
 - PR #54/#55/#56/#57/#58/#61 are integrated through #62 and closed as superseded. They must not be merged separately.
 - PR #59 and #60 remain closed-unmerged. Their 29 and 6 safe-tree-exclusive commits have zero inclusion in merged main.
 - Time systems are now a completed base. The four non-blocking PR #62 P2 findings remain backlog and do not trigger a new correction.
-### HISTORICAL ARCHIVE — NON-ACTIONABLE
+# HISTORICAL ARCHIVE — NON-ACTIONABLE
 
 The entries below preserve the former #54-#61 development/review chronology only. Their old P0/P1, blocker, MERGE_GATE, and NEXT ACTION wording is superseded by the authoritative closure above and must not restart time-engine work. PR #57 is now an included ancestor rather than an active branch.
 
@@ -623,7 +623,7 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 - Fresh direct review `5037414704` found P0=0/P1=1: `reconcileReturnedRaisedFloorContinuation` still emitted `${minutes}분` when preserving an evidence-bearing non-completion scene. Code checkpoint `e956dfc...` removes the count only from that parallel summary/appended narration and adds permanent no-elapsed-minute assertions. Focused and full repository regression pass.
 - The same review's zero-minute consequence wording suggestion is P2, does not mutate state, and remains non-blocking presentation backlog. Per bounded scope it is not fixed in this PR.
 
-## NEXT ACTION — AUTHORITATIVE
+# NEXT ACTION — AUTHORITATIVE
 
 1. Treat Event Consequence V1 as the completed Consequence Queue/Lifetime roadmap item and begin Active Threads V1.
 2. Inventory existing `activeEvents`, unresolved hooks, scheduled events, world arcs, Director callbacks, and `sceneRuntime.eventProgress`; do not create a duplicate authoritative save root.
