@@ -41,8 +41,8 @@ Repository: `hoho074566-cpu/lumencia-ac`
 
 - Base main: `a95bf7e226c4f4e3bddc6cbff76eb116cc6a42c3` (PR #70 Phase 1 FREEZE merge).
 - Branch: `codex/p2-pr01-fate-start-foundation`.
-- Overall: `0 / 9 PR merged`; Terminal: `0 / 9 processed`; Deferred: `0`.
-- P2-PR01 Fate Start Foundation — **IN_PROGRESS**.
+- Overall: `0 / 9 PR merged`; Terminal: `1 / 9 processed`; Deferred: `0`.
+- P2-PR01 Fate Start Foundation — **BLOCKED** at PR #71 exact reviewed code/docs head `4d8fdd0e3a5e793cc0f2ceda04c078118e25af71`.
 - P2-PR02 Origin / Starting Character — TODO.
 - P2-PR03 Character Consequences — TODO.
 - P2-PR04 Personal Story Hooks — TODO.
@@ -53,8 +53,13 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - P2-PR09 Novel / UI Polish — TODO.
 - P2-PR01 scope is bounded to the existing free/paste creator plus a separate Fate Start entry with male/female, commoner/fallen noble, the existing department choices, minimal additive creation state, and legacy save/load compatibility.
 - Do not add Procedural Origin, inheritance, NPC relationship changes, Personal Story, Ending/Fate Book, off-screen simulation, or any Phase 1 deferred correction in this PR.
+- Focused Fate Start/save/DEBUG/core tests, full repository regression, syntax/static, and `git diff --check` PASS. Local/remote implementation tree is `e2ee9f915e878bd0ae016e4ebd81deba7dfcd9ef`.
+- Safety `33076309013`, Vercel `8eQwiUDwonzVdZFxntL9hqnMR86Y`, fresh exact-head P0=0/P1=0 review, behind 0, and conflict-free mergeability PASS.
+- BLOCKER: the required Exact Preview UI/persistence acceptance is blocked by Vercel authentication because this client cannot complete the secure browser-auth handoff. This is an external-auth blocker, not a structural code finding. Protected runtime/persistence paths remain human-merge-only.
+- ROOT_CAUSE_CLASS: **NONE**; CORRECTION_BUDGET: **0/1**; SCOPE_EXPANSION: **NO**.
+- PHASE_2_BACKLOG_CANDIDATE: P2 `3872135947` — a custom department appended by free-mode paste can be copied into the Fate selector and then rejected by the fixed Fate allowlist. Non-critical/rare; do not expand P2-PR01 to correct it during this implementation pass.
 - PHASE1_DEFERRED_TOUCHED: **NO**.
-- NEXT ACTION: finish P2-PR01 validation, open its dedicated main-based PR, and require hosted Safety/Vercel plus fresh exact-head P0=0/P1=0 before terminal disposition.
+- NEXT ACTION: authenticate to PR #71 Preview; verify free/paste controls, Fate mode female + fallen noble + magic department creation, INFO reflection, and reload persistence once. If PASS, close documentation and leave protected PR #71 for human expected-head merge. P2-PR02 must wait for that merge.
 
 ---
 

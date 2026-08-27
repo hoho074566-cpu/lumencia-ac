@@ -18,9 +18,9 @@ Narrative Phase 1 **FROZEN**. NEXT ACTION is Narrative Phase 2 시작.
 - Base main: `a95bf7e226c4f4e3bddc6cbff76eb116cc6a42c3` (PR #70 Phase 1 FREEZE merge).
 - Branch: `codex/p2-pr01-fate-start-foundation`.
 - Overall: `0 / 9 PR merged`.
-- Terminal: `0 / 9 PR processed`.
+- Terminal: `1 / 9 PR processed`.
 - Deferred: `0`.
-- P2-PR01 Fate Start Foundation — **IN_PROGRESS**.
+- P2-PR01 Fate Start Foundation — **BLOCKED** at PR #71 exact reviewed code/docs head `4d8fdd0e3a5e793cc0f2ceda04c078118e25af71`.
 - P2-PR02 Origin / Starting Character — TODO.
 - P2-PR03 Character Consequences — TODO.
 - P2-PR04 Personal Story Hooks — TODO.
@@ -31,8 +31,13 @@ Narrative Phase 1 **FROZEN**. NEXT ACTION is Narrative Phase 2 시작.
 - P2-PR09 Novel / UI Polish — TODO.
 - Current scope: preserve free/paste creation; add a separate Fate Start mode with male/female, commoner/fallen noble, reused department selection, minimal additive creation state, and legacy save/load compatibility.
 - Explicitly excluded: Procedural Origin, inheritance, relationship behavior, Personal Story, Ending/Fate Book, off-screen simulation, and Phase 1 deferred correction.
+- Tests: focused Fate Start, DEBUG regression, legacy save migration, core invariants, syntax/static, `git diff --check`, and full `scripts/lumensia-pr-check.mjs` PASS. Local tested tree and remote exact-head tree both equal `e2ee9f915e878bd0ae016e4ebd81deba7dfcd9ef`.
+- Hosted: Safety run `33076309013` PASS; Vercel deployment `8eQwiUDwonzVdZFxntL9hqnMR86Y` Ready; fresh exact-head Codex review P0=0/P1=0; GitHub mergeable/conflict-free/behind 0.
+- BLOCKER: required Exact Preview UI/persistence acceptance cannot run because the protected Preview requires Vercel authentication and this client cannot perform the secure browser-auth handoff. This is external-auth access, not a code P1. Protected `app.js` / `app-runtime.js` also make merge human-only.
+- ROOT_CAUSE_CLASS: **NONE**. CORRECTION_BUDGET: **0/1**. SCOPE_EXPANSION: **NO**.
+- PHASE_2_BACKLOG_CANDIDATE: fresh review P2 `3872135947` notes that a custom free-mode department appended by pasted input could later be copied into the Fate selector and rejected by its fixed allowlist. It is a non-critical rare path and is not corrected in this bounded PR.
 - PHASE1_DEFERRED_TOUCHED: **NO**.
-- NEXT ACTION: complete P2-PR01 focused/UI/save acceptance, full regression, hosted Safety/Vercel, and fresh exact-head review. Apply at most one SAME_ROOT correction; otherwise DEFER/BLOCK under v2.1.
+- NEXT ACTION: authenticate to PR #71 Preview and run the one required acceptance: free/paste controls remain present; switch to Fate Start; select female + fallen noble + magic department; create; verify INFO; reload and verify the selection persists. If PASS, publish the terminal closure and leave protected PR #71 for human expected-head merge. Do not start P2-PR02 before #71 is human-merged.
 
 ## Permanent P0/P1 Operation Rule
 - Current exact HEAD에 P0/P1이 남아 있는 동안 repository-authorized remediation 범위 안에서 수정·focused test·full regression·push·hosted gate·fresh exact-head review를 계속한다. 중간 보고·`MERGE_GATE: FAIL`·새 review·HEAD 변경만으로는 멈추지 않는다.
