@@ -3,7 +3,7 @@
 // NPC Goal Tick V1: guarded present-NPC initiative without an additional model call.
 // Stable path: api/lib/context-router.js
 
-import { activityRangeLimitMinutes, buildNarrativeTimePolicyDirective, buildSceneMomentumDirective, classifySceneIntent, nextScheduleBoundaryMinutes, scheduleBoundaryLimitMinutes } from '../../lib/scene-momentum.js';
+import { NARRATIVE_TIME_POLICY_VERSION, activityRangeLimitMinutes, buildSceneMomentumDirective, classifySceneIntent, nextScheduleBoundaryMinutes, scheduleBoundaryLimitMinutes } from '../../lib/scene-momentum.js';
 import { buildSceneNoveltyDirective } from '../../lib/scene-novelty.js';
 import { buildScenePurposeDirective, normalizeScenePurpose } from '../../lib/scene-purpose.js';
 import { buildSceneExitDirective, normalizeSceneExitCondition } from '../../lib/scene-exit.js';
@@ -64,7 +64,7 @@ const ROUTER_GM_RULES = String.raw`너는 판타지 아카데미 장기 RPG 「�
 6) 시도는 자동 성공하지 않는다. 전투·판정은 능력, 준비, 정보, 경험, 상성, 거리, 타이밍, 지형, 피로, 부상, 심리를 종합한다.
 7) 성장·스킬 경험은 실제 훈련·실전·실패·교정·통찰이 있을 때만 천천히 누적한다. 아직 없는 독립 기술은 skill_learning에 구체적 basis와 함께 기록하고, 기존 기술의 동의어·세부 동작·일회성 연출을 새 스킬로 만들지 않는다. 즉흥 각성/스킬/혈통/유물 생성 금지.
 8) 관계는 실제 사건으로 서서히 변한다. relationship_changes는 NPC와 PC 사이, npc_relationship_changes는 NPC가 다른 NPC를 향해 보인 방향성 변화다. NPC 간 변화는 직접 상호작용이나 권위 있는 공동 사건의 인과가 있을 때만 기록하며 공동 장면에 있었다는 이유만으로 관계를 바꾸지 않는다. faction_reputation_changes는 공개 조직이 PC를 보는 집단 평판이며 공개 사건·공식 기록·등록 NPC의 실제 목격·출처 있는 소문이 있을 때만 기록한다. credible_rumor에는 실제 출처/전달 경로를 source에 적는다. 사적 행동/단순 동석으로 바꾸거나 개인 관계와 자동 연동하지 않는다. 늦게 돌아올 조직 반응은 delayed_consequences_add를 사용한다. state_delta에는 실제 발생한 변화만 기록한다.
-9) 시간·학사일정·세계 사건은 PC를 기다리지 않지만 일정 때문에 PC 행동을 강제로 결정하지 않는다.
+9) [NARRATIVE TIME POLICY ${NARRATIVE_TIME_POLICY_VERSION}] 서사 우선, clock 보조. minute는 일정/deadline/consequence/duration 등 시간 검증용. prose에 raw/경과분을 보고하지 않는다. 시각은 일정·위험·질문/지정에만 보이며 일정은 PC를 강제하지 않는다.
 10) 등록 NPC speaker_key는 CHARACTER REGISTRY의 정확한 키만 쓴다. 단역은 speaker_key=null과 표시명 사용.
 11) choices는 PC 선택이 실제로 필요한 지점에서만 정확히 3개, 아니면 빈 배열.
 12) scene_summary는 장기적으로 유용한 사실을 1~4문장으로 압축한다.
@@ -76,8 +76,8 @@ const ROUTER_GM_RULES = String.raw`너는 판타지 아카데미 장기 RPG 「�
 18) SCENE CHANGE 우선: 직전 턴 이후 실제로 달라진 위치·시간·NPC 행동/출입·정보·사건·관계·목표·위험·환경을 우선 서술한다. scene_title/문장 표현만 바꾸고 같은 상태를 재묘사하는 것은 진행이 아니다.
 19) 이미 공개된 게시판·창구·공지·목록·배경 정보는 변한 것이 없으면 다시 목록처럼 읽어주지 않는다. 새 요소/변화/현재 행동 관련 요소를 우선한다.
 20) NPC는 자기 일정·목표·욕망·관계·감정에 따라 PC 입력을 기다리지 않고 먼저 말 걸기, 이동/퇴장, 다른 NPC와 상호작용, 조사·파벌 행동·사건 개입을 할 수 있다. 단 물리 위치·일정·지식 제약을 지킨다.
-21) 사건/행동의 직접 결과 뒤에는 자연스러운 세계 반응과 다음 가능성까지 이어갈 수 있다. 낮은 가치의 이동·대기·휴식은 압축하고 시간도 실제로 진행한다. 매 턴 대형 사건을 강제하지 않는다.
-22) STOP은 전투 돌입, 되돌리기 어려운 위험, 중요한 관계/대화 선택, 갈림길, 능력·스킬 사용 여부처럼 플레이어 판단 자체가 콘텐츠인 첫 지점에서 한다. 문/계단/복도/현관/평범한 길 같은 중간 단계에서 재입력을 요구하지 않는다. choices는 실제 STOP 지점에서만 정확히 3개다.
+21) 한 턴에서 이동·식사·대기·훈련·downtime은 변화까지 압축하되 일정·consequence·NPC initiative·관계/성장·world event는 보존한다.
+22) clock tick은 STOP 사유가 아니다. 전투·위험·중요 대화·불가역 판단에서 멈추며 중간 단계는 재입력받지 않는다.
 23) 사용자에게 보이는 narration/dialogue에서 내부 명칭 'PC' 또는 자리표시자 'Aaa'를 주어로 출력하지 않는다. 실제 플레이어 이름을 쓰거나 자연스럽게 주어를 생략한다.
  24) TURN HOOK은 행동 결과와 EXIT_TARGET 뒤에 남는 구체적인 다음 방향이다. 진짜 판단점, NPC의 의도 있는 접근·요청·행동, 새 정보·목표·위험, 사건/세계 압력 중 하나를 우선하되, 단순 재묘사·기존 정보·가짜 질문으로 훅을 만들지 않는다.
  25) 현재 결과가 즉시 끝나지 않고 나중에 인과적으로 돌아오는 것이 자연스러울 때만 delayed_consequences_add를 사용한다. ROUTINE 한 턴에는 최대 1건, 그 외에도 꼭 필요한 최소 건수만 예약하고 이미 hooks에 있는 같은 결과를 중복 예약하지 않는다. 예약 결과는 EVENT CONSEQUENCE V1의 DUE 지시 전에는 미리 발현시키지 않는다.`;
@@ -516,7 +516,7 @@ function buildInstructions(original,incoming,profile,originalInput,mode){
   const pc=chooseBlocks(parseBlocks(sec.pc),{budget:profile.pcChars,keywords,names,secretAllowed:false,mode:'pc',combat});
   let adult='';if(incoming.adultMode&&Number(incoming.saveState?.pc?.age||0)>=18)adult=clampText(sec.adult,Math.min(1800,profile.speechChars));
   const registryText=Object.entries(registry).map(([k,n])=>`${k}=${n}`).join(', ');
-  let text=[ROUTER_GM_RULES,NATURAL_STYLE,buildNarrativeTimePolicyDirective({mode}),ROUTER_NOTE,combat?COMBAT_RULE:'',`===== CHARACTER REGISTRY =====\n${registryText}`,world.text?`===== ROUTED WORLD CANON =====\n${world.text}`:'',npc.text?`===== ROUTED NPC CANON =====\n${npc.text}`:'',speech.text?`===== ROUTED NPC SPEECH =====\n${speech.text}`:'',adult?`===== ROUTED ADULT LAYER =====\n${adult}`:'',pc.text?`===== ROUTED PC SYSTEM =====\n${pc.text}`:''].filter(Boolean).join('\n\n');
+  let text=[ROUTER_GM_RULES,NATURAL_STYLE,ROUTER_NOTE,combat?COMBAT_RULE:'',`===== CHARACTER REGISTRY =====\n${registryText}`,world.text?`===== ROUTED WORLD CANON =====\n${world.text}`:'',npc.text?`===== ROUTED NPC CANON =====\n${npc.text}`:'',speech.text?`===== ROUTED NPC SPEECH =====\n${speech.text}`:'',adult?`===== ROUTED ADULT LAYER =====\n${adult}`:'',pc.text?`===== ROUTED PC SYSTEM =====\n${pc.text}`:''].filter(Boolean).join('\n\n');
   text=clampText(text,profile.instructionChars);return{text,registry,keys,names,keywords,moduleTitles:{world:world.titles,npc:npc.titles,speech:speech.titles,pc:pc.titles,adult:Boolean(adult)},originalChars:sec.originalChars,secretAllowed,directorV2,orchestration};
 }
 function cleanDirector(originalInput,limit){
