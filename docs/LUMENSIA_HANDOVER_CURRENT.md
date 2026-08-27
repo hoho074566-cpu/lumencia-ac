@@ -10,6 +10,34 @@ Repository: `hoho074566-cpu/lumencia-ac`
 
 ---
 
+# SETUP -> PAYOFF LIFECYCLE REMEDIATION — CURRENT AUTHORITATIVE CHECKPOINT
+
+## Exact local state
+
+- User authorization: continue the recorded NEXT ACTION; keep PR #66 open/unmerged; do not replay completed work or auto-advance meaningful player choices.
+- Branch: `codex/setup-payoff-memory-v1`
+- Code checkpoint: `4cdaf6c8ce278141ddb4a961af523c612d4a672d`
+- Current main/base/merge-base: `9de2b595555000dc462d3db67f4db5c9aff79750`
+- At the code checkpoint: ahead 12 / behind 0; worktree was clean before this documentation update.
+
+## Completed remediation
+
+- P1 `3870426835`: callback lifecycle now has a pre-reconciliation validation receipt and a final post-time-reconciliation validation. Only an accepted opportunity whose exact ordered choice array survives unchanged may restore its callback metadata after Scene Momentum clears `turn.director`. Partial/reordered/unrelated choices and conflicting callback owners fail closed.
+- P1 `3870285419`: canonical `resolution_log.outcome === 'failure'` cannot resolve a callback. With a retained retry choice, the lifecycle is rewritten to the existing `payoff_opportunity` phase/beat; without a retry boundary, the whole turn is rejected rather than stranded. Structured `partial` and existing valid payoff resolution remain supported.
+- Permanent tests cover successful/partial resolution, failed retry, failed-without-retry rejection, final rewrite restoration, unrelated/partial boundary rejection, conflicting owner rejection, pre/post validation ordering, and the existing one-call/save-root/freeze invariants.
+- Focused affected suites, syntax/static checks, `git diff --check`, and full `node scripts/lumensia-pr-check.mjs origin/main HEAD` PASS.
+- Architecture remains one canonical core/model call with stable `/api/chat-router -> api/chat.js`, `store:false`, prompt cache/retention, existing Context Router budgets, no new save root/schema/migration, no prose regex/allowlist expansion, and no automatic player choice.
+
+## Current blocker / NEXT ACTION
+
+1. Commit this documentation checkpoint, push the code and docs commits, then verify local/remote exact HEAD equality and PR #66 still open/unmerged.
+2. Wait for exact-current-HEAD Vercel and Repository/Safety and obtain a fresh direct Codex review; prior-head review authority is invalid after this remediation.
+3. Run isolated Exact Preview cases for compressed payoff-opportunity ownership and explicit failure/retry persistence. Stop at all meaningful player choices and never use AUTO to choose them.
+4. If a current-head P0/P1 appears, use only the focused repository-authorized remediation cycle and rerun focused/full/Preview checks. Leave ordinary P2/P3 backlog untouched.
+5. **Do not merge or close PR #66.** It changes protected `api/**` and remains human-merge only.
+
+---
+
 # PHONE CLOUD WORK FINAL CHECKPOINT — AUTHORITATIVE
 
 ## Repository and exact state

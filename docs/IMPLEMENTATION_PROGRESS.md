@@ -1,5 +1,23 @@
 # Lumensia Implementation Progress
 
+## 2026-08-27 Setup -> Payoff Lifecycle Remediation — LOCAL CODE COMPLETE
+
+- The user explicitly authorized continuing the recorded NEXT ACTION while keeping PR #66 open/unmerged and preserving player sovereignty.
+- Branch: `codex/setup-payoff-memory-v1`; code checkpoint: `4cdaf6c8ce278141ddb4a961af523c612d4a672d`; base/merge-base: `9de2b595555000dc462d3db67f4db5c9aff79750`; local branch is ahead 12 / behind 0 at the code checkpoint.
+- P1 `3870426835` is corrected with structured lifecycle authority: the adapter validates the callback transition before Scene Momentum reconciliation, snapshots only an accepted `payoff_opportunity` plus its exact ordered choices, restores callback ownership only when that exact full choice boundary survives the final time rewrite, and validates the final turn again before persistence. A missing, partial, reordered, unrelated, or conflicting final boundary cannot inherit ownership.
+- P1 `3870285419` is corrected from canonical `resolution_log.outcome`: an explicit `failure` with a surviving retry choice remains `payoff_opportunity`; a failure without a new player-owned retry boundary rejects the complete turn instead of resolving the callback. `partial` and ordinary valid payoff behavior remain unchanged.
+- No prose/Korean regex, broad beat allowlist, parser expansion, save root/schema/migration, model call, routing budget, time-policy change, combat redesign, canon expansion, or player-choice automation was added.
+- Focused Setup/Payoff, Turn Hook, Scene Momentum time-floor/integration, Context Router/authority-tail, Active Threads, Orchestration, Event Consequence, and core-invariant suites PASS. Syntax/static checks, `git diff --check`, and full `node scripts/lumensia-pr-check.mjs origin/main HEAD` PASS.
+- Substantive second review found no unrelated state mutation or ownership widening. Exact choice-array equality and conflicting-owner rejection keep the restoration fail-closed.
+
+### NEXT ACTION
+
+1. Commit this documentation checkpoint and push both local commits to `origin/codex/setup-payoff-memory-v1`; verify exact local/remote equality and PR #66 open/unmerged.
+2. Require exact-current-HEAD Vercel and Repository/Safety results plus a fresh direct Codex review. Prior-head P0/P1 results are not reusable.
+3. Run bounded Exact Preview acceptance for the compressed-decision ownership case and the explicit-failure retry lifecycle. Use an isolated test state and stop at every meaningful player choice; do not auto-select narrative choices.
+4. If current-head P0/P1 remains, perform only the repository-authorized focused remediation cycle, rerun focused/full/Preview checks, and update this checkpoint. P2/P3 remain backlog unless repository policy promotes them.
+5. **Do not merge or close PR #66.** Protected `api/**` remains human-merge only even after all gates pass.
+
 ## 2026-08-27 Phone Cloud Work Final Checkpoint — AUTHORITATIVE
 
 - Repository: `hoho074566-cpu/lumencia-ac`; remote: `https://github.com/hoho074566-cpu/lumencia-ac.git`.
