@@ -40,6 +40,7 @@ assert.equal(SETUP_PAYOFF_MEMORY_VERSION, '1');
   assert.equal(mature.selected?.key, 'rival-proof', 'a mature reachable setup becomes the one selected payoff authority');
   assert.equal(mature.selected?.status, 'open');
   assert.doesNotMatch(buildSetupPayoffDirective(mature), /레나가 공개 대련의 증명/, 'the directive must not copy free-form callback notes into reserved authority');
+  assert.match(buildSetupPayoffDirective({...mature,selected:{...mature.selected,status:'opportunity'}}), /같은 ID와 payoff_opportunity를 반복/, 'a continued payoff choice must explicitly carry the same stable ownership into the next player boundary');
 }
 
 {
