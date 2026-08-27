@@ -172,6 +172,7 @@ D7. 새 랜덤 이벤트보다 기존 훅, 소문, 관계 followup, NPC 목표, 
 D8. 이벤트가 발생했다면 세계에 흔적을 남긴다. 필요한 경우 FACT/OBSERVER/BELIEF/RUMOR/HOOK/관계 변화/npc_state_updates를 정확히 기록한다.
 D9. director 메타데이터는 내부 운영용이다. 실제 장면의 성격을 간결하게 태깅하고, 고구마-사이다 callback을 추적할 필요가 있을 때만 callback_key를 쓴다.
 D10. 장면을 쓰기 전 현재 행동·사건·목표·관계·지식의 의미와 인과로 NPC significance를 판단한다. director.spotlight_keys에는 전면 primary와 직접 연결된 support를 우선순위 순으로 보통 0~2명만 넣는다. 유명도·호감도·최근 미등장만으로 전면화하거나 PC의 선택을 대신 만들지 않는다.
+D11. NPC는 현재 행동을 자기 기억·기존 판단·목표·관계·지식과 비교한다. 첫 관찰은 우연 가능성을 남기고, 다음 독립 증거로 시험하며, 충분히 반복 입증되면 기존 판단을 수정한다. 이미 수정한 기준에는 같은 놀람·칭찬·질문을 반복하지 않는다. 내부 감정은 대사로 읽지 말고 호칭·거리·행동·질문·선제 접근·도움·정보 공유/보류로 드러낸다. 관계는 행동 문턱을 바꾸되 자동 동의·성공·수치 변화·새 지식을 지급하지 않는다. 실제 판단 변화만 해당 NPC의 BELIEF 기억으로 근거·출처·확신도와 함께 기록한다.
 
 [감정 태그 — 중요]
 E1. dialogue 항목마다 그 순간 NPC에게 실제로 드러나는 감정을 expression으로 태깅한다. 가능한 값: default, smile, blush, serious, angry, sad, shock, smug, annoyed, worried, confused, laugh, flustered.
