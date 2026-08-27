@@ -62,6 +62,7 @@ for(const action of ['준비되면 1시간 훈련하자','에밀리가 1시간 �
 const directive=buildSceneMomentumDirective({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:{name:'아리아'},world:{date:'1285-03-01',time:'08:00',location:'기숙사'},sceneRuntime:{}},registry:{}});
 assert.match(directive,/STRUCTURED_TIME_PLAN=action_1:training@0-60\/0-60;action_2:sleep@60-540\/60-540/,'the canonical call receives the exact clause IDs and timeline');
 assert.match(directive,/effect_owners/,'the canonical call is instructed to return structural effect ownership');
+assert.match(directive,/decision_completion_clause_ids/,'the canonical call attaches decision completion claims to stable action IDs');
 
 const structuralTurn={
   scene:[{text:'훈련은 끝났고, 잠든 지 한 시간이 지났다.'}],
@@ -69,7 +70,7 @@ const structuralTurn={
   state_delta:{advance_minutes:120,fatigue_delta:-3,gold_delta:0,items_add:['미완료 수면 보상']},
   time_execution:{
     version:'1.0',plan_used:true,boundary_kind:'schedule',boundary_minutes:120,
-    completed_clause_ids:['action_1'],interrupted_clause_id:'action_2',decision_scene_index:null,
+    completed_clause_ids:['action_1'],interrupted_clause_id:'action_2',decision_scene_index:null,decision_completion_clause_ids:[],
     boundary_event_id:'schedule:morning-roll-call',
     effect_owners:[
       {scope:'state_delta',field:'items_add',effect_index:0,owner_kind:'clause',owner_id:'action_2'},
@@ -81,12 +82,21 @@ const scheduleRuntime={boundaries:{schedule:{minutes:120,event_ids:['schedule:mo
 const structuralAuthority=validateStructuredTimeExecution(structuralTurn,exact,scheduleRuntime);
 assert.equal(structuralAuthority.valid,true,'a started incomplete action is explicitly identified by clause ID');
 assert.deepEqual(projectStructuredOwnedEffects(structuralTurn,structuralAuthority,120).preserved_delta,{fatigue_delta:-3},'projection keeps completed-clause effects and drops interrupted-clause effects');
+const missingDecisionCompletionSet=structuredClone(structuralTurn);
+delete missingDecisionCompletionSet.time_execution.decision_completion_clause_ids;
+assert.equal(validateStructuredTimeExecution(missingDecisionCompletionSet,exact,scheduleRuntime).reason,'missing-decision-completion-set','a structured receipt cannot silently omit decision claim ownership');
+const invalidDecisionCompletionSet=structuredClone(structuralTurn);
+invalidDecisionCompletionSet.time_execution.decision_completion_clause_ids=['action_3'];
+assert.equal(validateStructuredTimeExecution(invalidDecisionCompletionSet,exact,scheduleRuntime).reason,'invalid-decision-completion-set','decision claims cannot invent a clause outside the canonical plan');
+const unexpectedDecisionCompletionSet=structuredClone(structuralTurn);
+unexpectedDecisionCompletionSet.time_execution.decision_completion_clause_ids=['action_1'];
+assert.equal(validateStructuredTimeExecution(unexpectedDecisionCompletionSet,exact,scheduleRuntime).reason,'unexpected-decision-completion-set','a no-choice response cannot attach completion ownership to a nonexistent decision prompt');
 const missingInterrupted=structuredClone(structuralTurn);
 missingInterrupted.time_execution.interrupted_clause_id=null;
 assert.equal(validateStructuredTimeExecution(missingInterrupted,exact,scheduleRuntime).reason,'missing-interrupted-clause','a started incomplete action cannot disappear from the execution receipt');
 const incompleteNoneBoundary=structuredClone(structuralTurn);
 incompleteNoneBoundary.state_delta={advance_minutes:60,fatigue_delta:0,gold_delta:0};
-incompleteNoneBoundary.time_execution={version:'1.0',plan_used:true,boundary_kind:'none',boundary_minutes:60,completed_clause_ids:['action_1'],interrupted_clause_id:'action_2',decision_scene_index:null,boundary_event_id:null,effect_owners:[],scalar_contributions:[]};
+incompleteNoneBoundary.time_execution={version:'1.0',plan_used:true,boundary_kind:'none',boundary_minutes:60,completed_clause_ids:['action_1'],interrupted_clause_id:'action_2',decision_scene_index:null,decision_completion_clause_ids:[],boundary_event_id:null,effect_owners:[],scalar_contributions:[]};
 assert.equal(validateStructuredTimeExecution(incompleteNoneBoundary,exact).reason,'incomplete-none-boundary','a no-boundary receipt cannot leave an interrupted suffix for the profile floor to complete');
 const completedNoneBoundary=structuredClone(incompleteNoneBoundary);
 completedNoneBoundary.state_delta.advance_minutes=540;
@@ -110,7 +120,7 @@ const activeChoiceTurn={
   scene:[{text:'동문과 서문 중 어느 길로 갈까?'}],choices:['동문','서문'],
   event_progress:{event_instance_id:'quest:escort',active_beat:'route-choice',completed_beats:['briefing']},
   state_delta:{advance_minutes:120,fatigue_delta:0,gold_delta:0},
-  time_execution:{version:'1.0',plan_used:true,boundary_kind:'choice',boundary_minutes:120,completed_clause_ids:['action_1'],interrupted_clause_id:'action_2',decision_scene_index:0,boundary_event_id:'quest:escort',effect_owners:[{scope:'turn',field:'event_progress',effect_index:null,owner_kind:'boundary-event',owner_id:'quest:escort'}],scalar_contributions:[]},
+  time_execution:{version:'1.0',plan_used:true,boundary_kind:'choice',boundary_minutes:120,completed_clause_ids:['action_1'],interrupted_clause_id:'action_2',decision_scene_index:0,decision_completion_clause_ids:[],boundary_event_id:'quest:escort',effect_owners:[{scope:'turn',field:'event_progress',effect_index:null,owner_kind:'boundary-event',owner_id:'quest:escort'}],scalar_contributions:[]},
 };
 const activeChoiceAuthority=validateStructuredTimeExecution(activeChoiceTurn,exact,{boundaries:{choice:{minutes:120,event_ids:['quest:escort']}}});
 assert.equal(activeChoiceAuthority.valid,true,'an externally authenticated active event can own its returned turn progress');
@@ -149,7 +159,7 @@ rebaseStructuredEffectOwners(coreSanitizedTurn);
 assert.deepEqual(coreSanitizedTurn.time_execution.effect_owners,[{scope:'state_delta',field:'relationship_changes',effect_index:0,owner_kind:'clause',owner_id:'action_2'}],'core sanitization drops the removed source owner and rebases the exact retained row instead of lending its compacted index');
 
 const overLimitPlan=deriveStructuredExecutionPlan(parseTimePlan('25시간 기다리고 8시간 잔다',context));
-const overLimitTurn={scene:[{text:'계속 기다릴까?'}],choices:['계속한다.'],state_delta:{advance_minutes:1440,fatigue_delta:0,gold_delta:0},time_execution:{version:'1.0',plan_used:true,boundary_kind:'choice',boundary_minutes:1440,completed_clause_ids:[],interrupted_clause_id:'action_1',decision_scene_index:0,boundary_event_id:null,effect_owners:[],scalar_contributions:[]}};
+const overLimitTurn={scene:[{text:'계속 기다릴까?'}],choices:['계속한다.'],state_delta:{advance_minutes:1440,fatigue_delta:0,gold_delta:0},time_execution:{version:'1.0',plan_used:true,boundary_kind:'choice',boundary_minutes:1440,completed_clause_ids:[],interrupted_clause_id:'action_1',decision_scene_index:0,decision_completion_clause_ids:[],boundary_event_id:null,effect_owners:[],scalar_contributions:[]}};
 assert.equal(validateStructuredTimeExecution(overLimitTurn,overLimitPlan,{required_boundary_kind:'turn-limit',boundaries:{choice:{minutes:1440,event_ids:[]},'turn-limit':{minutes:1440,event_ids:[]}}}).reason,'required-boundary-kind','an incomplete plan at the one-turn cap cannot be converted into a model choice boundary');
 
 console.log('PASS Time Plan Parser Phase 3 ordered execution timeline, range, alignment, and fail-closed boundaries');

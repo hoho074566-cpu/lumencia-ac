@@ -20,7 +20,7 @@ const testRegistry={artemis:'아르테미스',emily:'에밀리',lena:'레나'};
 const {applySceneMomentumTimeFloor,consequenceNpcKeysForShortening,consequenceNpcEffectsForShortening,deriveTimedActionRuntime,runtimeSynthesisTurn,prefixNpcStateUpdate,turnBeforePlayerChoice}=makeHelpers(array,object,classifySceneIntent,isPcRelevantScheduleEvent,nextScheduleBoundaryMinutes,scheduleBoundaryLimitMinutes,scheduledIdsDueByTurnEnd,minutesUntilEventConsequence,testRegistry,isAdditiveAdverbialStem,projectStructuredOwnedEffects,validateStructuredTimeExecution);
 
 const effectOwner=(field,effectIndex=null,ownerId='action_1',ownerKind='clause',scope='state_delta')=>({scope,field,effect_index:effectIndex,owner_kind:ownerKind,owner_id:ownerId});
-const choiceExecution=(turn,{minutes=Number(turn?.state_delta?.advance_minutes||0),completed=['action_1'],interrupted='action_2',owners=[],scalarContributions=[],boundaryEventId=null,boundaryKind='choice'}={})=>({version:'1.0',plan_used:true,boundary_kind:boundaryKind,boundary_minutes:minutes,completed_clause_ids:completed,interrupted_clause_id:interrupted,decision_scene_index:turn.choices?.length?turn.scene.length-1:null,boundary_event_id:boundaryEventId,effect_owners:owners,scalar_contributions:scalarContributions});
+const choiceExecution=(turn,{minutes=Number(turn?.state_delta?.advance_minutes||0),completed=['action_1'],interrupted='action_2',decisionCompletions=[],owners=[],scalarContributions=[],boundaryEventId=null,boundaryKind='choice'}={})=>({version:'1.0',plan_used:true,boundary_kind:boundaryKind,boundary_minutes:minutes,completed_clause_ids:completed,interrupted_clause_id:interrupted,decision_scene_index:turn.choices?.length?turn.scene.length-1:null,decision_completion_clause_ids:decisionCompletions,boundary_event_id:boundaryEventId,effect_owners:owners,scalar_contributions:scalarContributions});
 const scalarContribution=(field,amount,ownerId='action_1',ownerKind='clause')=>({field,amount,owner_kind:ownerKind,owner_id:ownerId});
 
 const cappedDecisionTurn={
@@ -230,10 +230,17 @@ const npcOwnedCompletionPrompt=applySceneMomentumTimeFloor({action:'1시간 동�
 assert.match(JSON.stringify(turn.scene),/나는 훈련을 마쳤다/,'first-person completion in keyed NPC dialogue remains owned by that speaker');
 assert.equal(npcOwnedCompletionPrompt.runtimeSceneTrusted,true,'speaker-owned completion does not contradict the player clause receipt');
 turn={scene:[{kind:'narration',text:'첫 한 시간의 자세 훈련을 끝냈다.'},{kind:'dialogue',speaker_key:'artemis',text:'첫 훈련을 마쳤다. 다음 훈련을 계속할까?'}],state_delta:{advance_minutes:60},choices:['다음 훈련을 계속한다','교관에게 묻는다','쉰다']};
-turn.time_execution=choiceExecution(turn,{minutes:60,completed:['action_1'],interrupted:'action_2'});
+turn.time_execution=choiceExecution(turn,{minutes:60,completed:['action_1'],interrupted:'action_2',decisionCompletions:['action_1']});
 const repeatedClauseCompletionPrompt=applySceneMomentumTimeFloor({action:'1시간 훈련하고 1시간 훈련한다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-01',time:'09:00'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.match(JSON.stringify(turn.scene),/첫 훈련을 마쳤다/,'a completion claim already owned by an earlier same-type clause is not reassigned to the incomplete clause');
 assert.equal(repeatedClauseCompletionPrompt.runtimeSceneTrusted,true,'same-type completed-clause context remains trusted when the receipt leaves the next clause incomplete');
+turn={scene:[{kind:'narration',text:'첫 한 시간의 자세 훈련을 끝냈다.'},{kind:'dialogue',speaker_key:'artemis',text:'두 번째 훈련을 마쳤으니 이제 무엇을 하겠나?'}],state_delta:{advance_minutes:60},choices:['다른 훈련을 한다','교관에게 묻는다','쉰다']};
+turn.time_execution=choiceExecution(turn,{minutes:60,completed:['action_1'],interrupted:'action_2',decisionCompletions:['action_2']});
+const falseSecondClauseCompletionPrompt=applySceneMomentumTimeFloor({action:'1시간 훈련하고 1시간 훈련한다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-01',time:'09:00'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.doesNotMatch(JSON.stringify(turn.scene),/두 번째 훈련을 마쳤으니/,'a decision claim owned by the interrupted action is removed without ordinal wording inference');
+assert.deepEqual(turn.choices,['다른 훈련을 한다','교관에게 묻는다','쉰다'],'clause-owned contradiction sanitization keeps the player choices independently');
+assert.equal(falseSecondClauseCompletionPrompt.runtimeSceneTrusted,false,'an interrupted clause cannot lend runtime trust to its completion prompt');
+assert.equal(falseSecondClauseCompletionPrompt.runtimeChoicesTrusted,true,'the awaiting-player boundary survives structural prompt sanitization');
 turn={scene:[{kind:'narration',text:'10분 동안 기본 자세를 반복했다.'},{kind:'dialogue',speaker_key:'artemis',text:'경보가 울렸다. 지금 어떻게 대응하겠나?'}],state_delta:{advance_minutes:10},choices:['경보를 확인한다','훈련을 계속한다','교관에게 묻는다']};
 turn.time_execution=choiceExecution(turn,{minutes:10,completed:[],interrupted:'action_1'});
 const alignedValidPrompt=applySceneMomentumTimeFloor({action:'1시간 동안 훈련한다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-01',time:'09:00'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
@@ -953,6 +960,13 @@ turn.time_execution=choiceExecution(turn,{minutes:60,completed:[],interrupted:'a
 const consequenceOwnedFalsePromptIntent=applySceneMomentumTimeFloor({action:'2시간 동안 훈련한다.',saveState:{world:{date:'1285-03-01',time:'09:00'},hooks:[coincidentConsequenceHook],scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game',{selected_id:coincidentConsequenceHook.id,status:'resolved',attribution_safe:true},consequenceOwnedFalsePrompt);
 assert.doesNotMatch(JSON.stringify(turn.scene),/훈련을 마쳤으니/,'a consequence-owned choice still sanitizes a prompt that contradicts its incomplete action receipt');
 assert.doesNotMatch(JSON.stringify(runtimeSynthesisTurn(turn,consequenceOwnedFalsePromptIntent).scene),/훈련을 마쳤으니/,'rejected consequence prompt narration cannot re-enter through runtime consequence synthesis');
+const consequenceSecondFalsePrompt=[{kind:'dialogue',speaker_key:'emily',text:'두 번째 훈련을 마쳤으니 흔들리는 봉인을 먼저 확인할까?'}];
+turn={scene:[...consequenceSecondFalsePrompt],state_delta:{advance_minutes:60,hooks_update:[{id:coincidentConsequenceHook.id,status:'resolved'}]},choices:['봉인을 확인한다','에밀리를 돕는다','물러난다'],event_progress:null};
+turn.time_execution=choiceExecution(turn,{minutes:60,completed:['action_1'],interrupted:'action_2',decisionCompletions:['action_2'],boundaryEventId:coincidentConsequenceHook.id,boundaryKind:'consequence'});
+const consequenceSecondFalsePromptIntent=applySceneMomentumTimeFloor({action:'1시간 훈련하고 1시간 훈련한다.',saveState:{world:{date:'1285-03-01',time:'09:00'},hooks:[coincidentConsequenceHook],scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game',{selected_id:coincidentConsequenceHook.id,status:'resolved',attribution_safe:true},consequenceSecondFalsePrompt);
+assert.doesNotMatch(JSON.stringify(turn.scene),/두 번째 훈련을 마쳤으니/,'a consequence receipt drops its selected source row when clause ownership contradicts the completed set');
+assert.deepEqual(turn.choices,['봉인을 확인한다','에밀리를 돕는다','물러난다'],'consequence-owned choices survive independently from the rejected clause-owned prompt');
+assert.doesNotMatch(JSON.stringify(runtimeSynthesisTurn(turn,consequenceSecondFalsePromptIntent).scene),/두 번째 훈련을 마쳤으니/,'runtime consequence synthesis cannot reintroduce the structurally rejected source row');
 const ordinaryChoicePrompt=[{kind:'dialogue',speaker_key:'artemis',text:'훈련을 계속할지 떠날지 고르겠나?'}],verifiedConsequenceScene=[{kind:'narration',text:'동시에 봉인이 흔들리기 시작했다.'}];
 turn={scene:[...ordinaryChoicePrompt],state_delta:{advance_minutes:60,hooks_update:[{id:coincidentConsequenceHook.id,status:'resolved'}]},choices:['계속 훈련한다','떠난다','상황을 묻는다'],event_progress:null};
 turn.time_execution=choiceExecution(turn,{minutes:60,completed:[],interrupted:'action_1'});
