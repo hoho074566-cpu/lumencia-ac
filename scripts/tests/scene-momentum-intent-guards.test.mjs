@@ -49,6 +49,18 @@ for(const action of ['지금 오리엔테이션이 끝난 뒤 대장간에 들�
 }
 assert.equal(classifySceneIntent('기다린다.',{location:'광장'}).kind,'wait');
 assert.equal(classifySceneIntent('공격한다.',{location:'광장'}).kind,'committed-consequence');
+assert.equal(classifySceneIntent('경비를 죽이고 잠을 잔다.',{location:'광장'}).kind,'committed-consequence','a consequential prefix must outrank a terminal sleep suffix');
+assert.equal(classifySceneIntent('경비를 죽이고 검술을 훈련한다.',{location:'광장'}).kind,'committed-consequence','a consequential prefix must outrank every routine compression suffix');
+assert.equal(classifySceneIntent('경비를 죽이지 않고 잠을 잔다.',{location:'광장'}).kind,'downtime','an explicitly negated consequential prefix may still leave a committed sleep action');
+assert.equal(classifySceneIntent('공격하지 않고 협상을 하고 잠을 잔다.',{location:'광장'}).kind,'committed-consequence','negating one consequential clause must not erase a later committed consequential clause');
+assert.equal(classifySceneIntent('누군가 “죽이겠다”고 외치는 소리를 듣고 잠을 잔다.',{location:'광장'}).kind,'downtime','quoted consequential speech must not become the player action');
+assert.equal(classifySceneIntent('누군가 죽이겠다고 외치는 소리를 듣고 잠을 잔다.',{location:'광장'}).kind,'downtime','reported consequential speech must not become the player action');
+assert.equal(classifySceneIntent('그가 경비를 죽이겠다는 소리를 듣고 잠을 잔다.',{location:'광장'}).kind,'downtime','nominalized third-party consequential reports must not become the player action');
+assert.equal(classifySceneIntent('그가 경비를 죽이겠다는 사실을 알고 잠을 잔다.',{location:'광장'}).kind,'downtime','third-party consequential knowledge reports must not become the player action');
+assert.equal(classifySceneIntent('나는 경비를 죽이겠다고 말하고 잠을 잔다.',{location:'광장'}).kind,'committed-consequence','first-person consequential intent must not be discarded as third-party attributed speech');
+assert.equal(classifySceneIntent('나는 경비를 죽이겠다는 결심을 하고 잠을 잔다.',{location:'광장'}).kind,'committed-consequence','first-person nominalized intent must remain a committed player action');
+assert.equal(classifySceneIntent('저는 경비를 죽이겠다는 계획을 확인하고 잠을 잔다.',{location:'광장'}).kind,'committed-consequence','polite first-person consequential intent must not be filtered as third-party speech');
+assert.equal(classifySceneIntent('우리는 경비를 죽이겠다는 계획을 확인하고 잠을 잔다.',{location:'광장'}).kind,'committed-consequence','plural first-person consequential intent must not be filtered as third-party speech');
 
 // Explicit durations override generic wait/downtime minimum floors.
 const wait5=classifySceneIntent('5분만 기다린다.',{location:'광장'});

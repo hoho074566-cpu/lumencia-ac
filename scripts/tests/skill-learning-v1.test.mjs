@@ -24,7 +24,7 @@ assert.match(router, /stateDelta\.properties\.skill_learning=skillLearningFieldS
 assert.match(router, /rawSkillLearning[\s\S]*skill_learning=rawSkillLearning\.slice\(0,2\)/, 'raw structured fields must survive the canonical parser');
 assert.match(router, /skill_learning:\[\]/, 'CONTINUE freeze must clear skill learning changes');
 assert.match(router, /mode==='meta'[^\n]*state_delta\.skill_learning=\[\]/, 'META must explicitly clear skill learning changes');
-assert.match(router, /allowProgress:mode==='game'/, 'AUTO must not create PC growth without a player action');
+assert.match(router, /growthAllowed=mode==='game'&&!zeroElapsedIntent/, 'AUTO must not create PC growth without a player action');
 assert.ok(router.indexOf('const skillLearningState=deriveSkillLearningState') < router.indexOf('const sceneIntent=applySceneMomentumTimeFloor'), 'invalid learning rows must be rejected before Scene Momentum measures State Delta');
 assert.match(runtime, /skill_learning: \[\]/, 'client frozen delta must clear skill learning');
 assert.match(runtime, /save\.pc\.skillCandidates = candidates/, 'client runtime must persist bounded candidates in the existing PC root');
@@ -273,7 +273,7 @@ assert.equal(growthDelta.flags.growthChanged, true, 'an accepted learning mutati
 
 assert.match(router, /maxItems:2[\s\S]*skill:\{type:'string',minLength:2,maxLength:48\}[\s\S]*amount:\{type:'integer',minimum:1,maximum:15\}/, 'patched structured schema must bound candidate rows and per-turn progress');
 assert.match(router, /basis 없는 진척은 금지/, 'model instructions must preserve the evidence gate');
-assert.match(router, /state_delta\.skill_experience=mode==='auto'\?\[\]:filterExistingSkillExperience/, 'adapter must freeze AUTO experience and block legacy experience from creating unfinished candidate skills');
+assert.match(router, /replaceStructuredEffectRows\(data\.turn,'skill_experience',mode==='auto'\?\[\]:filterExistingSkillExperience\(structuredEffectRows/, 'adapter must freeze AUTO experience, block legacy candidate leakage, and keep accepted ownership row-aligned');
 
 const divider = '='.repeat(20);
 const instructions = `===== CHARACTER REGISTRY =====

@@ -84,6 +84,12 @@ test('visible manifestation resolves the queue item while an ignored result rema
   assert.equal(resolved.status,'resolved');
   assert.deepEqual(shown.state_delta.hooks_update.map(row=>[row.id,row.status]),[[hook.id,'resolved']]);
 
+  const prefixPatch={id:'prefix-hook',status:'open',reason:'완료된 대화에서 정한 약속'};
+  const reordered={scene_title:'교수의 호출',scene:[{kind:'narration',text:'학생회 서기가 교수 호출장을 내밀었다.'}],scene_summary:'공개 결투의 여파로 교수가 불렀다.',state_delta:{hooks_update:[{id:hook.id,status:'resolved',reason:'모델 원본'},prefixPatch]},time_execution:{effect_owners:[{scope:'state_delta',field:'hooks_update',effect_index:1,owner_kind:'clause',owner_id:'action_1'}]}};
+  reconcileEventConsequenceLifecycle({saveState:save,turn:reordered,selectedConsequence:selected});
+  assert.deepEqual(reordered.state_delta.hooks_update.map(row=>row.id),['prefix-hook',hook.id],'lifecycle reconciliation may move the selected consequence behind retained updates');
+  assert.equal(reordered.time_execution.effect_owners[0].effect_index,0,'hook ownership follows the exact retained source row after lifecycle compaction and reordering');
+
   const ignored={scene_title:'조용한 복도',scene:[{kind:'narration',text:'창밖으로 바람이 불었다.'}],scene_summary:'복도에 머물렀다.',state_delta:{hooks_update:[{id:hook.id,status:'resolved',reason:'근거 없는 완료'}]}};
   const open=reconcileEventConsequenceLifecycle({saveState:save,turn:ignored,selectedConsequence:selected});
   assert.equal(open.status,'open');
@@ -106,6 +112,15 @@ test('secret cause is not copied into the due directive and expired items close 
   assert.equal(lifecycle.expired_ids.length,1);
   assert.equal(turn.state_delta.hooks_update.length,1);
   assert.equal(turn.state_delta.hooks_update[0].status,'expired');
+
+  const identicalExpired={id:expiredSave.hooks[0].id,status:'expired',reason:'Event Consequence V1 bounded lifetime 종료'};
+  const identicalTurn={
+    state_delta:{hooks_update:[identicalExpired]},
+    time_execution:{effect_owners:[{scope:'state_delta',field:'hooks_update',effect_index:0,owner_kind:'clause',owner_id:'action_1'}]},
+  };
+  reconcileEventConsequenceLifecycle({saveState:expiredSave,turn:identicalTurn});
+  assert.deepEqual(identicalTurn.time_execution.effect_owners,[],'a runtime-created expiry row cannot borrow ownership from an identical model row');
+  assert.doesNotThrow(()=>reconcileEventConsequenceLifecycle({saveState:expiredSave,turn:identicalTurn}),'an explicitly unowned runtime row stays safe when a later lifecycle pass tags raw source rows');
 });
 
 const instructions=`===== CHARACTER REGISTRY =====\nguide=가이드\n===== WORLD CANON =====\nacademy\n===== NPC CANON =====\nguide\n===== NPC SPEECH =====\nguide speech\n===== PC SYSTEM =====\npc`;
@@ -142,6 +157,38 @@ test('an explicit wait routes to its consequence boundary and an earlier fixed s
   assert.equal(waiting.telemetry.event_director_v2.result,'EVENT_CONSEQUENCE_DUE');
   assert.equal(waiting.telemetry.event_director_v2.event_consequence_trigger_minutes,20);
   assert.match(waiting.params.input,/TRIGGER_IN=20min/);
+
+  const zeroRangeSave={...waitingSave,world:{...waitingSave.world,time:'09:35'}};
+  const zeroRange=routeOpenAIParams({instructions,input},{mode:'game',incoming:{action:'0분에서 10분 동안 기다린다.',saveState:zeroRangeSave,recentTurns:[]}});
+  assert.equal(zeroRange.telemetry.event_director_v2.result,'EVENT_CONSEQUENCE_DUE','a consequence inside a zero-minimum positive range must route before the model call');
+  assert.equal(zeroRange.telemetry.event_director_v2.event_consequence_trigger_minutes,5,'zero-minimum range lookahead must retain the positive upper endpoint');
+  assert.match(zeroRange.params.input,/TRIGGER_IN=5min/,'the routed consequence must preserve its exact trigger inside the zero-minimum range');
+
+  for(const action of ['검술을 훈련한다.','기초 수업에 참석한다.']){
+    const timed=routeOpenAIParams({instructions,input},{mode:'game',incoming:{action,saveState:waitingSave,recentTurns:[]}});
+    assert.equal(timed.telemetry.event_director_v2.result,'EVENT_CONSEQUENCE_DUE',`${action}: a consequence due before the activity minimum must route before the model call`);
+    assert.equal(timed.telemetry.event_director_v2.event_consequence_trigger_minutes,20);
+  }
+  const namedTimed=routeOpenAIParams({instructions,input},{mode:'game',incoming:{action:'가이드와 검술을 훈련한다.',saveState:waitingSave,recentTurns:[]}});
+  assert.equal(namedTimed.telemetry.event_director_v2.result,'EVENT_CONSEQUENCE_DUE','an NPC-focused compressed action must still route an earlier queued consequence');
+  assert.equal(namedTimed.telemetry.event_director_v2.event_consequence_trigger_minutes,20);
+  const futureDated=routeOpenAIParams({instructions,input},{mode:'game',incoming:{action:'내일 오전 10시에 수업을 듣는다.',saveState:waitingSave,recentTurns:[]}});
+  assert.equal(futureDated.telemetry.event_director_v2.result,'EVENT_CONSEQUENCE_DUE','a date-qualified request must still route a queued consequence inside its bounded next-day window');
+  assert.equal(futureDated.telemetry.event_director_v2.event_consequence_trigger_minutes,20);
+  const overdue={id:'overdue-class',title:'필수 수업',date:'1285-03-01',time:'09:00',kind:'academic',status:'scheduled'};
+  const overdueSave={...waitingSave,scheduledEvents:[overdue],scheduleContext:{due:[overdue],upcoming:[]}};
+  const afterOverdue=routeOpenAIParams({instructions,input},{mode:'game',incoming:{action:'검술을 훈련한다.',saveState:overdueSave,recentTurns:[]}});
+  assert.equal(afterOverdue.telemetry.event_director_v2.result,'EVENT_CONSEQUENCE_DUE','an overdue schedule must not suppress a genuinely future queued consequence');
+  assert.equal(afterOverdue.telemetry.event_director_v2.event_consequence_trigger_minutes,20);
+
+  const rangedSave={...waitingSave,world:{...waitingSave.world,time:'08:40'}};
+  const ranged=routeOpenAIParams({instructions,input},{mode:'game',incoming:{action:'검술을 훈련한다.',saveState:rangedSave,recentTurns:[]}});
+  assert.equal(ranged.telemetry.event_director_v2.result,'EVENT_CONSEQUENCE_DUE','a consequence inside the valid 30–120 minute training range must be routed before the model call');
+  assert.equal(ranged.telemetry.event_director_v2.event_consequence_trigger_minutes,60);
+
+  const relativeStart=routeOpenAIParams({instructions,input},{mode:'game',incoming:{action:'1시간 후에 훈련한다.',saveState:waitingSave,recentTurns:[]}});
+  assert.equal(relativeStart.telemetry.event_director_v2.result,'EVENT_CONSEQUENCE_DUE','a consequence before a relative future activity start must route before the model call');
+  assert.equal(relativeStart.telemetry.event_director_v2.event_consequence_trigger_minutes,20);
 
   const scheduled={id:'class#1',title:'필수 수업',date:'1285-03-01',time:'09:30',kind:'academic',status:'scheduled',participants:[]};
   const scheduledSave={...waitingSave,pc:{name:'아리아',department:'기사과'},scheduledEvents:[scheduled],scheduleContext:{due:[],upcoming:[scheduled]}};

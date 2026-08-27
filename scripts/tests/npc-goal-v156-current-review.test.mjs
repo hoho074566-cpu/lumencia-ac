@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { structuredEffectRows } from '../../lib/time-plan-reconciliation.js';
 
 const source=readFileSync('api/chat-router.js','utf8');
 const lifecycleStart=source.indexOf('function bounded(');
@@ -21,8 +22,8 @@ const schemaStart=source.indexOf('function goalV2FieldSchema(){');
 const schemaEnd=source.indexOf('function installResponsesRouter()');
 assert.ok(schemaStart>=0&&schemaEnd>schemaStart,'Goal V2 structured-format source markers missing');
 const schemaSource=source.slice(schemaStart,schemaEnd);
-const makeSchema=new Function(`const GOAL_V2_RULES='[NPC GOAL V2]';${schemaSource};return {patchGoalV2StructuredFormat};`);
-const {patchGoalV2StructuredFormat}=makeSchema();
+const makeSchema=new Function('structuredEffectRows',`const GOAL_V2_RULES='[NPC GOAL V2]';const TIME_EXECUTION_RULES='[TPP PHASE 3]';${schemaSource};return {patchGoalV2StructuredFormat};`);
+const {patchGoalV2StructuredFormat}=makeSchema(structuredEffectRows);
 
 const key='anastasia';
 function oldGoal(overrides={}){
@@ -51,6 +52,7 @@ test('duplicate npc_state_updates stay row-aligned after legacy parsing',()=>{
   assert.equal(parsed.state_delta.npc_state_updates[1].goal_progress_delta,-7);
   assert.equal(parsed.state_delta.npc_state_updates[1].goal_reason,'둘째 근거');
   assert.equal(parsed.state_delta.npc_state_updates[1].goal_replace,true);
+  assert.equal(parsed.state_delta.npc_state_updates[1][Symbol.for('lumensia.time.effect.source')],1,'the parser carries the exact raw row index through core sanitization');
 });
 
 test('legacy structured output preserves the Event Consequence queue field added by the adapter',()=>{
@@ -66,7 +68,29 @@ test('legacy structured output preserves the Event Consequence queue field added
   assert.ok(patched.text.format.schema.properties.state_delta.required.includes('delayed_consequences_add'));
   const consequence={event_name:'교수 호출',target_bucket:'active',delay_minutes:30,reason:'결투 여파',secret_level:0};
   const raw={state_delta:{hooks_add:[],npc_state_updates:[],delayed_consequences_add:[consequence]}};
-  assert.deepEqual(patched.text.format.$parseRaw(JSON.stringify(raw)).state_delta.delayed_consequences_add,[consequence]);
+  assert.deepEqual(JSON.parse(JSON.stringify(patched.text.format.$parseRaw(JSON.stringify(raw)).state_delta.delayed_consequences_add)),[consequence]);
+});
+
+test('structured format requires and preserves the TPP execution ownership receipt',()=>{
+  const format={
+    schema:{
+      type:'object',
+      properties:{
+        scene:{type:'array',items:{type:'object'}},
+        choices:{type:'array',items:{type:'string'}},
+        state_delta:{type:'object',properties:{advance_minutes:{type:'integer'},npc_state_updates:{type:'array',items:{type:'object',properties:{npc_key:{type:'string'},current_goal:{anyOf:[{type:'string'},{type:'null'}]}},required:['npc_key','current_goal'],additionalProperties:false}}}},
+      },
+      required:['scene','choices','state_delta'],
+      additionalProperties:false,
+    },
+    $parseRaw:(content)=>{const raw=JSON.parse(content);return{scene:raw.scene,choices:raw.choices,state_delta:raw.state_delta};},
+  };
+  const patched=patchGoalV2StructuredFormat({instructions:'base',text:{format}}),receipt={version:'1.0',plan_used:true,boundary_kind:'choice',boundary_minutes:60,completed_clause_ids:['action_1'],interrupted_clause_id:'action_2',decision_scene_index:0,boundary_event_id:null,effect_owners:[],scalar_contributions:[]};
+  assert.ok(patched.text.format.schema.properties.time_execution,'the canonical response schema contains the ownership receipt');
+  assert.ok(patched.text.format.schema.required.includes('time_execution'),'strict output requires the ownership receipt on every turn');
+  const parsed=patched.text.format.$parseRaw(JSON.stringify({scene:[{kind:'narration',text:'선택한다.'}],choices:['계속'],state_delta:{advance_minutes:60,npc_state_updates:[]},time_execution:receipt}));
+  assert.deepEqual(parsed.time_execution,receipt,'the adapter restores the receipt after the canonical Zod parser strips extension fields');
+  assert.match(patched.instructions,/TPP PHASE 3/,'the same canonical call receives the ownership contract');
 });
 
 test('rephrasing preserves persisted priority and urgency even with due schedule and active hook',()=>{

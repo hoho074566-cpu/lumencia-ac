@@ -28,12 +28,23 @@ const libraryCorridor=evaluateSceneExitCondition(libraryTravel,{turn:{scene:[{ki
 assert.equal(libraryCorridor.status,'open','an intermediate location must not satisfy a named travel destination');
 const libraryReached=evaluateSceneExitCondition(libraryTravel,{turn:{scene:[{kind:'narration',text:'도서관에 도착했다.'}],choices:[]},sceneDelta:{score:1,structuralScore:1,afterLocation:'루멘시아 아카데미 대도서관 입구',flags:{locationChanged:true}}});
 assert.equal(libraryReached.status,'reached');
+const namedPcTravel=deriveSceneExitCondition({action:'카인이 도서관으로 간다.',saveState:{...baseSave,pc:{name:'카인'}},turnNumber:13});
+assert.equal(namedPcTravel.kind,'semantic-destination','scene exit must recognize the saved PC as the travel actor');
+assert.equal(namedPcTravel.destination,'도서관','saved-name travel must retain the declared destination boundary');
 
 const question=deriveSceneExitCondition({action:'지금 입학식에 돌아갈까?',saveState:baseSave,turnNumber:13});
 assert.equal(question.kind,'question-answered');
+const futureWeekdayAction=deriveSceneExitCondition({action:'이번 목요일 오전 10시에 1시간 훈련한다.',saveState:{...baseSave,world:{date:'1285-03-01',weekday:'수요일',time:'11:00',location:'훈련장'}},turnNumber:13});
+assert.equal(futureWeekdayAction.kind,'action-resolved','scene exit must use the saved fantasy weekday instead of applying a question freeze to a future action');
 const answered=evaluateSceneExitCondition(question,{turn:{scene:[{kind:'dialogue',speaker_key:'guide',text:'아직 늦지는 않았어.'}],choices:[]},sceneDelta:{score:1,structuralScore:0,advanceMinutes:0,flags:{npcAction:true}}});
 assert.equal(answered.status,'reached');
 assert.match(buildSceneExitDirective({action:'지금 입학식에 돌아갈까?',saveState:baseSave}),/질문 속 가능 행동을 실행하거나 시간·위치·진행 상태를 바꾸지 않는다/);
+const downtime=deriveSceneExitCondition({action:'좀 쉰다.',saveState:baseSave,turnNumber:13});
+const truncatedDowntime=evaluateSceneExitCondition(downtime,{turn:{scene:[],choices:[]},sceneDelta:{score:1,structuralScore:0,advanceMinutes:20,flags:{timeAdvanced:true}},incompleteBoundary:true});
+assert.equal(truncatedDowntime.status,'open','a sanitized partial timed turn must not close its scene boundary from time alone');
+const genericAction=deriveSceneExitCondition({action:'문서를 정리한다.',saveState:baseSave,turnNumber:13});
+const truncatedAction=evaluateSceneExitCondition(genericAction,{turn:{scene:[],choices:[]},sceneDelta:{score:2,structuralScore:1,advanceMinutes:5,flags:{objectiveChanged:true}},incompleteBoundary:true});
+assert.equal(truncatedAction.status,'open','a sanitized partial action must not close its scene boundary from structural delta alone');
 
 const openEvent=deriveSceneExitCondition({action:'[AUTO FLOW: PC 새 행동 없음]',saveState:baseSave,purpose,turnNumber:13});
 assert.equal(openEvent.kind,'event-step');

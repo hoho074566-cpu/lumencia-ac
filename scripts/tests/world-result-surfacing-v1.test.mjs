@@ -190,6 +190,8 @@ const scheduledInput = input.replace('INTERVENTION: light', 'INTERVENTION: sched
 assert.notEqual(route('주변의 변화를 살펴본다.', {}, 'game', scheduledInput).telemetry.event_director_v2?.result, 'WORLD_RESULT_SURFACE', 'scheduled fixed flow stays ahead');
 const upcoming = { id: 'class', title: '기사과 수업', kind: 'academic', date: '1285-03-01', time: '14:11', status: 'scheduled' };
 assert.notEqual(route('주변의 변화를 살펴본다.', { scheduledEvents: [upcoming], scheduleContext: { due: [], upcoming: [upcoming] } }).telemetry.event_director_v2?.result, 'WORLD_RESULT_SURFACE', 'a reachable fixed schedule boundary stays ahead');
+const overdue = { id: 'overdue-class', title: '이미 시작한 기사과 수업', kind: 'academic', date: '1285-03-01', time: '14:00', status: 'scheduled' };
+assert.notEqual(route('주변의 변화를 살펴본다.', { scheduledEvents: [overdue], scheduleContext: { due: [overdue], upcoming: [] } }).telemetry.event_director_v2?.result, 'WORLD_RESULT_SURFACE', 'an overdue unfinished schedule must block unrelated world-result surfacing');
 assert.notEqual(route('주변의 변화를 살펴본다.', {}, 'game', input, { backgroundSim: false }).telemetry.event_director_v2?.result, 'WORLD_RESULT_SURFACE', 'disabled background simulation disables result surfacing');
 
 const activeGoal = { id: 'discipline', desire: 'PC의 훈련 태도를 직접 확인한다.', priority: 5, urgency: 4, progress: 10, state: 'active', target_type: 'pc', target_key: 'pc', next_actions: ['PC에게 먼저 말을 건다.'] };
@@ -223,7 +225,7 @@ const health = readFileSync('api/health.js', 'utf8');
 assert.equal((adapter.match(/coreHandler\(/g) || []).length, 1, 'Event Director V3 must preserve one canonical core call');
 assert.match(adapter, /world_result_surface:worldResultSurface/, 'the checkpoint must stay under the existing sceneRuntime root');
 assert.match(adapter, /event_director_v3_enabled:true/);
-assert.match(health, /version: '0\.8\.5'/);
+assert.match(health, /version: '0\.8\.7'/);
 assert.match(health, /eventDirector: 'V3 public world-result surfacing/);
 
 console.log('PASS Event Director V3 bounded public world-result surfacing, priority, retry, evidence, freeze, and one-call regressions');

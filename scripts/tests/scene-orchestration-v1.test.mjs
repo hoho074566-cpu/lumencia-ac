@@ -81,6 +81,53 @@ assert.match(scheduleDirective, /TRIGGER_MINUTES=30/);
 assert.match(scheduleDirective, /PRIMARY를 TRIGGER_MINUTES의 경계까지만 진행한 뒤 SECONDARY를 처리/,
   'an interrupting boundary must cut off compressed primary action instead of waiting for its full completion');
 
+const resumedTimedScheduleBoundary=deriveSceneOrchestrationPlan({
+  mode:'game',
+  action:'계속한다.',
+  saveState:{
+    world:{date:'1285-03-01',time:'09:00',location:'개인실'},
+    pc:{name:'카인',department:'기사과'},
+    scheduledEvents:[{id:'resumed-class',title:'기사과 필수 수업',kind:'academic',date:'1285-03-01',time:'10:00',status:'scheduled'}],
+    scheduleContext:{due:[],upcoming:[{id:'resumed-class',title:'기사과 필수 수업',kind:'academic',date:'1285-03-01',time:'10:00',status:'scheduled'}]},
+    sceneRuntime:{timed_action:{kind:'downtime',remaining_minutes:1440}},
+  },
+  directorTelemetry:{result:'NO_RANDOM_EVENT_DUE'},
+});
+assert.equal(resumedTimedScheduleBoundary.intent,'downtime','orchestration must classify a resumable timed action with the saved runtime record');
+assert.equal(resumedTimedScheduleBoundary.secondary,'schedule-boundary','a required schedule must interrupt a resumed timed action');
+assert.equal(resumedTimedScheduleBoundary.trigger_minutes,60,'the resumed orchestration boundary must use the authoritative schedule offset');
+
+const requestedClass={id:'basic-class',title:'기사과 기초 수업',kind:'academic',date:'1285-03-01',time:'10:00',status:'scheduled'};
+const ownScheduledActivity=deriveSceneOrchestrationPlan({
+  mode:'game',
+  action:'10시에 기초 수업에 참석한다.',
+  saveState:{world:{date:'1285-03-01',time:'09:00',location:'기숙사'},pc:{department:'기사과'},scheduleContext:{due:[],upcoming:[requestedClass]},scheduledEvents:[requestedClass],sceneRuntime:{}},
+  directorTelemetry:{result:'NO_RANDOM_EVENT_DUE'},
+});
+assert.equal(ownScheduledActivity.secondary,'world-response','the orchestration layer must not reintroduce the requested class as its own interruption');
+assert.equal(ownScheduledActivity.trigger_minutes,null);
+
+const requestedConsult={id:'personal-consult',title:'개인 상담',kind:'personal',date:'1285-03-01',time:'10:00',status:'scheduled',participants:['emily']};
+const namedScheduledActivity=deriveSceneOrchestrationPlan({
+  mode:'game',
+  action:'10시에 에밀리와 상담한다.',
+  saveState:{world:{date:'1285-03-01',time:'09:00',location:'기숙사'},scheduleContext:{due:[],upcoming:[requestedConsult]},scheduledEvents:[requestedConsult],sceneRuntime:{}},
+  directorTelemetry:{result:'DIRECT_USER_FOCUS'},
+  registry:{emily:'에밀리'},
+});
+assert.equal(namedScheduledActivity.secondary,'world-response','canonical participant labels must keep a requested personal appointment out of schedule arbitration');
+assert.equal(namedScheduledActivity.trigger_minutes,null);
+
+const futureDateInterrupted=deriveSceneOrchestrationPlan({
+  mode:'game',
+  action:'내일 오전 8시에 기사과 기초 수업을 듣는다.',
+  saveState:{world:{date:'1285-03-01',time:'09:00',location:'기숙사'},pc:{department:'기사과'},scheduledEvents:[{id:'today-briefing',title:'기사과 필수 브리핑',kind:'academic',date:'1285-03-01',time:'09:30',status:'scheduled'}],scheduleContext:{due:[],upcoming:[{id:'today-briefing',title:'기사과 필수 브리핑',kind:'academic',date:'1285-03-01',time:'09:30',status:'scheduled'}]},sceneRuntime:{}},
+  directorTelemetry:{result:'NO_RANDOM_EVENT_DUE'},
+});
+assert.equal(futureDateInterrupted.secondary,'schedule-boundary','a bounded future-date plan must yield to an earlier authoritative schedule');
+assert.equal(futureDateInterrupted.order,'action-until-interruption','orchestration must agree with the date-qualified Scene Momentum boundary');
+assert.equal(futureDateInterrupted.trigger_minutes,30);
+
 const dueScheduleDoesNotFreezeAction = deriveSceneOrchestrationPlan({
   mode: 'game',
   action: '기숙사로 간다.',
@@ -175,7 +222,7 @@ assert.equal((adapter.match(/coreHandler\(/g) || []).length, 1, 'Multi-System Sc
 
 const divider = '='.repeat(20);
 const instructions = `===== CHARACTER REGISTRY =====
-artemis=아르테미스, mirabelle=미라벨
+artemis=아르테미스, mirabelle=미라벨, emily=에밀리
 ===== WORLD CANON =====
 ${divider}
 PUBLIC
@@ -219,6 +266,17 @@ assert.match(routed.params.input, /===== MULTI-SYSTEM SCENE ORCHESTRATION V1 ===
 assert.match(routed.params.input, /TURN_PLAN=user-action>present-npc-goal/);
 assert.equal(routed.telemetry.scene_orchestration.primary, 'user-action');
 assert.equal(routed.telemetry.scene_orchestration.secondary, 'present-npc-goal');
+
+const routedNamedAppointment=routeOpenAIParams(
+  {instructions,input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}'},
+  {incoming:{
+    action:'10시에 에밀리와 상담한다.',
+    saveState:{turnNumber:8,world:{date:'1285-03-01',time:'09:00',location:'기숙사'},pc:{name:'아리아'},scheduleContext:{due:[],upcoming:[requestedConsult]},scheduledEvents:[requestedConsult],sceneRuntime:{}},
+    recentTurns:[],
+  },mode:'game'},
+);
+assert.equal(routedNamedAppointment.telemetry.scene_orchestration.secondary,'world-response','the routed orchestration plan must receive canonical labels parsed from the registry');
+assert.equal(routedNamedAppointment.telemetry.scene_orchestration.trigger_minutes,null,'the routed requested appointment must not become its own stop boundary');
 
 const suppressedDirector = routeOpenAIParams(
   { instructions, input: `===== TURN OPTIONS =====

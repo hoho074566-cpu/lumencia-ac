@@ -28,6 +28,11 @@ assert.match(context,/DIRECTOR_COOLDOWN_TURNS/,'momentum must preserve cooldown 
 
 assert.match(chat,/SCENE_MOMENTUM_VERSION/);
 assert.match(chat,/applySceneMomentumTimeFloor/);
+assert.match(chat,/const runtimeTurn=runtimeSynthesisTurn\(data\.turn,sceneIntent\)/,'time-shortened visible scenes must be filtered before runtime synthesis');
+assert.match(chat,/localSceneRuntime\([^;]+,runtimeTurn,/,'scene runtime synthesis must consume the filtered turn');
+assert.match(chat,/timed_action:timedAction/,'incomplete exact timed actions must persist a resumable runtime record');
+assert.match(chat,/localSceneRuntime\([^;]+sceneIntent\)/,'scene runtime persistence must receive the reconciled timed intent');
+assert.match(chat,/localNpcUpdates\(incoming0,runtimeTurn\)/,'NPC runtime synthesis must consume the filtered turn');
 assert.match(chat,/deriveSceneDelta/);
 assert.match(chat,/updateSceneMomentum/);
 assert.match(chat,/deriveScenePurpose/);
@@ -44,14 +49,28 @@ assert.match(chat,/scene_purpose_v1:true/);
 assert.match(chat,/scene_exit_condition_v1:true/);
 assert.match(chat,/turn_hook_v1:true/);
 assert.match(chat,/event_consequence_v1:true/);
-assert.match(chat,/const ADAPTER_VERSION = '0\.8\.5'/);
+assert.match(chat,/const ADAPTER_VERSION = '0\.8\.7'/);
 assert.equal((chat.match(/coreHandler\(/g)||[]).length,1,'stable adapter must keep exactly one canonical coreHandler call site');
-assert.match(chat,/const hasMeaningfulStop=array\(turn\?\.choices\)\.length>0/,'time-floor stop evidence must come from an explicit player decision');
+assert.match(chat,/const modelHasMeaningfulStop=array\(turn\?\.choices\)\.length>0/,'time-floor stop evidence must originate in an explicit player decision');
+assert.match(chat,/hasMeaningfulStop=Boolean\(modelHasMeaningfulStop&&!turnLimitPreemptsChoice\)/,'the canonical one-turn cap must defer choices on an incomplete long action');
 assert.match(chat,/const reachedConsequenceBoundary=/,'manifested delayed results must be recognized as compression boundaries');
-assert.match(chat,/applySceneMomentumTimeFloor\([^;]+consequenceLifecycle\)/,'the selected consequence lifecycle must reach the elapsed-time guard');
+assert.match(chat,/applySceneMomentumTimeFloor\([^;]+consequenceLifecycle,consequenceVisibleScene,\{director_occurrence_id:[^}]+choice_event_ids:resumableIds\}\)/,'the selected consequence lifecycle and externally routed event authority must reach the elapsed-time guard');
 assert.doesNotMatch(chat,/hasMeaningfulStop[^;\n]*importance[^;\n]*critical/i,'critical scene severity must not suppress deterministic elapsed time');
+assert.match(chat,/growthAllowed=mode==='game'&&!zeroElapsedIntent/,'explicit zero-minute and non-game actions must share one deterministic growth freeze gate');
+assert.equal((chat.match(/allowProgress:growthAllowed/g)||[]).length,6,'initial validation and all three post-boundary persistence rebuilds must share the growth gate');
+assert.match(chat,/zeroElapsedRange=array\(growthIntent\.explicitDurationRangeMinutes\)[^;]+zeroElapsedIntent=mode==='game'&&\(growthIntent\.explicitDurationMinutes===0\|\|zeroElapsedRange\)&&Number\(growthIntent\.minAdvanceMinutes\|\|0\)<=0/,'zero-growth freeze must cover both scalar-zero and zero-length range requests');
+assert.match(chat,/growthIntent=classifySceneIntent\(incoming0\.action\|\|'',\{[^}]*actorName:incoming\.saveState\?\.pc\?\.name\|\|'',resumeTimedAction:incoming\.saveState\?\.sceneRuntime\?\.timed_action\}\)/,'zero-growth classification must preserve the saved player and resumable timed action');
+const timeReconciliationIndex=chat.indexOf('const sceneIntent=applySceneMomentumTimeFloor');
+for(const marker of ['persistedCombatGrowthState=deriveCombatGrowthState','persistedSkillLearningState=deriveSkillLearningState','persistedAwakeningTalentState=deriveAwakeningTalentState']){
+  assert.ok(timeReconciliationIndex>=0&&chat.lastIndexOf(marker)>timeReconciliationIndex,`${marker} must be recomputed after time-boundary reconciliation freezes rejected completion deltas`);
+}
+assert.match(chat,/growthValidationScene=data\.turn\?\.scene[\s\S]*persistedCombatGrowthState=deriveCombatGrowthState\([^\n]*scene:growthValidationScene[^\n]*allowProgress:growthAllowed/,'a shortened turn must retain prevalidated prefix combat growth using the original evidence scene');
+assert.match(chat,/data\.turn\.state_delta\.skill_learning!==skillLearningState\.accepted_changes[\s\S]*persistedSkillLearningState=deriveSkillLearningState\([^\n]*scene:growthValidationScene[^\n]*allowProgress:growthAllowed/,'a shortened turn must rebuild the persisted skill-learning packet from its prevalidated final subset');
+assert.match(chat,/data\.turn\.state_delta\.awakening_progress!==awakeningTalentState\.accepted_awakening_changes[\s\S]*persistedAwakeningTalentState=deriveAwakeningTalentState\([^\n]*scene:growthValidationScene[^\n]*allowProgress:growthAllowed/,'a shortened turn must rebuild awakening and talent persistence from its prevalidated final subset');
+assert.match(chat,/runtimeTrustedConsequenceScene[\s\S]*trustedConsequenceScene=array\(intent\?\.runtimeTrustedConsequenceScene\)/,'runtime synthesis must retain attributed consequence arrivals while discarding untrusted boundary prose');
+assert.match(chat,/runtime_state=\{[^\n]*skill_learning:persistedSkillLearningState,awakening_talent:persistedAwakeningTalentState/,'the client must receive only the post-reconciliation growth packets');
 
-assert.match(health,/version: '0\.8\.5'/);
+assert.match(health,/version: '0\.8\.7'/);
 assert.match(health,/appVersion: '1\.5\.6'/);
 assert.match(health,/sceneMomentum:/);
 assert.match(health,/sceneNovelty:/);
