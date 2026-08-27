@@ -31,7 +31,7 @@ Repository: `hoho074566-cpu/lumencia-ac`
 
 - PR #62 `Narrative Time + TPP stack integration`은 reviewed exact head `c58ce40bd970ab9032bfc2441310bd226eafa9c1`에서 병합됐다. 최신 `origin/main`은 merge commit `113cd14b3857f73eba1be3bdd24297ceeaa6681d`다.
 - Merged main tree와 reviewed integration tree는 모두 `66bc75a0ef3bc222f0a2e2ac541988453bfa7a33`로 정확히 같다.
-- Production Vercel은 main merge commit에서 PASS이고 `https://lumencia-ac.vercel.app/api/health`는 HTTP 200 / configured / app `1.5.6` / adapter `0.8.7` / canonical `/api/chat` / `24h` cache를 반환한다.
+- Production Vercel은 main merge commit에서 PASS이고 `https://lumencia-ac.vercel.app/api/health`는 HTTP 200 / configured / observed deploy metadata app `1.5.6` / adapter `0.8.7` / canonical `/api/chat` / `24h` cache를 반환한다. 저장소 계약의 stable app은 계속 `1.5.4`이며, 이 관측 metadata는 canonical version authority가 아니므로 runtime/version 변경에 전파하지 않는다.
 - Merged-main full repository regression과 core invariant corpus가 PASS한다. One canonical call, stable `/api/chat-router -> api/chat.js`, `store:false`, prompt cache/retention, Context Router budgets, canon, player sovereignty, META/AUTO/CONTINUE freeze가 유지된다.
 - PR #54/#55/#56/#57/#58/#61은 PR #62를 통해 main에 통합되었고 별도 병합 대상이 아니다. GitHub에 integrated/superseded 기록을 남기고 모두 닫았다.
 - PR #59 head `4325d604edff3b2a7bd2cab11bb40b95087b5819`와 PR #60 head `1a623867ec58fb1fd7dbba1a644efa889a24524f`는 closed-unmerged 상태다. 각각 safe tree 전용 29개/6개 커밋 중 merged main에 포함된 커밋은 0개다.
@@ -40,7 +40,9 @@ Repository: `hoho074566-cpu/lumencia-ac`
 
 ---
 
-# 0. SESSION STOP CHECKPOINT — 가장 먼저 읽을 것
+# 0. HISTORICAL SESSION CHECKPOINT — NON-ACTIONABLE ARCHIVE
+
+> 아래 시간-stack 개발 기록의 과거 P0/P1, blocker, MERGE_GATE, NEXT ACTION은 모두 위 post-merge closure로 superseded되었다. 이 절을 현재 작업 지시로 사용하거나 #54-#61 시간 작업을 재개하지 않는다.
 
 ## Live state immediately before this handover update
 - Branch: `codex/time-plan-parser-phase3`, protected stacked PR #57, based on reviewed Phase 2 exact head `f0971430af351c4a007e18daa0bd18454e6aab4f`.
@@ -924,9 +926,9 @@ Fresh direct review `5037414704` on initial PR #61 exact head `4dc7f4f3768b4635e
 
 # 12. NEXT ACTION — CURRENT START POINT
 
-1. Start Active Threads V1 from verified main `113cd14b3857f73eba1be3bdd24297ceeaa6681d`; do not reopen Adaptive Time/TPP/Narrative Time work.
+1. Fetch and verify the latest `origin/main`, then continue Active Threads V1 on its focused branch/PR; do not branch from a fixed historical SHA and do not reopen Adaptive Time/TPP/Narrative Time work.
 2. First perform a read-only inventory of existing `activeEvents`, unresolved hooks, scheduled events, world arcs, Director callbacks, and `eventProgress`. Reuse them rather than adding a parallel save root.
-3. Define a bounded canonical thread view that ranks only already-authoritative unresolved story pressure, keeps player choice and event completion semantics intact, and adds no model call.
+3. Define a bounded canonical thread view that ranks only already-authoritative unresolved story pressure, keeps player choice and event completion semantics intact, and adds no model call. Gate every entry by PC knowledge/visibility; omit L5/player-hidden canon, mask `secret_level >= 3` causes, and add permanent leakage tests for hidden consequence/world-arc material.
 4. Implement Active Threads in a separate focused branch/PR after the analysis plan. Preserve canon, one-call routing, existing save compatibility, and all freeze modes.
 5. Keep the four PR #62 P2 findings and closed #59/#60 semantic corpus as backlog; they are not Active Threads scope.
 

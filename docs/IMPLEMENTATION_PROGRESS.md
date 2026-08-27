@@ -14,11 +14,15 @@ Narrative Engine continuation — time stack post-merge closure complete; Active
 - Repo: `hoho074566-cpu/lumencia-ac`
 - Main: `113cd14b3857f73eba1be3bdd24297ceeaa6681d` (PR #62 merge).
 - Reviewed integration head `c58ce40bd970ab9032bfc2441310bd226eafa9c1` and merged main share tree `66bc75a0ef3bc222f0a2e2ac541988453bfa7a33`.
-- Production Vercel PASS; `/api/health` HTTP 200 reports configured app `1.5.6`, adapter `0.8.7`, canonical `/api/chat`, stable router/context paths, `store:false` coverage, `24h` prompt retention, and preserved budgets.
+- Production Vercel PASS; `/api/health` HTTP 200 reports observed deploy metadata app `1.5.6` and adapter `0.8.7`, plus canonical `/api/chat`, stable router/context paths, `store:false` coverage, `24h` prompt retention, and preserved budgets. The repository contract remains stable app `1.5.4`; the observed deploy metadata is not canonical version authority and must not be propagated into runtime/version changes by this checkpoint.
 - Merged-main full repository regression PASS. One canonical call, stable routing, cache/retention, budgets, canon, player sovereignty, and META/AUTO/CONTINUE freeze all pass their permanent invariants.
 - PR #54/#55/#56/#57/#58/#61 are integrated through #62 and closed as superseded. They must not be merged separately.
 - PR #59 and #60 remain closed-unmerged. Their 29 and 6 safe-tree-exclusive commits have zero inclusion in merged main.
 - Time systems are now a completed base. The four non-blocking PR #62 P2 findings remain backlog and do not trigger a new correction.
+### HISTORICAL ARCHIVE — NON-ACTIONABLE
+
+The entries below preserve the former #54-#61 development/review chronology only. Their old P0/P1, blocker, MERGE_GATE, and NEXT ACTION wording is superseded by the authoritative closure above and must not restart time-engine work. PR #57 is now an included ancestor rather than an active branch.
+
 - Historical Phase 3 branch: `codex/time-plan-parser-phase3`, PR #57, stacked on reviewed Phase 2 exact head `f0971430af351c4a007e18daa0bd18454e6aab4f`; it is now an included ancestor, not the active working branch.
 - Current Adaptive Time Scale V2 runtime code head: `24407193b59d0f9e9cf2f9d8f1a4589b4b92c95c`; local focused/full regression, Safety run `32947576791`, Vercel, current-base `1018d8c...`, behind 0, and conflict-free mergeability pass. Fresh exact-head review `5028340142` reports four remaining P1s, all caused by the wording-specific string parser. PR #54 is therefore a stable checkpoint but is not merge-ready.
 - TPP Phase 1 is implemented locally as a shadow-only structured parser. It emits ordered clauses with actor, action type, start/date/clock, duration/range, destination, deadline, sequence relation, commitment/completion, hypothetical, quoted, and third-party fields. Legacy `classifySceneIntent` and every execution/arbitration/mutation path remain authoritative.
