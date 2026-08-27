@@ -141,6 +141,8 @@ assert.equal(turn.event_progress.event_instance_id,'morning-class','validated st
 assert.equal(structuredOnlyScheduleIntent.runtimeSceneTrusted,false,'structured progress alone must not make unrelated visible narration trustworthy');
 assert.equal(turn.scene_title,'일정 경계','an unsurfaced structured boundary must use deterministic visible reconciliation');
 assert.doesNotMatch(JSON.stringify(turn.scene),/왕도|에밀리/,'post-boundary narration must be removed when no boundary scene can be validated');
+assert.deepEqual(turn.choices,[],'choices from the discarded later scene cannot survive an unsurfaced schedule rewind');
+assert.equal(structuredOnlyScheduleIntent.runtimeChoicesTrusted,false,'an unsurfaced schedule cannot authorize choices created after its boundary');
 
 for(const [action,prose,elapsed] of [
   ['1시간 동안 훈련한다.','리나는 먼저 훈련을 마쳤다.',10],
@@ -851,6 +853,13 @@ assert.equal(coincidentConsequenceChoiceIntent.runtimeChoicesTrusted,true,'verif
 const coincidentConsequenceChoiceRuntime=runtimeSynthesisTurn(turn,coincidentConsequenceChoiceIntent);
 assert.deepEqual(coincidentConsequenceChoiceRuntime.scene,consequenceChoiceScene,'runtime synthesis retains the verified consequence scene');
 assert.deepEqual(coincidentConsequenceChoiceRuntime.choices,turn.choices,'runtime synthesis retains the consequence choices for awaiting-player persistence');
+turn={scene:[...consequenceChoiceScene,{kind:'narration',text:'그 뒤 문이 열리며 안쪽 방이 드러났다.'}],state_delta:{advance_minutes:90,items_add:['미검증 대기 보상'],hooks_update:[{id:coincidentConsequenceHook.id,status:'resolved'}]},choices:['안쪽 방에 들어간다','문을 닫는다','복도로 돌아간다'],event_progress:null};
+const rewoundConsequenceChoiceIntent=applySceneMomentumTimeFloor({action:'2시간 동안 기다린다.',saveState:{world:{date:'1285-03-01',time:'09:00'},hooks:[coincidentConsequenceHook],scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game',{selected_id:coincidentConsequenceHook.id,status:'resolved',attribution_safe:true},consequenceChoiceScene);
+assert.equal(turn.state_delta.advance_minutes,60,'an overrun response rewinds to the verified consequence minute');
+assert.deepEqual(turn.state_delta.items_add,[],'effects created after the rewound consequence fail closed');
+assert.deepEqual(turn.choices,[],'choices created after the rewound consequence are discarded with their prerequisite scene');
+assert.equal(rewoundConsequenceChoiceIntent.runtimeChoicesTrusted,false,'a rewound consequence cannot authenticate later response choices');
+assert.deepEqual(runtimeSynthesisTurn(turn,rewoundConsequenceChoiceIntent).choices,[],'runtime synthesis cannot persist post-boundary consequence choices');
 const arrivalRelationship={npc_key:'emily',affinity_delta:-1,trust_delta:1,status:'경계 중',reason:'에밀리가 약속 시각에 중앙광장에 도착해 함께 후문을 경계했다'};
 const arrivalKnowledge='에밀리가 약속 시각에 중앙광장에 도착했다.';
 const arrivalMemory={owner:'pc',fact:'에밀리가 약속 시각에 중앙광장에 도착해 후문 경계를 시작했다.',importance:2,secret_level:0};
