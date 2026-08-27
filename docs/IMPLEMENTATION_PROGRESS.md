@@ -1,5 +1,48 @@
 # Lumensia Implementation Progress
 
+## 2026-08-27 Phone Cloud Work Final Checkpoint — AUTHORITATIVE
+
+- Repository: `hoho074566-cpu/lumencia-ac`; remote: `https://github.com/hoho074566-cpu/lumencia-ac.git`.
+- Remote branch/upstream: `codex/setup-payoff-memory-v1` / `origin/codex/setup-payoff-memory-v1`.
+- Handoff-preparation code/docs HEAD: `790c8ebe584123b07df7d930cdf54a5c41aa689f`. The final checkpoint commit created after this entry is reported separately by the handing-off Work; do not try to infer it from this document.
+- Current main/base/merge-base: `9de2b595555000dc462d3db67f4db5c9aff79750`; branch is ahead 10 and behind 0 at the handoff-preparation HEAD. Local and upstream were identical and the worktree was clean before this documentation update.
+- PR #66 `Setup to Payoff Memory V1` is open, `merged=false`, non-draft, mergeable with no conflict, and protected because it changes `api/**`. **Do not merge or close it during handoff.** Merge is forbidden until a future exact-current-HEAD cycle has Safety/Repository PASS, Vercel PASS, direct P0/P1=0, full regression PASS, behind 0, no conflict, and explicit human merge authority.
+- Hosted state on `790c8eb...`: Repository/Safety PASS, Vercel PASS, Merge Readiness FAIL, current exact-head Codex review `5039221009` has P0=0/P1=1. The blocking inline finding `3870426835` reports that Setup->Payoff lifecycle validation occurs before Scene Momentum time reconciliation; reconciliation can clear `turn.director` after choices survive, leaving the callback `open` and making the offered continuation unreachable.
+- A second known lifecycle regression from prior docs-only head review `5039055319` / finding `3870285419` remains relevant because no runtime change followed it: an explicit failed payoff can be accepted as resolved while retry choices remain, stranding the retry. It is not used as current-head review authority, but it remains required follow-up corpus.
+
+### Completed
+
+- Bounded priority correction: hard boundary > validated owned payoff continuation > generic active combat > ordinary flow.
+- Bounded lifecycle phase/beat contract using existing canonical beat types; wrong callback/turn/choice, stale/resolved ownership, phase skipping, and unselected payoff paths remain fail-closed.
+- Representative Exact Preview acceptance on the unchanged runtime code tree: the original owned option and five subsequent player-owned choices continued under callback `rival-proof` without 409, ownership transfer, automatic resolution, or aftermath skipping.
+- Focused Setup/Payoff, turn-hook, Scene Orchestration, Context Router, authority-tail and core invariant coverage passed. Full `node scripts/lumensia-pr-check.mjs origin/main HEAD` passed on `790c8eb...`; `git diff --check` passed; hosted Repository checks and Vercel passed.
+- One canonical model call, stable `/api/chat-router -> api/chat.js`, `store:false`, prompt cache/retention, Context Router budgets, canon, player sovereignty, and META/AUTO/CONTINUE freeze remain preserved.
+
+### Incomplete / blockers
+
+- PR #66 is not merge-ready because exact-head P1 `3870426835` is unresolved. Merge Readiness is authoritative FAIL.
+- Retry-aware payoff resolution semantics described by `3870285419` also remain unimplemented.
+- The user-authorized one bounded lifecycle-contract correction has been consumed. Do not add another wording/regex/allowlist patch on this PR. A future Work must first obtain explicit authority for a separate, bounded lifecycle design/remediation task.
+- Current non-blocking P2 findings remain backlog and must not trigger checkpoint changes.
+
+### Major changed files
+
+- `api/chat-router.js`
+- `api/lib/context-router.js`
+- `lib/setup-payoff-memory.js`
+- `scripts/tests/setup-payoff-memory-v1.test.mjs`
+- `docs/IMPLEMENTATION_PROGRESS.md`
+- `docs/LUMENSIA_HANDOVER_CURRENT.md`
+
+### Phone Cloud Work NEXT ACTION
+
+1. Fetch `origin` and check out `codex/setup-payoff-memory-v1`; confirm local HEAD equals the final checkpoint SHA reported by the handing-off Work, upstream ahead/behind is `0/0`, and PR #66 remains open/unmerged.
+2. Read this checkpoint and `docs/LUMENSIA_HANDOVER_CURRENT.md`. Do not restart completed HF1/HF2, time/TPP, Active Threads, priority, phase/beat, or passed Preview analysis.
+3. Do not merge PR #66. Preserve its fail-closed behavior and regression corpus. Ask for or verify explicit authorization before starting a separate bounded lifecycle remediation for current P1 `3870426835` and the retry-resolution contract `3870285419`.
+4. If remediation is authorized, use structured lifecycle/state authority rather than prose, Korean regex, or broad allowlists; then run focused tests, full regression, Exact Preview, Vercel/Safety, and a fresh exact-head review.
+5. Never auto-advance a meaningful player/game/story choice. Only the player may choose consequential dialogue, relationship, combat, irreversible, or other sovereignty-sensitive actions.
+6. Preserve existing normal behavior and completed work. Do not reanalyze completed stages from the beginning.
+
 ## Current Phase
 Narrative Engine continuation — PR #66 Setup -> Payoff Memory V1 bounded lifecycle correction is complete, but a new exact-head lifecycle P1 keeps the PR closed-unmerged.
 

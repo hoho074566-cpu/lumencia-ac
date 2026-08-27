@@ -10,6 +10,64 @@ Repository: `hoho074566-cpu/lumencia-ac`
 
 ---
 
+# PHONE CLOUD WORK FINAL CHECKPOINT — AUTHORITATIVE
+
+## Repository and exact state
+
+- Repository: `hoho074566-cpu/lumencia-ac`
+- Remote URL: `https://github.com/hoho074566-cpu/lumencia-ac.git`
+- Remote branch/upstream: `codex/setup-payoff-memory-v1` / `origin/codex/setup-payoff-memory-v1`
+- Handoff-preparation code/docs HEAD: `790c8ebe584123b07df7d930cdf54a5c41aa689f`
+- Current main: `9de2b595555000dc462d3db67f4db5c9aff79750`
+- Merge-base: `9de2b595555000dc462d3db67f4db5c9aff79750`
+- At the handoff-preparation HEAD: main comparison ahead 10 / behind 0; upstream comparison ahead 0 / behind 0; worktree clean.
+- The documentation commit containing this checkpoint necessarily has a later SHA. The handing-off Work reports that final local/remote SHA separately after push and fetch verification.
+
+## PR and gate state
+
+- Related PR: #66 `Setup to Payoff Memory V1`.
+- State: open, non-draft, `merged=false`, mergeable/no conflict, but `mergeable_state=unstable` because required readiness is failing.
+- **MERGE FORBIDDEN. Do not merge or close PR #66 during this handoff.** It changes protected `api/**` and requires a person even after every gate becomes green.
+- Exact `790c8eb...` hosted state: Repository/Safety PASS; Vercel PASS; Lumensia Merge Readiness FAIL; fresh exact-head Codex review `5039221009` P0=0/P1=1.
+- Current authoritative P1 `3870426835`: payoff lifecycle validation runs before Scene Momentum time reconciliation. A compressed decision can retain choices while reconciliation clears `turn.director`, so the callback stays `open` and the player-owned continuation becomes unreachable.
+- Required follow-up corpus from prior docs-only head, not current review authority: P1 `3870285419` shows that an explicit failed payoff can resolve the callback while retry choices remain. No runtime change resolved it.
+- Two current P2 findings and older P2/P3 remain non-blocking backlog. Do not modify them for this checkpoint.
+
+## Completion boundary
+
+Completed:
+
+- Owned payoff continuation routing priority is structurally bounded below hard boundaries and above generic active combat only when callback, turn, presented option, and explicit selection ownership all match.
+- Existing canonical lifecycle phases are bound to a minimal canonical beat allowlist. Wrong/stale/resolved/unselected ownership and phase skipping remain fail-closed.
+- Focused tests, full repository regression, `git diff --check`, Repository/Safety, Vercel, and representative Exact Preview acceptance passed on the runtime code tree preserved by `790c8eb...`.
+- Exact Preview continued callback `rival-proof` through the original owned option and five further owned choices without 409, callback transfer, automatic resolution, or aftermath skipping.
+- Canon, player sovereignty, one canonical call, stable routing, `store:false`, prompt cache/retention, Context Router budgets, and META/AUTO/CONTINUE freeze remain intact.
+
+Incomplete/blocker:
+
+- P1 `3870426835` prevents merge and must not be hidden by the later documentation commit.
+- Retry-aware success/partial/failure lifecycle behavior from `3870285419` remains a separate lifecycle design requirement.
+- The single authorized bounded correction has been consumed. Do not extend this PR with new regex, wording exceptions, broad beat allowlists, parser work, model calls, TPP/time changes, or combat redesign. Resume implementation only with explicit authority for a separate bounded lifecycle remediation/design task.
+
+## Required environment variable names
+
+Record names only; never copy values into Git, logs, chat, or this handover.
+
+- Runtime/deployment: `OPENAI_API_KEY`, `OPENAI_MODEL_LUNA`, `OPENAI_MODEL_TERRA`, `OPENAI_PROMPT_CACHE_KEY`, `LUMENSIA_ACCESS_TOKEN`
+- Live acceptance when applicable: `LUMENSIA_LIVE_BASE_URL`, `LUMENSIA_LIVE_ACCESS_TOKEN`, `LUMENSIA_LIVE_TIMEOUT_MS`
+- Hosted automation is GitHub-managed: `CODEX_REVIEW_ACTORS`, `LUMENSIA_REQUIRED_CHECKS`; do not extract GitHub/Vercel secrets.
+
+## Phone Cloud Work NEXT ACTION
+
+1. Fetch `origin`, check out `codex/setup-payoff-memory-v1`, and verify local HEAD equals the final checkpoint SHA reported in the handoff response; confirm upstream ahead/behind 0/0 and PR #66 open/unmerged.
+2. Read `docs/IMPLEMENTATION_PROGRESS.md`, this section, repository `AGENTS.md`, and `scripts/tests/setup-payoff-memory-v1.test.mjs`. These are the only prior paths needed to resume the current task.
+3. Do not merge PR #66. Do not restart completed HF1/HF2, time/TPP, Active Threads, routing-priority, phase/beat, or already-passed Preview analysis.
+4. Before any code change, obtain or verify explicit authorization for a separate bounded lifecycle remediation addressing P1 `3870426835` and retry-resolution contract `3870285419`. Prefer structured lifecycle/state authority; do not infer from prose or add Korean wording regex.
+5. Preserve player sovereignty: never auto-select or auto-advance an important combat, relationship, irreversible, narrative, or other meaningful player choice.
+6. After any authorized fix: focused regression -> full `scripts/lumensia-pr-check.mjs` -> exact Preview -> Vercel/Safety -> fresh exact-current-HEAD Codex review. Protected paths remain human-merge only.
+
+---
+
 # GLOBAL P0/P1 CONTINUOUS FIX & REVIEW RULE — 상시 적용
 
 이 규칙은 Lumensia의 모든 구현·리뷰·수정 Phase에 계속 적용한다.
@@ -27,7 +85,7 @@ Repository: `hoho074566-cpu/lumencia-ac`
 
 ---
 
-# 0. PR #66 SETUP -> PAYOFF MEMORY V1 — P0/P1 CLOSED
+# 0. PR #66 SETUP -> PAYOFF MEMORY V1 — HISTORICAL PRE-BLOCKER CHECKPOINT
 
 - PR #65 is merged; current `origin/main` is `9de2b595555000dc462d3db67f4db5c9aff79750`. PR #66 branch `codex/setup-payoff-memory-v1` is based and merge-based on that main with behind 0.
 - Exact lifecycle code checkpoint `0426d472d3680a1985fb55ce1781719a7b1977ed` contains the authorized priority and lifecycle-contract corrections. A required schedule/hard boundary remains first; only an unresolved/reachable payoff whose stable ID, awaiting choice turn, presented option, and exact player selection all match may precede generic `ACTIVE_COMBAT_FIXED_FLOW`.
