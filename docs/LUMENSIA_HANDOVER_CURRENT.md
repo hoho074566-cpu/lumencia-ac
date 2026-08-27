@@ -42,7 +42,7 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Base main: `a95bf7e226c4f4e3bddc6cbff76eb116cc6a42c3` (PR #70 Phase 1 FREEZE merge).
 - Branch: `codex/p2-pr01-fate-start-foundation`.
 - Overall: `0 / 9 PR merged`; Terminal: `1 / 9 processed`; Deferred: `0`.
-- P2-PR01 Fate Start Foundation — **BLOCKED** at PR #71; last fresh-reviewed pre-terminal head is `4ec94966c6ed0a741cbd36275342c7e2015e937e`.
+- P2-PR01 Fate Start Foundation — **BLOCKED** at PR #71; last fresh-reviewed pre-terminal head is `2bc44270a7b05d612c473baf9b1df5ee9b06be1d`.
 - Queue insertion after P2-PR01 human merge: one latest-main Narrative Flavor Baseline bounded hotfix, then return to P2-PR02. The hotfix resolves completed user intent through its safe endpoint, replaces repeated meta choice prompts with world-native hooks, preserves explicit player limits, and covers the four required acceptance cases without implementing P2-PR09 or adding an engine/parser/lifecycle/save root.
 - P2-PR02 Origin / Starting Character — TODO.
 - P2-PR03 Character Consequences — TODO.
@@ -55,10 +55,10 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - P2-PR01 scope is bounded to the existing free/paste creator plus a separate Fate Start entry with male/female, commoner/fallen noble, the existing department choices, minimal additive creation state, and legacy save/load compatibility.
 - Do not add Procedural Origin, inheritance, NPC relationship changes, Personal Story, Ending/Fate Book, off-screen simulation, or any Phase 1 deferred correction in this PR.
 - Focused Fate Start/save/DEBUG/core tests, full repository regression, syntax/static, and `git diff --check` PASS. Local/remote implementation tree is `e2ee9f915e878bd0ae016e4ebd81deba7dfcd9ef`.
-- Current-head Safety `33077013269`, Vercel `CtggdyhCD8D9eXjjd3BbnY11zkxF`, fresh exact-head P0=0/P1=0 review, behind 0, and conflict-free mergeability PASS.
+- Current-head Safety `33079126915`, Vercel `psFFXWhsRZoRhEG8Xss45qa4fyUb`, fresh exact-head P0=0/P1=0 review, behind 0, and conflict-free mergeability PASS.
 - BLOCKER: after the Android client update, secure ChatGPT authentication succeeded and the protected Preview rendered. The `새 게임` action opened its native replacement confirmation, but the cloud browser controller then entered persistent CDP recovery timeouts; fresh-tab and documented handoff recovery failed before the dialog could be accepted. Exact Preview UI/persistence acceptance remains externally blocked rather than failed. This is not a structural code finding. Protected runtime/persistence paths remain human-merge-only.
 - ROOT_CAUSE_CLASS: **NONE**; CORRECTION_BUDGET: **0/1**; SCOPE_EXPANSION: **NO**.
-- PHASE_2_BACKLOG_CANDIDATE: P2 `3872135947` — a custom department appended by free-mode paste can be copied into the Fate selector and then rejected by the fixed Fate allowlist. Non-critical/rare; do not expand P2-PR01 to correct it during this implementation pass.
+- PHASE_2_BACKLOG_CANDIDATE: P2 `3872135947` — a custom department appended by free-mode paste can be copied into the Fate selector and then rejected by the fixed Fate allowlist. P2 `3872204510` — `/lib/fate-start.js` is omitted from the service-worker offline shell, so a fresh offline PWA launch can fail before the module is cached. Both remain non-blocking; do not expand P2-PR01 to correct them during this implementation pass.
 - PHASE1_DEFERRED_TOUCHED: **NO**.
 - NEXT ACTION: reconnect a fresh controllable authenticated browser to PR #71 Preview; verify free/paste controls, Fate mode female + fallen noble + magic department creation, INFO reflection, and reload persistence once. If PASS, close documentation and leave protected PR #71 for human expected-head merge. After the merge, run the Narrative Flavor Baseline bounded hotfix from latest main. P2-PR02 waits until that hotfix is MERGED or non-blocking DEFERRED.
 
