@@ -39,7 +39,18 @@ const save = (patch = {}) => ({
   assert.equal(JSON.stringify(before), snapshot, 'deriving active threads must never mutate authoritative save state');
   const auto = buildActiveThreadsDirective({ action: '[AUTO FLOW: PC 새 행동 없음]', saveState: before, mode: 'auto' });
   assert.equal(auto.mode, 'await-player', 'AUTO must fail closed at a player-owned active thread');
-  assert.match(auto.directive, /플레이어가 직접 답하기 전 AUTO/, 'the directive must preserve player sovereignty');
+  assert.match(auto.directive, /플레이어 응답 전 AUTO/, 'the directive must preserve player sovereignty');
+}
+
+{
+  const runningSchedule = { id: 'morning-class', title: '오전 필수 수업', date: '1285-03-01', time: '10:00', status: 'scheduled' };
+  const threads = deriveActiveThreads({ saveState: save({
+    sceneRuntime: { eventProgress: { eventInstanceId: 'morning-class#1285-03-01t10:00', activeBeat: 'lecture', paused: false } },
+    scheduleContext: { due: [runningSchedule], upcoming: [runningSchedule] },
+  }) });
+  assert.equal(threads.filter((thread) => /morning-class/.test(thread.id)).length, 1, 'a running scheduled occurrence must be one current-event thread, not a second schedule boundary');
+  assert.equal(threads[0].status, 'active-due', 'the coalesced current event must retain due-schedule authority');
+  assert.equal(threads[0].due_at, '1285-03-01T10:00', 'the coalesced current event must retain schedule timing metadata');
 }
 
 {
@@ -95,6 +106,20 @@ const routed = routeOpenAIParams({ instructions, input }, { incoming: { action: 
 assert.match(routed.params.input, /===== ACTIVE THREADS V1 =====/, 'the derived view must reach the existing canonical model context');
 assert.equal(routed.telemetry.active_threads_v1?.version, '1.0', 'router telemetry must expose the active-thread version');
 assert.equal(routed.telemetry.active_threads_v1?.count, 1, 'router telemetry must report the bounded thread count');
+
+{
+  const denseSave = save({
+    sceneRuntime: { turn_hook: { kind: 'player-choice', anchor: '중요한 선택 '.repeat(30), source: 'choices', status: 'awaiting-player', established_turn: 12 } },
+    activeEvents: Array.from({ length: 8 }, (_, index) => `장기 진행 사건 ${index} ${'상세 '.repeat(45)}`),
+    scheduleContext: { due: Array.from({ length: 3 }, (_, index) => ({ id: `dense-${index}-${'x'.repeat(80)}`, title: `필수 일정 ${index} ${'세부 '.repeat(45)}`, date: '1285-03-01', time: `1${index}:00` })), upcoming: [] },
+  });
+  const dense = buildActiveThreadsDirective({ action: '[AUTO FLOW: PC 새 행동 없음]', saveState: denseSave, mode: 'auto', maxChars: 1150 });
+  assert.ok(dense.directive.length <= 1150, 'dense directives must be structurally fitted before routing');
+  assert.match(dense.directive, /player_owned\/awaiting-player는 플레이어 응답 전 AUTO/, 'dense directives must retain the complete sovereignty rule');
+  const payload = dense.directive.match(/^THREADS=(.+)$/m)?.[1];
+  assert.doesNotThrow(() => JSON.parse(payload), 'dense thread payload must remain complete valid JSON');
+  assert.ok(dense.visible_threads >= 1, 'the top player boundary must survive dense compaction');
+}
 
 const routerSource = readFileSync(new URL('../../api/lib/context-router.js', import.meta.url), 'utf8');
 const coreSource = readFileSync(new URL('../../api/chat-router.js', import.meta.url), 'utf8');
