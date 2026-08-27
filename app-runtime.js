@@ -790,6 +790,12 @@ async function boot() {
       `import { createFreeCharacterCreation, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation } from '${location.origin}/lib/fate-start.js?v=156';`,
       'fate start import'
     );
+    source = replaceOnce(
+      source,
+      "import { createFateProgressionState, normalizeFateProgressionState } from './lib/fate-inheritance.js';",
+      `import { createFateProgressionState, normalizeFateProgressionState } from '${location.origin}/lib/fate-inheritance.js?v=156';`,
+      'fate inheritance import'
+    );
 
     source = replaceRegexOnce(
       source,
