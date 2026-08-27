@@ -128,6 +128,7 @@ assert.ok(routed.params.input.length<=9000,`inheritance routing exceeded the rou
 
 const moduleSource=readFileSync('lib/fate-inheritance.js','utf8');
 const appSource=readFileSync('app.js','utf8');
+const runtimeSource=readFileSync('app-runtime.js','utf8');
 const routerSource=readFileSync('api/lib/context-router.js','utf8');
 const coreSource=readFileSync('api/chat-router.js','utf8');
 assert.doesNotMatch(`${moduleSource}\n${routerSource}`,/responses\.create|chat\.completions|new OpenAI/,'P2-PR05 must not add a model call');
@@ -135,6 +136,13 @@ assert.equal((coreSource.match(/=>coreHandler\(/g)||[]).length,1,'the adapter mu
 assert.match(appSource,/fateProgression: createFateProgressionState\(\)/,'new and legacy saves must own the persistent cross-run ledger');
 assert.match(appSource,/base\.fateProgression=normalizeFateProgressionState\(save\.fateProgression\)/,'a new PC must retain prior-run progression');
 assert.match(appSource,/inheritance:base\.fateProgression/,'Fate generation must consume the persistent ledger');
+assert.match(runtimeSource,/"import \{ createFateProgressionState, normalizeFateProgressionState \} from '\.\/lib\/fate-inheritance\.js';"[\s\S]*?\/lib\/fate-inheritance\.js\?v=156[\s\S]*?'fate inheritance import'/,'the blob runtime must rewrite the inheritance module to an origin URL before import');
+assert.equal(knight.creation.fateStart.background.strengthProfile.band,'advanced_start','inherited final conditions must refresh the persisted start-strength band');
+const normalizedKnight=normalizeCharacterCreation(JSON.parse(JSON.stringify(knight.creation)));
+assert.equal(normalizedKnight.fateStart.background.strengthProfile.band,'advanced_start','the inherited start-strength band must survive creation normalization');
+const knightContext=routeOpenAIParams({instructions,input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}'},{incoming:{action:'기사과 신입 평가를 받는다.',saveState:{...saveState,creation:knight.creation,pc:knight.pc},recentTurns:[]},mode:'game'});
+assert.match(knightContext.params.input,/advanced_start/,'routed Background authority must use inherited final conditions');
+assert.doesNotMatch(knightContext.params.input,/foundation_start/,'routed Background authority must not retain the pre-inheritance beginner band');
 assert.doesNotMatch(moduleSource,/endingDialog|fateBookDialog|Ending UI/,'P2-PR05 must not implement the P2-PR08 Ending/Fate Book UI');
 
 console.log('fate-inheritance-progression: PASS');
