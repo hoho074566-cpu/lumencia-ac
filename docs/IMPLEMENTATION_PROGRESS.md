@@ -1,7 +1,7 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Narrative Engine continuation — PR #66 Setup -> Payoff Memory V1 lifecycle contract closed at P0/P1=0; final docs-only exact-head confirmation pending.
+Narrative Engine continuation — PR #66 Setup -> Payoff Memory V1 bounded lifecycle correction is complete, but a new exact-head lifecycle P1 keeps the PR closed-unmerged.
 
 ## Permanent P0/P1 Operation Rule
 - Current exact HEAD에 P0/P1이 남아 있는 동안 repository-authorized remediation 범위 안에서 수정·focused test·full regression·push·hosted gate·fresh exact-head review를 계속한다. 중간 보고·`MERGE_GATE: FAIL`·새 review·HEAD 변경만으로는 멈추지 않는다.
@@ -36,10 +36,13 @@ Narrative Engine continuation — PR #66 Setup -> Payoff Memory V1 lifecycle con
 - Focused Setup/Payoff, turn-hook, Scene Orchestration, Context Router, authority-tail, syntax/static checks, `git diff --check`, and full `scripts/lumensia-pr-check.mjs origin/main HEAD` PASS. Repository checks and Vercel are green for the code checkpoint.
 - Exact Preview PASS: the original owned option advanced 10:03→10:05 without 409, retained callback `rival-proof`, and offered the next meaningful combat choice. Five more exact player-owned selections continued through the same callback without mismatch or ownership transfer. The public exported checkpoint at turn 13 records the same stable ID as `opportunity`, `lastTurn=13`, canonical `payoff_opportunity` beat/phase, and the current three-choice turn hook.
 - The Preview did not fabricate resolution or skip directly to aftermath; it stopped at each real player decision with AUTO disabled. Temporary acceptance exports were removed after verification without inspecting browser protection state.
-- Current code/full/Preview/Vercel are PASS. Final fresh exact-docs-head Codex P0/P1 review and final merge-state revalidation remain; protected `api/**` keeps PR #66 human-merge only.
+- Current code/full/Preview/Vercel are PASS. Protected `api/**` keeps PR #66 human-merge only, but the exact-head lifecycle finding below prevents merge.
 - Fresh direct review `5038937933` on exact head `b4f1391ed7499a86a245daffb1e5b0aaa621a156` reports P0=0/P1=0. Its two findings are P2 only: a pre-existing 140-character turn-hook anchor can strand longer schema-valid choices, and pre-V1 non-ASCII callback IDs can be excluded by the stable-ID validator. Per closure scope both remain explicit backlog and receive no correction here.
 - Final gate revalidation on `b4f1391...`: current main/base/merge-base all equal `9de2b595555000dc462d3db67f4db5c9aff79750`, behind 0, mergeable true, no conflict, Repository checks PASS, Vercel PASS, and Merge Readiness PASS. Unresolved threads are either remediated prior-head P1s superseded by this fresh zero finding or non-blocking P2 backlog.
-- This final documentation commit changes no runtime behavior. Its exact HEAD requires only docs-head Vercel/fresh direct P0/P1 confirmation; if green, `MERGE_GATE: PASS` and the protected PR is ready for human merge with that exact expected HEAD.
+- Exact-head review `5039055319` / inline finding `3870285419` reports P1: an explicit failed payoff result can still satisfy the payoff-resolution validator, after which `app.js` resolves the callback even when the response retains a retry choice. That can strand a legitimate retry and is a new lifecycle semantics/transition issue, not the corrected phase-to-beat allowlist mismatch.
+- A later same-head clean issue comment conflicts with that concrete finding but no code change occurred between them. The repository readiness evaluator therefore correctly remains BLOCKED on the unresolved formal P1; it must not be treated as merge approval.
+- Per the user's one-correction closure budget, do not add another allowlist, semantic exception, or lifecycle patch in PR #66. Preserve the current fail-closed fallback and Exact Preview/regression evidence, keep PR #66 unmerged, and move any future Setup->Payoff lifecycle design into a separately authorized follow-up.
+- This documentation-only closure records the blocker and changes no runtime behavior.
 # HISTORICAL ARCHIVE — NON-ACTIONABLE
 
 The entries below preserve the former #54-#61 development/review chronology only. Their old P0/P1, blocker, MERGE_GATE, and NEXT ACTION wording is superseded by the authoritative closure above and must not restart time-engine work. PR #57 is now an included ancestor rather than an active branch.
@@ -646,8 +649,8 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 
 # NEXT ACTION — AUTHORITATIVE
 
-1. Commit/push this final docs-only checkpoint and rerun full repository regression on its exact HEAD.
-2. Require docs-head Vercel and fresh direct P0/P1=0. Do not add P2/P3 hardening.
-3. If green and main/base/merge-base/behind/conflict remain unchanged, report `MERGE_GATE: PASS` with the exact expected HEAD for human merge.
-4. Keep the two fresh P2 findings as non-blocking backlog; do not modify choice storage or legacy callback-ID compatibility in PR #66.
-5. If the same lifecycle/beat P1 returns, stop correction and retain fail-closed unmerged closure rather than widening the contract.
+1. Commit/push this blocker-only documentation checkpoint and rerun full repository regression on its exact HEAD.
+2. Keep PR #66 open or close it unmerged at the user's discretion; do not merge current tree while formal P1 `3870285419` remains unresolved.
+3. Do not perform another PR #66 correction. Preserve the bounded priority/phase-beat work and all Preview/regression evidence as follow-up corpus.
+4. Keep the two P2 findings as non-blocking backlog; do not modify choice storage or legacy callback-ID compatibility in PR #66.
+5. If Setup->Payoff Memory is resumed, start from an explicitly authorized separate lifecycle design task that distinguishes failed/partial/successful payoff resolution without widening beat allowlists or inferring prose.

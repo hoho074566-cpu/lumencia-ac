@@ -953,14 +953,14 @@ Fresh direct review `5037414704` on initial PR #61 exact head `4dc7f4f3768b4635e
 
 # 12. NEXT ACTION — CURRENT START POINT
 
-1. Commit/push this final docs-only checkpoint and run full regression on its exact HEAD.
-2. Require docs-head Vercel and fresh direct P0/P1=0; make no P2/P3 change.
-3. Reconfirm unchanged main/base/merge-base, behind 0, no conflict, Repository/Vercel/Merge Readiness.
-4. If green, notify the user that protected PR #66 may be human-merged at the exact expected docs HEAD.
-5. If the same lifecycle/beat P1 recurs, stop correction and retain fail-closed unmerged closure rather than widening the contract.
+1. Commit/push the blocker-only documentation checkpoint and run full regression on its exact HEAD.
+2. Keep PR #66 unmerged. Exact-head formal review `5039055319` / inline finding `3870285419` reports that an explicit failed payoff can still resolve its callback and strand a retained retry choice.
+3. Treat the later same-head clean issue comment as conflicting evidence, not as resolution: no code change occurred, and Merge Readiness remains BLOCKED on the concrete P1.
+4. Do not perform another PR #66 correction under the exhausted one-correction closure budget. Do not widen the phase/beat allowlist or add semantic/prose patches.
+5. Preserve the bounded priority/phase-beat code, Preview evidence, and regressions as follow-up corpus. Any retry-aware payoff resolution contract requires a separately authorized lifecycle design task.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> Read both progress documents first. PR #65 is merged and current main is `9de2b595...`. PR #66 code checkpoint `0426d472...` and reviewed docs head `b4f1391...` pass focused/full/Repository/Vercel/Preview with fresh direct P0/P1=0 and only two non-blocking P2s. Publish and confirm the final docs-only exact HEAD, then report the protected human-merge gate. Do not widen the allowlist or add P2/P3 hardening.
+> Read both progress documents first. PR #65 is merged and current main is `9de2b595...`. PR #66 code checkpoint `0426d472...` passes focused/full/Repository/Vercel/Preview, but exact-head formal review `5039055319` has unresolved P1 `3870285419`: explicit failed payoff resolution can close the callback while retaining a retry choice. A later clean issue comment did not follow a code change and does not resolve the concrete finding; Merge Readiness remains BLOCKED. The user authorized exactly one lifecycle-contract correction, so do not modify PR #66 again or merge it. Preserve the current evidence and require a separately authorized lifecycle design follow-up if Setup->Payoff work resumes.
