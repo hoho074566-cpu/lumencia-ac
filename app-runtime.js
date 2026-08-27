@@ -296,7 +296,7 @@ function zeroStateDeltaStable() {
 function compactStateStable() {
   return {
     id: save.id || '',
-    version: save.version, turnNumber: save.turnNumber, world: save.world, pc: save.pc,
+    version: save.version, turnNumber: save.turnNumber, world: save.world, creation: save.creation, pc: save.pc,
     relationships: save.relationships, intimacyStates: save.intimacyStates, npcStates: save.npcStates,
     emotionStates: save.emotionStates, activeEvents: save.activeEvents, completedEvents: save.completedEvents,
     pcKnowledge: save.pcKnowledge, memories: save.memories, hooks: save.hooks,

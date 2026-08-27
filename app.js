@@ -737,7 +737,7 @@ function rebuildRollingSummary() {
 
 function compactState() {
   return {
-    version: save.version, turnNumber: save.turnNumber, world: save.world, pc: save.pc, relationships: save.relationships, intimacyStates: save.intimacyStates, npcStates: save.npcStates,
+    version: save.version, turnNumber: save.turnNumber, world: save.world, creation: save.creation, pc: save.pc, relationships: save.relationships, intimacyStates: save.intimacyStates, npcStates: save.npcStates,
     emotionStates: save.emotionStates, activeEvents: save.activeEvents, completedEvents: save.completedEvents,
     pcKnowledge: save.pcKnowledge, memories: save.memories, hooks:save.hooks, scheduledEvents:save.scheduledEvents, scheduleContext:save.scheduleContext, director:save.director, flags: save.flags,
   };

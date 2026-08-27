@@ -81,8 +81,14 @@ assert.equal(nobleRoute.params.input.includes(noble.creation.fateStart.backgroun
 assert.notEqual(commonerRoute.params.input,nobleRoute.params.input,'same event must receive character-dependent context');
 
 const app=readFileSync('app.js','utf8');
+const runtime=readFileSync('app-runtime.js','utf8');
 const router=readFileSync('api/lib/context-router.js','utf8');
 assert.match(app,/startRoute\.arrivalFocus[\s\S]*startRoute\.eventMeaning[\s\S]*startRoute\.checkpoint/,'Fate creation must start from its persisted route');
+assert.match(app,/world: save\.world, creation: save\.creation, pc: save\.pc/,'base compact request must carry persistent creation state');
+const compactStateStableSource=runtime.match(/function compactStateStable\(\) \{[\s\S]*?\n\}/)?.[0];
+assert.ok(compactStateStableSource,'stable runtime compact request function is missing');
+const runtimePayload=Function('save',`${compactStateStableSource}; return compactStateStable();`)({id:'runtime-test',version:6,turnNumber:0,world:{},creation:commoner.creation,pc:commoner.pc,usage:{},qualityTelemetry:{}});
+assert.deepEqual(runtimePayload.creation,commoner.creation,'deployed stable runtime request must carry persistent Fate background state');
 assert.doesNotMatch(router,/rumor propagation|global epistemic|faction intelligence/i,'P2-PR03 must not add a generic knowledge/rumor engine');
 
 console.log('background-persistence-character-start: PASS');
