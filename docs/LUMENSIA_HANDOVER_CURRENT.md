@@ -27,6 +27,19 @@ Repository: `hoho074566-cpu/lumencia-ac`
 
 ---
 
+# 0. NPC SIGNIFICANCE EVALUATOR V1 — AUTHORITATIVE CURRENT TASK
+
+- PR #66 Setup -> Payoff Memory V1 is explicitly **deferred** at exact head `fbf2935c1229b8f16bed404b48c3cdf0abb95809`. Keep it open and unmerged; do not close it, mutate its Preview, or use it as the base of later work.
+- The approved failure-outcome propagation correction on #66 passed focused A-I, full repository regression, `scripts/lumensia-pr-check.mjs`, Exact Preview, Safety, and Vercel. Later P1 `3871077298` is a distinct schedule-reconciliation loss of an already validated/resolved payoff receipt. Do not correct or generalize that lifecycle problem in #66.
+- The active branch is `codex/npc-significance-evaluator-v1`, created directly from verified main `9de2b595555000dc462d3db67f4db5c9aff79750`; it contains no PR #66 commit.
+- V1 is intentionally small: the canonical model semantically chooses zero or one foreground primary plus zero or one directly causal support using the existing `director.spotlight_keys` receipt. The eligible boundary is the routed canonical `relevantNpcKeys`. Deterministic code only validates membership, uniqueness, the 1+1 cap, and META/CONTINUE/unanswered-player-boundary freeze.
+- No deterministic significance score, Korean wording classifier/regex, new save root, lifecycle phase, callback system, model call, parser expansion, generic NPC simulation engine, or automatic player choice exists in this task.
+- Focused NPC Significance, Context Router, authority-tail, Scene Orchestration, NPC Goal/Relationship, Director/world-result, Active Threads, CONTINUE, save migration, and core-invariant tests pass. Full repository regression passes.
+- The one permitted bounded correction was consumed after the first reserved-input directive displaced USER ACTION at the minimum adaptive routine budget. The final form keeps the semantic contract in the preserved Router/Core instruction rule and sends candidates through the already-authoritative routed state, restoring both action head and final predicate.
+- NEXT ACTION: substantive second review, commit/publish, separate main-target PR, Safety/Vercel, and fresh exact-head Codex review. Any structural P1 now stops the task without another correction. Never return to PR #66 from this branch.
+
+---
+
 # 0. ACTIVE THREADS V1 POST-MERGE CLOSURE — AUTHORITATIVE
 
 - PR #64 `Active Threads V1`은 reviewed exact head `4727a468f15c0f8e2990c4ae55cb688e12cc5ec6`에서 사람 병합됐다. 최신 `origin/main`은 merge commit `609c2bc0e4dd7931156687c32e59ed2ed2f28fa6`다.
@@ -803,8 +816,8 @@ Longer roadmap:
 - Consequence Queue / Lifetime
 - Active Threads
 - Reputation / faction-social propagation
-- Setup -> Payoff memory
-- NPC significance / relationship thresholds / knowledge boundaries
+- Setup -> Payoff memory — deferred in PR #66; do not resume from that branch
+- NPC significance — active bounded V1 / relationship thresholds and knowledge boundaries remain later separate tasks
 - NPC-vs-NPC conflict
 - Fail Forward
 - Off-screen World Progression expansion
@@ -939,14 +952,14 @@ Fresh direct review `5037414704` on initial PR #61 exact head `4dc7f4f3768b4635e
 
 # 12. NEXT ACTION — CURRENT START POINT
 
-1. Fetch and verify the latest `origin/main`, then begin **Setup -> Payoff Memory V1** on a separate focused branch; do not reopen Adaptive Time/TPP/Narrative Time or Active Threads P2 hardening.
-2. First perform a read-only inventory of existing hooks, Director callbacks, event consequence sources, visible world-result facts, recent-turn memory, event progress/completion, and routed context. Identify which existing authority can represent a setup, its public knowledge boundary, payoff eligibility, and terminal consumption without a parallel save root.
-3. Produce a bounded design for setup registration, deterministic payoff eligibility/priority, once-only consumption, expiry/cancellation, player-choice protection, secret/canon boundaries, routing budget, and META/AUTO/CONTINUE behavior. Prefer existing hook/callback/event IDs and evidence over free-form narration inference.
-4. Preserve one canonical model call, stable routing, `store:false`, prompt cache/retention, Context Router budgets, save compatibility, canon, and player sovereignty. Do not make the model invent a payoff merely because a setup is old; uncertain or hidden ownership fails closed.
-5. Add focused permanent regressions before implementation: setup survives unrelated turns, payoff requires causal evidence and PC visibility, consumed/cancelled setup does not replay, unrelated hooks do not fire, meaningful payoff choice stops AUTO, and META/CONTINUE remain frozen. Then run full repository regression and hosted exact-head review/Preview on the focused PR.
+1. Preserve PR #66 at its deferred blocker. Do not merge/close it, mutate its Preview, fix P1 `3871077298`, or use `codex/setup-payoff-memory-v1` as a base.
+2. Continue **NPC Significance Evaluator V1** only on `codex/npc-significance-evaluator-v1`, based on main `9de2b595...`.
+3. Keep scope to the existing model-owned `director.spotlight_keys` semantic receipt: at most one primary and one causal support from routed canonical NPCs. Deterministic code owns only membership/cap/freeze invariants.
+4. Preserve one canonical model call, stable routing/Core/Director/Orchestration, `store:false`, prompt cache/retention, Context Router budgets, saves, canon, NPC autonomy, and player sovereignty. Add no score engine, natural-language regex, save root, lifecycle, parser, relationship threshold, knowledge-boundary system, or generic NPC simulation.
+5. Publish the tested code/docs, open a separate main-target PR, and require Safety, Vercel, full regression, and fresh exact-head Codex review. The one bounded correction is already consumed; any structural P1 stops this task without another iteration.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> Read both progress documents first. PR #64 merged reviewed Active Threads head `4727a468...` as main `609c2bc...`; reviewed and merged trees are identical and production/full regression/runtime acceptance pass. Active Threads V1 and the PR #62 time stack are completed foundations. PR #59/#60 remain closed-unmerged. Do not continue time-engine or Active Threads P2 hardening. The current Narrative Engine NEXT ACTION is Setup -> Payoff Memory V1, beginning with read-only reuse analysis of existing hook/callback/event/consequence/memory authority and no parallel save root or second model call.
+> Read both progress documents first. PR #66 Setup -> Payoff Memory V1 is deferred at `fbf2935c...` because distinct lifecycle P1 `3871077298` remains after its approved correction; do not touch, merge, close, Preview-mutate, or base new work on it. Current main is `9de2b595...`. Continue NPC Significance Evaluator V1 only on the separate main-based branch: model-semantic primary/support selection through existing `director.spotlight_keys`, deterministic routed-key/1+1/freeze bounds, no score/regex/save-root/lifecycle/second-call expansion. The correction budget is consumed; any fresh structural P1 stops the task.
