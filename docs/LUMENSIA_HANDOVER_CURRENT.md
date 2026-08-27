@@ -320,7 +320,7 @@ This means:
 
 ---
 
-# 1. PROJECT / ARCHITECTURE INVARIANTS
+## 1. PROJECT / ARCHITECTURE INVARIANTS
 
 Lumensia Academy is a mobile/PWA long-running AI RPG. The player owns PC decisions; the model is GM + independent world simulator.
 
@@ -346,7 +346,7 @@ Context Router target / soft budgets:
 
 ---
 
-# 2. PLAYER SOVEREIGNTY / WORLD SIMULATION
+## 2. PLAYER SOVEREIGNTY / WORLD SIMULATION
 
 Aaa is PC placeholder, not NPC.
 
@@ -380,7 +380,7 @@ Combat/growth:
 
 ---
 
-# 3. MERGE / AUTOMATION SAFETY — MUST NOT BE WEAKENED
+## 3. MERGE / AUTOMATION SAFETY — MUST NOT BE WEAKENED
 
 Review-race lessons from prior handovers:
 - generic PR reaction/timestamp is not current-review authority;
@@ -409,7 +409,7 @@ Past sticky `Lumensia Merge Readiness` states have contradicted direct live revi
 
 ---
 
-# 4. CURRENT MERGED FOUNDATION
+## 4. CURRENT MERGED FOUNDATION
 
 Already in main before PR #33:
 - PLAYER ACTION COMMIT
@@ -432,7 +432,7 @@ Asset truth:
 
 ---
 
-# 5. PR #33 — SCENE MOMENTUM RECOVERY HF1
+## 5. PR #33 — SCENE MOMENTUM RECOVERY HF1
 
 Goal:
 
@@ -505,7 +505,7 @@ Always preserve:
 
 ---
 
-# 6. IMPORTANT IMPLEMENTATION / FIX COMMITS
+## 6. IMPORTANT IMPLEMENTATION / FIX COMMITS
 
 ### Base integration/test point
 `df382f3b0ab91b97f8f88f2b50667aa4b5553892`
@@ -574,7 +574,7 @@ BUT this exact head's final Codex review found the new P1 below, so it is not me
 
 ---
 
-# 7. FINAL-REVIEW P1 — FIXED IN CURRENT CANDIDATE
+## 7. FINAL-REVIEW P1 — FIXED IN CURRENT CANDIDATE
 
 ## P1: Reserve Scene Momentum directive under input pressure
 Thread: `PRRT_kwDOT8LCAs6biXWm`  
@@ -632,7 +632,7 @@ Additional mode regressions prove CONTINUE retains `INTENT=continue-freeze` and 
 
 ---
 
-# 8. REVIEW STATE AT HANDOVER
+## 8. REVIEW STATE AT HANDOVER
 
 PR #33 final authority and merge:
 - exact reviewed HEAD `216bef1d51b72f2edb6da3f06c69e02aa45b5b10`;
@@ -688,7 +688,7 @@ Fresh review `PRR_kwDOT8LCAs8AAAABKkKXOQ` on exact head `acab3594c784fdd3b93a32f
 
 ---
 
-# 9. PERMANENT TEST COVERAGE
+## 9. PERMANENT TEST COVERAGE
 
 HF1-specific permanent suites:
 - `scripts/tests/context-router-authority-tail.test.mjs`
@@ -711,7 +711,7 @@ Last green hosted evidence before this docs-only handover update:
 
 ---
 
-# 10. DO NOT BREAK
+## 10. DO NOT BREAK
 
 Runtime/API:
 1. exactly one canonical core/model call per normal turn;
@@ -766,7 +766,7 @@ Merge safety:
 
 ---
 
-# 11. AFTER HF1 MERGE — NEXT NARRATIVE PHASE
+## 11. AFTER HF1 MERGE — NEXT NARRATIVE PHASE
 
 HF1 merge is not Narrative completion. Do not restart HF1 diagnosis after it merges.
 
@@ -813,7 +813,7 @@ Gameplay roadmap discussed:
 
 ---
 
-# PR #57 PHASE 3 — LATEST P0/P1 CLOSURE CYCLE
+## PR #57 PHASE 3 — LATEST P0/P1 CLOSURE CYCLE
 
 Fresh direct review `PRR_kwDOT8LCAs8AAAABK_AqZQ` on exact docs head `3626be33a22fa257004db9404b2abc457146f7ed` found P0=0 / P1=6:
 - completion evidence before a same-sentence choice clause was discarded;
@@ -903,7 +903,7 @@ The signed-in Exact Preview corpus is complete for Phase 3. The required-schedul
 
 ---
 
-# PR #60 BOUNDED CLOSURE / SAFE NARRATIVE TIME POLICY FOLLOW-UP
+## PR #60 BOUNDED CLOSURE / SAFE NARRATIVE TIME POLICY FOLLOW-UP
 
 - PR #60 final exact head `1a623867ec58fb1fd7dbba1a644efa889a24524f` passed local focused/full regression, Vercel, and representative Preview movement, but the final fresh review found direct P0=0/P1=2.
 - P1 #1: `1시간 훈련하고 기숙사로 가서 게시판을 확인한다.` was reduced to the travel profile, so the preceding one-hour training and an intervening schedule boundary could be lost.
@@ -927,7 +927,7 @@ Fresh direct review `5037414704` on initial PR #61 exact head `4dc7f4f3768b4635e
 # 12. NEXT ACTION — CURRENT START POINT
 
 1. Fetch and verify the latest `origin/main`, then continue Active Threads V1 on its focused branch/PR; do not branch from a fixed historical SHA and do not reopen Adaptive Time/TPP/Narrative Time work.
-2. First perform a read-only inventory of existing `activeEvents`, unresolved hooks, scheduled events, world arcs, Director callbacks, and `eventProgress`. Reuse them rather than adding a parallel save root.
+2. First perform a read-only inventory of existing `activeEvents`, unresolved hooks, scheduled events, world arcs, Director callbacks, `sceneRuntime.eventProgress`, paused `sceneRuntime.eventProgressByInstance`, and `completedEvents`. Reuse them rather than adding a parallel save root; cover pause/resume and completed-occurrence suppression in lifecycle tests.
 3. Define a bounded canonical thread view that ranks only already-authoritative unresolved story pressure, keeps player choice and event completion semantics intact, and adds no model call. Gate every entry by PC knowledge/visibility; omit L5/player-hidden canon, mask `secret_level >= 3` causes, and add permanent leakage tests for hidden consequence/world-arc material.
 4. Implement Active Threads in a separate focused branch/PR after the analysis plan. Preserve canon, one-call routing, existing save compatibility, and all freeze modes.
 5. Keep the four PR #62 P2 findings and closed #59/#60 semantic corpus as backlog; they are not Active Threads scope.
@@ -936,4 +936,4 @@ Fresh direct review `5037414704` on initial PR #61 exact head `4dc7f4f3768b4635e
 
 # NEW CHAT START INSTRUCTION
 
-> Read both progress documents first. PR #62 merged reviewed time stack head `c58ce40...` as main `113cd14...`; reviewed and merged trees are identical and production/full regression pass. PR #54/#55/#56/#57/#58/#61 are integrated/superseded and closed. PR #59/#60 remain closed-unmerged with zero exclusive commits in main. Do not continue time-engine hardening. The current Narrative Engine NEXT ACTION is Active Threads V1, beginning with read-only reuse analysis of existing event/hook/schedule/arc/callback/progress authority and no parallel save root or second model call.
+> Read both progress documents first. PR #62 merged reviewed time stack head `c58ce40...` as main `113cd14...`; reviewed and merged trees are identical and production/full regression pass. PR #54/#55/#56/#57/#58/#61 are integrated/superseded and closed. PR #59/#60 remain closed-unmerged with zero exclusive commits in main. Do not continue time-engine hardening. The current Narrative Engine NEXT ACTION is Active Threads V1, beginning with read-only reuse analysis of existing event/hook/schedule/arc/callback/current-and-paused-progress/completed-event authority and no parallel save root or second model call.

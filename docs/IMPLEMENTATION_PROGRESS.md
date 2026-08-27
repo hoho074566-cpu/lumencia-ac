@@ -626,7 +626,7 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 # NEXT ACTION — AUTHORITATIVE
 
 1. Treat Event Consequence V1 as the completed Consequence Queue/Lifetime roadmap item and begin Active Threads V1.
-2. Inventory existing `activeEvents`, unresolved hooks, scheduled events, world arcs, Director callbacks, and `sceneRuntime.eventProgress`; do not create a duplicate authoritative save root.
+2. Inventory existing `activeEvents`, unresolved hooks, scheduled events, world arcs, Director callbacks, `sceneRuntime.eventProgress`, paused `sceneRuntime.eventProgressByInstance`, and `completedEvents`; do not create a duplicate authoritative save root. Lifecycle regressions must cover pause/resume and completed-occurrence suppression.
 3. Produce a bounded design for a derived/canonical active-thread view, deterministic ordering and relevance, lifecycle removal, routing budget, player-choice protection, and META/AUTO/CONTINUE behavior.
 4. Implement only after that read-only plan on a separate focused branch. Add no model call, canon expansion, time-system hardening, or incompatible save migration.
 5. Validate with focused lifecycle/routing/freeze tests and full repository regression before hosted review/Preview.
