@@ -7,6 +7,7 @@ import {
   buildSetupPayoffDirective,
   deriveSetupPayoffPlan,
   reconcileSetupPayoffTurn,
+  restoreSetupPayoffOpportunity,
 } from '../../lib/setup-payoff-memory.js';
 import { routeOpenAIParams } from '../../api/lib/context-router.js';
 
@@ -125,11 +126,79 @@ for (const mode of ['meta', 'auto', 'continue']) {
   const payoff = turn({callback_key:'rival-proof',callback_phase:'payoff',beat:'payoff'});
   assert.equal(reconcileSetupPayoffTurn({saveState:offered,turn:payoff,plan:offeredPlan}).status, 'resolved', 'the exact owned opportunity may resolve after the player acts');
 
+  const failedPayoff = turn(
+    {callback_key:'rival-proof',callback_phase:'payoff',beat:'payoff'},
+    {resolution_log:{triggered:true,outcome:'failure',summary:'유효타에 실패했다.',abilities:[]},choices:['간격을 다시 잡고 재도전한다.']},
+  );
+  const failedResult = reconcileSetupPayoffTurn({saveState:offered,turn:failedPayoff,plan:offeredPlan});
+  assert.equal(failedResult.status, 'opportunity', 'an explicit failed payoff must remain a player-owned opportunity');
+  assert.equal(failedResult.reason, 'owned-payoff-failure-retry');
+  assert.equal(failedPayoff.director.callback_phase, 'payoff_opportunity', 'failure must not persist a resolved callback phase');
+  assert.equal(failedPayoff.director.beat, 'payoff_opportunity', 'the retained retry must use the existing canonical opportunity beat');
+  assert.equal(failedPayoff.director.callback_key, 'rival-proof');
+
+  const failedWithoutRetry = turn(
+    {callback_key:'rival-proof',callback_phase:'payoff',beat:'payoff'},
+    {resolution_log:{triggered:true,outcome:'failure',summary:'유효타에 실패했다.',abilities:[]}},
+  );
+  const failedWithoutRetryResult = reconcileSetupPayoffTurn({saveState:offered,turn:failedWithoutRetry,plan:offeredPlan});
+  assert.equal(failedWithoutRetryResult.reason, 'payoff-failure-requires-retry-choice', 'failure without a new player boundary must fail closed instead of resolving');
+  assert.equal(failedWithoutRetryResult.reject_turn, true);
+
+  const partialPayoff = turn(
+    {callback_key:'rival-proof',callback_phase:'payoff',beat:'payoff'},
+    {resolution_log:{triggered:true,outcome:'partial',summary:'조건 일부를 증명했다.',abilities:[]}},
+  );
+  assert.equal(reconcileSetupPayoffTurn({saveState:offered,turn:partialPayoff,plan:offeredPlan}).status, 'resolved', 'a structured partial success may complete the owned payoff');
+
   const legacyCase = save({sceneRuntime:{participants:['lena'],turn_hook:payoffBoundary(9)},director:{callbacks:[callback({key:'Rival-Proof',status:'opportunity'})]}});
   const legacyPlan = deriveSetupPayoffPlan({saveState:legacyCase,action:payoffChoice,reachableNpcKeys:['lena']});
   const legacyPayoff = turn({callback_key:'rival-proof',callback_phase:'payoff',beat:'payoff'});
   assert.equal(reconcileSetupPayoffTurn({saveState:legacyCase,turn:legacyPayoff,plan:legacyPlan}).status, 'resolved');
   assert.equal(legacyPayoff.director.callback_key, 'Rival-Proof', 'accepted transitions must retain the persisted exact key so the existing frontend row is updated instead of duplicated');
+}
+
+{
+  const acceptedDirector = {
+    intervention:'medium', beat:'payoff_opportunity', event_kind:'rivalry', spotlight_keys:['lena'],
+    callback_key:'rival-proof', callback_phase:'payoff_opportunity', callback_note:null, reason:'test',
+  };
+  const rewritten = {director:null,choices:['간격을 다시 잡고 재도전한다.']};
+  assert.equal(restoreSetupPayoffOpportunity({
+    turn:rewritten,
+    lifecycle:{status:'opportunity',callback_key:'rival-proof'},
+    acceptedDirector,
+    acceptedChoices:['간격을 다시 잡고 재도전한다.'],
+  }), true, 'a final time rewrite must restore accepted callback ownership when the exact player choice survives');
+  assert.equal(rewritten.director.callback_key, 'rival-proof');
+  assert.equal(rewritten.director.callback_phase, 'payoff_opportunity');
+
+  const unrelatedRewrite = {director:null,choices:['수업으로 돌아간다.']};
+  assert.equal(restoreSetupPayoffOpportunity({
+    turn:unrelatedRewrite,
+    lifecycle:{status:'opportunity',callback_key:'rival-proof'},
+    acceptedDirector,
+    acceptedChoices:['간격을 다시 잡고 재도전한다.'],
+  }), false, 'an unrelated rewritten choice cannot inherit payoff ownership');
+  assert.equal(unrelatedRewrite.director, null);
+
+  const partialRewrite = {director:null,choices:['간격을 다시 잡고 재도전한다.']};
+  assert.equal(restoreSetupPayoffOpportunity({
+    turn:partialRewrite,
+    lifecycle:{status:'opportunity',callback_key:'rival-proof'},
+    acceptedDirector,
+    acceptedChoices:['간격을 다시 잡고 재도전한다.','거리를 벌리고 상황을 본다.'],
+  }), false, 'a partially replaced choice boundary cannot inherit payoff ownership');
+  assert.equal(partialRewrite.director, null);
+
+  const conflictingRewrite = {director:{callback_key:'other-proof',callback_phase:'payoff_opportunity'},choices:['간격을 다시 잡고 재도전한다.']};
+  assert.equal(restoreSetupPayoffOpportunity({
+    turn:conflictingRewrite,
+    lifecycle:{status:'opportunity',callback_key:'rival-proof'},
+    acceptedDirector,
+    acceptedChoices:['간격을 다시 잡고 재도전한다.'],
+  }), false, 'a different final callback owner cannot be overwritten');
+  assert.equal(conflictingRewrite.director.callback_key, 'other-proof');
 }
 
 const instructions = `
@@ -182,6 +251,8 @@ const appSource = readFileSync(new URL('../../app.js', import.meta.url), 'utf8')
 assert.doesNotMatch(routerSource, /responses\.create|chat\.completions|new OpenAI/, 'Setup -> Payoff routing must not add a model call');
 assert.equal((adapterSource.match(/=>coreHandler\(/g) || []).length, 1, 'the adapter must retain one canonical core call');
 assert.match(adapterSource, /reconcileSetupPayoffTurn/, 'the returned semantic transition must pass the deterministic validator before persistence');
+assert.ok((adapterSource.match(/reconcileSetupPayoffTurn/g) || []).length >= 3, 'the adapter must validate before and after final time reconciliation');
+assert.ok(adapterSource.lastIndexOf('restoreSetupPayoffOpportunity') > adapterSource.indexOf('const sceneIntent=applySceneMomentumTimeFloor'), 'accepted opportunity ownership must be restored only after the final time rewrite');
 assert.match(adapterSource, /setupPayoffLifecycle\.reject_turn[\s\S]*SETUP_PAYOFF_LIFECYCLE_REJECTED/, 'a rejected payoff must fail the complete response before its narration or state delta can persist');
 assert.match(appSource, /callback_phase[\s\S]*payoff_opportunity[\s\S]*payoff[\s\S]*resolved/, 'V1 must reuse the existing callback lifecycle instead of adding a save root');
 assert.doesNotMatch(adapterSource, /setupPayoffMemory\s*=|setup_payoff_memory_add/, 'V1 must not create parallel persistent setup authority');

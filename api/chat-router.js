@@ -26,7 +26,7 @@ import { compactAwakeningTalentTelemetry, deriveAwakeningTalentState } from '../
 import { compactCombatGrowthTelemetry, deriveCombatGrowthState } from '../lib/combat-growth.js';
 import { deriveSceneOrchestrationState } from '../lib/scene-orchestration.js';
 import { deriveWorldResultSurfaceState } from '../lib/world-result-surfacing.js';
-import { reconcileSetupPayoffTurn } from '../lib/setup-payoff-memory.js';
+import { reconcileSetupPayoffTurn, restoreSetupPayoffOpportunity } from '../lib/setup-payoff-memory.js';
 
 export const config = { maxDuration: 300 };
 
@@ -1063,8 +1063,9 @@ export default async function handler(req,res){
     if(mode==='meta'){if(data.turn?.state_delta){data.turn.state_delta.stat_progress=[];data.turn.state_delta.skill_experience=[];data.turn.state_delta.skill_learning=[];data.turn.state_delta.awakening_progress=[];data.turn.state_delta.talent_evolution=[];}const pipeline={pipeline:'meta-full-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,event_director_v3:telemetry?.event_director_v3||null,event_director_v3_enabled:true,world_result_surface:null,world_result_surfacing_v1:true,adaptive_time_scale_version:ADAPTIVE_TIME_SCALE_VERSION,adaptive_time_scale_v2:true,scene_orchestration:telemetry?.scene_orchestration||null,scene_orchestration_v1:true,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true,faction_social_v1:true,combat_growth_v2:true,skill_learning_v1:true,awakening_talent_v1:true};data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);}
     applyExtendedExpressions(data.turn,incoming0.saveState||{});
     data.turn.choices=filterTurnHookChoices(incoming.action,{...data.turn,choices:freshChoices(incoming.action,data.turn)});
-    const setupPayoffLifecycle=reconcileSetupPayoffTurn({saveState:incoming.saveState,turn:data.turn,mode,plan:telemetry?.setup_payoff_memory_v1?.plan});
+    let setupPayoffLifecycle=reconcileSetupPayoffTurn({saveState:incoming.saveState,turn:data.turn,mode,plan:telemetry?.setup_payoff_memory_v1?.plan});
     if(setupPayoffLifecycle.reject_turn){const error=new Error(`Setup/payoff lifecycle rejected: ${setupPayoffLifecycle.reason}`);error.status=409;error.code='SETUP_PAYOFF_LIFECYCLE_REJECTED';throw error;}
+    const setupPayoffOpportunityAuthority=setupPayoffLifecycle.status==='opportunity'?{director:clone(data.turn.director),choices:array(data.turn.choices).map(choice=>String(choice||''))}:null;
     const growthIntent=classifySceneIntent(incoming0.action||'',{location:incoming.saveState?.world?.location||'',currentTime:incoming.saveState?.world?.time||'',currentDate:incoming.saveState?.world?.date||'',currentWeekday:incoming.saveState?.world?.weekday||'',actorName:incoming.saveState?.pc?.name||'',resumeTimedAction:incoming.saveState?.sceneRuntime?.timed_action}),zeroElapsedRange=array(growthIntent.explicitDurationRangeMinutes).length===2&&growthIntent.explicitDurationRangeMinutes.every(value=>Number(value)===0),zeroElapsedIntent=mode==='game'&&(growthIntent.explicitDurationMinutes===0||zeroElapsedRange)&&Number(growthIntent.minAdvanceMinutes||0)<=0,growthAllowed=mode==='game'&&!zeroElapsedIntent,growthValidationScene=data.turn?.scene;
     if(data.turn?.state_delta)replaceStructuredEffectRows(data.turn,'skill_experience',mode==='auto'?[]:filterExistingSkillExperience(structuredEffectRows(data.turn,'skill_experience'),incoming0.saveState?.pc?.skills));
     const combatGrowthState=deriveCombatGrowthState({
@@ -1110,6 +1111,9 @@ export default async function handler(req,res){
     const {visible_scene:consequenceVisibleScene,...consequenceEffects}=consequenceNpcEffectsForShortening(data.turn,selectedConsequence,telemetry?.event_director_v2?.event_consequence_npc_keys),consequenceLifecycleBase=reconcileEventConsequenceLifecycle({saveState:incoming.saveState,turn:data.turn,selectedConsequence});
     const consequenceLifecycle={...consequenceLifecycleBase,...consequenceEffects};
     const sceneIntent=applySceneMomentumTimeFloor({...incoming0,saveState:incoming.saveState,action:incoming0.action||''},data.turn,mode,consequenceLifecycle,consequenceVisibleScene,{director_occurrence_id:telemetry?.event_director_v2?.occurrence_id,choice_event_ids:resumableIds});
+    if(setupPayoffOpportunityAuthority)restoreSetupPayoffOpportunity({turn:data.turn,lifecycle:setupPayoffLifecycle,acceptedDirector:setupPayoffOpportunityAuthority.director,acceptedChoices:setupPayoffOpportunityAuthority.choices});
+    setupPayoffLifecycle=reconcileSetupPayoffTurn({saveState:incoming.saveState,turn:data.turn,mode,plan:telemetry?.setup_payoff_memory_v1?.plan});
+    if(setupPayoffLifecycle.reject_turn){const error=new Error(`Setup/payoff lifecycle rejected after time reconciliation: ${setupPayoffLifecycle.reason}`);error.status=409;error.code='SETUP_PAYOFF_LIFECYCLE_REJECTED';throw error;}
     let timePlan;try{timePlan=parseTimePlan(incoming0.action||'',{location:incoming.saveState?.world?.location||'',currentTime:incoming.saveState?.world?.time||'',currentDate:incoming.saveState?.world?.date||'',currentWeekday:incoming.saveState?.world?.weekday||'',actorName:incoming.saveState?.pc?.name||''});}catch{timePlan={version:TIME_PLAN_PARSER_VERSION,mode:'shadow',clauses:[],diagnostics:['shadow-parser-error']};}const timePlanTelemetry=summarizeTimePlan(timePlan,sceneIntent);
     let persistedCombatGrowthState=combatGrowthState,persistedSkillLearningState=skillLearningState,persistedAwakeningTalentState=awakeningTalentState;
     if(data.turn?.state_delta&&(data.turn.state_delta.stat_progress!==combatGrowthState.accepted_stat_progress||data.turn.state_delta.skill_experience!==combatGrowthState.accepted_skill_experience)){
