@@ -1,6 +1,6 @@
 import { ASSETS } from './assets.js';
 import { migrateLegacyNpcKeys } from './save-migrations.js';
-import { createFateCharacterCreation, createFreeCharacterCreation, fateStartLabels, normalizeCharacterCreation } from './lib/fate-start.js';
+import { createFreeCharacterCreation, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation } from './lib/fate-start.js';
 
 const APP_VERSION = '1.4.8';
 const SAVE_KEY = 'lumensia.save.v1';
@@ -499,8 +499,10 @@ function renderInfo() {
     .join(', ') || '-';
   const skills = Object.entries(save.pc.skills || {}).map(([k,v]) => `${k} ${v.grade}`).join(' | ') || '-';
   const stats = Object.entries(save.pc.stats || {}).map(([k,v]) => `- ${k}: ${v.grade} [${v.progress}/100]`).join('\n');
+  const fateOrigin=save.creation?.mode==='fate'?save.creation?.fateStart?.origin:null;
+  const fateStory=Array.isArray(fateOrigin?.originStory)?fateOrigin.originStory.join('\n'):'';
   $('infoContent').textContent = `PC: ${save.pc.name} (${save.pc.age}세 / ${save.pc.gender})
-출신: ${save.pc.origin || '-'} | 신분: ${save.pc.socialStatus || '-'} | 입학: ${save.pc.admission || '-'}
+출신: ${save.pc.origin || '-'} | 신분: ${save.pc.socialStatus || '-'} | 입학: ${save.pc.admission || '-'}${fateStory?`\n운명 배경:\n${fateStory}\n---------`:''}
 경지: ${save.pc.realm} | 소속: 루멘시아 아카데미\n---------\n직위: ${save.pc.department} | 상황: 🟢\n---------\n스킬: ${skills}\n---------\n스탯:\n${stats}\n---------\n🔮[魔] ${save.pc.talents.magic} | ⚔️[武] ${save.pc.talents.martial} | 🌟[魂] ${save.pc.talents.soul} | 📘[智] ${save.pc.talents.knowledge}\n---------\n상태: ${save.pc.status} | 피로 ${save.pc.fatigue}/100\n💼: ${(save.pc.inventory||[]).join(', ') || '-'} | 금화 ${save.pc.gold}G\n관계: ${rel}\n친밀도(성인모드): ${intimacy}\n---------\n진행 사건: ${save.activeEvents.join(', ') || '-'}\n토큰 누적: 입력 ${save.usage.inputTokens || 0} / 캐시 ${save.usage.cachedTokens || 0} / 출력 ${save.usage.outputTokens || 0} / 추론 ${save.usage.reasoningTokens || 0}\n직전 턴: 입력 ${save.usage.lastInputTokens || 0} / 출력 ${save.usage.lastOutputTokens || 0} / 캐시 적중 ${Math.round(Number(save.usage.lastCacheHitRate || 0)*100)}% / 비용 $${Number(save.usage.lastTurnUsd || 0).toFixed(4)}\n누적 API 비용(추정): $${Number(save.usage.estimatedUsd || 0).toFixed(4)}\n영구 타임라인: ${save.timeline?.length || 0}건 | NPC 감정상태: ${Object.keys(save.emotionStates || {}).length}명
 예약 일정: ${(save.scheduledEvents||[]).filter(x=>x.status!=='completed'&&x.status!=='cancelled').length}건 | 훅: ${(save.hooks||[]).filter(x=>!['resolved','expired'].includes(x.status)).length}건 | 기억: ${(save.memories?.global||[]).length + Object.values(save.memories?.npc||{}).reduce((n,x)=>n+(x?.length||0),0)}건`;
 }
@@ -1124,14 +1126,14 @@ function openPcCreator() {
 function createNewSaveFromCreator() {
   const base=defaultSave();
   if($('pcCreationMode').value==='fate') {
-    const creation=createFateCharacterCreation({
+    const generated=generateFateStartingCharacter({
       gender:$('fateGender').value,
       socialClass:$('fateSocialClass').value,
       department:$('fateDepartment').value,
     });
-    const labels=fateStartLabels(creation.fateStart);
-    base.creation=creation;
-    base.pc={...base.pc,gender:labels.gender,socialStatus:labels.socialClass,department:labels.department};
+    const labels=fateStartLabels(generated.creation.fateStart);
+    base.creation=generated.creation;
+    base.pc={...base.pc,...generated.pc,gender:labels.gender,socialStatus:labels.socialClass,department:labels.department};
     base.rollingSummary=`입학식 당일 08:40. ${base.pc.name}은(는) 루멘시아 아카데미 대강당 앞에 도착했으며 입학식 개막 전이다.`;
     return normalizeSave(base);
   }
@@ -1203,7 +1205,7 @@ $('pcCreatorClearBtn').addEventListener('click',()=>clearPcCreatorForm({keepPast
 $('pcPasteApplyBtn').addEventListener('click',applyPastedPcText);
 $('pcFreeModeBtn').addEventListener('click',()=>setPcCreationMode('free'));
 $('pcFateModeBtn').addEventListener('click',()=>setPcCreationMode('fate'));
-$('pcCreatorForm').addEventListener('submit',(e)=>{e.preventDefault();save=createNewSaveFromCreator();refreshScheduleContext();persist();$('pcCreatorDialog').close();renderAll();toast(save.creation.mode==='fate'?'운명 시작 세이브 생성':`${save.pc.name} 새 게임 생성`);});
+$('pcCreatorForm').addEventListener('submit',(e)=>{e.preventDefault();save=createNewSaveFromCreator();refreshScheduleContext();persist();$('pcCreatorDialog').close();renderAll();toast(save.creation.mode==='fate'?`${save.pc.name}의 운명 생성`:`${save.pc.name} 새 게임 생성`);});
 
 function exportSave() {
   persist(); const blob = new Blob([JSON.stringify(save,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`lumensia-save-${save.world.date}-${save.world.time.replace(':','')}.json`; a.click(); URL.revokeObjectURL(a.href);

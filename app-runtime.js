@@ -786,8 +786,8 @@ async function boot() {
     );
     source = replaceOnce(
       source,
-      "import { createFateCharacterCreation, createFreeCharacterCreation, fateStartLabels, normalizeCharacterCreation } from './lib/fate-start.js';",
-      `import { createFateCharacterCreation, createFreeCharacterCreation, fateStartLabels, normalizeCharacterCreation } from '${location.origin}/lib/fate-start.js?v=156';`,
+      "import { createFreeCharacterCreation, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation } from './lib/fate-start.js';",
+      `import { createFreeCharacterCreation, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation } from '${location.origin}/lib/fate-start.js?v=156';`,
       'fate start import'
     );
 
