@@ -18,6 +18,8 @@ const baseSave = {
   director: { callbacks: [] },
 };
 const callback = (patch = {}) => ({ key:'rival-proof', status:'open', createdTurn:9, lastTurn:9, note:'레나가 공개 대련의 증명을 요구했다.', spotlight_keys:['lena'], ...patch });
+const payoffChoice = '훈련용 목검을 들고 한 번의 유효타를 목표로 대련한다.';
+const payoffBoundary = (turn = 9, anchor = payoffChoice) => ({ kind:'player-choice', source:'choices', status:'awaiting-player', established_turn:turn, anchor });
 const save = (patch = {}) => ({
   ...baseSave, ...patch,
   sceneRuntime: { ...baseSave.sceneRuntime, ...(patch.sceneRuntime || {}) },
@@ -51,12 +53,13 @@ assert.equal(SETUP_PAYOFF_MEMORY_VERSION, '1');
 }
 
 {
-  const awaiting = save({ sceneRuntime:{participants:['lena'],turn_hook:{status:'awaiting-player',established_turn:12}}, director:{callbacks:[callback()]} });
+  const awaiting = save({ sceneRuntime:{participants:['lena'],turn_hook:payoffBoundary(12)}, director:{callbacks:[callback()]} });
   assert.equal(deriveSetupPayoffPlan({saveState:awaiting,reachableNpcKeys:['lena']}).selected, null, 'an unrelated player-owned boundary blocks a new payoff opportunity');
-  const ownedOpportunity = save({ sceneRuntime:{participants:['lena'],turn_hook:{status:'awaiting-player',established_turn:9}}, director:{callbacks:[callback({status:'opportunity'})]} });
-  assert.equal(deriveSetupPayoffPlan({saveState:ownedOpportunity,reachableNpcKeys:['lena']}).selected?.key, 'rival-proof', 'an already offered opportunity remains available for the player response that resolves it');
-  const unrelatedLaterChoice = save({ sceneRuntime:{participants:['lena'],turn_hook:{status:'awaiting-player',established_turn:12}}, director:{callbacks:[callback({status:'opportunity'})]} });
-  assert.equal(deriveSetupPayoffPlan({saveState:unrelatedLaterChoice,reachableNpcKeys:['lena']}).selected, null, 'a later unrelated player choice cannot consume an older payoff opportunity');
+  const ownedOpportunity = save({ sceneRuntime:{participants:['lena'],turn_hook:payoffBoundary(9)}, director:{callbacks:[callback({status:'opportunity'})]} });
+  assert.equal(deriveSetupPayoffPlan({saveState:ownedOpportunity,action:payoffChoice,reachableNpcKeys:['lena']}).selected?.key, 'rival-proof', 'the exact presented option keeps its owned payoff authority');
+  assert.equal(deriveSetupPayoffPlan({saveState:ownedOpportunity,action:'학생 식당으로 간다.',reachableNpcKeys:['lena']}).selected, null, 'an unrelated action cannot consume the presented payoff opportunity');
+  const unrelatedLaterChoice = save({ sceneRuntime:{participants:['lena'],turn_hook:payoffBoundary(12)}, director:{callbacks:[callback({status:'opportunity'})]} });
+  assert.equal(deriveSetupPayoffPlan({saveState:unrelatedLaterChoice,action:payoffChoice,reachableNpcKeys:['lena']}).selected, null, 'a later unrelated player boundary cannot consume an older payoff opportunity');
 }
 
 for (const mode of ['meta', 'auto', 'continue']) {
@@ -100,13 +103,13 @@ for (const mode of ['meta', 'auto', 'continue']) {
   assert.equal(earlyResult.reason, 'payoff-requires-owned-opportunity', 'an open setup cannot skip the player-owned opportunity transition');
   assert.equal(earlyResult.reject_turn, true, 'an unauthorized payoff must reject the complete result so narration and rewards cannot leak through');
 
-  const offered = save({sceneRuntime:{participants:['lena'],turn_hook:{status:'awaiting-player',established_turn:9}},director:{callbacks:[callback({status:'opportunity'})]}});
-  const offeredPlan = deriveSetupPayoffPlan({saveState:offered,reachableNpcKeys:['lena']});
+  const offered = save({sceneRuntime:{participants:['lena'],turn_hook:payoffBoundary(9)},director:{callbacks:[callback({status:'opportunity'})]}});
+  const offeredPlan = deriveSetupPayoffPlan({saveState:offered,action:payoffChoice,reachableNpcKeys:['lena']});
   const payoff = turn({callback_key:'rival-proof',callback_phase:'payoff',beat:'payoff'});
   assert.equal(reconcileSetupPayoffTurn({saveState:offered,turn:payoff,plan:offeredPlan}).status, 'resolved', 'the exact owned opportunity may resolve after the player acts');
 
-  const legacyCase = save({sceneRuntime:{participants:['lena'],turn_hook:{status:'awaiting-player',established_turn:9}},director:{callbacks:[callback({key:'Rival-Proof',status:'opportunity'})]}});
-  const legacyPlan = deriveSetupPayoffPlan({saveState:legacyCase,reachableNpcKeys:['lena']});
+  const legacyCase = save({sceneRuntime:{participants:['lena'],turn_hook:payoffBoundary(9)},director:{callbacks:[callback({key:'Rival-Proof',status:'opportunity'})]}});
+  const legacyPlan = deriveSetupPayoffPlan({saveState:legacyCase,action:payoffChoice,reachableNpcKeys:['lena']});
   const legacyPayoff = turn({callback_key:'rival-proof',callback_phase:'payoff',beat:'payoff'});
   assert.equal(reconcileSetupPayoffTurn({saveState:legacyCase,turn:legacyPayoff,plan:legacyPlan}).status, 'resolved');
   assert.equal(legacyPayoff.director.callback_key, 'Rival-Proof', 'accepted transitions must retain the persisted exact key so the existing frontend row is updated instead of duplicated');
@@ -139,6 +142,22 @@ const scheduledInput = `${input}\n===== GM EVENT DIRECTOR (SERVER GUIDANCE) ====
 const scheduledPriority = routeOpenAIParams({instructions,input:scheduledInput},{incoming:{action:'주변을 살핀다.',saveState:save({director:{callbacks:[callback()]},scheduleContext:{due:[{id:'class',title:'필수 수업',participants:['lena']}],upcoming:[]}}),recentTurns:[]},mode:'game'});
 assert.notEqual(scheduledPriority.telemetry.event_director_v2?.result, 'CALLBACK_PRIORITY', 'a fixed schedule must stay ahead of a mature setup');
 assert.equal(scheduledPriority.telemetry.setup_payoff_memory_v1?.plan?.selected, null, 'a higher-priority fixed flow must remove payoff transition authority from the receipt');
+
+const ownedCombatSave = save({
+  sceneRuntime:{participants:['lena'],turn_hook:payoffBoundary(12)},
+  director:{callbacks:[callback({status:'opportunity',lastTurn:12})]},
+});
+const ownedCombat = routeOpenAIParams({instructions,input},{incoming:{action:payoffChoice,saveState:ownedCombatSave,recentTurns:[]},mode:'game'});
+assert.equal(ownedCombat.telemetry.event_director_v2?.result, 'CALLBACK_PRIORITY', 'an exact selected owned payoff continuation must outrank generic active-combat routing');
+assert.equal(ownedCombat.telemetry.setup_payoff_memory_v1?.plan?.selected?.key, 'rival-proof', 'the same stable callback must own the continued payoff');
+const scheduledOwnedCombat = routeOpenAIParams({instructions,input:scheduledInput},{incoming:{action:payoffChoice,saveState:{...ownedCombatSave,scheduleContext:{due:[{id:'class',title:'필수 수업',participants:['lena']}],upcoming:[]}},recentTurns:[]},mode:'game'});
+assert.notEqual(scheduledOwnedCombat.telemetry.event_director_v2?.result, 'CALLBACK_PRIORITY', 'a required schedule must remain above an owned payoff continuation');
+assert.equal(scheduledOwnedCombat.telemetry.setup_payoff_memory_v1?.plan?.selected, null, 'hard-boundary routing must not consume the payoff opportunity');
+const ignoredPayoff = routeOpenAIParams({instructions,input},{incoming:{action:'학생 식당으로 간다.',saveState:ownedCombatSave,recentTurns:[]},mode:'game'});
+assert.notEqual(ignoredPayoff.telemetry.event_director_v2?.result, 'CALLBACK_PRIORITY', 'choosing another action must leave the payoff unconsumed');
+assert.equal(ignoredPayoff.telemetry.setup_payoff_memory_v1?.plan?.selected, null, 'an unselected option has no continuation authority');
+const ordinaryCombat = routeOpenAIParams({instructions,input},{incoming:{action:'공개 대련을 시작한다.',saveState:save(),recentTurns:[]},mode:'game'});
+assert.equal(ordinaryCombat.telemetry.event_director_v2?.result, 'ACTIVE_COMBAT_FIXED_FLOW', 'ordinary combat without an owned payoff must retain the existing fixed flow');
 
 const routerSource = readFileSync(new URL('../../api/lib/context-router.js', import.meta.url), 'utf8');
 const adapterSource = readFileSync(new URL('../../api/chat-router.js', import.meta.url), 'utf8');

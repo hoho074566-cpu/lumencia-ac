@@ -305,9 +305,9 @@ function buildEventDirectorV2(incoming,originalInput,registry,mode='game'){
   if(['meta','continue'].includes(mode))return fixedDirective(`RNG_DISABLED_${mode.toUpperCase()}`);
   const explicit=mentionedNpcKeys(incoming.action||'',registry);
   const directUserFocus=Boolean(explicit.length||plan.focused.length||DIRECT_NPC_PRONOUN_RE.test(String(incoming.action||'')));
-  const callbackPlan=deriveSetupPayoffPlan({saveState:save,mode,reachableNpcKeys:[...array(save?.sceneRuntime?.participants),...array(save?.scheduleContext?.due).flatMap((row)=>array(row?.participants)),...explicit]});
+  const callbackPlan=deriveSetupPayoffPlan({saveState:save,mode,action:incoming.action||'',reachableNpcKeys:[...array(save?.sceneRuntime?.participants),...array(save?.scheduleContext?.due).flatMap((row)=>array(row?.participants)),...explicit]});
   if(!directUserFocus&&plan.intervention==='aftermath')return fixedDirective('AFTERMATH_FIXED_FLOW');
-  if(!directUserFocus&&(plan.intervention==='combat'||plan.intervention==='critical'||hasAffirmedActionKeyword(incoming.action||'',COMBAT_RE)))return fixedDirective('ACTIVE_COMBAT_FIXED_FLOW');
+  const activeCombatFlow=!directUserFocus&&(plan.intervention==='combat'||plan.intervention==='critical'||hasAffirmedActionKeyword(incoming.action||'',COMBAT_RE));
 
   const boundaryLookahead=Math.max(0,Number(sceneIntent.boundaryLookaheadMinutes||0));
   const consequenceLookahead=(sceneIntent.compression&&activityRangeLimitMinutes(sceneIntent)>0)||boundaryLookahead>0?activityRangeLimitMinutes(sceneIntent):0;
@@ -330,6 +330,8 @@ function buildEventDirectorV2(incoming,originalInput,registry,mode='game'){
   if(mode==='auto')return fixedDirective('RNG_DISABLED_AUTO');
 
   const scheduled=plan.intervention==='scheduled';
+  if(!scheduled&&callbackPlan.selected?.status==='opportunity')return fixedDirective('CALLBACK_PRIORITY');
+  if(activeCombatFlow)return fixedDirective('ACTIVE_COMBAT_FIXED_FLOW');
   if(!scheduled&&callbackPlan.selected)return fixedDirective('CALLBACK_PRIORITY');
   const medium=plan.intervention==='medium'&&(plan.routineStreak>=2||plan.eventGap>=3||plan.crossDue);
   const momentumDue=momentumPressure;
@@ -543,7 +545,7 @@ function buildInput(incoming,originalInput,profile,routed,mode='game'){
   const action=String(incoming.action||'');
   const recent=compactRecent(incoming.recentTurns,profile.recentTurns),recentFactionTexts=recent.map((turn)=>`${turn.action||''} ${turn.summary||''} ${array(turn.scene).map((item)=>item.text||'').join(' ')}`);
   const routine=profile.name.includes('routine'),registeredNpcKeys=Object.keys(routed.registry),save=compactSave(incoming,routed.keys,routed.registry,profile,routed.keywords,action,recentFactionTexts),opts=clampText(sectionBetween(originalInput,'===== TURN OPTIONS =====','===== AUTHORITATIVE SAVE_STATE ====='),700),schedule=compactSchedule(incoming.saveState||{},routed.keys),runtime={npcInnerStates:Object.fromEntries(routed.keys.filter(k=>incoming.saveState?.npcInnerStates?.[k]).map(k=>[k,compactInnerNpc(incoming.saveState.npcInnerStates[k])])),sceneRuntime:compactSceneRuntime(incoming.saveState?.sceneRuntime,routed.keywords,action,registeredNpcKeys,3,2,recentFactionTexts),backgroundDigest:clampText(incoming.saveState?.backgroundDigest||'',350)},cg=array(incoming.availableCgIds).slice(0,60).join(', '),momentumDirective=clampText(buildSceneMomentumDirective({action,saveState:incoming.saveState||{},registry:routed.registry}),2800),noveltyDirective=clampText(buildSceneNoveltyDirective({action,saveState:incoming.saveState||{},recentTurns:incoming.recentTurns}),900),purposeDirective=clampText(buildScenePurposeDirective({action,saveState:incoming.saveState||{}}),1400),exitDirective=clampText(buildSceneExitDirective({action,saveState:incoming.saveState||{}}),1600),turnHookDirective=clampText(buildTurnHookDirective({action,saveState:incoming.saveState||{}}),900),activeThreads=buildActiveThreadsDirective({action,saveState:incoming.saveState||{},mode,limit:6,maxChars:1150}),activeThreadsDirective=activeThreads.directive;
-  const rawSetupPayoff=deriveSetupPayoffPlan({saveState:incoming.saveState||{},mode,reachableNpcKeys:[...array(incoming.saveState?.sceneRuntime?.participants),...array(incoming.saveState?.scheduleContext?.due).flatMap((row)=>array(row?.participants)),...routed.keys]});
+  const rawSetupPayoff=deriveSetupPayoffPlan({saveState:incoming.saveState||{},mode,action,reachableNpcKeys:[...array(incoming.saveState?.sceneRuntime?.participants),...array(incoming.saveState?.scheduleContext?.due).flatMap((row)=>array(row?.participants)),...routed.keys]});
   const orchestration=routed.orchestration||deriveSceneOrchestrationPlan({action,saveState:incoming.saveState||{},mode,directorTelemetry:routed.directorV2?.telemetry,registry:routed.registry});
   const directorSuppressed=sceneOrchestrationSuppressesDirectorResult(orchestration,routed.directorV2?.telemetry);
   const directorResult=String(routed.directorV2?.telemetry?.result||''),setupFlowAllowed=['CALLBACK_PRIORITY','DIRECT_USER_FOCUS'].includes(directorResult)&&!directorSuppressed,setupPayoff=setupFlowAllowed?rawSetupPayoff:{...rawSetupPayoff,selected:null,reason:rawSetupPayoff.selected?'higher-priority-flow':rawSetupPayoff.reason},setupPayoffDirective=clampText(buildSetupPayoffDirective(setupPayoff),setupPayoff.selected?900:600);
