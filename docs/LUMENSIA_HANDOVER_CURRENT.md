@@ -888,20 +888,36 @@ The signed-in Exact Preview corpus is complete for Phase 3. The required-schedul
 
 ---
 
+# PR #60 BOUNDED CLOSURE / SAFE NARRATIVE TIME POLICY FOLLOW-UP
+
+- PR #60 final exact head `1a623867ec58fb1fd7dbba1a644efa889a24524f` passed local focused/full regression, Vercel, and representative Preview movement, but the final fresh review found direct P0=0/P1=2.
+- P1 #1: `1시간 훈련하고 기숙사로 가서 게시판을 확인한다.` was reduced to the travel profile, so the preceding one-hour training and an intervening schedule boundary could be lost.
+- P1 #2: `기숙사로 가고 싶어서 지도를 확인한다.` promoted a desire into committed travel and violated player sovereignty.
+- Both findings are the same compound semantic-arbitration root cause. Per bounded closure, PR #60 was closed **without merge**. No classifier-priority, Korean wording, regex, or time-arithmetic correction was added.
+- The closed head preserves its A-F regressions and Exact Preview evidence as a follow-up corpus. The successful Preview evidence (Great Hall 09:18 -> dormitory A lobby 09:30, room assignment/key, staff response, meaningful choice, no raw three-minute diagnostic) proves only the explored case; it does not authorize the unsafe compound classifier.
+- Compound semantics is a separate future bounded task. It should use the existing canonical model response to return minimal `action_N` semantic ownership/commitment, while deterministic code validates IDs, ordering, allowlisted commitment values, hard boundaries, and state consistency. No second model call or wording-specific parser expansion is allowed; uncertain/invalid claims fail closed.
+
+The safe Narrative Time Policy follow-up is `codex/narrative-time-policy-v1-safe`, created exactly from merge-authoritative safe stack base `9458633a9657c53c7e875a5cf26538d5f38a0cac`. Code checkpoint `490927644a156b04e1f57e50b164a3b87740c2e7` contains only:
+
+- the compact Narrative Time Policy V1 rules inside the three existing time/compression/STOP GM lines, with their prior total 332-character budget preserved;
+- `NARRATIVE_TIME_POLICY_VERSION=1.0` and a dedicated policy regression suite;
+- natural deterministic boundary/reconciliation prose that keeps authoritative minutes internal instead of printing `N분 동안 행동을 진행한 뒤` or `N분 지점` in ordinary narration.
+
+It contains no `compound-routine`, compound intent arbitration, new parser/regex semantics, TPP expansion, extra model call, schema/canon change, or `api/chat.js` change. Syntax/focused policy, time-floor, Context Router, authority-tail, core-invariant, `git diff --check`, and full `scripts/lumensia-pr-check.mjs 9458633... HEAD` all pass. Two substantive reviews found no compound classifier carryover, new model call, budget drift, hard-boundary weakening, player-sovereignty change, or unrelated scope.
+
+---
+
 # 12. NEXT ACTION — CURRENT START POINT
 
-1. Read this file and `docs/IMPLEMENTATION_PROGRESS.md` first.
-2. Confirm main remains PR #53 merge `1018d8c27c451dc122982fb14bf7d3e3902c70ca`; merge and reviewed-head trees must remain equal. Do **not** redo completed HF1/HF2/HF3 through Event Director V3.
-3. Preserve PR #54 runtime checkpoint `24407193b59d0f9e9cf2f9d8f1a4589b4b92c95c` and direct parsing P1=4. Do not add another wording-specific patch and do not merge PR #54.
-4. Phase 3 code head `cf3cb1ae2d39cc9ffa8c18220d247e0e7cdcd5b6` has direct P0/P1=0, Vercel Ready, mergeability, exact reviewed Phase 2 stack base/merge-base, behind 0, full regression, and all required Exact Preview evidence. Preserve these results; do not rerun completed acceptance unless the code tree changes.
-5. Commit/push this final acceptance/docs checkpoint. Because that creates a new exact docs HEAD, require its Vercel result and a fresh direct exact-head P0/P1 review. The stacked main-only Safety workflow remains absent and must not be synthesized as PASS.
-6. If the docs exact HEAD remains P0/P1=0, Phase 3 is closed for implementation. PR #57 changes `api/**` and is human-merge-only; Codex must not merge it. The final main-target merge gate still requires current main, Safety PASS, Vercel PASS, fresh direct P0/P1=0, unresolved-thread audit, no conflict, base/merge-base=current main, and behind 0 after the stacked chain is retargeted or integrated.
-7. Carry the non-blocking current-head P2 (`owner_kind:world` accepted by schema but fail-closed by shortened-turn projection) as explicit structural follow-up evidence. Do not turn it into a narration/wording regex patch or silently expand Phase 4 scope.
-8. Phase 4 branch `codex/time-plan-parser-phase4` is stacked from reviewed Phase 3 exact `3fde9714...`. First cleanup checkpoint `53168db4...` removes only multi-clause terminal-completion narration authority when its structural receipt is absent/invalid. Commit/push this docs checkpoint, open the stacked protected PR against `codex/time-plan-parser-phase3`, then require Vercel and fresh exact-head P0/P1=0 before selecting the next removal.
-9. Phase 4 remains **legacy-cleanup only**: prove one TPP-authoritatively replaced fallback with permanent regression, remove exactly that path, rerun focused/full regression, and move to the next target. Add no feature, natural-language coverage, regex coverage, or new reconciliation policy. A removal regression must first be classified as evidence that legacy is still required or Phase 3 is incomplete; do not patch Phase 3 design flaws inside Phase 4. Keep the `owner_kind:world` P2 outside this cleanup.
+1. Commit the docs checkpoint, push the exact head, and open a protected stacked PR against exact safe base `codex/time-plan-parser-phase4` / `9458633...`.
+2. Require exact-head Vercel, fresh direct P0/P1=0, no conflict, base=merge-base=`9458633...`, and behind 0. Do not synthesize a stacked main-only Safety PASS.
+3. Run only representative Narrative Time Policy Preview acceptance: ordinary routine/elapsed prose hides internal minute diagnostics, a real schedule boundary still interrupts naturally, and a direct time question may surface exact time. Do not rerun compound semantic permutations.
+4. If direct P0/P1=0 and Preview passes, close the safe policy scope without P2/P3 hardening. The PR changes `api/**` and remains human-merge-only.
+5. Preserve the PR #60 compound findings for a separate AI Semantic Receipt task. Do not return to deterministic Korean classifier priority or time-arithmetic expansion.
+6. After policy closure, leave the time engine and read the latest unfinished Narrative Engine NEXT ACTION. Do not redo completed HF1/HF2/HF3 through Event Director V3.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> `docs/LUMENSIA_HANDOVER_CURRENT.md`와 `docs/IMPLEMENTATION_PROGRESS.md`를 먼저 읽고 Lumensia 프로젝트를 그대로 이어가라. 새 프로젝트가 아니다. 완료된 HF1/HF2/HF3부터 Event Director V3까지 다시 분석하지 않는다. Main은 PR #53 merge `1018d8c...`이고, PR #54 runtime checkpoint `24407193...`의 wording-parser P1 4건은 TPP corpus로 보존하며 PR #54에 새 regex patch를 추가하지 않는다. 현재 branch는 protected stacked `codex/time-plan-parser-phase3`, PR #57, reviewed Phase 2 exact base `f0971430...`이다. 최신 P1 closure는 invalid no-choice `none` claim을 반환 시각의 fail-closed 공통 reconciliation으로 보내고, choice-event authority를 pre-response routed resume / exactly due schedule·consequence / preselected Director occurrence로만 제한한다. Focused/full regression은 통과했다. 다음은 exact HEAD commit/push → Vercel/stack comparison → fresh direct review다. 이 fresh review에서 P0/P1이 남으면 Codex-local two-remediation cap에 따라 gate를 FAIL로 유지하고 사람/trusted path에 인계하며, zero면 Exact Preview case 2부터 남은 Phase 3 corpus를 즉시 실행한다. Stacked PR에 없는 main-only Safety를 PASS로 합성하지 않는다. one canonical call, stable routing, `store:false`, prompt cache/retention, budgets, canon, player sovereignty, freeze, 1440 cap을 보존한다. `api/**` 보호 경로는 사람만 병합한다.`
+> Read both progress documents first. PR #60 exact `1a62386...` is closed unmerged after two compound semantic-arbitration P1s; do not add another classifier/regex/time patch there. Current work is the safe policy-only branch `codex/narrative-time-policy-v1-safe` from exact base `9458633...`, code checkpoint `4909276...`. It contains only zero-budget Narrative Time Policy rules and natural deterministic reconciliation prose; no compound arbitration or parser semantics. Focused/full regression and two scope reviews pass. Continue with docs commit/push → protected stacked PR → Vercel/fresh exact-head P0/P1=0 → representative Preview. Preserve one canonical call, stable routing, `store:false`, cache/retention, budgets, canon, player sovereignty, freezes, hard schedule/consequence/deadline boundaries, and human-only merge for `api/**`.
