@@ -77,7 +77,7 @@ const GM_RULES = `너는 판타지 아카데미 장기 RPG 「루멘시아 아�
 5. LEVEL 4~5 정보는 정당한 발견 전 PC나 일반 NPC의 지식으로 사용하지 않는다. 객관적 사실·소문·추정·기관 분석·종교 해석을 구분한다.
 6. 시도는 자동 성공하지 않는다. 전투·판정은 능력, 준비, 정보, 경험, 상성, 거리, 타이밍, 지형, 피로, 부상, 심리를 종합한다. 억지 성공/억지 실패 금지.
 7. 성장·스킬 경험은 실제 훈련·실전·실패·교정·통찰과 관련될 때만 천천히 누적한다. 의미 없는 반복이나 자해성 꼼수에 보상하지 않는다.
-8. 관계는 실제 사건으로 서서히 변한다. 정치적 동맹과 개인 감정을 구분한다. relationship_changes는 NPC와 PC 사이의 변화만 기록하고 cause=변화 원인, expression=이번 장면에서 드러난 행동/표정/말투, followup=다음 행동에 실제로 남는 변화(없으면 null)를 함께 반환한다. npc_relationship_changes는 NPC가 다른 NPC를 향해 실제로 보인 방향성 변화만 기록한다. 직접 상호작용하거나 권위 있는 공동 사건의 인과가 있을 때만 쓰며, 같은 장면에 있었다는 이유만으로 관계를 바꾸지 않는다. faction_reputation_changes는 공개 조직이 PC를 보는 집단 평판만 기록한다. 공개 사건·공식 기록·등록 NPC의 실제 목격·출처 있는 소문이 있을 때만 쓰고, credible_rumor에는 실제 출처나 전달 경로를 source에 적는다. 사적 행동이나 단순 동석으로 바꾸지 않는다. 집단 평판은 개인 NPC 관계나 NPC 간 관계를 자동 변경하지 않는다. 늦게 돌아올 조직 반응은 기존 delayed_consequences_add로 별도 예약한다.
+8. 관계는 실제 사건으로 서서히 변한다. 정치적 동맹과 개인 감정을 구분한다. relationship_changes는 NPC와 PC 사이의 변화만 기록하고 cause=변화 원인, expression=이번 장면에서 드러난 행동/표정/말투, followup=다음 행동에 실제로 남는 변화(없으면 null)를 함께 반환한다. threshold_signal은 누적 관계와 이번 사건을 함께 보고 행동 가능성이 질적으로 달라진 실제 경계에서만 trust_opened/trust_withdrawn/hostility_opened/hostility_eased 중 하나를 쓰고, 작은 수치 변화나 단순 상태 유지에는 none이다. 경계 신호는 NPC 성격·목표·현재 장면 안에서 정보 공유·협조·방어·거리두기·경계·충돌 같은 행동 후보를 열거나 닫을 뿐 즉시 대사·사건·PC 선택을 강제하지 않는다. AUTO/META/CONTINUE에서는 none이다. npc_relationship_changes는 NPC가 다른 NPC를 향해 실제로 보인 방향성 변화만 기록한다. 직접 상호작용하거나 권위 있는 공동 사건의 인과가 있을 때만 쓰며, 같은 장면에 있었다는 이유만으로 관계를 바꾸지 않는다. faction_reputation_changes는 공개 조직이 PC를 보는 집단 평판만 기록한다. 공개 사건·공식 기록·등록 NPC의 실제 목격·출처 있는 소문이 있을 때만 쓰고, credible_rumor에는 실제 출처나 전달 경로를 source에 적는다. 사적 행동이나 단순 동석으로 바꾸지 않는다. 집단 평판은 개인 NPC 관계나 NPC 간 관계를 자동 변경하지 않는다. 늦게 돌아올 조직 반응은 기존 delayed_consequences_add로 별도 예약한다.
 9. 시간은 자연스럽고 일관되게 흐른다. 정해진 학사 일정과 세계 사건은 PC를 기다리지 않는다.
 10. 판타지 소설처럼 몰입감 있게 쓰되 불필요하게 늘이지 않는다. 감정은 표정·몸짓·말투·행동으로 보여준다.
 11. 매 응답은 제공된 JSON 구조만 반환한다. Markdown 이미지 링크를 출력하지 않는다. 화면에 표시할 NPC는 speaker_key로 지정한다.
@@ -1197,6 +1197,7 @@ const RelationshipChange = z.object({
   cause: z.string().max(260).nullable(),
   expression: z.string().max(260).nullable(),
   followup: z.string().max(260).nullable(),
+  threshold_signal: z.enum(['none','trust_opened','trust_withdrawn','hostility_opened','hostility_eased']),
 });
 
 const NpcRelationshipChange = z.object({
@@ -1485,6 +1486,7 @@ function sanitizeTurn(turn, { allowedCgIds = [] } = {}) {
       cause: String(row?.cause || '').slice(0,260) || null,
       expression: String(row?.expression || '').slice(0,260) || null,
       followup: String(row?.followup || '').slice(0,260) || null,
+      threshold_signal: ['none','trust_opened','trust_withdrawn','hostility_opened','hostility_eased'].includes(row?.threshold_signal) ? row.threshold_signal : 'none',
     }));
   d.npc_relationship_changes = arrays(d.npc_relationship_changes, 6)
     .filter((row) => REGISTERED_SPEAKER_KEYS.has(row?.source_npc_key)
