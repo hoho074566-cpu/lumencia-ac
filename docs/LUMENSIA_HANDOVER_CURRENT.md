@@ -27,19 +27,22 @@ Repository: `hoho074566-cpu/lumencia-ac`
 
 ---
 
-# 0. CURRENT STACK INTEGRATION — AUTHORITATIVE
+# 0. TIME STACK POST-MERGE CLOSURE — AUTHORITATIVE
 
-- 작업 모드는 **stack integration only**다. 새 Narrative Time Policy 기능, hardening, parser/regex, compound semantics, TPP phase, model call을 추가하지 않는다.
-- 최신 fetched `origin/main`은 `1018d8c27c451dc122982fb14bf7d3e3902c70ca`이며, integration source는 PR #61의 exact safe head `de854414d525d1fbaffc5f048ef4b8a08e8fbdac`다.
-- 안전 누적 계보는 `main -> #54 -> #55 -> #56 -> #57 -> #58 -> #61`이다. 새 branch `codex/time-stack-integration`은 exact safe head에서 생성하고 PR base는 `main`으로 한다.
-- PR #59 head `4325d604edff3b2a7bd2cab11bb40b95087b5819`와 PR #60 head `1a623867ec58fb1fd7dbba1a644efa889a24524f`는 모두 safe head의 조상이 아니다. 두 closed-unmerged PR의 전용 commits/diff를 integration tree에 포함하지 않는다.
-- 기존 stacked PR별 검증을 재실행하지 않는다. main-target integration PR 한 번에서 diff/static/focused/full regression, Safety, Vercel, 대표 Preview, fresh exact-head P0/P1=0을 요구한다.
-- 대표 Preview는 ordinary Narrative Time Policy, hard schedule, meaningful choice, compound boundary ownership, CONTINUE/META/AUTO freeze, Scene Momentum 이동 압축으로 제한한다. 나머지는 permanent automated corpus를 authority로 사용한다.
-- 모든 final gate가 PASS하면 P2/P3 hardening 없이 closure하고, `api/**` 보호 정책에 따라 사람이 expected exact head를 병합한다.
+- PR #62 `Narrative Time + TPP stack integration`은 reviewed exact head `c58ce40bd970ab9032bfc2441310bd226eafa9c1`에서 병합됐다. 최신 `origin/main`은 merge commit `113cd14b3857f73eba1be3bdd24297ceeaa6681d`다.
+- Merged main tree와 reviewed integration tree는 모두 `66bc75a0ef3bc222f0a2e2ac541988453bfa7a33`로 정확히 같다.
+- Production Vercel은 main merge commit에서 PASS이고 `https://lumencia-ac.vercel.app/api/health`는 HTTP 200 / configured / observed deploy metadata app `1.5.6` / adapter `0.8.7` / canonical `/api/chat` / `24h` cache를 반환한다. 저장소 계약의 stable app은 계속 `1.5.4`이며, 이 관측 metadata는 canonical version authority가 아니므로 runtime/version 변경에 전파하지 않는다.
+- Merged-main full repository regression과 core invariant corpus가 PASS한다. One canonical call, stable `/api/chat-router -> api/chat.js`, `store:false`, prompt cache/retention, Context Router budgets, canon, player sovereignty, META/AUTO/CONTINUE freeze가 유지된다.
+- PR #54/#55/#56/#57/#58/#61은 PR #62를 통해 main에 통합되었고 별도 병합 대상이 아니다. GitHub에 integrated/superseded 기록을 남기고 모두 닫았다.
+- PR #59 head `4325d604edff3b2a7bd2cab11bb40b95087b5819`와 PR #60 head `1a623867ec58fb1fd7dbba1a644efa889a24524f`는 closed-unmerged 상태다. 각각 safe tree 전용 29개/6개 커밋 중 merged main에 포함된 커밋은 0개다.
+- 시간 시스템은 완료된 Narrative Engine 기반 작업으로 취급한다. 기존 P2/P3 backlog 때문에 새 TPP/Narrative Time correction이나 phase를 시작하지 않는다.
+- Event Consequence V1이 bounded consequence queue/lifetime을 이미 완료했으므로 다음 미완료 Narrative Engine 항목은 **Active Threads V1**이다.
 
 ---
 
-# 0. SESSION STOP CHECKPOINT — 가장 먼저 읽을 것
+# 0. HISTORICAL SESSION CHECKPOINT — NON-ACTIONABLE ARCHIVE
+
+> 아래 시간-stack 개발 기록의 과거 P0/P1, blocker, MERGE_GATE, NEXT ACTION은 모두 위 post-merge closure로 superseded되었다. 이 절을 현재 작업 지시로 사용하거나 #54-#61 시간 작업을 재개하지 않는다.
 
 ## Live state immediately before this handover update
 - Branch: `codex/time-plan-parser-phase3`, protected stacked PR #57, based on reviewed Phase 2 exact head `f0971430af351c4a007e18daa0bd18454e6aab4f`.
@@ -317,7 +320,7 @@ This means:
 
 ---
 
-# 1. PROJECT / ARCHITECTURE INVARIANTS
+## 1. PROJECT / ARCHITECTURE INVARIANTS
 
 Lumensia Academy is a mobile/PWA long-running AI RPG. The player owns PC decisions; the model is GM + independent world simulator.
 
@@ -343,7 +346,7 @@ Context Router target / soft budgets:
 
 ---
 
-# 2. PLAYER SOVEREIGNTY / WORLD SIMULATION
+## 2. PLAYER SOVEREIGNTY / WORLD SIMULATION
 
 Aaa is PC placeholder, not NPC.
 
@@ -377,7 +380,7 @@ Combat/growth:
 
 ---
 
-# 3. MERGE / AUTOMATION SAFETY — MUST NOT BE WEAKENED
+## 3. MERGE / AUTOMATION SAFETY — MUST NOT BE WEAKENED
 
 Review-race lessons from prior handovers:
 - generic PR reaction/timestamp is not current-review authority;
@@ -406,7 +409,7 @@ Past sticky `Lumensia Merge Readiness` states have contradicted direct live revi
 
 ---
 
-# 4. CURRENT MERGED FOUNDATION
+## 4. CURRENT MERGED FOUNDATION
 
 Already in main before PR #33:
 - PLAYER ACTION COMMIT
@@ -429,7 +432,7 @@ Asset truth:
 
 ---
 
-# 5. PR #33 — SCENE MOMENTUM RECOVERY HF1
+## 5. PR #33 — SCENE MOMENTUM RECOVERY HF1
 
 Goal:
 
@@ -502,7 +505,7 @@ Always preserve:
 
 ---
 
-# 6. IMPORTANT IMPLEMENTATION / FIX COMMITS
+## 6. IMPORTANT IMPLEMENTATION / FIX COMMITS
 
 ### Base integration/test point
 `df382f3b0ab91b97f8f88f2b50667aa4b5553892`
@@ -571,7 +574,7 @@ BUT this exact head's final Codex review found the new P1 below, so it is not me
 
 ---
 
-# 7. FINAL-REVIEW P1 — FIXED IN CURRENT CANDIDATE
+## 7. FINAL-REVIEW P1 — FIXED IN CURRENT CANDIDATE
 
 ## P1: Reserve Scene Momentum directive under input pressure
 Thread: `PRRT_kwDOT8LCAs6biXWm`  
@@ -629,7 +632,7 @@ Additional mode regressions prove CONTINUE retains `INTENT=continue-freeze` and 
 
 ---
 
-# 8. REVIEW STATE AT HANDOVER
+## 8. REVIEW STATE AT HANDOVER
 
 PR #33 final authority and merge:
 - exact reviewed HEAD `216bef1d51b72f2edb6da3f06c69e02aa45b5b10`;
@@ -685,7 +688,7 @@ Fresh review `PRR_kwDOT8LCAs8AAAABKkKXOQ` on exact head `acab3594c784fdd3b93a32f
 
 ---
 
-# 9. PERMANENT TEST COVERAGE
+## 9. PERMANENT TEST COVERAGE
 
 HF1-specific permanent suites:
 - `scripts/tests/context-router-authority-tail.test.mjs`
@@ -708,7 +711,7 @@ Last green hosted evidence before this docs-only handover update:
 
 ---
 
-# 10. DO NOT BREAK
+## 10. DO NOT BREAK
 
 Runtime/API:
 1. exactly one canonical core/model call per normal turn;
@@ -763,7 +766,7 @@ Merge safety:
 
 ---
 
-# 11. AFTER HF1 MERGE — NEXT NARRATIVE PHASE
+## 11. AFTER HF1 MERGE — NEXT NARRATIVE PHASE
 
 HF1 merge is not Narrative completion. Do not restart HF1 diagnosis after it merges.
 
@@ -810,7 +813,7 @@ Gameplay roadmap discussed:
 
 ---
 
-# PR #57 PHASE 3 — LATEST P0/P1 CLOSURE CYCLE
+## PR #57 PHASE 3 — LATEST P0/P1 CLOSURE CYCLE
 
 Fresh direct review `PRR_kwDOT8LCAs8AAAABK_AqZQ` on exact docs head `3626be33a22fa257004db9404b2abc457146f7ed` found P0=0 / P1=6:
 - completion evidence before a same-sentence choice clause was discarded;
@@ -900,7 +903,7 @@ The signed-in Exact Preview corpus is complete for Phase 3. The required-schedul
 
 ---
 
-# PR #60 BOUNDED CLOSURE / SAFE NARRATIVE TIME POLICY FOLLOW-UP
+## PR #60 BOUNDED CLOSURE / SAFE NARRATIVE TIME POLICY FOLLOW-UP
 
 - PR #60 final exact head `1a623867ec58fb1fd7dbba1a644efa889a24524f` passed local focused/full regression, Vercel, and representative Preview movement, but the final fresh review found direct P0=0/P1=2.
 - P1 #1: `1시간 훈련하고 기숙사로 가서 게시판을 확인한다.` was reduced to the travel profile, so the preceding one-hour training and an intervening schedule boundary could be lost.
@@ -923,14 +926,14 @@ Fresh direct review `5037414704` on initial PR #61 exact head `4dc7f4f3768b4635e
 
 # 12. NEXT ACTION — CURRENT START POINT
 
-1. Keep `codex/time-stack-integration` implementation-identical to PR #61 exact safe tree apart from this integration-only documentation checkpoint.
-2. Prove `origin/main` is the exact base/merge-base, behind 0, conflict-free; prove PR #59/#60 heads and their exclusive commits are absent.
-3. Open one main-target integration PR and run focused/full regression, main Safety, Vercel, fresh exact-head P0/P1=0, and only the six representative Preview categories listed above.
-4. If all gates pass, make no P2/P3 or semantic hardening changes. Record `MERGE_GATE: PASS` and wait for a person to merge the protected `api/**` PR by expected exact head.
-5. After merge, fetch main, verify tree/production health/Vercel/full regression, mark #54/#55/#56/#57/#58/#61 integrated or superseded, retain #59/#60 closed-unmerged, then leave the time engine for the latest unfinished Narrative Engine action.
+1. Fetch and verify the latest `origin/main`, then continue Active Threads V1 on its focused branch/PR; do not branch from a fixed historical SHA and do not reopen Adaptive Time/TPP/Narrative Time work.
+2. First perform a read-only inventory of existing `activeEvents`, unresolved hooks, scheduled events, world arcs, Director callbacks, `sceneRuntime.eventProgress`, paused `sceneRuntime.eventProgressByInstance`, and `completedEvents`. Reuse them rather than adding a parallel save root; cover pause/resume and completed-occurrence suppression in lifecycle tests.
+3. Define a bounded canonical thread view that ranks only already-authoritative unresolved story pressure, keeps player choice and event completion semantics intact, and adds no model call. Gate every entry by PC knowledge/visibility; omit L5/player-hidden canon, mask `secret_level >= 3` causes, and add permanent leakage tests for hidden consequence/world-arc material.
+4. Implement Active Threads in a separate focused branch/PR after the analysis plan. Preserve canon, one-call routing, existing save compatibility, and all freeze modes.
+5. Keep the four PR #62 P2 findings and closed #59/#60 semantic corpus as backlog; they are not Active Threads scope.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> Read both progress documents first. Work only on `codex/time-stack-integration`, sourced from PR #61 exact safe head `de854414d525d1fbaffc5f048ef4b8a08e8fbdac` and targeted directly at current `main` `1018d8c27c451dc122982fb14bf7d3e3902c70ca`. The included stack is #54/#55/#56/#57/#58/#61. PR #59/#60 remain closed-unmerged and excluded. Add no feature/hardening/parser/regex/model-call change. Finish the single main-target Safety/Vercel/regression/fresh-review/representative-Preview authority cycle, then leave the protected PR for human expected-head merge.
+> Read both progress documents first. PR #62 merged reviewed time stack head `c58ce40...` as main `113cd14...`; reviewed and merged trees are identical and production/full regression pass. PR #54/#55/#56/#57/#58/#61 are integrated/superseded and closed. PR #59/#60 remain closed-unmerged with zero exclusive commits in main. Do not continue time-engine hardening. The current Narrative Engine NEXT ACTION is Active Threads V1, beginning with read-only reuse analysis of existing event/hook/schedule/arc/callback/current-and-paused-progress/completed-event authority and no parallel save root or second model call.
