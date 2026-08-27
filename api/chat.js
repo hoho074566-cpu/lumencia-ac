@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { zodTextFormat } from 'openai/helpers/zod';
 import { z } from 'zod/v4';
 import { FACTION_EVIDENCE_TYPES, FACTION_KEYS } from '../lib/faction-social-consequence.js';
+import { sanitizeCanonicalResolutionLog } from '../lib/resolution-log.js';
 
 // LUMENSIA MOBILE V1.4.7 single-file API bundle
 // api/lib modules are inlined for mobile-friendly GitHub deployment.
@@ -84,6 +85,7 @@ const GM_RULES = `너는 판타지 아카데미 장기 RPG 「루멘시아 아�
 12. scene 배열은 실제 출력 순서다. 대사 직전의 행동이 필요하면 narration 뒤 dialogue 순으로 둔다. 대사 후 반응은 dialogue 뒤 narration으로 둔다.
 13. choices는 PC의 선택이 필요한 자연스러운 지점에서만 정확히 3개를 제시하고, 아니면 빈 배열로 둔다. 추천 외 자유행동도 가능하다는 전제를 유지한다.
 13-1. choices는 이번 USER ACTION과 그 결과가 모두 끝난 뒤의 선택지다. 방금 완료된 이동·입장·정보 전달·상호작용을 그대로 다시 제안하지 말고 결과 위치와 상태에서 가능한 후속 행동을 제시한다. 단, 실패·저지된 시도의 재시도와 진행 중 전투의 반복 공격은 허용한다.
+13-2. resolution_log는 이번 USER ACTION의 구조화된 판정 결과다. triggered는 능력 판정 여부이고 outcome은 실제 결과다. 결과가 미확정이면 outcome='none'으로 둔다. Payoff failure is a real outcome, not none: payoff/aftermath 실패는 outcome='failure'로 반환하고 retry choices가 남으면 같은 callback을 payoff_opportunity로 유지해 resolved 처리하지 않는다.
 14. state_delta에는 실제로 발생한 변화만 넣는다. 변하지 않은 수치·관계·아이템을 꾸며내지 않는다.
 15. memories_add에는 다음 턴 이후에도 기억해야 할 구체적 정보만 넣는다. type은 fact/observer/belief/rumor/promise/deferred_hook/relationship/secret/event/obligation/knowledge 중 하나다.
 - fact: 실제 발생 사실.
@@ -1236,6 +1238,20 @@ const SkillExperience = z.object({
   reason: z.string().min(1).max(240),
 });
 
+const AbilityUse = z.object({
+  kind: z.enum(['skill', 'stat', 'trait', 'authority']),
+  name: z.string().min(1).max(80),
+  role: z.enum(['primary', 'support', 'passive']),
+  reason: z.string().min(1).max(240),
+});
+
+const ResolutionLog = z.object({
+  triggered: z.boolean(),
+  outcome: z.enum(['none', 'success', 'partial', 'failure']),
+  summary: z.string().max(320).nullable(),
+  abilities: z.array(AbilityUse).max(5),
+});
+
 const MemoryAdd = z.object({
   owner: z.string().min(1).max(80),
   type: z.enum(['fact','observer','belief','rumor','promise','deferred_hook','relationship','secret','event','obligation','knowledge']),
@@ -1305,6 +1321,7 @@ const TurnSchema = z.object({
   scene: z.array(SceneItem).min(1).max(18),
   cg_id: z.string().max(120).nullable(),
   choices: z.array(z.string().min(1).max(240)).max(3),
+  resolution_log: ResolutionLog,
   event_progress: z.object({
     event_instance_id: z.string().min(1).max(80),
     active_beat: z.string().min(1).max(80).nullable(),
@@ -1444,6 +1461,7 @@ function sanitizeTurn(turn, { allowedCgIds = [] } = {}) {
     reason: String(dm?.reason || '장면 흐름 유지').slice(0,280),
   };
   turn.choices = arrays(turn.choices, 3);
+  turn.resolution_log = sanitizeCanonicalResolutionLog(turn.resolution_log);
   const eventProgress = turn.event_progress;
   const eventId = String(eventProgress?.event_instance_id || '').trim();
   const safeEventId = /^[a-z0-9][a-z0-9._:#-]{0,79}$/i.test(eventId) ? eventId.toLowerCase() : '';
