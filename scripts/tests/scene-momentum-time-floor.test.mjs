@@ -211,6 +211,11 @@ assert.doesNotMatch(JSON.stringify(turn.scene),/훈련을 마쳤다|완료 보�
 assert.deepEqual(turn.choices,['보상을 받는다','다음 훈련을 고른다','쉰다'],'the structural choice boundary remains available after its contradictory prompt is sanitized');
 assert.equal(contradictoryValidPrompt.runtimeSceneTrusted,false,'a completion-contradicting prompt cannot enter runtime scene authority');
 assert.equal(contradictoryValidPrompt.runtimeChoicesTrusted,true,'sanitized choices remain player-owned independently from the rejected prompt narration');
+turn={scene:[{kind:'narration',text:'10분 동안 기본 자세를 반복했다.'},{kind:'dialogue',speaker_key:'artemis',text:'나는 훈련을 마쳤다. 이제 무엇을 하겠나?'}],state_delta:{advance_minutes:10},choices:['계속 훈련한다','교관에게 묻는다','쉰다']};
+turn.time_execution=choiceExecution(turn,{minutes:10,completed:[],interrupted:'action_1'});
+const npcOwnedCompletionPrompt=applySceneMomentumTimeFloor({action:'1시간 동안 훈련한다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-01',time:'09:00'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.match(JSON.stringify(turn.scene),/나는 훈련을 마쳤다/,'first-person completion in keyed NPC dialogue remains owned by that speaker');
+assert.equal(npcOwnedCompletionPrompt.runtimeSceneTrusted,true,'speaker-owned completion does not contradict the player clause receipt');
 turn={scene:[{kind:'narration',text:'10분 동안 기본 자세를 반복했다.'},{kind:'dialogue',speaker_key:'artemis',text:'경보가 울렸다. 지금 어떻게 대응하겠나?'}],state_delta:{advance_minutes:10},choices:['경보를 확인한다','훈련을 계속한다','교관에게 묻는다']};
 turn.time_execution=choiceExecution(turn,{minutes:10,completed:[],interrupted:'action_1'});
 const alignedValidPrompt=applySceneMomentumTimeFloor({action:'1시간 동안 훈련한다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-01',time:'09:00'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
@@ -225,6 +230,15 @@ turn={scene:[{kind:'dialogue',speaker_key:'artemis',text:'붉은 약병과 푸�
 const safeMissingReceiptContext=applySceneMomentumTimeFloor({action:'1시간 동안 훈련한다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-01',time:'09:00'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.match(JSON.stringify(turn.scene),/붉은 약병과 푸른 약병/,'safe decision context survives even when a missing receipt keeps action effects fail-closed');
 assert.equal(safeMissingReceiptContext.runtimeSceneTrusted,true,'a receipt-missing but action-neutral decision prompt remains safe runtime context');
+const priorChoiceProgress={eventInstanceId:'quest:escort',activeBeat:'briefing',completedBeats:['accepted'],paused:false};
+turn={scene:[{kind:'dialogue',speaker_key:'emily',text:'동문과 서문 중 어느 길로 갈까?'}],state_delta:{advance_minutes:10},choices:['동문으로 간다','서문으로 간다','상황을 확인한다'],event_progress:{event_instance_id:'quest:escort',active_beat:'route-choice',completed_beats:['accepted','unowned-route']}};
+const missingReceiptProgressIntent=applySceneMomentumTimeFloor({action:'1시간 동안 훈련한다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-01',time:'09:00'},sceneRuntime:{eventProgress:priorChoiceProgress},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+assert.equal(turn.event_progress,null,'missing-receipt reconciliation rejects the returned unowned progress mutation');
+const missingReceiptRuntimeTurn=runtimeSynthesisTurn(turn,missingReceiptProgressIntent);
+assert.equal(Object.prototype.hasOwnProperty.call(missingReceiptRuntimeTurn,'event_progress'),false,'runtime input distinguishes a rejected progress mutation from an explicit deletion');
+const preservedChoiceProgress=mergeRoutedEventProgressState(priorChoiceProgress,{},missingReceiptRuntimeTurn.event_progress).eventProgress;
+assert.equal(preservedChoiceProgress?.activeBeat,'briefing','rejecting an unowned same-instance mutation preserves the prior active beat');
+assert.deepEqual(preservedChoiceProgress?.completedBeats,['accepted'],'rejecting an unowned same-instance mutation preserves prior completed beats');
 const ineligibleConcurrentAction='1시간 훈련하면서 1시간 대화한다';
 assert.equal(classifySceneIntent(ineligibleConcurrentAction,{location:'훈련장',currentTime:'09:00'}).structuredExecutionPlan,null,'the concurrent action remains outside exact structured execution authority');
 turn={scene:[{kind:'narration',text:'카인은 대화를 마쳤다.'}],state_delta:{advance_minutes:10},choices:['다음 행동을 고른다']};
@@ -622,6 +636,12 @@ turn.time_execution=choiceExecution(turn,{boundaryEventId:'director:ongoing-fire
 applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{...structuralCompoundSave,sceneRuntime:{eventProgress:{eventInstanceId:'director:ongoing-fire'}}}},turn,'game',null,[],{director_occurrence_id:'director:ongoing-fire'});
 assert.equal(turn.event_progress?.event_instance_id,'director:ongoing-fire','an owned nonterminal active Director event survives its resumed choice boundary');
 assert.deepEqual(turn.director,ongoingDirector,'owned active Director metadata remains attached to its choices');
+turn={scene_title:'화재 속 수면 선택',scene:[{kind:'narration',text:'한 시간 훈련을 마친 순간 화재 현장의 대피 지시가 이어졌다.'},{kind:'dialogue',speaker_key:'artemis',text:'수면을 마쳤으니 동쪽과 서쪽 중 어디부터 대피시키겠나?'}],choices:['동쪽부터.','서쪽부터.','상황을 본다.'],director:ongoingDirector,event_progress:{event_instance_id:'director:ongoing-fire',active_beat:'evacuation-choice',completed_beats:['alarm']},state_delta:{advance_minutes:60,active_events_add:[]}};
+turn.time_execution=choiceExecution(turn,{boundaryEventId:'director:ongoing-fire',owners:[effectOwner('event_progress',null,'director:ongoing-fire','boundary-event','turn'),effectOwner('director',null,'director:ongoing-fire','boundary-event','turn')]});
+const contradictoryDirectorPrompt=applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{...structuralCompoundSave,sceneRuntime:{eventProgress:{eventInstanceId:'director:ongoing-fire'}}}},turn,'game',null,[],{director_occurrence_id:'director:ongoing-fire'});
+assert.equal(contradictoryDirectorPrompt.runtimeSceneTrusted,false,'an incomplete-clause contradiction removes only the Director narration authority');
+assert.deepEqual(turn.director,ongoingDirector,'validated Director metadata survives visible prompt sanitization');
+assert.deepEqual(runtimeSynthesisTurn(turn,contradictoryDirectorPrompt).director,ongoingDirector,'runtime synthesis preserves validated Director callback metadata independently from narration');
 
 const ongoingQuestProgress={event_instance_id:'quest:escort',active_beat:'route-choice',completed_beats:['briefing']};
 turn={scene_title:'훈련 뒤 호위 경로 선택',scene:[{kind:'narration',text:'한 시간 훈련을 마친 뒤 진행 중인 호위 임무의 갈림길에 도착했다.'},{kind:'dialogue',speaker_key:'emily',text:'동문과 서문 중 어느 길로 갈까?'}],choices:['동문으로 간다.','서문으로 간다.','상황을 확인한다.'],event_progress:ongoingQuestProgress,state_delta:{advance_minutes:60,active_events_add:[]}};

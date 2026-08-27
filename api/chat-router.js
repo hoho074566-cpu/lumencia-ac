@@ -591,20 +591,20 @@ function choicePromptScore(text='',choices=[]){
 function turnBeforePlayerChoice(turn,executionAuthority=null){
   if(executionAuthority?.valid){
     const scene=array(turn?.scene),decisionIndex=Number(executionAuthority.decision_scene_index),item=object(scene[decisionIndex]),prompt=String(item.text||'').trim();
-    return{...turn,scene_title:'',scene_summary:'',scene:scene.slice(0,decisionIndex),choices:[],_choice_prompt_text:prompt,_decision_evidence_ordered:true,_structured_choice_authority:true};
+    return{...turn,scene_title:'',scene_summary:'',scene:scene.slice(0,decisionIndex),choices:[],_choice_prompt_text:prompt,_choice_prompt_source_row:{...item},_decision_evidence_ordered:true,_structured_choice_authority:true};
   }
   const scene=array(turn?.scene),choices=array(turn?.choices),candidates=scene.map((item,index)=>({index,question:/[?？]/.test(String(item?.text||'')),dialogue:String(item?.kind||'')==='dialogue',score:choicePromptScore(item?.text,choices)})).filter(row=>row.question||row.dialogue),scored=[...candidates].sort((left,right)=>right.score-left.score||right.index-left.index),questionIndexes=candidates.filter(row=>row.question).map(row=>row.index),dialogueIndexes=candidates.filter(row=>row.dialogue).map(row=>row.index),decisionIndex=scored[0]?.score>0?scored[0].index:questionIndexes.at(-1)??dialogueIndexes.at(-1)??scene.length;
   const item=object(scene[decisionIndex]),source=String(item.text||''),parts=[...source.matchAll(/[^.!?。！？\n]+[.!?。！？]?/gu)].map(match=>({text:String(match[0]||'').trim(),index:match.index??0,question:/[?？]/.test(match[0]),score:choicePromptScore(match[0],choices)})).filter(row=>row.text),questionParts=parts.filter(row=>row.question),promptPart=[...(questionParts.length?questionParts:parts)].sort((left,right)=>right.score-left.score||right.index-left.index)[0]||null,promptSource=String(promptPart?.text||source),clauseBreaks=[...promptSource.matchAll(/[,;:]\s*/gu)],clauseOffset=clauseBreaks.at(-1)?(clauseBreaks.at(-1).index??0)+clauseBreaks.at(-1)[0].length:0,promptIndex=(promptPart?.index??0)+clauseOffset,prefix=promptPart?source.slice(0,promptIndex).trim():'',prompt=promptSource.slice(clauseOffset).trim(),evidenceScene=[...scene.slice(0,decisionIndex),...(prefix?[{...item,text:prefix}]:[])];
-  return{...turn,scene_title:'',scene_summary:'',scene:evidenceScene,choices:[],_choice_prompt_text:String(prompt||source),_decision_evidence_ordered:true};
+  return{...turn,scene_title:'',scene_summary:'',scene:evidenceScene,choices:[],_choice_prompt_text:String(prompt||source),_choice_prompt_source_row:{...item},_decision_evidence_ordered:true};
 }
 function structuredTextClaimsIncompleteCompletion(text='',sourceRow={},plan={},executionAuthority=null,intent={},action='',actorName=''){
   if(!executionAuthority?.applicable)return false;
   const prompt=String(text||'').trim(),completed=executionAuthority.valid&&executionAuthority.completed_clause_set instanceof Set?executionAuthority.completed_clause_set:new Set(executionAuthority.valid?array(executionAuthority.completed_clause_ids).map(String):[]);if(!prompt)return false;
-  const candidates=[prompt,prompt.replace(/[?？]+$/u,'').trim()].filter(Boolean),promptTurn=(value)=>({scene:[{...object(sourceRow),kind:'narration',text:value}],choices:[]});
-  return array(plan?.clauses).some((clause,position)=>{const id=String(clause?.clause_id||`action_${Number(clause?.index||position+1)}`);return!completed.has(id)&&candidates.some(candidate=>timedActionCompletionEvidence(promptTurn(candidate),{...intent,completionActionType:String(clause?.action_type||'')},action,actorName));});
+  const source=object(sourceRow),speakerOwnsFirstPerson=String(source.kind||'')==='dialogue'&&Boolean(String(source.speaker_key||'').trim()),candidates=[prompt,prompt.replace(/[?？]+$/u,'').trim()].filter(Boolean),promptTurn=(value)=>({scene:[{...source,text:value}],choices:[]});
+  return array(plan?.clauses).some((clause,position)=>{const id=String(clause?.clause_id||`action_${Number(clause?.index||position+1)}`);return!completed.has(id)&&candidates.some(candidate=>timedActionCompletionEvidence(promptTurn(candidate),{...intent,completionActionType:String(clause?.action_type||'')},action,actorName,{includeDialogue:true,speakerOwnsFirstPerson}));});
 }
 function structuredChoicePromptContradictsExecution(turn,plan={},executionAuthority=null,intent={},action='',actorName=''){
-  const prompt=String(turn?._choice_prompt_text||'').trim(),sourceRow=object(array(turn?.scene)[Number(executionAuthority?.decision_scene_index)]);return structuredTextClaimsIncompleteCompletion(prompt,sourceRow,plan,executionAuthority,intent,action,actorName);
+  const prompt=String(turn?._choice_prompt_text||'').trim(),sourceRow=object(turn?._choice_prompt_source_row||array(turn?.scene)[Number(executionAuthority?.decision_scene_index)]);return structuredTextClaimsIncompleteCompletion(prompt,sourceRow,plan,executionAuthority,intent,action,actorName);
 }
 function sanitizeStructuredBoundaryScene(scene=[],plan={},executionAuthority=null,intent={},action='',actorName=''){
   return array(scene).filter(row=>!structuredTextClaimsIncompleteCompletion(row?.text,row,plan,executionAuthority,intent,action,actorName));
@@ -660,8 +660,8 @@ function reconcileExplicitZeroTurn(turn){
   turn.state_delta={...frozen,advance_minutes:0,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0};
   delete turn.event_progress;
 }
-function completionSegmentAttributedToPc(segment='',matchIndex=0,kind='',actorName=''){
-  const allowedSubjects=new Set(['나','내','저','제','우리','저희',String(actorName||'').trim().toLowerCase()].filter(Boolean));
+function completionSegmentAttributedToPc(segment='',matchIndex=0,kind='',actorName='',ownership={}){
+  const firstPersonSubjects=ownership?.speakerOwnsFirstPerson===true?[]:['나','내','저','제','우리','저희'],allowedSubjects=new Set([...firstPersonSubjects,String(actorName||'').trim().toLowerCase()].filter(Boolean));
   const activitySubjects={downtime:new Set(['잠','수면','휴식']),sleep:new Set(['잠','수면','숙면']),rest:new Set(['휴식','쉬기']),wait:new Set(['기다림','대기']),meal:new Set(['식사','밥','아침','점심','저녁']),training:new Set(['훈련','연습','수련','단련']),'class-attendance':new Set(['수업','강의','세미나','실습','오리엔테이션','교육','입학식']),dialogue:new Set(['대화','이야기','질문','답변','설명','상담','논의','면담','회의','브리핑'])}[kind]||new Set();
   let prefix=String(segment||'').slice(0,Math.max(0,Number(matchIndex)||0)).toLowerCase();
   const clauseBreaks=[...prefix.matchAll(/(?:해서|하여|하니|라서|어서|아서|기에|때문에|지만|는데|더니|고서)\s+/gu)],lastBreak=clauseBreaks.at(-1);if(lastBreak)prefix=prefix.slice((lastBreak.index||0)+lastBreak[0].length);
@@ -671,8 +671,8 @@ function completionSegmentAttributedToPc(segment='',matchIndex=0,kind='',actorNa
   const attribution=attributions.sort((a,b)=>a.index-b.index).at(-1);if(!attribution)return true;
   return allowedSubjects.has(attribution.owner)||!attribution.possessive&&activitySubjects.has(attribution.owner);
 }
-function timedActionCompletionEvidence(turn,intent={},action='',actorName=''){
-  const segments=[turn?.scene_title,turn?.scene_summary,...array(turn?.scene).filter(item=>String(item?.kind||'')!=='dialogue').map(item=>item?.text)].filter(Boolean).flatMap(value=>String(value).split(/(?<=[.!?。！？])|\n+/)).map(value=>value.trim()).filter(Boolean),kind=String(intent?.completionActionType||intent?.kind||'');if(!segments.length)return false;
+function timedActionCompletionEvidence(turn,intent={},action='',actorName='',ownership={}){
+  const segments=[turn?.scene_title,turn?.scene_summary,...array(turn?.scene).filter(item=>ownership?.includeDialogue===true||String(item?.kind||'')!=='dialogue').map(item=>item?.text)].filter(Boolean).flatMap(value=>String(value).split(/(?<=[.!?。！？])|\n+/)).map(value=>value.trim()).filter(Boolean),kind=String(intent?.completionActionType||intent?.kind||'');if(!segments.length)return false;
   const patterns={
     downtime:/(?:잠에서\s*깨어|눈을\s*떴|잠을\s*(?:푹\s*)?잤|수면을\s*마쳤|휴식을\s*마쳤|충분히\s*쉬었)/,
     sleep:/(?:잠에서\s*깨어|눈을\s*떴|잠을\s*(?:푹\s*)?잤|수면을\s*마쳤)/,
@@ -695,7 +695,7 @@ function timedActionCompletionEvidence(turn,intent={},action='',actorName=''){
   }
   if(!patterns[kind])return false;
   const pcAttributedKinds=new Set(['downtime','sleep','rest','wait','meal','training','class-attendance','dialogue']);
-  return segments.some(segment=>{if(hypothetical.test(segment)||kind==='wait'&&uncertainWait.test(segment))return false;const match=patterns[kind].exec(segment);if(match){if(kind==='wait'&&match.groups?.waitAmount){const native={한:1,두:2,세:3,네:4,다섯:5,여섯:6,일곱:7,여덟:8,아홉:9,열:10},amount=Number(match.groups.waitAmount) || native[match.groups.waitAmount] || 0,cueMinutes=amount*(match.groups.waitUnit==='시간'?60:1),required=Math.max(0,Number(intent?.minAdvanceMinutes||0));if(cueMinutes<required)return false;}return!pcAttributedKinds.has(kind)||completionSegmentAttributedToPc(segment,match.index,kind,actorName);}const foodMatch=kind==='meal'&&foodCompletion?foodCompletion.exec(segment.toLowerCase()):null;return Boolean(foodMatch&&completionSegmentAttributedToPc(segment,foodMatch.index,kind,actorName));});
+  return segments.some(segment=>{if(hypothetical.test(segment)||kind==='wait'&&uncertainWait.test(segment))return false;const match=patterns[kind].exec(segment);if(match){if(kind==='wait'&&match.groups?.waitAmount){const native={한:1,두:2,세:3,네:4,다섯:5,여섯:6,일곱:7,여덟:8,아홉:9,열:10},amount=Number(match.groups.waitAmount) || native[match.groups.waitAmount] || 0,cueMinutes=amount*(match.groups.waitUnit==='시간'?60:1),required=Math.max(0,Number(intent?.minAdvanceMinutes||0));if(cueMinutes<required)return false;}return!pcAttributedKinds.has(kind)||completionSegmentAttributedToPc(segment,match.index,kind,actorName,ownership);}const foodMatch=kind==='meal'&&foodCompletion?foodCompletion.exec(segment.toLowerCase()):null;return Boolean(foodMatch&&completionSegmentAttributedToPc(segment,foodMatch.index,kind,actorName,ownership));});
 }
 function travelDestinationReachedForReconciliation(location='',target=''){
   const compact=(value)=>String(value||'').toLowerCase().replace(/[\s\p{P}\p{S}]+/gu,''),actual=compact(location),expected=compact(target);if(!actual||!expected)return false;if(expected.length>=2&&actual.includes(expected))return true;
@@ -736,6 +736,7 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   const reachedConsequenceBoundary=consequenceWithinProfile&&!earlierInterruptionBeforeConsequence&&(current>=consequenceBoundary||consequenceLifecycle?.status==='resolved'),manifestedConsequenceBoundary=Boolean(reachedConsequenceBoundary&&consequenceLifecycle?.status==='resolved');
   const reachedBoundaries=[reachedScheduledBoundary?scheduleBoundary:null,reachedConsequenceBoundary?consequenceBoundary:null,decisionBoundary].filter(value=>value!=null&&Number.isFinite(Number(value))).map(Number),reachedBoundary=reachedBoundaries.length?Math.min(...reachedBoundaries):null;
   const appliedScheduleBoundary=reachedScheduledBoundary&&scheduleBoundary===reachedBoundary,appliedConsequenceBoundary=manifestedConsequenceBoundary&&consequenceBoundary===reachedBoundary,appliedConsequenceTimeBoundary=reachedConsequenceBoundary&&consequenceBoundary===reachedBoundary,appliedDecisionBoundary=decisionBoundary!=null&&decisionBoundary===reachedBoundary;
+  const runtimePreservePriorEventProgress=Boolean(appliedDecisionBoundary&&executionAuthority?.reason==='missing-contract'&&previousEventId&&eventId===previousEventId);
   const boundaryProgress=object(turn?.event_progress),boundaryProgressSignals=[boundaryProgress.active_beat,boundaryProgress.activeBeat,boundaryProgress.status,...array(boundaryProgress.completed_beats||boundaryProgress.completedBeats)].map(value=>String(value||'').trim().toLowerCase()),boundaryProgressTerminal=boundaryProgressSignals.some(value=>['complete','completed','done','finished','end'].includes(value)),trustedScheduleProgress=structuredBoundary&&!boundaryProgressTerminal?{...boundaryProgress}:null,trustedScheduleActiveAdds=array(turn?.state_delta?.active_events_add).filter(value=>boundaryIds.has(String(value||'').trim().toLowerCase())),trustedSchedulePendingRemovals=array(turn?.state_delta?.scheduled_events_remove).filter(value=>boundaryIds.has(String(value||'').trim().toLowerCase())),ownedTurnFields=new Set(array(executionAuthority?.effect_owners).filter(owner=>owner?.scope==='turn'&&owner?.owner_kind==='boundary-event'&&String(owner?.owner_id||'')===eventId).map(owner=>String(owner?.field||''))),structuredChoiceDirector=Boolean(eventId.startsWith('director:')&&executionAuthority.valid&&executionAuthority.boundary_kind==='choice'&&executionAuthority.boundary_event_id===eventId&&ownedTurnFields.has('event_progress')&&ownedTurnFields.has('director')),preserveChoiceDirectorState=Boolean(appliedDecisionBoundary&&hasMeaningfulStop&&!boundaryProgressTerminal&&(structuredChoiceDirector||structuredInterruption&&directorStateVisibleBeforeDecision(decisionEvidenceTurn,turn?.director))),trustedChoiceDirectorProgress=preserveChoiceDirectorState?{...boundaryProgress}:null,trustedChoiceDirectorActiveAdds=preserveChoiceDirectorState?array(turn?.state_delta?.active_events_add).filter(value=>String(value||'').trim().toLowerCase()===eventId):[],trustedChoiceDirector=preserveChoiceDirectorState&&turn?.director&&typeof turn.director==='object'?{...turn.director}:null;
   let applied=current;
   if(reachedBoundary!=null)applied=reachedBoundary;
@@ -764,8 +765,9 @@ function applySceneMomentumTimeFloor(incoming,turn,mode='game',consequenceLifecy
   if(Object.prototype.hasOwnProperty.call(preservedStructuredTurn,'event_progress'))turn.event_progress={...object(preservedStructuredTurn.event_progress)};
   if(Object.prototype.hasOwnProperty.call(preservedStructuredTurn,'director'))turn.director={...object(preservedStructuredTurn.director)};
   if(preserveChoiceDirectorState&&!Object.keys(preservedStructuredTurn).length){turn.event_progress=trustedChoiceDirectorProgress;turn.state_delta.active_events_add=mergePreservedRows(turn.state_delta.active_events_add,trustedChoiceDirectorActiveAdds);if(trustedChoiceDirector)turn.director=trustedChoiceDirector;}
+  const runtimeTrustedDirector=preserveChoiceDirectorState&&turn?.director&&typeof turn.director==='object'?{...turn.director}:null;
   const runtimeChoicesTrusted=Boolean(hasMeaningfulStop&&array(turn.choices).length&&(appliedDecisionBoundary||unverifiedStructuredScheduleBoundary&&scheduleChoiceAtBoundary||preserveAttributedConsequence&&appliedConsequenceTimeBoundary&&preserveConsequenceChoices));
-  return{...intent,runtimeSceneTrusted:appliedDecisionBoundary&&!untrustedStructuredDecision||unverifiedStructuredScheduleBoundary&&visibleBoundary||preserveSurfacedScheduleScene||raisedFloorSceneRuntimeTrusted||!returnedSceneReconciled,runtimeChoicesTrusted,runtimeTrustedConsequenceScene,returnedSceneReconciled,reconciliationReason:returnedSceneReconciled?reconciliationReason:null,structuredBoundaryReconciliationApplied,completedPrefixActionTypes};
+  return{...intent,runtimeSceneTrusted:appliedDecisionBoundary&&!untrustedStructuredDecision||unverifiedStructuredScheduleBoundary&&visibleBoundary||preserveSurfacedScheduleScene||raisedFloorSceneRuntimeTrusted||!returnedSceneReconciled,runtimeChoicesTrusted,runtimeTrustedConsequenceScene,runtimeTrustedDirector,runtimePreservePriorEventProgress,returnedSceneReconciled,reconciliationReason:returnedSceneReconciled?reconciliationReason:null,structuredBoundaryReconciliationApplied,completedPrefixActionTypes};
 }
 function deriveTimedActionRuntime(previousRuntime={},intent={},action='',turn={},mode='game'){
   const previous=object(previousRuntime?.timed_action);if(mode!=='game')return Object.keys(previous).length?previous:null;
@@ -776,9 +778,11 @@ function deriveTimedActionRuntime(previousRuntime={},intent={},action='',turn={}
   return{version:'1.0',kind:String(intent.kind||previous.kind||''),original_action:String(previous.original_action||action||'').slice(0,240),semantic_target:String(intent.semanticTarget||previous.semantic_target||'').slice(0,120)||null,total_minutes:total,elapsed_minutes:totalElapsed,remaining_minutes:remaining,remaining_wait_minutes:remainingWait,remaining_activity_minutes:remainingActivity,status:'active'};
 }
 function runtimeSynthesisTurn(turn,intent={}){
-  if(intent?.runtimeSceneTrusted!==false)return turn;
-  const trustedConsequenceScene=array(intent?.runtimeTrustedConsequenceScene).filter(item=>String(item?.text||'').trim()),trustedChoices=intent?.runtimeChoicesTrusted===true?array(turn?.choices).map(value=>String(value||'').trim().slice(0,140)).filter(Boolean).slice(0,3):[];
-  return{...object(turn),scene:trustedConsequenceScene,scene_title:'',scene_summary:'',choices:trustedChoices,emotion_updates:[],director:null,runtime_incomplete_boundary:true};
+  const preservePriorProgress=intent?.runtimePreservePriorEventProgress===true;
+  if(intent?.runtimeSceneTrusted!==false&&!preservePriorProgress)return turn;
+  const trustedDirector=intent?.runtimeTrustedDirector&&typeof intent.runtimeTrustedDirector==='object'?{...intent.runtimeTrustedDirector}:null,trustedConsequenceScene=array(intent?.runtimeTrustedConsequenceScene).filter(item=>String(item?.text||'').trim()),trustedChoices=intent?.runtimeChoicesTrusted===true?array(turn?.choices).map(value=>String(value||'').trim().slice(0,140)).filter(Boolean).slice(0,3):[],runtimeTurn=intent?.runtimeSceneTrusted===false?{...object(turn),scene:trustedConsequenceScene,scene_title:'',scene_summary:'',choices:trustedChoices,emotion_updates:[],director:trustedDirector,runtime_incomplete_boundary:true}:{...object(turn)};
+  if(preservePriorProgress)delete runtimeTurn.event_progress;
+  return runtimeTurn;
 }
 function reconcileReturnedTimedTurn(turn,{reason='profile-cap',elapsed=0,boundaryTitle='',completedPrefixActionTypes=[],decisionPromptText='',preserveDecisionRows=true,preserveChoices=false}={}){
   if(!turn||typeof turn!=='object')return false;
