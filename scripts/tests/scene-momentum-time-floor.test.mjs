@@ -166,6 +166,10 @@ assert.deepEqual(turn.choices,['대련한다','쉰다','돌아간다'],'missing-
 assert.doesNotMatch(JSON.stringify(turn.scene),/훈련을 마쳤으니/,'an unverified same-sentence completion prompt is replaced structurally instead of parsed for wording');
 assert.deepEqual(turn.state_delta.items_add,[],'effects attached to the unverified same-sentence completion prompt fail closed');
 assert.equal(untrustedSinglePrompt.runtimeSceneTrusted,false,'the deterministic replacement for an unverified single-action prompt is excluded from runtime synthesis');
+assert.equal(untrustedSinglePrompt.runtimeChoicesTrusted,true,'sanitized player choices receive authority independently from untrusted completion narration');
+const untrustedDecisionRuntime=runtimeSynthesisTurn(turn,untrustedSinglePrompt);
+assert.deepEqual(untrustedDecisionRuntime.choices,['대련한다','쉰다','돌아간다'],'runtime synthesis preserves sanitized choices so the awaiting-player boundary cannot be skipped');
+assert.equal(untrustedDecisionRuntime.runtime_incomplete_boundary,true,'the choice-only runtime view remains an incomplete boundary');
 turn={scene:[{kind:'narration',text:'카인은 훈련을 마쳤다.'}],state_delta:{advance_minutes:60,items_add:['훈련 완료 증표']},choices:['다음 훈련을 고른다']};
 turn.time_execution=choiceExecution(turn,{minutes:60,completed:['action_1'],interrupted:null,owners:[effectOwner('items_add',0,'action_1')]});
 const ownedSingleCompletion=applySceneMomentumTimeFloor({action:'1시간 동안 훈련한다.',saveState:{pc:{name:'카인'},world:{date:'1285-03-01',time:'09:00'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
@@ -837,6 +841,16 @@ assert.equal(turn.state_delta.advance_minutes,60,'an action may complete exactly
 assert.deepEqual(turn.state_delta.pc_knowledge_add,[],'a missing single-action receipt cannot preserve an unowned action effect at a coincident consequence boundary');
 assert.match(turn.scene_summary,/후속 상황이 발현할 시점/,'a coincident open consequence must become visible instead of being skipped');
 assert.equal(coincidentConsequenceIntent.reconciliationReason,'consequence-boundary','coincident consequence reconciliation must report its boundary');
+const consequenceChoiceScene=[{kind:'dialogue',speaker_key:'emily',text:'동시에 봉인이 흔들리기 시작했어. 어느 쪽을 먼저 확인할까?'}];
+turn={scene:[...consequenceChoiceScene],state_delta:{advance_minutes:60,items_add:['미검증 대기 보상'],hooks_update:[{id:coincidentConsequenceHook.id,status:'resolved'}]},choices:['봉인을 확인한다','에밀리를 돕는다','물러난다'],event_progress:null};
+const coincidentConsequenceChoiceIntent=applySceneMomentumTimeFloor({action:'1시간 동안 기다린다.',saveState:{world:{date:'1285-03-01',time:'09:00'},hooks:[coincidentConsequenceHook],scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game',{selected_id:coincidentConsequenceHook.id,status:'resolved',attribution_safe:true},consequenceChoiceScene);
+assert.deepEqual(turn.state_delta.items_add,[],'coincident consequence reconciliation still removes effects without structural action ownership');
+assert.deepEqual(turn.state_delta.hooks_update,[{id:coincidentConsequenceHook.id,status:'resolved'}],'the verified consequence lifecycle survives independently from rejected action effects');
+assert.deepEqual(turn.choices,['봉인을 확인한다','에밀리를 돕는다','물러난다'],'verified consequence reconciliation preserves the player choices shown at its boundary');
+assert.equal(coincidentConsequenceChoiceIntent.runtimeChoicesTrusted,true,'verified consequence choices receive independent runtime authority');
+const coincidentConsequenceChoiceRuntime=runtimeSynthesisTurn(turn,coincidentConsequenceChoiceIntent);
+assert.deepEqual(coincidentConsequenceChoiceRuntime.scene,consequenceChoiceScene,'runtime synthesis retains the verified consequence scene');
+assert.deepEqual(coincidentConsequenceChoiceRuntime.choices,turn.choices,'runtime synthesis retains the consequence choices for awaiting-player persistence');
 const arrivalRelationship={npc_key:'emily',affinity_delta:-1,trust_delta:1,status:'경계 중',reason:'에밀리가 약속 시각에 중앙광장에 도착해 함께 후문을 경계했다'};
 const arrivalKnowledge='에밀리가 약속 시각에 중앙광장에 도착했다.';
 const arrivalMemory={owner:'pc',fact:'에밀리가 약속 시각에 중앙광장에 도착해 후문 경계를 시작했다.',importance:2,secret_level:0};
