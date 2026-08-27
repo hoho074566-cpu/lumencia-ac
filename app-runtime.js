@@ -784,6 +784,12 @@ async function boot() {
       `import { migrateLegacyNpcKeys } from '${location.origin}/save-migrations.js?v=156';\nimport { explicitFutureDelayMinutes, materializeDelayedConsequences } from '${location.origin}/lib/event-consequence.js?v=156';`,
       'save migration import'
     );
+    source = replaceOnce(
+      source,
+      "import { createFateCharacterCreation, createFreeCharacterCreation, fateStartLabels, normalizeCharacterCreation } from './lib/fate-start.js';",
+      `import { createFateCharacterCreation, createFreeCharacterCreation, fateStartLabels, normalizeCharacterCreation } from '${location.origin}/lib/fate-start.js?v=156';`,
+      'fate start import'
+    );
 
     source = replaceRegexOnce(
       source,

@@ -153,6 +153,12 @@ h1 { margin: 2px 0 0; font-size: 20px; }
 .ghost-btn { background:transparent; border:1px solid var(--line); color:var(--muted); border-radius:12px; padding:10px 12px; font-weight:800; }
 @media (max-width:520px) { .pc-paste-actions { grid-template-columns:1fr; } }
 
+.creation-mode-switch { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; padding:4px; border:1px solid var(--line); border-radius:14px; background:#0b1019; }
+.creation-mode-btn { border:1px solid transparent; border-radius:10px; padding:10px 12px; background:transparent; color:var(--muted); font-weight:900; }
+.creation-mode-btn.active { border-color:rgba(217,184,108,.5); background:rgba(217,184,108,.13); color:#f6dfaa; }
+.creation-mode-fields { display:grid; gap:14px; }
+.fate-start-fields { padding:12px; border:1px solid rgba(217,184,108,.22); border-radius:14px; background:rgba(217,184,108,.045); }
+
 #pcCharacterSetting {
   min-height: 190px;
   line-height: 1.55;

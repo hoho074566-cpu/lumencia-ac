@@ -1,5 +1,6 @@
 import { ASSETS } from './assets.js';
 import { migrateLegacyNpcKeys } from './save-migrations.js';
+import { createFateCharacterCreation, createFreeCharacterCreation, fateStartLabels, normalizeCharacterCreation } from './lib/fate-start.js';
 
 const APP_VERSION = '1.4.8';
 const SAVE_KEY = 'lumensia.save.v1';
@@ -121,6 +122,7 @@ const defaultSave = () => ({
     time: '08:40',
     location: '루멘시아 아카데미 대강당 앞',
   },
+  creation: createFreeCharacterCreation(),
   pc: {
     // 스키마 기본값은 특정 프리셋이 아닌 완전 중립값이어야 한다.
     // 새 캐릭터의 스킬/장비는 생성창에 사용자가 입력한 것만 저장한다.
@@ -187,6 +189,7 @@ function normalizeSave(raw) {
   next.version = 6;
   next.appVersion = APP_VERSION;
   next.world = { ...base.world, ...(next.world || {}) };
+  next.creation = normalizeCharacterCreation(next.creation);
   next.pc = { ...base.pc, ...(next.pc || {}) };
   next.pc.stats = { ...base.pc.stats, ...(next.pc.stats || {}) };
   next.pc.skills = (next.pc.skills && typeof next.pc.skills === 'object' && !Array.isArray(next.pc.skills)) ? { ...next.pc.skills } : {};
@@ -953,8 +956,34 @@ function clearPcCreatorForm({keepPaste=false} = {}) {
     const el=$(id); if (el) el.value='';
   }
   if ($('pcDepartment')) $('pcDepartment').value='';
+  if ($('fateGender')) $('fateGender').value='';
+  if ($('fateSocialClass')) $('fateSocialClass').value='';
+  if ($('fateDepartment')) $('fateDepartment').value='';
   if (!keepPaste && $('pcPasteText')) $('pcPasteText').value='';
   if ($('pcPasteResult')) { $('pcPasteResult').textContent='빈 새 캐릭터 시트. 직접 입력하거나 위에 설정을 붙여넣어 자동채우기.'; $('pcPasteResult').className='field-help pc-paste-result'; }
+}
+
+function setPcCreationMode(mode='free') {
+  const selected=mode==='fate'?'fate':'free';
+  $('pcCreationMode').value=selected;
+  const free=$('pcFreeCreationFields');
+  const fate=$('pcFateStartFields');
+  free.classList.toggle('hidden',selected!=='free');
+  fate.classList.toggle('hidden',selected!=='fate');
+  for(const el of free.querySelectorAll('input, textarea, select, button')) el.disabled=selected!=='free';
+  for(const el of fate.querySelectorAll('input, textarea, select, button')) el.disabled=selected!=='fate';
+  for(const [id,value] of [['pcFreeModeBtn','free'],['pcFateModeBtn','fate']]) {
+    const active=selected===value; const button=$(id);
+    button.classList.toggle('active',active);
+    button.setAttribute('aria-selected',active?'true':'false');
+  }
+  $('pcCreatorSubmit').textContent=selected==='fate'?'이 선택으로 운명 시작':'이 설정으로 새 게임';
+}
+
+function syncFateDepartmentOptions() {
+  const source=$('pcDepartment'); const target=$('fateDepartment');
+  target.replaceChildren(...[...source.options].map(option=>option.cloneNode(true)));
+  target.value='';
 }
 
 function setCreatorSelectValue(id, value='') {
@@ -1088,10 +1117,25 @@ function applyPastedPcText() {
 
 function openPcCreator() {
   clearPcCreatorForm();
+  syncFateDepartmentOptions();
+  setPcCreationMode('free');
   $('pcCreatorDialog').showModal();
 }
 function createNewSaveFromCreator() {
   const base=defaultSave();
+  if($('pcCreationMode').value==='fate') {
+    const creation=createFateCharacterCreation({
+      gender:$('fateGender').value,
+      socialClass:$('fateSocialClass').value,
+      department:$('fateDepartment').value,
+    });
+    const labels=fateStartLabels(creation.fateStart);
+    base.creation=creation;
+    base.pc={...base.pc,gender:labels.gender,socialStatus:labels.socialClass,department:labels.department};
+    base.rollingSummary=`입학식 당일 08:40. ${base.pc.name}은(는) 루멘시아 아카데미 대강당 앞에 도착했으며 입학식 개막 전이다.`;
+    return normalizeSave(base);
+  }
+  base.creation=createFreeCharacterCreation();
   base.pc={...base.pc,
     name:$('pcName').value.trim()||'Aaa', age:clamp($('pcAge').value||20,14,99), gender:$('pcGender').value.trim()||'미지정', department:$('pcDepartment').value||'미지정',
     origin:$('pcOrigin').value.trim(), socialStatus:$('pcSocialStatus').value.trim(), admission:$('pcAdmission').value.trim(), appearance:$('pcAppearance').value.trim(),
@@ -1157,7 +1201,9 @@ $('metaBtn')?.addEventListener('click',()=>{ if (busy) return; metaModeOnce=!met
 $('pcCreatorClose').addEventListener('click',()=>$('pcCreatorDialog').close());
 $('pcCreatorClearBtn').addEventListener('click',()=>clearPcCreatorForm({keepPaste:false}));
 $('pcPasteApplyBtn').addEventListener('click',applyPastedPcText);
-$('pcCreatorForm').addEventListener('submit',(e)=>{e.preventDefault();save=createNewSaveFromCreator();refreshScheduleContext();persist();$('pcCreatorDialog').close();renderAll();toast(`${save.pc.name} 새 게임 생성`);});
+$('pcFreeModeBtn').addEventListener('click',()=>setPcCreationMode('free'));
+$('pcFateModeBtn').addEventListener('click',()=>setPcCreationMode('fate'));
+$('pcCreatorForm').addEventListener('submit',(e)=>{e.preventDefault();save=createNewSaveFromCreator();refreshScheduleContext();persist();$('pcCreatorDialog').close();renderAll();toast(save.creation.mode==='fate'?'운명 시작 세이브 생성':`${save.pc.name} 새 게임 생성`);});
 
 function exportSave() {
   persist(); const blob = new Blob([JSON.stringify(save,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`lumensia-save-${save.world.date}-${save.world.time.replace(':','')}.json`; a.click(); URL.revokeObjectURL(a.href);
