@@ -1,7 +1,17 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Narrative Engine continuation — Active Threads V1 post-merge closure complete; Setup -> Payoff Memory V1 is the next unfinished foundation.
+Narrative Engine continuation — PR #66 Setup -> Payoff Memory V1 is deferred; NPC Significance Evaluator V1 is the active separate-main task.
+
+## NPC Significance Evaluator V1 — Authoritative Current Checkpoint
+- The task branch is `codex/npc-significance-evaluator-v1`, created directly from verified `origin/main` `9de2b595555000dc462d3db67f4db5c9aff79750`. It contains no PR #66 commit and must not be rebased onto the deferred payoff branch.
+- PR #66 remains open, unmerged, and deferred at `fbf2935c1229b8f16bed404b48c3cdf0abb95809`. Its failure-outcome correction passed focused A-I, full regression, repository check, Exact Preview, Safety, and Vercel. Later lifecycle P1 `3871077298` is a separate schedule-reconciliation receipt-loss blocker. Do not correct, merge, close, preview-mutate, or use that branch as a base.
+- V1 reuses the canonical model-owned `director.spotlight_keys` as the semantic receipt. The model judges zero to one foreground primary and zero to one directly causal support from `AUTHORITATIVE SAVE_STATE.relevantNpcKeys`; deterministic code only enforces routed canonical membership, de-duplication, the 1+1 cap, and META/CONTINUE/player-boundary freeze.
+- No NPC score engine, Korean wording classifier/regex, new model call, save root, lifecycle phase, simulation framework, parser expansion, or automatic player choice was added. Existing Router/Core/Director/Orchestration ownership remains intact.
+- Permanent focused coverage passes for semantic/no-foreground receipts, unknown/unrouted/over-cap fail-closed behavior, direct player focus, AUTO player-boundary freeze, META/CONTINUE freeze, adaptive authority-tail action preservation, routing budgets, one canonical call, and existing NPC Goal/Relationship/Director/Active Threads paths.
+- Published PR #67 code/docs head `b62693e9dac7f7ecd5a67c4776fdeaf43ad4b402` exactly matches locally tested tree `5252791f0b2299f04a4d01465ab8d6573f185098`. Full `node scripts/lumensia-pr-check.mjs origin/main HEAD` passes; Safety run `33067212240` and Vercel are PASS; fresh exact-head Codex review comment `5438312419` reports no major issues/direct P0=0/P1=0; GitHub reports mergeable with no conflict.
+- The one allowed bounded correction was consumed by moving the semantic contract into the already-preserved instruction prefix after the initial reserved-input form displaced USER ACTION under the minimum adaptive routine budget. No further automatic correction remains for this task.
+- NEXT ACTION: publish this docs-only closure and require its exact-head Safety/Vercel/fresh review confirmation. If still green, PR #67 is merge-ready but remains human-merge-only because it changes protected `api/**`. Any new structural P1 stops the task without correction; never return to PR #66.
 
 ## Permanent P0/P1 Operation Rule
 - Current exact HEAD에 P0/P1이 남아 있는 동안 repository-authorized remediation 범위 안에서 수정·focused test·full regression·push·hosted gate·fresh exact-head review를 계속한다. 중간 보고·`MERGE_GATE: FAIL`·새 review·HEAD 변경만으로는 멈추지 않는다.
@@ -12,7 +22,7 @@ Narrative Engine continuation — Active Threads V1 post-merge closure complete;
 
 ## Current GitHub State
 - Repo: `hoho074566-cpu/lumencia-ac`
-- Main: `609c2bc0e4dd7931156687c32e59ed2ed2f28fa6` (PR #64 merge).
+- Main: `9de2b595555000dc462d3db67f4db5c9aff79750` (PR #65 post-merge Active Threads documentation closure).
 - PR #64 reviewed head `4727a468f15c0f8e2990c4ae55cb688e12cc5ec6` and merged main share tree `ce54953f9185642cd294a5bccfe401e002745a42`.
 - PR #64 is `merged=true`. Production Vercel PASS and production `/api/health` HTTP 200 confirm adapter `0.8.7`, canonical `/api/chat`, stable router/context paths, `24h` prompt retention, and preserved HF1 budgets.
 - Merged-main full repository regression and Active Threads focused lifecycle/routing/freeze tests PASS. Production runtime acceptance completed the entrance ceremony, continued by AUTO without replay, then disabled AUTO at the next meaningful player-owned department choice.
@@ -630,8 +640,7 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 
 # NEXT ACTION — AUTHORITATIVE
 
-1. Treat Active Threads V1 as completed and begin Setup -> Payoff Memory V1 from the latest verified main. Do not reopen time-engine/TPP work or PR #64 P2 hardening.
-2. Inventory existing hooks, Director callbacks, event-consequence sources, visible world-result facts, recent-turn memory, event progress/completion, and routed context. Reuse existing canonical IDs and lifecycle state; do not add a parallel save root.
-3. Produce a bounded analysis/plan before implementation: setup registration, public/PC knowledge boundary, deterministic payoff eligibility and priority, causal evidence, once-only consumption, expiry/cancellation, meaningful-stop behavior, and META/AUTO/CONTINUE freezes.
-4. Preserve one canonical model call, stable `/api/chat-router -> api/chat.js`, `store:false`, prompt cache/retention, Context Router budgets, save compatibility, canon, and player sovereignty. Fail closed on hidden, ambiguous, completed, cancelled, or unowned setup/payoff claims.
-5. Add permanent focused regressions for unrelated-turn persistence, evidence-gated payoff, no replay after consumption/cancellation, unrelated-hook isolation, meaningful player-choice STOP, and freeze modes; then run full regression and hosted exact-head review/representative Preview on a separate focused PR.
+1. Keep PR #66 deferred and untouched. Do not merge/close it, mutate its Preview, resolve lifecycle P1 `3871077298`, or base any new work on its branch.
+2. Continue only NPC Significance Evaluator V1 on `codex/npc-significance-evaluator-v1` from main `9de2b595...`. Preserve the bounded model-semantic `director.spotlight_keys` receipt and deterministic routed-key/1+1/freeze invariants; add no score engine, wording regex, save root, lifecycle, parser, or second model call.
+3. PR #67 code/docs head `b62693e9...` passed full regression, Safety `33067212240`, Vercel, conflict checks, and fresh P0=0/P1=0 review `5438312419`. Publish the docs-only closure, require its exact-head hosted confirmation, then leave the protected-path PR for human merge.
+4. The single bounded correction budget has been consumed by the adaptive authority-tail token-budget repair. If any new structural P1 appears, stop and report without another correction. Do not expand toward relationship thresholds, knowledge boundaries, NPC conflict, or a generic NPC simulation engine in this V1.

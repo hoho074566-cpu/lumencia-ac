@@ -31,6 +31,7 @@ export default async function handler(req, res) {
     adaptiveTimeScale: 'V2 action-sensitive dialogue/meal/training/class/sleep/travel time guides + schedule-boundary priority',
     timePlanParser: 'Phase 1 shadow structured clause/time plan + legacy execution authority',
     sceneOrchestration: 'V1 one primary driver + at most one causally connected secondary response + effect-only system guard',
+    npcSignificance: 'V1 model-semantic foreground primary/support selection + routed canonical-key bounds + no new save root',
     sceneNovelty: 'V1 bounded visible-term repetition tracking + change-first suppression',
     tokenBudget: { routine: 17000, routineSoftMax: 20000, scheduled: 18000, important: 20000, critical: 24000 },
   });
