@@ -764,7 +764,7 @@ function runtimeSynthesisTurn(turn,intent={}){
 }
 function reconcileReturnedTimedTurn(turn,{reason='profile-cap',elapsed=0,boundaryTitle='',completedPrefixActionTypes=[],decisionPromptText=''}={}){
   if(!turn||typeof turn!=='object')return false;
-  const minutes=Math.max(0,Math.trunc(Number(elapsed)||0)),labels={training:'훈련','class-attendance':'수업',meal:'식사',dialogue:'대화',sleep:'수면',rest:'휴식',wait:'대기',travel:'이동'},completed=[...new Set(array(completedPrefixActionTypes).map(value=>labels[value]).filter(Boolean))],completedLabel=completed.length?completed.length===1?completed[0]:`${completed.slice(0,-1).join('·')}과 ${completed.at(-1)}`:'',prefix=completedLabel?`${minutes}분 동안 진행해 앞선 ${completedLabel}을 마친 뒤, `:minutes>0?`${minutes}분 동안 행동을 진행한 뒤, `:'행동을 시작하려던 순간, ';
+  const minutes=Math.max(0,Math.trunc(Number(elapsed)||0)),labels={training:'훈련','class-attendance':'수업',meal:'식사',dialogue:'대화',sleep:'수면',rest:'휴식',wait:'대기',travel:'이동'},completed=[...new Set(array(completedPrefixActionTypes).map(value=>labels[value]).filter(Boolean))],completedLabel=completed.length?completed.length===1?completed[0]:`${completed.slice(0,-1).join('·')}과 ${completed.at(-1)}`:'',prefix=completedLabel?`앞선 ${completedLabel}을 마친 뒤, `:minutes>0?'행동을 이어가던 중, ':'행동을 시작하려던 순간, ';
   const completedAtRaisedFloor=reason==='profile-floor',scheduleLabel=String(boundaryTitle||'예정된 일정').trim()||'예정된 일정',detail=reason==='schedule-boundary'?`${scheduleLabel}의 시작 시점에 도달했다.`:reason==='consequence-boundary'?'후속 상황이 발현할 시점에 도달했다.':reason==='decision-boundary'?'플레이어의 판단이 필요한 선택 지점에 도달했다.':reason==='turn-limit'?'한 턴의 진행 한계에 도달했다.':reason==='explicit-zero'?'요청한 지속시간이 0분이므로 행동 결과는 발생하지 않았다.':reason==='invalid-structured-execution'?'구조화된 실행 결과를 검증할 수 없어 반환된 시점에서 진행을 중단했다.':completedAtRaisedFloor?'요청한 행동이 완료될 수 있는 최소 시간을 채워 행동을 마쳤다.':'요청한 시간 범위의 끝에 도달했다.';
   const text=`${prefix}${detail}${completedAtRaisedFloor?'':' 그 이후 과정은 아직 확정되지 않았다.'}`;
   turn.scene_title=reason==='schedule-boundary'?'일정 경계':reason==='consequence-boundary'?'후속 상황 경계':reason==='decision-boundary'?'선택 지점':reason==='turn-limit'?'진행 중':['explicit-zero','invalid-structured-execution'].includes(reason)?'행동 보류':completedAtRaisedFloor?'행동 완료':'행동 진행 중';
@@ -781,7 +781,7 @@ function reconcileReturnedRaisedFloorContinuation(turn,{elapsed=0}={}){
 }
 function reconcileReturnedConsequenceTurn(turn,{elapsed=0,scene=[]}={}){
   if(!turn||typeof turn!=='object')return false;
-  const minutes=Math.max(0,Math.trunc(Number(elapsed)||0)),rows=array(scene).filter(item=>String(item?.text||'').trim()).slice(0,4),boundaryText=`${minutes}분 지점에 후속 상황이 발현했다.`;
+  const minutes=Math.max(0,Math.trunc(Number(elapsed)||0)),rows=array(scene).filter(item=>String(item?.text||'').trim()).slice(0,4),boundaryText='행동을 이어가던 중 후속 상황이 발현했다.';
   if(!rows.length)return reconcileReturnedTimedTurn(turn,{reason:'consequence-boundary',elapsed:minutes});
   turn.scene_title='후속 상황';turn.scene_summary=boundaryText;turn.scene=[{kind:'narration',text:boundaryText},...rows];turn.choices=[];turn.emotion_updates=[];turn.director=null;
   return true;

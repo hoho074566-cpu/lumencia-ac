@@ -19,6 +19,21 @@ const longTraining=classifySceneIntent('일주일 동안 수련한다',{currentD
 assert.equal(longTraining.turnLimitTruncated,true,'existing one-turn safety cap remains authoritative for long compression');
 assert.match(buildSceneMomentumDirective({action:'지금 몇 시야?',saveState:{world:{date:'1285-03-01',time:'13:27'}}}),/QUESTION \/ DELIBERATION 규칙/,'a direct time question remains a same-moment player question');
 
+const guidedRoomAssignment=classifySceneIntent('기숙사 안내를 따라가서 내 방 배정을 확인한다.',{location:'루멘시아 아카데미 대강당',currentDate:'1285-03-01',currentTime:'09:15'});
+assert.equal(guidedRoomAssignment.kind,'compound-routine','an unresolved committed prefix must not be discarded in favor of a terminal observe verb');
+assert.equal(guidedRoomAssignment.compression,true,'routine movement and its dependent local action must remain one compressed turn');
+assert.match(buildSceneMomentumDirective({action:'기숙사 안내를 따라가서 내 방 배정을 확인한다.',saveState:{world:{date:'1285-03-01',time:'09:15',location:'루멘시아 아카데미 대강당'}}}),/앞선 이동.*같은 턴에 압축.*state_delta\.new_location/s,'the canonical call must preserve location progression and the dependent check');
+assert.equal(classifySceneIntent('게시판을 확인한다.',{location:'기숙사'}).kind,'observe','a standalone local check must remain an observe action');
+const travelThenObserve=classifySceneIntent('기숙사로 가서 게시판을 확인한다.',{location:'루멘시아 아카데미 대강당',currentDate:'1285-03-01',currentTime:'09:15'});
+assert.equal(travelThenObserve.kind,'compound-routine','a known travel prefix and dependent observe action must both be preserved');
+assert.match(travelThenObserve.semanticTarget,/complete-chain-at:기숙사/,'the existing structured travel destination must remain the chain target');
+const deliberatedChain=classifySceneIntent('기숙사로 가서 확인할까?',{location:'루멘시아 아카데미 대강당',currentDate:'1285-03-01',currentTime:'09:15'});
+assert.equal(deliberatedChain.kind,'decision-sensitive','a hypothetical chain must preserve player sovereignty and never auto-travel');
+const exteriorThenObserve=classifySceneIntent('밖으로 나가서 주변을 살핀다.',{location:'기숙사 개인실',currentDate:'1285-03-01',currentTime:'09:15'});
+assert.equal(exteriorThenObserve.kind,'compound-routine','an unresolved exterior prefix must survive terminal observation arbitration');
+const interruptedChain=buildSceneMomentumDirective({action:'기숙사로 가서 게시판을 확인한다.',saveState:{world:{date:'1285-03-01',time:'09:15',location:'루멘시아 아카데미 대강당'},scheduleContext:{due:[],upcoming:[{id:'required:0920',title:'필수 면담',date:'1285-03-01',time:'09:20',importance:5}]}}});
+assert.match(interruptedChain,/SCHEDULE_(?:BOUNDARY|CAP)=5min/,'a compound routine action must remain subject to an earlier hard schedule');
+
 const router=readFileSync('api/lib/context-router.js','utf8');
 const chat=readFileSync('api/chat.js','utf8');
 assert.doesNotMatch(router,/buildNarrativeTimePolicyDirective/,'Narrative Time Policy must not consume a separate instruction-budget section');
