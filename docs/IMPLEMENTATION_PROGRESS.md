@@ -20,7 +20,7 @@ Narrative Phase 1 **FROZEN**. NEXT ACTION is Narrative Phase 2 시작.
 - Overall: `0 / 9 PR merged`.
 - Terminal: `1 / 9 PR processed`.
 - Deferred: `0`.
-- P2-PR01 Fate Start Foundation — **BLOCKED** at PR #71; last fresh-reviewed pre-terminal head is `2bc44270a7b05d612c473baf9b1df5ee9b06be1d`.
+- P2-PR01 Fate Start Foundation — **BLOCKED / HUMAN_MERGE_REQUIRED** at PR #71; last fresh-reviewed pre-closure head is `8dc541dd28ebf60f8693bcddfdad77edf3085d4a`.
 - After P2-PR01 is human-merged, run one separate latest-main Narrative Flavor Baseline bounded hotfix before P2-PR02. It must close completed user intent, prefer world-native hooks over repeated meta choice prompts, preserve explicit action limits, and add acceptance for wait-to-start, dorm/unpack, three-turn hooks, and listen-at-door without entering. It is not P2-PR09 and adds no engine/parser/lifecycle/save root.
 - P2-PR02 Origin / Starting Character — TODO.
 - P2-PR03 Character Consequences — TODO.
@@ -34,11 +34,12 @@ Narrative Phase 1 **FROZEN**. NEXT ACTION is Narrative Phase 2 시작.
 - Explicitly excluded: Procedural Origin, inheritance, relationship behavior, Personal Story, Ending/Fate Book, off-screen simulation, and Phase 1 deferred correction.
 - Tests: focused Fate Start, DEBUG regression, legacy save migration, core invariants, syntax/static, `git diff --check`, and full `scripts/lumensia-pr-check.mjs` PASS. Local tested tree and remote exact-head tree both equal `e2ee9f915e878bd0ae016e4ebd81deba7dfcd9ef`.
 - Hosted: current-head Safety run `33079126915` PASS; Vercel deployment `psFFXWhsRZoRhEG8Xss45qa4fyUb` Ready; fresh exact-head Codex review P0=0/P1=0; GitHub mergeable/conflict-free/behind 0.
-- BLOCKER: after the Android client update, secure ChatGPT authentication to the protected Preview succeeded and the deployed game rendered. Opening `새 게임` then exposed the native replacement confirmation, but the cloud browser controller entered persistent CDP recovery timeouts before it could accept the dialog; fresh-tab and documented handoff recovery also failed. Required UI/persistence acceptance therefore remains externally blocked, not failed. This is a browser-control failure, not a code P1. Protected `app.js` / `app-runtime.js` also make merge human-only.
+- Exact Preview: **PASS** by user on the protected PR #71 deployment. Existing free/paste controls remained available; Fate Start female + fallen noble + magic department creation succeeded; INFO reflected the selection; reload preserved it.
+- BLOCKER: no code or acceptance blocker remains. Protected `app.js` / `app-runtime.js` make merge human-only, and the next latest-main hotfix depends on this merge.
 - ROOT_CAUSE_CLASS: **NONE**. CORRECTION_BUDGET: **0/1**. SCOPE_EXPANSION: **NO**.
 - PHASE_2_BACKLOG_CANDIDATE: P2 `3872135947` notes that a custom free-mode department appended by pasted input could later be copied into the Fate selector and rejected by its fixed allowlist. P2 `3872204510` notes that `/lib/fate-start.js` is not in the service-worker offline shell, so a fresh offline PWA launch can fail before that module has been cached. Both are non-blocking backlog and are not corrected in this bounded PR.
 - PHASE1_DEFERRED_TOUCHED: **NO**.
-- NEXT ACTION: reconnect a fresh controllable authenticated browser to PR #71 Preview and run the one required acceptance: free/paste controls remain present; switch to Fate Start; select female + fallen noble + magic department; create; verify INFO; reload and verify the selection persists. If PASS, publish terminal closure and leave protected PR #71 for human expected-head merge. After that merge, run the bounded Narrative Flavor Baseline hotfix from latest main; only after its MERGED or non-blocking DEFERRED terminal state start P2-PR02.
+- NEXT ACTION: finish the docs-only exact-head Safety/Vercel/fresh-review cycle, then human-merge PR #71 using the reported expected head. After post-merge verification, run the bounded Narrative Flavor Baseline hotfix from latest main; only after its MERGED or non-blocking DEFERRED terminal state start P2-PR02.
 
 ## Permanent P0/P1 Operation Rule
 - Current exact HEAD에 P0/P1이 남아 있는 동안 repository-authorized remediation 범위 안에서 수정·focused test·full regression·push·hosted gate·fresh exact-head review를 계속한다. 중간 보고·`MERGE_GATE: FAIL`·새 review·HEAD 변경만으로는 멈추지 않는다.
