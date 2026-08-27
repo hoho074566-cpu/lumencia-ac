@@ -27,7 +27,22 @@ Repository: `hoho074566-cpu/lumencia-ac`
 
 ---
 
-# 0. NPC SIGNIFICANCE EVALUATOR V1 — AUTHORITATIVE CURRENT TASK
+# 0. KNOWLEDGE BOUNDARIES V1 — AUTHORITATIVE CURRENT TASK
+
+- Latest verified main is `9f2274abeef7f34531c8d0240f66ed39293b9eef`, the human merge of PR #67 NPC Significance Evaluator V1 from reviewed head `3293e1c11569e5531518ae7e05918a54693c2bb9`. NPC Significance is complete and is not being redesigned.
+- PR #68 Relationship Thresholds V1 remains open, unmerged, and **deferred** at exact head `d58a31022ac7e5bc99c53fb1ee579405e78bd31f`. Its exhausted-budget blockers are current-turn threshold eligibility and rejected-claim followup residue. Do not correct either blocker, mutate its Preview, or use its branch as a base.
+- PR #66 Setup -> Payoff Memory V1 remains open, unmerged, and **deferred** at exact head `fbf2935c1229b8f16bed404b48c3cdf0abb95809`. Its separate schedule-reconciliation receipt-loss blocker remains untouched and does not block Phase 1 FREEZE.
+- Knowledge Boundaries V1 is developed on `codex/knowledge-boundaries-v1`, created directly from verified main `9f2274a...`; it contains no PR #66/#68 commit.
+- V1 reuses existing `memories.npc`, `memories.global`, `pcKnowledge`, current participants, canonical response schema, and the one existing model call. `memories_add.knowledge_basis` is the bounded provenance enum `witnessed|told|public|private`; it is not a new save root.
+- The model makes the semantic visibility/communication judgment. Deterministic code only enforces registered NPC ownership, authoritative/current-scene membership for witnessed/told claims, explicit source requirements, and sourced low-secret world/global membership for public facts. PC-only, another NPC's memory, private/off-screen, invalid owner, and unknown provenance cannot cross that boundary.
+- Ignorance is silent by default. The feature does not force “I do not know” dialogue or create automatic NPC events. Player sovereignty, NPC significance, goal, scene momentum, schedule authority, and META/AUTO/CONTINUE behavior remain unchanged.
+- No new model call, save root, parser, Korean wording regex, generic knowledge lifecycle/state engine, NPC knowledge database, rumor/faction propagation system, or relationship-threshold correction exists in this branch.
+- Focused Knowledge Boundaries and relevant Context Router/authority-tail/core/NPC/scene/save/CONTINUE/world/faction regressions pass. The one allowed bounded correction is consumed: the initial reserved context placement displaced the head of USER ACTION at the minimum adaptive budget, so the always-on general contract remains in production instructions while the compact per-turn membership block is first in pressure-clippable optional context. USER ACTION and the authoritative schedule tail are again preserved.
+- Remaining gate sequence: full `scripts/lumensia-pr-check.mjs`, exact-head publication, Safety, Vercel, and one fresh exact-head review. A separate structural P1 now causes bounded DEFER with no further correction. Whether merge-ready or deferred, NEXT ACTION is **Narrative Phase 1 FREEZE**; PR #66/#68 do not block it.
+
+---
+
+# 0. NPC SIGNIFICANCE EVALUATOR V1 — SUPERSEDED COMPLETED CHECKPOINT
 
 - PR #66 Setup -> Payoff Memory V1 is explicitly **deferred** at exact head `fbf2935c1229b8f16bed404b48c3cdf0abb95809`. Keep it open and unmerged; do not close it, mutate its Preview, or use it as the base of later work.
 - The approved failure-outcome propagation correction on #66 passed focused A-I, full repository regression, `scripts/lumensia-pr-check.mjs`, Exact Preview, Safety, and Vercel. Later P1 `3871077298` is a distinct schedule-reconciliation loss of an already validated/resolved payoff receipt. Do not correct or generalize that lifecycle problem in #66.
@@ -952,14 +967,14 @@ Fresh direct review `5037414704` on initial PR #61 exact head `4dc7f4f3768b4635e
 
 # 12. NEXT ACTION — CURRENT START POINT
 
-1. Preserve PR #66 at its deferred blocker. Do not merge/close it, mutate its Preview, fix P1 `3871077298`, or use `codex/setup-payoff-memory-v1` as a base.
-2. Continue **NPC Significance Evaluator V1** only on `codex/npc-significance-evaluator-v1`, based on main `9de2b595...`.
-3. Keep scope to the existing model-owned `director.spotlight_keys` semantic receipt: at most one primary and one causal support from routed canonical NPCs. Deterministic code owns only membership/cap/freeze invariants.
-4. Preserve one canonical model call, stable routing/Core/Director/Orchestration, `store:false`, prompt cache/retention, Context Router budgets, saves, canon, NPC autonomy, and player sovereignty. Add no score engine, natural-language regex, save root, lifecycle, parser, relationship threshold, knowledge-boundary system, or generic NPC simulation.
-5. PR #67 code/docs head `b62693e9...` passed full regression, Safety `33067212240`, Vercel, conflict checks, and fresh P0=0/P1=0 review `5438312419`. Publish the docs-only closure, require exact-head hosted confirmation, then leave the protected-path PR for human merge. The one bounded correction is already consumed; any structural P1 stops this task without another iteration.
+1. Keep PR #66 and PR #68 deferred, open, unmerged, and untouched. Do not mutate their code/Preview/blockers or use either branch as a base.
+2. Finish only **Knowledge Boundaries V1** on `codex/knowledge-boundaries-v1`, created from main `9f2274a...`: full repository check, exact-head publication, Safety, Vercel, and one fresh exact-head review.
+3. Preserve the existing model-semantic ownership decision and the bounded `knowledge_basis` enum/membership/source/secret invariants. Add no model call, save root, parser, wording regex, generic knowledge lifecycle/state engine, NPC knowledge database, or rumor/faction propagation system.
+4. Correction budget is consumed at 1/1 by the adaptive context-budget repair. Any separate structural P1 causes immediate bounded DEFER; do not iterate another correction.
+5. After merge-ready or bounded-DEFER closure, start no more Phase 1 feature work. NEXT ACTION is **Narrative Phase 1 FREEZE**. Deferred PR #66/#68 and non-critical new findings are not FREEZE blockers.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> Read both progress documents first. PR #66 Setup -> Payoff Memory V1 is deferred at `fbf2935c...` because distinct lifecycle P1 `3871077298` remains after its approved correction; do not touch, merge, close, Preview-mutate, or base new work on it. Current main is `9de2b595...`. PR #67 NPC Significance Evaluator V1 is the separate main-based task: reviewed head `b62693e9...` passed full regression, Safety, Vercel, conflict checks, and direct P0=0/P1=0. Publish/verify the docs-only closure, then leave the protected-path PR for human merge. Scope remains model-semantic `director.spotlight_keys` primary/support plus deterministic routed-key/1+1/freeze bounds; no score/regex/save-root/lifecycle/second-call expansion. The correction budget is consumed; any fresh structural P1 stops the task.
+> Read both progress documents first. Latest verified main is `9f2274a...`, with NPC Significance merged. PR #66 remains deferred at `fbf2935c...`; PR #68 remains deferred at exact head `d58a310...` with its two exhausted-budget blockers. Touch neither PR or Preview and use neither as a base. Continue only Knowledge Boundaries V1 on `codex/knowledge-boundaries-v1`: existing memory-row `knowledge_basis`, canonical ownership/presence/source/public bounds, one model call, no new save root/parser/regex/lifecycle. Correction budget is consumed 1/1; any separate structural P1 means bounded DEFER. After hosted gates and fresh exact-head review, NEXT ACTION is Narrative Phase 1 FREEZE whether merge-ready or deferred.

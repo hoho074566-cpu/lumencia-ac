@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { zodTextFormat } from 'openai/helpers/zod';
 import { z } from 'zod/v4';
 import { FACTION_EVIDENCE_TYPES, FACTION_KEYS } from '../lib/faction-social-consequence.js';
+import { deriveNpcKnowledgeBoundary, sanitizeKnowledgeMemoryRows } from '../lib/npc-knowledge-boundaries.js';
 
 // LUMENSIA MOBILE V1.4.7 single-file API bundle
 // api/lib modules are inlined for mobile-friendly GitHub deployment.
@@ -74,7 +75,7 @@ const GM_RULES = `너는 판타지 아카데미 장기 RPG 「루멘시아 아�
 2. 세계와 NPC는 PC가 보지 않는 곳에서도 각자 일정·목표·이해관계에 따라 움직인다.
 3. NPC는 각자의 성격·신분·지식·말투를 유지하고, 이유가 있으면 먼저 접근·질문·도발·거래·대련 제안 등을 한다. 모든 NPC가 PC를 좋아하거나 중요하게 여기지 않는다.
 4. WORLD/NPC CANON/NPC SPEECH/CURRENT STATE/PC SYSTEM을 지킨다. 동적 현재 상태는 AUTHORITATIVE SAVE_STATE를 최우선으로 한다.
-5. LEVEL 4~5 정보는 정당한 발견 전 PC나 일반 NPC의 지식으로 사용하지 않는다. 객관적 사실·소문·추정·기관 분석·종교 해석을 구분한다.
+5. LEVEL 4~5 정보는 정당한 발견 전 PC나 일반 NPC의 지식으로 사용하지 않는다. NPC는 자기 기억, 실제 직접 목격, 명시적으로 전달받은 내용, 공개 사실만 행동 근거로 사용한다. PC만 아는 정보·다른 NPC의 기억·GM/off-screen 정보는 근거가 아니다. 근거가 없으면 그 정보를 사용하지 않는 것이 기본이며 반드시 “모른다”고 대사할 필요는 없다. 객관적 사실·소문·추정·기관 분석·종교 해석을 구분한다.
 6. 시도는 자동 성공하지 않는다. 전투·판정은 능력, 준비, 정보, 경험, 상성, 거리, 타이밍, 지형, 피로, 부상, 심리를 종합한다. 억지 성공/억지 실패 금지.
 7. 성장·스킬 경험은 실제 훈련·실전·실패·교정·통찰과 관련될 때만 천천히 누적한다. 의미 없는 반복이나 자해성 꼼수에 보상하지 않는다.
 8. 관계는 실제 사건으로 서서히 변한다. 정치적 동맹과 개인 감정을 구분한다. relationship_changes는 NPC와 PC 사이의 변화만 기록하고 cause=변화 원인, expression=이번 장면에서 드러난 행동/표정/말투, followup=다음 행동에 실제로 남는 변화(없으면 null)를 함께 반환한다. npc_relationship_changes는 NPC가 다른 NPC를 향해 실제로 보인 방향성 변화만 기록한다. 직접 상호작용하거나 권위 있는 공동 사건의 인과가 있을 때만 쓰며, 같은 장면에 있었다는 이유만으로 관계를 바꾸지 않는다. faction_reputation_changes는 공개 조직이 PC를 보는 집단 평판만 기록한다. 공개 사건·공식 기록·등록 NPC의 실제 목격·출처 있는 소문이 있을 때만 쓰고, credible_rumor에는 실제 출처나 전달 경로를 source에 적는다. 사적 행동이나 단순 동석으로 바꾸지 않는다. 집단 평판은 개인 NPC 관계나 NPC 간 관계를 자동 변경하지 않는다. 늦게 돌아올 조직 반응은 기존 delayed_consequences_add로 별도 예약한다.
@@ -92,7 +93,7 @@ const GM_RULES = `너는 판타지 아카데미 장기 RPG 「루멘시아 아�
 - rumor: 전달된 소문/평판. 출처가 있으면 source에 적는다.
 - promise: 실제 약속.
 - deferred_hook: 날짜 없는 보류 제안.
-subject는 무엇/누구에 관한 기억인지, source는 목격/전달 출처, confidence는 0~1 확신도, status는 필요할 때 active/resolved/declined/expired/completed를 쓴다. 모르면 null.
+subject는 무엇/누구에 관한 기억인지, source는 목격/전달 출처, confidence는 0~1 확신도, status는 필요할 때 active/resolved/declined/expired/completed를 쓴다. NPC owner는 npc:등록키, 세계 owner는 world/global을 쓴다. PC만 아는 내용은 memories_add가 아니라 pc_knowledge_add에 넣는다. knowledge_basis는 witnessed/told/public/private 중 하나다. witnessed/told는 해당 NPC가 현재 장면에 실제로 있고 source가 있어야 한다. public은 출처가 있고 비밀등급 0~1인 world/global 기억에만 쓴다. 그 밖에는 private다. 모르면 null.
 importance는 1~5다. 1=잡담성, 2=기억할 만함, 3=중요, 4=장기 관계/약속에 지속 영향, 5=절대 잊으면 안 되는 핵심. 비밀등급을 지키고 NPC별 기억과 PC 지식을 섞지 않는다. 중요도 4~5는 반복 요약에서 사라져도 장기기억으로 유지된다고 가정한다.
 16. npc_state_updates에는 이번 장면으로 실제 확인되거나 변화한 주요 NPC의 위치·상태·현재 목표만 넣는다. 전지적 추측으로 채우지 않는다.
 17. scene_summary는 이번 턴의 중요한 사실을 1~4문장으로 압축한다. 장기기억/타임라인에 쓰인다.
@@ -891,6 +892,7 @@ const cleanMemory = (memory) => ({
   turn: Number(memory?.turn || 0),
   subject: trimText(memory?.subject || '', 120) || null,
   source: trimText(memory?.source || '', 180) || null,
+  knowledge_basis: ['witnessed','told','public','private'].includes(memory?.knowledge_basis) ? memory.knowledge_basis : 'private',
   confidence: memory?.confidence == null ? null : Math.max(0, Math.min(1, Number(memory.confidence) || 0)),
   status: trimText(memory?.status || '', 40) || null,
 });
@@ -1245,6 +1247,7 @@ const MemoryAdd = z.object({
   secret_level: z.number().int().min(0).max(5),
   subject: z.string().max(120).nullable(),
   source: z.string().max(200).nullable(),
+  knowledge_basis: z.enum(['witnessed','told','public','private']),
   confidence: z.number().min(0).max(1).nullable(),
   status: z.enum(['active','resolved','declined','expired','completed']).nullable(),
 });
@@ -1427,7 +1430,7 @@ const EXPRESSIONS = new Set(['default', 'smile', 'blush', 'serious', 'angry', 's
 const clamp = (n, min, max) => Math.min(max, Math.max(min, Number(n) || 0));
 const arrays = (value, max) => Array.isArray(value) ? value.slice(0, max) : [];
 
-function sanitizeTurn(turn, { allowedCgIds = [] } = {}) {
+function sanitizeTurn(turn, { allowedCgIds = [], saveState = {}, inputMode = 'game' } = {}) {
   if (!turn || typeof turn !== 'object') throw new Error('모델 응답이 비어 있습니다.');
   const dm = turn.director || {};
   const allowedIntervention = new Set(['none','light','medium','scheduled','aftermath']);
@@ -1514,7 +1517,14 @@ function sanitizeTurn(turn, { allowedCgIds = [] } = {}) {
   d.active_events_remove = arrays(d.active_events_remove, 8);
   d.completed_events_add = arrays(d.completed_events_add, 8);
   d.pc_knowledge_add = arrays(d.pc_knowledge_add, 10);
-  d.memories_add = arrays(d.memories_add, 12).map(row => ({
+  const knowledgeBoundary = deriveNpcKnowledgeBoundary({
+    saveState,
+    npcKeys: [...REGISTERED_SPEAKER_KEYS],
+    registeredNpcKeys: [...REGISTERED_SPEAKER_KEYS],
+    currentSceneNpcKeys: turn.scene.map((item) => item?.speaker_key).filter(Boolean),
+    mode: inputMode,
+  });
+  const normalizedMemories = arrays(d.memories_add, 12).map(row => ({
     ...row,
     importance:clamp(row?.importance,1,5),
     secret_level:clamp(row?.secret_level,0,5),
@@ -1523,6 +1533,10 @@ function sanitizeTurn(turn, { allowedCgIds = [] } = {}) {
     confidence:row?.confidence == null ? null : clamp(row.confidence,0,1),
     status:String(row?.status || '').slice(0,40) || null,
   }));
+  d.memories_add = sanitizeKnowledgeMemoryRows(normalizedMemories, {
+    boundary: knowledgeBoundary,
+    registeredNpcKeys: [...REGISTERED_SPEAKER_KEYS],
+  }).rows;
   d.scheduled_events_add = arrays(d.scheduled_events_add, 8).map(row => ({...row, participants:arrays(row?.participants,12).filter(key=>REGISTERED_SPEAKER_KEYS.has(key)), importance:clamp(row?.importance,1,5)}));
   d.scheduled_events_complete = arrays(d.scheduled_events_complete, 8).map(String);
   d.hooks_add = arrays(d.hooks_add, 8).map(row => ({
@@ -1644,7 +1658,7 @@ export default async function handler(req, res) {
       return json(res, 502, { error: '구조화된 게임 응답을 받지 못했습니다.', request_id: response._request_id });
     }
 
-    let turn = sanitizeTurn(response.output_parsed, { allowedCgIds: availableCgIds });
+    let turn = sanitizeTurn(response.output_parsed, { allowedCgIds: availableCgIds, saveState, inputMode });
     if (!adultActive && turn?.state_delta) turn.state_delta.intimacy_changes = [];
     if (inputMode === 'meta') {
       turn.director = { intervention:'none', beat:'routine', event_kind:'none', spotlight_keys:[], callback_key:null, callback_phase:'none', callback_note:null, reason:'META freeze' };
