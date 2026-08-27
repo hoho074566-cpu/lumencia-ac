@@ -27,7 +27,7 @@ Repository: `hoho074566-cpu/lumencia-ac`
 
 ---
 
-# 0. PR #66 SETUP -> PAYOFF MEMORY V1 — FINAL REVIEW PENDING
+# 0. PR #66 SETUP -> PAYOFF MEMORY V1 — P0/P1 CLOSED
 
 - PR #65 is merged; current `origin/main` is `9de2b595555000dc462d3db67f4db5c9aff79750`. PR #66 branch `codex/setup-payoff-memory-v1` is based and merge-based on that main with behind 0.
 - Exact lifecycle code checkpoint `0426d472d3680a1985fb55ce1781719a7b1977ed` contains the authorized priority and lifecycle-contract corrections. A required schedule/hard boundary remains first; only an unresolved/reachable payoff whose stable ID, awaiting choice turn, presented option, and exact player selection all match may precede generic `ACTIVE_COMBAT_FIXED_FLOW`.
@@ -35,7 +35,9 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - The existing canonical beat enum is now bound by an explicit minimal contract: open-to-opportunity accepts `choice|payoff_opportunity`; an already presented and exactly selected continuation additionally accepts only `combat`; resolution accepts only the exact `payoff` or `aftermath` beat. Arbitrary canonical beats and phase skipping remain blocked.
 - Focused affected suites, syntax/static checks, `git diff --check`, full repository regression, Repository checks, and Vercel PASS for the code checkpoint.
 - Exact Preview PASS: the original selected rule choice no longer returns either lifecycle 409, advances into the agreed duel, and offers the next player-owned choice. Five subsequent owned combat selections continue under the exact same `rival-proof` callback. The public turn-13 checkpoint remains `status=opportunity`, `lastTurn=13`, beat/phase `payoff_opportunity`, with an exact current choice hook; it neither auto-resolves nor skips to aftermath.
-- Final fresh exact-docs-head review and merge-state revalidation remain. Do not add further allowlist entries or P2/P3 hardening. PR #66 changes protected paths and remains human-merge only.
+- Fresh direct review `5038937933` on exact head `b4f1391ed7499a86a245daffb1e5b0aaa621a156` reports P0=0/P1=0. Two P2 findings—long choice truncation in the older turn-hook anchor and pre-V1 non-ASCII callback-ID compatibility—remain backlog and are not fixed in this bounded PR.
+- Current main/base/merge-base equal `9de2b595...`, behind 0, mergeable true, no conflict; Repository checks, Vercel, and Merge Readiness PASS. Unresolved threads are superseded prior-head findings or current P2 backlog, not current P0/P1.
+- The final docs-only checkpoint requires Vercel/fresh direct confirmation. If green, report the docs exact HEAD as human-merge-ready. Do not add further allowlist entries or P2/P3 hardening; PR #66 remains protected and human-merge only.
 
 ---
 
@@ -951,14 +953,14 @@ Fresh direct review `5037414704` on initial PR #61 exact head `4dc7f4f3768b4635e
 
 # 12. NEXT ACTION — CURRENT START POINT
 
-1. Commit/push the lifecycle acceptance docs and run the full repository check on that exact HEAD.
-2. Require current-head Vercel and fresh direct Codex P0/P1=0; prior-head review is not approval.
-3. If zero, revalidate current main/base/merge-base, behind 0, conflict/thread/check state, and protected-path human-merge policy. Do not add P2/P3 hardening.
-4. If all gates pass, mark PR #66 merge-ready and notify the user of the exact expected HEAD for human merge.
-5. If the same lifecycle/beat P1 recurs, stop correction, retain fail-closed behavior, and record unmerged closure/follow-up rather than widening the contract.
+1. Commit/push this final docs-only checkpoint and run full regression on its exact HEAD.
+2. Require docs-head Vercel and fresh direct P0/P1=0; make no P2/P3 change.
+3. Reconfirm unchanged main/base/merge-base, behind 0, no conflict, Repository/Vercel/Merge Readiness.
+4. If green, notify the user that protected PR #66 may be human-merged at the exact expected docs HEAD.
+5. If the same lifecycle/beat P1 recurs, stop correction and retain fail-closed unmerged closure rather than widening the contract.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> Read both progress documents first. PR #65 is merged and current main is `9de2b595...`. PR #66 lifecycle code checkpoint `0426d472...` uses a bounded canonical phase/beat contract, passes focused/full/Repository/Vercel and the exact owned-continuation Preview corpus. Commit/push the final docs checkpoint, require fresh exact-head P0/P1=0, then revalidate the protected human-merge gate. Do not widen the allowlist or add P2/P3 hardening.
+> Read both progress documents first. PR #65 is merged and current main is `9de2b595...`. PR #66 code checkpoint `0426d472...` and reviewed docs head `b4f1391...` pass focused/full/Repository/Vercel/Preview with fresh direct P0/P1=0 and only two non-blocking P2s. Publish and confirm the final docs-only exact HEAD, then report the protected human-merge gate. Do not widen the allowlist or add P2/P3 hardening.
