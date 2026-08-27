@@ -27,6 +27,18 @@ Repository: `hoho074566-cpu/lumencia-ac`
 
 ---
 
+# 0. PR #66 SETUP -> PAYOFF MEMORY V1 — CURRENT BLOCKER
+
+- PR #65 is merged; current `origin/main` is `9de2b595555000dc462d3db67f4db5c9aff79750`. PR #66 branch `codex/setup-payoff-memory-v1` is based and merge-based on that main with behind 0.
+- Exact code checkpoint `80e24075ad9297708bd8cc7ac016c894f5240eff` implements the one authorized structural priority correction. A required schedule/hard boundary remains first; only an unresolved/reachable payoff whose stable ID, awaiting choice turn, presented option, and exact player selection all match may precede generic `ACTIVE_COMBAT_FIXED_FLOW`.
+- Wrong/stale/resolved/other-turn/other-option/unselected cases fail closed and do not consume a payoff. Ordinary active combat retains its original route. No regex/parser/save-root/model-call/time/combat redesign was added.
+- Focused affected suites, syntax/static checks, `git diff --check`, and full repository regression PASS. Repository/Vercel checks are green for the code checkpoint.
+- Exact Preview proves the priority root cause is closed: the owned selection no longer fails as `unselected-payoff-opportunity` and routes the exact callback through `CALLBACK_PRIORITY`.
+- A separate downstream blocker is now authoritative: the canonical response supplies `callback_phase=payoff_opportunity` with a beat rejected by the lifecycle validator, causing `payoff-opportunity-beat-mismatch`. State remains fail-closed; this is not a recurrence of the generic-combat priority bug.
+- The user authorized one bounded correction only. Do not add a second phase/beat semantic expansion to this cycle. PR #66 is unmerged and `MERGE_GATE: FAIL`; the mismatch must be handled as a separately bounded lifecycle-contract task before merge readiness can be reconsidered.
+
+---
+
 # 0. ACTIVE THREADS V1 POST-MERGE CLOSURE — AUTHORITATIVE
 
 - PR #64 `Active Threads V1`은 reviewed exact head `4727a468f15c0f8e2990c4ae55cb688e12cc5ec6`에서 사람 병합됐다. 최신 `origin/main`은 merge commit `609c2bc0e4dd7931156687c32e59ed2ed2f28fa6`다.
@@ -939,14 +951,14 @@ Fresh direct review `5037414704` on initial PR #61 exact head `4dc7f4f3768b4635e
 
 # 12. NEXT ACTION — CURRENT START POINT
 
-1. Fetch and verify the latest `origin/main`, then begin **Setup -> Payoff Memory V1** on a separate focused branch; do not reopen Adaptive Time/TPP/Narrative Time or Active Threads P2 hardening.
-2. First perform a read-only inventory of existing hooks, Director callbacks, event consequence sources, visible world-result facts, recent-turn memory, event progress/completion, and routed context. Identify which existing authority can represent a setup, its public knowledge boundary, payoff eligibility, and terminal consumption without a parallel save root.
-3. Produce a bounded design for setup registration, deterministic payoff eligibility/priority, once-only consumption, expiry/cancellation, player-choice protection, secret/canon boundaries, routing budget, and META/AUTO/CONTINUE behavior. Prefer existing hook/callback/event IDs and evidence over free-form narration inference.
-4. Preserve one canonical model call, stable routing, `store:false`, prompt cache/retention, Context Router budgets, save compatibility, canon, and player sovereignty. Do not make the model invent a payoff merely because a setup is old; uncertain or hidden ownership fails closed.
-5. Add focused permanent regressions before implementation: setup survives unrelated turns, payoff requires causal evidence and PC visibility, consumed/cancelled setup does not replay, unrelated hooks do not fire, meaningful payoff choice stops AUTO, and META/CONTINUE remain frozen. Then run full repository regression and hosted exact-head review/Preview on the focused PR.
+1. Keep protected PR #66 unmerged and complete the current docs exact-head hosted/fresh-review checkpoint. Exact Preview remains the blocking authority while `payoff-opportunity-beat-mismatch` persists.
+2. Preserve the completed routing fix: hard boundary > exact owned/presented/selected continuation > generic active combat > ordinary flow. Do not reopen the resolved priority root cause or add wording/parser/time/combat patches.
+3. Start only a separately bounded lifecycle-contract analysis for the phase/beat mismatch. Compare the canonical structured response contract with the deterministic validator allowlist and identify one general, fail-closed authority; do not infer ownership from narration or add a model call.
+4. Any separately authorized fix must retain exact callback/action ownership, stale/resolved/wrong-choice rejection, hard-boundary precedence, player sovereignty, and META/AUTO/CONTINUE freeze, with focused/full regression, Exact Preview, Vercel, and fresh exact-head P0/P1 review.
+5. P2/P3 remain backlog. Do not return to time-engine/TPP or expand Setup -> Payoff beyond V1's existing-setup, legitimately selected-payoff continuation goal.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> Read both progress documents first. PR #64 merged reviewed Active Threads head `4727a468...` as main `609c2bc...`; reviewed and merged trees are identical and production/full regression/runtime acceptance pass. Active Threads V1 and the PR #62 time stack are completed foundations. PR #59/#60 remain closed-unmerged. Do not continue time-engine or Active Threads P2 hardening. The current Narrative Engine NEXT ACTION is Setup -> Payoff Memory V1, beginning with read-only reuse analysis of existing hook/callback/event/consequence/memory authority and no parallel save root or second model call.
+> Read both progress documents first. PR #65 is merged and current main is `9de2b595...`. PR #66 exact code checkpoint `80e24075...` closes the generic-active-combat continuation priority root cause, passes focused/full regression and hosted checks, but Exact Preview exposes the distinct fail-closed `payoff-opportunity-beat-mismatch` lifecycle-contract blocker. Keep PR #66 unmerged, finish the docs exact-head review checkpoint, and make any later phase/beat work a separately bounded general contract task—no wording/parser/time/combat expansion or second model call.

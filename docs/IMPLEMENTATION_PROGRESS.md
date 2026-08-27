@@ -1,7 +1,7 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Narrative Engine continuation — Active Threads V1 post-merge closure complete; Setup -> Payoff Memory V1 is the next unfinished foundation.
+Narrative Engine continuation — PR #66 Setup -> Payoff Memory V1 bounded continuation-priority correction complete; a separate payoff phase/beat contract blocker remains.
 
 ## Permanent P0/P1 Operation Rule
 - Current exact HEAD에 P0/P1이 남아 있는 동안 repository-authorized remediation 범위 안에서 수정·focused test·full regression·push·hosted gate·fresh exact-head review를 계속한다. 중간 보고·`MERGE_GATE: FAIL`·새 review·HEAD 변경만으로는 멈추지 않는다.
@@ -12,7 +12,8 @@ Narrative Engine continuation — Active Threads V1 post-merge closure complete;
 
 ## Current GitHub State
 - Repo: `hoho074566-cpu/lumencia-ac`
-- Main: `609c2bc0e4dd7931156687c32e59ed2ed2f28fa6` (PR #64 merge).
+- Main: `9de2b595555000dc462d3db67f4db5c9aff79750` (PR #65 merge).
+- PR #65 is `merged=true`; its reviewed head is `91e62f1b86a94e0e498ab79ab20c58c8518c9535`.
 - PR #64 reviewed head `4727a468f15c0f8e2990c4ae55cb688e12cc5ec6` and merged main share tree `ce54953f9185642cd294a5bccfe401e002745a42`.
 - PR #64 is `merged=true`. Production Vercel PASS and production `/api/health` HTTP 200 confirm adapter `0.8.7`, canonical `/api/chat`, stable router/context paths, `24h` prompt retention, and preserved HF1 budgets.
 - Merged-main full repository regression and Active Threads focused lifecycle/routing/freeze tests PASS. Production runtime acceptance completed the entrance ceremony, continued by AUTO without replay, then disabled AUTO at the next meaningful player-owned department choice.
@@ -24,6 +25,16 @@ Narrative Engine continuation — Active Threads V1 post-merge closure complete;
 - PR #54/#55/#56/#57/#58/#61 are integrated through #62 and closed as superseded. They must not be merged separately.
 - PR #59 and #60 remain closed-unmerged. Their 29 and 6 safe-tree-exclusive commits have zero inclusion in merged main.
 - Time systems and Active Threads V1 are now completed bases. Their non-blocking P2 findings remain backlog and do not trigger a new correction.
+
+## PR #66 Setup -> Payoff Memory V1 — bounded correction checkpoint
+
+- Branch: `codex/setup-payoff-memory-v1`; code checkpoint: `80e24075ad9297708bd8cc7ac016c894f5240eff`; base and merge-base: current main `9de2b595555000dc462d3db67f4db5c9aff79750`; behind 0.
+- The authorized structural correction uses the existing awaiting player-choice hook, stable callback/payoff ID, exact presented option, established turn, and unresolved/reachable callback lifecycle as the only owned-continuation authority. A scheduled hard boundary remains first, a validated owned continuation now precedes generic `ACTIVE_COMBAT_FIXED_FLOW`, and every mismatch falls back without consuming a payoff.
+- No Korean wording regex, parser expansion, save root, callback redesign, model call, TPP/time change, combat redesign, or new payoff feature was added. META/AUTO/CONTINUE freeze and player sovereignty remain covered.
+- Focused Setup/Payoff, turn-hook, Scene Orchestration, Context Router, authority-tail, syntax/static checks, `git diff --check`, and full `scripts/lumensia-pr-check.mjs origin/main HEAD` PASS. Repository checks and Vercel are green for the code checkpoint.
+- Exact Preview confirms the approved priority root cause is closed: the selected owned option no longer returns `unselected-payoff-opportunity`, and local routing telemetry selects the exact `rival-proof` callback through `CALLBACK_PRIORITY` instead of generic active combat.
+- Exact Preview then fails at a distinct downstream contract: the canonical response reports `callback_phase=payoff_opportunity` with a beat outside the current lifecycle validator allowlist, producing `Setup/payoff lifecycle rejected: payoff-opportunity-beat-mismatch`. This is not the corrected combat-priority root cause and is not persistence corruption; the save remains fail-closed.
+- Per the one-correction closure budget, no additional phase/beat allowlist or semantic expansion is added to PR #66 in this cycle. PR #66 remains protected, unmerged, and `MERGE_GATE: FAIL` pending a separately bounded lifecycle-contract decision/fix and its own regression/Preview/review cycle.
 # HISTORICAL ARCHIVE — NON-ACTIONABLE
 
 The entries below preserve the former #54-#61 development/review chronology only. Their old P0/P1, blocker, MERGE_GATE, and NEXT ACTION wording is superseded by the authoritative closure above and must not restart time-engine work. PR #57 is now an included ancestor rather than an active branch.
@@ -630,8 +641,8 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 
 # NEXT ACTION — AUTHORITATIVE
 
-1. Treat Active Threads V1 as completed and begin Setup -> Payoff Memory V1 from the latest verified main. Do not reopen time-engine/TPP work or PR #64 P2 hardening.
-2. Inventory existing hooks, Director callbacks, event-consequence sources, visible world-result facts, recent-turn memory, event progress/completion, and routed context. Reuse existing canonical IDs and lifecycle state; do not add a parallel save root.
-3. Produce a bounded analysis/plan before implementation: setup registration, public/PC knowledge boundary, deterministic payoff eligibility and priority, causal evidence, once-only consumption, expiry/cancellation, meaningful-stop behavior, and META/AUTO/CONTINUE freezes.
-4. Preserve one canonical model call, stable `/api/chat-router -> api/chat.js`, `store:false`, prompt cache/retention, Context Router budgets, save compatibility, canon, and player sovereignty. Fail closed on hidden, ambiguous, completed, cancelled, or unowned setup/payoff claims.
-5. Add permanent focused regressions for unrelated-turn persistence, evidence-gated payoff, no replay after consumption/cancellation, unrelated-hook isolation, meaningful player-choice STOP, and freeze modes; then run full regression and hosted exact-head review/representative Preview on a separate focused PR.
+1. Keep PR #66 unmerged. Complete this docs exact-head hosted/fresh-review checkpoint, but do not report it merge-ready while Exact Preview returns `payoff-opportunity-beat-mismatch`.
+2. Treat the combat-routing priority correction as complete. Do not add another priority, wording, parser, time, or combat correction for the resolved `unselected-payoff-opportunity` reproduction.
+3. Analyze the phase/beat mismatch as a separate bounded lifecycle-contract task: determine whether the existing canonical response contract or deterministic validator has an internally inconsistent allowlist, preserve fail-closed behavior, and add no free-form narration inference or new model call.
+4. If a small general contract/validator correction is independently authorized, cover matching phase/beat acceptance plus wrong ID, stale/resolved, hard-boundary, unrelated action, and META/AUTO/CONTINUE negatives; then repeat focused/full, Exact Preview, Vercel, and fresh exact-head review.
+5. Preserve one canonical model call, stable routing, `store:false`, prompt cache/retention, Context Router budgets, save compatibility, canon, player sovereignty, and protected-path human merge only. P2/P3 remain backlog.
