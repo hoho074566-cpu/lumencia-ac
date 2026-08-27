@@ -95,6 +95,17 @@ const NATURAL_STYLE = String.raw`[NATURAL NPC / SCENE]
 - '그렇군/흥미롭군/이해했다 → 설명 → 질문' 같은 정형 루프와 매번 질문으로 끝내는 습관을 피한다.
 - 눈앞에서 이미 본 사실은 굳이 다시 말로 설명하지 않는다. ROUTINE은 짧고 밀도 있게 진행한다.`;
 
+const NARRATIVE_FLAVOR_BASELINE = String.raw`BASELINE_VERSION=1.0
+COMPLETION=declared-safe-endpoint
+SPECIFICITY=bounded-autonomy
+HOOK=world-native-first
+FLOW=action>consequence-or-sensation>npc-or-world-reaction>meaning>new-situation
+- 충돌하지 않는 긍정형 선언 절은 안전한 명시 endpoint까지 모두 resolve한다. 도착·시작 직전이나 “곧” 상태에서 같은 의도를 재입력받지 않는다.
+- 일정 시작까지 기다리면 interruption이 없는 한 시각 도달을 넘어 첫 실제 beat와 NPC/세계 반응을 시작하고 event_progress/state_delta를 맞춘다.
+- 낮은 specificity의 안전하고 결정 가치 없는 세부는 완성하되, 장소·행동·관찰 범위와 명시적 금지는 넘지 않는다.
+- 실제 PC 판단점이 아니면 choices=[]; 알려진 상태 보고·메타 질문 대신 새 변화와 인과적인 NPC 행동·정보·사건·환경·일정 시작을 world-native hook으로 남긴다.
+- META/CONTINUE freeze, 실제 interruption, 불가역 선택, USER ACTION의 명시 한계가 우선한다.`;
+
 const COMBAT_RULE = String.raw`[COMBAT INTERNAL VERDICT]
 서술 전에 경지·신체·마나·스킬·실전경험·거리·선수권·장비·피로·부상·정보·지형·상성을 내부적으로 비교해 성공/부분성공/실패와 이유를 먼저 정한다. 판정 메모는 출력하지 않는다.`;
 
@@ -558,7 +569,7 @@ function buildInput(incoming,originalInput,profile,routed,mode='game'){
   const essentialSave={version:save.version,turnNumber:save.turnNumber,world:{date:world.date||null,...(world.weekday?{weekday:world.weekday}:{}),time:world.time||null,location:clampText(world.location||'',140)},pc:essentialPc,relevantNpcKeys:array(save.relevantNpcKeys).slice(0,4),npcStates:Object.fromEntries(Object.entries(object(save.npcStates)).slice(0,4).map(([key,row])=>[key,{location:clampText(row?.location||'',100),status:clampText(row?.status||row?.state||'',120)}])),sceneRuntime:{participants:array(scene.participants).slice(0,6),purpose:normalizeScenePurpose(scene.purpose),exit_condition:normalizeSceneExitCondition(scene.exit_condition),turn_hook:turnHook?{kind:turnHook.kind,status:turnHook.status,anchor:clampText(turnHook.anchor,140)}:null,momentum:{stall_streak:Number(momentum.stall_streak||0),last_intent:clampText(momentum.last_intent||'',60)},...(scene.timed_action?{timed_action:scene.timed_action}:{}),eventProgress:scene.eventProgress==null?null:{eventInstanceId:clampText(eventProgress.eventInstanceId||'',100),activeBeat:clampText(eventProgress.activeBeat||'',100)},faction_social:Object.keys(essentialFactionSocial.reputations).length?essentialFactionSocial:null}};
   const saveState=`===== AUTHORITATIVE SAVE_STATE (ROUTED MINIMUM) =====\n${safeJson(essentialSave)}`;
   const optionalContext=`===== ACTIVE THREADS V1 =====\n${activeThreadsDirective}\n\n===== TURN OPTIONS =====\n${opts}\n\n===== AUTHORITATIVE SAVE_STATE (ROUTED DETAIL) =====\n${safeJson(save)}\n\n===== ROLLING SUMMARY TAIL =====\n${clampText(incoming.rollingSummary||'아직 없음',1500)}\n\n===== RECENT TURNS =====\n${safeJson(recent)}\n\n===== CURRENT NPC/SCENE RUNTIME =====\n${clampText(runtime,1800)}\n\n===== AVAILABLE_CG_IDS =====\n${cg||'없음'}`;
-  const reservedContext=`===== MULTI-SYSTEM SCENE ORCHESTRATION V1 =====\n${orchestrationDirective}\n\n===== SCENE MOMENTUM HF1 =====\n${momentumDirective}${noveltyDirective?`\n\n===== DETERMINISTIC SCENE NOVELTY V1 =====\n${noveltyDirective}`:''}\n\n===== SCENE PURPOSE V1 =====\n${purposeDirective}\n\n===== EXPLICIT SCENE EXIT CONDITION V1 =====\n${exitDirective}\n\n===== STRONGER TURN HOOK V1 =====\n${turnHookDirective}${consequenceDirective?`\n\n===== EVENT CONSEQUENCE V1 =====\n${consequenceDirective}`:''}`;
+  const reservedContext=`===== NARRATIVE FLAVOR BASELINE =====\n${NARRATIVE_FLAVOR_BASELINE}\n\n===== MULTI-SYSTEM SCENE ORCHESTRATION V1 =====\n${orchestrationDirective}\n\n===== SCENE MOMENTUM HF1 =====\n${momentumDirective}${noveltyDirective?`\n\n===== DETERMINISTIC SCENE NOVELTY V1 =====\n${noveltyDirective}`:''}\n\n===== SCENE PURPOSE V1 =====\n${purposeDirective}\n\n===== EXPLICIT SCENE EXIT CONDITION V1 =====\n${exitDirective}\n\n===== STRONGER TURN HOOK V1 =====\n${turnHookDirective}${consequenceDirective?`\n\n===== EVENT CONSEQUENCE V1 =====\n${consequenceDirective}`:''}`;
   const actionFrame=(text)=>`===== USER ACTION =====\n${text}\n\n${sceneOrchestrationActionFrame(orchestration)}\nUSER ACTION의 의미 목표를 압축 완료하고 새 PC 선택 없이 EXIT_TARGET 뒤의 첫 판단점에서 멈춰라. ROUTINE은 변화 중심, 주요 NPC 감정 태그·강도·근거를 일치시켜라.`,fixedSeparators=6,emptyActionFrame=actionFrame(''),scheduledProfile=profile.name.includes('scheduled'),baseAuthorityBudget=routine||scheduledProfile?900:180,desiredAuthorityBudget=baseAuthorityBudget+(noveltyDirective?Math.max(900,noveltyDirective.length):0),continueProfile=profile.name.includes('continue');
   const actionTextBudget=continueProfile?5200:Math.max(0,Math.min(5200,profile.inputChars-saveState.length-reservedContext.length-emptyActionFrame.length-fixedSeparators-desiredAuthorityBudget));
   const actionBlock=actionFrame(clampMiddleText(action,actionTextBudget));

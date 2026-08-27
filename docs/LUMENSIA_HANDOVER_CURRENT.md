@@ -39,11 +39,13 @@ Repository: `hoho074566-cpu/lumencia-ac`
 
 ## PHASE 2 PROGRESS — CURRENT
 
-- Base main: `a95bf7e226c4f4e3bddc6cbff76eb116cc6a42c3` (PR #70 Phase 1 FREEZE merge).
-- Branch: `codex/p2-pr01-fate-start-foundation`.
-- Overall: `0 / 9 PR merged`; Terminal: `1 / 9 processed`; Deferred: `0`.
-- P2-PR01 Fate Start Foundation — **BLOCKED / HUMAN_MERGE_REQUIRED** at PR #71; last fresh-reviewed pre-closure head is `8dc541dd28ebf60f8693bcddfdad77edf3085d4a`.
-- Queue insertion after P2-PR01 human merge: one latest-main Narrative Flavor Baseline bounded hotfix, then return to P2-PR02. The hotfix resolves completed user intent through its safe endpoint, replaces repeated meta choice prompts with world-native hooks, preserves explicit player limits, and covers the four required acceptance cases without implementing P2-PR09 or adding an engine/parser/lifecycle/save root.
+- Current main: `f39fb9976ae7d98f1f66c0226285f041c12238bf` (PR #71 merge); its tree `a27d155327eb3ea5c4cf737ec4b3d3c39b3d4c8c` equals reviewed PR head `4d118ce9a91a30636e196caca3eceaaaa73c6aeb`.
+- Overall queue: `1 / 9 PR merged`; P2-PR01 terminal **MERGED**. Separate bounded insertion: `1 DEFERRED`.
+- P2-PR01 Fate Start Foundation — **MERGED** at PR #71. Focused/full/post-merge regression, Safety `33082361212`, Vercel, fresh exact-head P0=0/P1=0, merge-tree identity, clean/synced main, and user Preview acceptance all PASS. Existing free/paste creation plus separate Fate mode, gender/status/department selection, additive creation state, and legacy save/load compatibility are complete.
+- Narrative Flavor Baseline — **DEFERRED** as draft PR #72 from branch `codex/narrative-flavor-baseline`, base main `f39fb9976ae7d98f1f66c0226285f041c12238bf`, implementation exact head `341598a2f3c2f9054e4079c4ebfa528e752806d3`.
+- Hotfix completed scope: one reserved output-policy contract for declared-safe-endpoint completion, bounded autonomy, explicit-limit priority, world-native hooks, and Action→Consequence/Sensation→Reaction→Meaning→New Situation flow; one focused prompt-contract suite covers acceptance A-D and pressure reservation. No parser, engine, lifecycle, save root, P2-PR09 system, wording regex list, or Phase 1 deferred correction was added.
+- Hotfix tests: `narrative-flavor-baseline.test.mjs` PASS; syntax and `git diff --check` PASS. Required `context-router-authority-tail.test.mjs` FAILS because the `.76` adaptive routine pressure case loses the beginning of a 5,200-character USER ACTION. Full regression, Safety, Vercel, and fresh review were not run after this blocking local regression.
+- Hotfix blocker/root cause: **NEW_STRUCTURAL** context priority/budget ownership is needed among an always-reserved flavor contract, USER ACTION, and Director/Schedule authority. Policy compaction used the one allowed correction and the same failure remained. Correction budget **1/1 exhausted**; scope expansion **NO**; merge recommendation **DO NOT MERGE / DEFERRED**. The branch exact head is preserved and receives no further correction during this pass.
 - P2-PR02 Origin / Starting Character — TODO.
 - P2-PR03 Character Consequences — TODO.
 - P2-PR04 Personal Story Hooks — TODO.
@@ -52,16 +54,10 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - P2-PR07 Living World — TODO.
 - P2-PR08 Ending / Fate Book — TODO.
 - P2-PR09 Novel / UI Polish — TODO.
-- P2-PR01 scope is bounded to the existing free/paste creator plus a separate Fate Start entry with male/female, commoner/fallen noble, the existing department choices, minimal additive creation state, and legacy save/load compatibility.
-- Do not add Procedural Origin, inheritance, NPC relationship changes, Personal Story, Ending/Fate Book, off-screen simulation, or any Phase 1 deferred correction in this PR.
-- Focused Fate Start/save/DEBUG/core tests, full repository regression, syntax/static, and `git diff --check` PASS. Local/remote implementation tree is `e2ee9f915e878bd0ae016e4ebd81deba7dfcd9ef`.
-- Current-head Safety `33079126915`, Vercel `psFFXWhsRZoRhEG8Xss45qa4fyUb`, fresh exact-head P0=0/P1=0 review, behind 0, and conflict-free mergeability PASS.
-- Exact Preview: **PASS** by user on the protected PR #71 deployment. Existing free/paste controls remained available; Fate Start female + fallen noble + magic department creation succeeded; INFO reflected the selection; reload preserved it.
-- BLOCKER: no code or acceptance blocker remains. Protected runtime/persistence paths make merge human-only, and the next latest-main hotfix depends on this merge.
-- ROOT_CAUSE_CLASS: **NONE**; CORRECTION_BUDGET: **0/1**; SCOPE_EXPANSION: **NO**.
 - PHASE_2_BACKLOG_CANDIDATE: P2 `3872135947` — a custom department appended by free-mode paste can be copied into the Fate selector and then rejected by the fixed Fate allowlist. P2 `3872204510` — `/lib/fate-start.js` is omitted from the service-worker offline shell, so a fresh offline PWA launch can fail before the module is cached. Both remain non-blocking; do not expand P2-PR01 to correct them during this implementation pass.
 - PHASE1_DEFERRED_TOUCHED: **NO**.
-- NEXT ACTION: finish the docs-only exact-head Safety/Vercel/fresh-review cycle, then human-merge PR #71 using the reported expected head. After post-merge verification, run the Narrative Flavor Baseline bounded hotfix from latest main. P2-PR02 waits until that hotfix is MERGED or non-blocking DEFERRED.
+- REPOSITORY_INTEGRITY: latest main remains clean, synchronized, and fully verified; deferred PR #72 is isolated and is not a base for later work.
+- NEXT ACTION: start **P2-PR02 — Procedural Origin + Starting Character** from latest main `f39fb9976ae7d98f1f66c0226285f041c12238bf`. Do not stack on or modify PR #72, and do not touch Phase 1 deferred PR #66/#68/#69.
 
 ---
 
