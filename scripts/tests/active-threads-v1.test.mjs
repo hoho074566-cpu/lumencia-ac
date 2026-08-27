@@ -54,6 +54,32 @@ const save = (patch = {}) => ({
 }
 
 {
+  const lifecycleSave = save({
+    sceneRuntime: {
+      eventProgressByInstance: {
+        'paused-archive#7': { eventInstanceId: 'paused-archive#7', activeBeat: 'return_to_archive' },
+      },
+    },
+    activeEvents: ['이미 끝난 현장 사건'],
+    worldArcs: ['이미 끝난 세계 사건'],
+    completedEvents: ['이미 끝난 현장 사건', '이미 끝난 세계 사건', 'finished-schedule'],
+    scheduleContext: {
+      due: [{ id: 'finished-schedule', title: '끝난 일정', date: '1285-03-01', time: '09:00' }],
+      upcoming: [{ id: 'finished-schedule', title: '끝난 일정', date: '1285-03-01', time: '09:00' }],
+    },
+  });
+  const threads = deriveActiveThreads({ saveState: lifecycleSave });
+  assert.ok(threads.some((thread) => thread.id === 'event:paused-archive#7' && thread.status === 'paused'), 'a paused occurrence ledger entry must remain resumable continuity authority');
+  assert.ok(!threads.some((thread) => /finished-schedule|이미 끝난/.test(`${thread.id} ${thread.title}`)), 'completed event authority must suppress stale active, world, and schedule threads');
+
+  const completedPause = deriveActiveThreads({ saveState: save({
+    sceneRuntime: lifecycleSave.sceneRuntime,
+    completedEvents: ['paused-archive#7'],
+  }) });
+  assert.ok(!completedPause.some((thread) => thread.id === 'event:paused-archive#7'), 'a completed paused occurrence must not be resurrected');
+}
+
+{
   const consequence = {
     id: 'consequence:hidden', title: '금지된 연구의 추적자', status: 'deferred', importance: 4,
     event_consequence: { version: '1.0', event_name: '금지된 연구의 추적자', reason: '비밀 교단이 PC를 특정했다', secret_level: 5, due_at: '1285-03-01T09:50', expires_at: '1285-03-02T09:50' },
