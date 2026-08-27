@@ -27,16 +27,15 @@ Repository: `hoho074566-cpu/lumencia-ac`
 
 ---
 
-# 0. NPC SIGNIFICANCE EVALUATOR V1 — AUTHORITATIVE CURRENT TASK
+# 0. NARRATIVE PHASE 1 FREEZE — AUTHORITATIVE CURRENT STATE
 
-- PR #66 Setup -> Payoff Memory V1 is explicitly **deferred** at exact head `fbf2935c1229b8f16bed404b48c3cdf0abb95809`. Keep it open and unmerged; do not close it, mutate its Preview, or use it as the base of later work.
-- The approved failure-outcome propagation correction on #66 passed focused A-I, full repository regression, `scripts/lumensia-pr-check.mjs`, Exact Preview, Safety, and Vercel. Later P1 `3871077298` is a distinct schedule-reconciliation loss of an already validated/resolved payoff receipt. Do not correct or generalize that lifecycle problem in #66.
-- The active branch is `codex/npc-significance-evaluator-v1`, created directly from verified main `9de2b595555000dc462d3db67f4db5c9aff79750`; it contains no PR #66 commit.
-- V1 is intentionally small: the canonical model semantically chooses zero or one foreground primary plus zero or one directly causal support using the existing `director.spotlight_keys` receipt. The eligible boundary is the routed canonical `relevantNpcKeys`. Deterministic code only validates membership, uniqueness, the 1+1 cap, and META/CONTINUE/unanswered-player-boundary freeze.
-- No deterministic significance score, Korean wording classifier/regex, new save root, lifecycle phase, callback system, model call, parser expansion, generic NPC simulation engine, or automatic player choice exists in this task.
-- Focused NPC Significance, Context Router, authority-tail, Scene Orchestration, NPC Goal/Relationship, Director/world-result, Active Threads, CONTINUE, save migration, and core-invariant tests pass. Full repository regression passes. PR #67 code/docs head `b62693e9dac7f7ecd5a67c4776fdeaf43ad4b402` has tree `5252791f0b2299f04a4d01465ab8d6573f185098`; Safety `33067212240`, Vercel, conflict checks, and fresh Codex review `5438312419` all pass with direct P0=0/P1=0.
-- The one permitted bounded correction was consumed after the first reserved-input directive displaced USER ACTION at the minimum adaptive routine budget. The final form keeps the semantic contract in the preserved Router/Core instruction rule and sends candidates through the already-authoritative routed state, restoring both action head and final predicate.
-- NEXT ACTION: publish this docs-only closure and require its exact-head hosted/fresh-review confirmation. If green, leave protected-path PR #67 merge-ready for human merge. Any structural P1 stops the task without another correction. Never return to PR #66 from this branch.
+- Narrative Phase 1 is **FROZEN** on verified main `9f2274abeef7f34531c8d0240f66ed39293b9eef`. PR #67 NPC Significance Evaluator V1 was human-merged from exact head `3293e1c11569e5531518ae7e05918a54693c2bb9` and is present in that main merge.
+- Completed and merged Phase 1 foundations are: Scene Momentum Recovery HF1; Scene Purpose, Explicit Scene Exit, Stronger Turn Hook, Multi-System Scene Orchestration, and Scene Novelty; Narrative Time/TPP, Active Threads, Event Consequence, Living World/Off-screen Progression, and World Result Surfacing/Event Director; NPC Motivation/Relationship Reason, NPC Goal V2/Goal Tick, NPC-to-NPC Relationship, Faction/Social Consequence, and NPC Significance Evaluator V1; Combat Growth V2, Skill Learning V1, and Awakening/Talent Evolution V1.
+- PR #66 Setup -> Payoff Memory V1 remains open, unmerged, and **DEFERRED** at exact head `fbf2935c1229b8f16bed404b48c3cdf0abb95809`. Its distinct lifecycle blocker is that a validated resolved payoff receipt can be lost during later schedule reconciliation while payoff effects remain, leaving the callback stranded. Do not correct, commit to, merge, close, Preview-mutate, or reuse this branch.
+- PR #68 Relationship Thresholds V1 remains open, unmerged, and **DEFERRED** at exact head `d58a31022ac7e5bc99c53fb1ee579405e78bd31f`. Current-turn threshold crossing is not reflected by pre-turn eligibility, and a rejected threshold claim's followup can remain in NPC plan/reason. Its correction budget is exhausted at 1/1. Do not correct, commit to, merge, close, Preview-mutate, or reuse this branch.
+- PR #69 Knowledge Boundaries V1 remains open as draft, unmerged, and **DEFERRED** at exact head `99f7e4975a186e68cfa1340f06019c46d23501ae`. A narration-only NPC can lack `speaker_key` after normalization and fall out of current-scene membership, causing legitimate witnessed/told memory to be removed by the sanitizer. Its correction budget is exhausted at 1/1. Do not correct, commit to, merge, close, Preview-mutate, or reuse this branch.
+- These deferred blockers are explicitly **not** Narrative Phase 1 FREEZE blockers. They are separate stabilization candidates for Phase 2/backlog, to be reassessed after Phase 2 using actual-play impact. Phase 1 adds no further Narrative Engine feature, correction, edge-case task, or scope expansion.
+- **NEXT ACTION: Narrative Phase 2 시작.** Do not return to Phase 1 deferred items before starting Phase 2.
 
 ---
 
@@ -952,14 +951,13 @@ Fresh direct review `5037414704` on initial PR #61 exact head `4dc7f4f3768b4635e
 
 # 12. NEXT ACTION — CURRENT START POINT
 
-1. Preserve PR #66 at its deferred blocker. Do not merge/close it, mutate its Preview, fix P1 `3871077298`, or use `codex/setup-payoff-memory-v1` as a base.
-2. Continue **NPC Significance Evaluator V1** only on `codex/npc-significance-evaluator-v1`, based on main `9de2b595...`.
-3. Keep scope to the existing model-owned `director.spotlight_keys` semantic receipt: at most one primary and one causal support from routed canonical NPCs. Deterministic code owns only membership/cap/freeze invariants.
-4. Preserve one canonical model call, stable routing/Core/Director/Orchestration, `store:false`, prompt cache/retention, Context Router budgets, saves, canon, NPC autonomy, and player sovereignty. Add no score engine, natural-language regex, save root, lifecycle, parser, relationship threshold, knowledge-boundary system, or generic NPC simulation.
-5. PR #67 code/docs head `b62693e9...` passed full regression, Safety `33067212240`, Vercel, conflict checks, and fresh P0=0/P1=0 review `5438312419`. Publish the docs-only closure, require exact-head hosted confirmation, then leave the protected-path PR for human merge. The one bounded correction is already consumed; any structural P1 stops this task without another iteration.
+1. Narrative Phase 1 is frozen at main `9f2274abeef7f34531c8d0240f66ed39293b9eef`; create no additional Phase 1 Narrative Engine feature or correction task.
+2. Keep PR #66 at `fbf2935c...`, PR #68 at `d58a3102...`, and PR #69 at `99f7e497...` deferred and untouched. Their blockers do not block this freeze.
+3. Reassess those deferred stabilization candidates only after Phase 2, using actual-play impact; do not make them a prerequisite for Phase 2.
+4. **Start Narrative Phase 2** from then-current verified main on a separate branch.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> Read both progress documents first. PR #66 Setup -> Payoff Memory V1 is deferred at `fbf2935c...` because distinct lifecycle P1 `3871077298` remains after its approved correction; do not touch, merge, close, Preview-mutate, or base new work on it. Current main is `9de2b595...`. PR #67 NPC Significance Evaluator V1 is the separate main-based task: reviewed head `b62693e9...` passed full regression, Safety, Vercel, conflict checks, and direct P0=0/P1=0. Publish/verify the docs-only closure, then leave the protected-path PR for human merge. Scope remains model-semantic `director.spotlight_keys` primary/support plus deterministic routed-key/1+1/freeze bounds; no score/regex/save-root/lifecycle/second-call expansion. The correction budget is consumed; any fresh structural P1 stops the task.
+> Read both progress documents first. Narrative Phase 1 is frozen on main `9f2274abeef7f34531c8d0240f66ed39293b9eef`; NPC Significance Evaluator V1 is merged. PR #66 `fbf2935c...`, PR #68 `d58a3102...`, and PR #69 `99f7e497...` remain deferred and untouched, and their blockers are not Phase 1 FREEZE blockers. Do not fix, merge, close, Preview-mutate, or reuse those branches. NEXT ACTION is Narrative Phase 2 시작 from then-current verified main; deferred stabilization is a later Phase 2/backlog actual-play reassessment, not a Phase 2 prerequisite.
