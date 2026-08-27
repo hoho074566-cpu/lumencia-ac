@@ -1,22 +1,25 @@
 # Lumensia Implementation Progress
 
-## 2026-08-27 Setup -> Payoff Lifecycle Remediation — LOCAL CODE COMPLETE
+## 2026-08-27 Setup -> Payoff Lifecycle Remediation — EXACT PREVIEW / HOSTED VALIDATED
 
 - The user explicitly authorized continuing the recorded NEXT ACTION while keeping PR #66 open/unmerged and preserving player sovereignty.
-- Branch: `codex/setup-payoff-memory-v1`; code checkpoint: `4cdaf6c8ce278141ddb4a961af523c612d4a672d`; base/merge-base: `9de2b595555000dc462d3db67f4db5c9aff79750`; local branch is ahead 12 / behind 0 at the code checkpoint.
+- Branch: `codex/setup-payoff-memory-v1`; runtime code checkpoint: `4cdaf6c8ce278141ddb4a961af523c612d4a672d`; reviewed code/docs checkpoint: `4ad566d83c4d201fac5b4904a1605b191eeae4b6`; base/merge-base: `9de2b595555000dc462d3db67f4db5c9aff79750`; branch is ahead 13 / behind 0 at the reviewed checkpoint.
 - P1 `3870426835` is corrected with structured lifecycle authority: the adapter validates the callback transition before Scene Momentum reconciliation, snapshots only an accepted `payoff_opportunity` plus its exact ordered choices, restores callback ownership only when that exact full choice boundary survives the final time rewrite, and validates the final turn again before persistence. A missing, partial, reordered, unrelated, or conflicting final boundary cannot inherit ownership.
 - P1 `3870285419` is corrected from canonical `resolution_log.outcome`: an explicit `failure` with a surviving retry choice remains `payoff_opportunity`; a failure without a new player-owned retry boundary rejects the complete turn instead of resolving the callback. `partial` and ordinary valid payoff behavior remain unchanged.
 - No prose/Korean regex, broad beat allowlist, parser expansion, save root/schema/migration, model call, routing budget, time-policy change, combat redesign, canon expansion, or player-choice automation was added.
 - Focused Setup/Payoff, Turn Hook, Scene Momentum time-floor/integration, Context Router/authority-tail, Active Threads, Orchestration, Event Consequence, and core-invariant suites PASS. Syntax/static checks, `git diff --check`, and full `node scripts/lumensia-pr-check.mjs origin/main HEAD` PASS.
 - Substantive second review found no unrelated state mutation or ownership widening. Exact choice-array equality and conflicting-owner rejection keep the restoration fail-closed.
+- Hosted exact checkpoint `4ad566d...` PASS: Safety run `33060466829` / #512, Vercel Ready, Merge Readiness current P0/P1=0 and no conflict, and fresh Codex result `5437381146` with no major issues on reviewed commit `4ad566d83c`.
+- Exact Preview compressed-decision PASS: an isolated 10:00 two-hour preparation action reached 12:00, exposed three meaningful choices, and retained `rival-proof` as `opportunity`, T9→T13, beat/phase `payoff_opportunity`.
+- Exact Preview explicit-failure PASS: an isolated invalid no-attack attempt reached 10:06, exposed three retry/exit choices, and retained `rival-proof` as `opportunity`, T9→T13, beat/phase `payoff_opportunity` rather than resolving it.
+- No meaningful Preview choice was selected and AUTO remained unused. P2 `3870553612` remains ordinary non-blocking routing-context backlog.
 
 ### NEXT ACTION
 
-1. Commit this documentation checkpoint and push both local commits to `origin/codex/setup-payoff-memory-v1`; verify exact local/remote equality and PR #66 open/unmerged.
-2. Require exact-current-HEAD Vercel and Repository/Safety results plus a fresh direct Codex review. Prior-head P0/P1 results are not reusable.
-3. Run bounded Exact Preview acceptance for the compressed-decision ownership case and the explicit-failure retry lifecycle. Use an isolated test state and stop at every meaningful player choice; do not auto-select narrative choices.
-4. If current-head P0/P1 remains, perform only the repository-authorized focused remediation cycle, rerun focused/full/Preview checks, and update this checkpoint. P2/P3 remain backlog unless repository policy promotes them.
-5. **Do not merge or close PR #66.** Protected `api/**` remains human-merge only even after all gates pass.
+1. Commit and push this final documentation checkpoint; verify exact local/remote equality, current main/base/merge-base, behind 0, clean worktree, and PR #66 still open/unmerged.
+2. Require exact-final-docs-HEAD Safety/Repository and Vercel PASS plus a fresh direct Codex completion. Prior-head approval is not reused for the docs-only HEAD.
+3. If a current-head P0/P1 appears, perform only the repository-authorized focused remediation cycle and rerun focused/full/Preview checks. P2/P3 remain backlog unless repository policy promotes them.
+4. When the final docs HEAD is green, hand off for an explicit human expected-head merge decision. **Do not merge or close PR #66 in this Work.**
 
 ## 2026-08-27 Phone Cloud Work Final Checkpoint — AUTHORITATIVE
 

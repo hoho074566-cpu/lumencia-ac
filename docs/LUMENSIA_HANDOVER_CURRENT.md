@@ -10,31 +10,35 @@ Repository: `hoho074566-cpu/lumencia-ac`
 
 ---
 
-# SETUP -> PAYOFF LIFECYCLE REMEDIATION — CURRENT AUTHORITATIVE CHECKPOINT
+# SETUP -> PAYOFF LIFECYCLE REMEDIATION — FINAL VALIDATED CHECKPOINT
 
-## Exact local state
+## Exact validated state
 
 - User authorization: continue the recorded NEXT ACTION; keep PR #66 open/unmerged; do not replay completed work or auto-advance meaningful player choices.
-- Branch: `codex/setup-payoff-memory-v1`
-- Code checkpoint: `4cdaf6c8ce278141ddb4a961af523c612d4a672d`
-- Current main/base/merge-base: `9de2b595555000dc462d3db67f4db5c9aff79750`
-- At the code checkpoint: ahead 12 / behind 0; worktree was clean before this documentation update.
+- Branch: `codex/setup-payoff-memory-v1`.
+- Runtime code checkpoint: `4cdaf6c8ce278141ddb4a961af523c612d4a672d`.
+- Reviewed code/docs checkpoint: `4ad566d83c4d201fac5b4904a1605b191eeae4b6`.
+- Current main/base/merge-base: `9de2b595555000dc462d3db67f4db5c9aff79750`; branch ahead 13 / behind 0 at the reviewed checkpoint.
+- The final documentation commit containing this checkpoint necessarily has a later SHA; report and verify that exact SHA separately after push.
 
-## Completed remediation
+## Completed remediation and validation
 
 - P1 `3870426835`: callback lifecycle now has a pre-reconciliation validation receipt and a final post-time-reconciliation validation. Only an accepted opportunity whose exact ordered choice array survives unchanged may restore its callback metadata after Scene Momentum clears `turn.director`. Partial/reordered/unrelated choices and conflicting callback owners fail closed.
-- P1 `3870285419`: canonical `resolution_log.outcome === 'failure'` cannot resolve a callback. With a retained retry choice, the lifecycle is rewritten to the existing `payoff_opportunity` phase/beat; without a retry boundary, the whole turn is rejected rather than stranded. Structured `partial` and existing valid payoff resolution remain supported.
+- P1 `3870285419`: canonical `resolution_log.outcome === 'failure'` cannot resolve a callback. With retained retry choices the lifecycle stays on the existing `payoff_opportunity` phase/beat; without a retry boundary the whole turn is rejected rather than stranded. Structured `partial` and existing valid payoff resolution remain supported.
 - Permanent tests cover successful/partial resolution, failed retry, failed-without-retry rejection, final rewrite restoration, unrelated/partial boundary rejection, conflicting owner rejection, pre/post validation ordering, and the existing one-call/save-root/freeze invariants.
 - Focused affected suites, syntax/static checks, `git diff --check`, and full `node scripts/lumensia-pr-check.mjs origin/main HEAD` PASS.
+- Exact hosted checkpoint `4ad566d...`: Safety run `33060466829` / #512 PASS; Vercel Ready; fresh Codex result `5437381146` reports no major issues on reviewed commit `4ad566d83c`; Merge Readiness reports Safety PASS, Vercel PASS, Codex COMPLETE, current P0/P1=0, and no conflict.
+- Exact Preview compressed case PASS: an isolated 10:00 two-hour preparation action reached 12:00, exposed three meaningful choices, and retained callback `rival-proof` as `opportunity`, T9→T13, with beat/phase `payoff_opportunity`. No choice was selected.
+- Exact Preview explicit-failure case PASS: an isolated invalid no-attack attempt advanced 10:05→10:06, produced three retry/exit choices, and retained the same callback as `opportunity`, T9→T13, with beat/phase `payoff_opportunity`. No choice was selected.
 - Architecture remains one canonical core/model call with stable `/api/chat-router -> api/chat.js`, `store:false`, prompt cache/retention, existing Context Router budgets, no new save root/schema/migration, no prose regex/allowlist expansion, and no automatic player choice.
+- Current non-blocking P2 `3870553612` (reserve selected callback context under extreme routing pressure) remains backlog. It is not promoted by current policy and receives no change in this closure.
 
 ## Current blocker / NEXT ACTION
 
-1. Commit this documentation checkpoint, push the code and docs commits, then verify local/remote exact HEAD equality and PR #66 still open/unmerged.
-2. Wait for exact-current-HEAD Vercel and Repository/Safety and obtain a fresh direct Codex review; prior-head review authority is invalid after this remediation.
-3. Run isolated Exact Preview cases for compressed payoff-opportunity ownership and explicit failure/retry persistence. Stop at all meaningful player choices and never use AUTO to choose them.
-4. If a current-head P0/P1 appears, use only the focused repository-authorized remediation cycle and rerun focused/full/Preview checks. Leave ordinary P2/P3 backlog untouched.
-5. **Do not merge or close PR #66.** It changes protected `api/**` and remains human-merge only.
+1. Commit and push this final documentation checkpoint; verify local HEAD equals the remote branch, base/merge-base remain current main, behind remains 0, and the worktree is clean.
+2. Require exact-final-docs-HEAD Safety/Repository and Vercel PASS plus a fresh direct Codex completion. If any current P0/P1 appears, resume only the focused repository-authorized remediation loop.
+3. Keep PR #66 open and unmerged. Do not auto-select any pending Preview choice or restart already-passed lifecycle/Preview analysis.
+4. After the exact final docs HEAD is green, hand off as ready for an explicit human expected-head merge decision. **Do not merge or close PR #66 in this Work.**
 
 ---
 
