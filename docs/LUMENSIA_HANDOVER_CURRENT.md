@@ -10,42 +10,36 @@ Repository: `hoho074566-cpu/lumencia-ac`
 
 ---
 
-# SETUP -> PAYOFF LIFECYCLE REMEDIATION — FINAL VALIDATED CHECKPOINT
+# SETUP -> PAYOFF FAILURE CONTRACT — MERGE-READY CODE CHECKPOINT
 
 ## Exact validated state
 
-- User authorization: continue the recorded NEXT ACTION; keep PR #66 open/unmerged; do not replay completed work or auto-advance meaningful player choices.
+- User authorization: one additional bounded structural correction for the two production failure-outcome P1s; keep PR #66 open/unmerged; do not replay completed work or auto-advance meaningful player choices.
 - Branch: `codex/setup-payoff-memory-v1`.
-- Runtime code checkpoint: `4cdaf6c8ce278141ddb4a961af523c612d4a672d`.
-- Reviewed code/docs checkpoint: `4ad566d83c4d201fac5b4904a1605b191eeae4b6`.
-- Final canonical-response correction checkpoint: `d462ba792a084edd539644b623bfe4b88cd729c0`.
+- Final bounded code checkpoint: `44171b807eb4c3861a3f018f72c86a0897a6d701`.
 - Current main/base/merge-base: `9de2b595555000dc462d3db67f4db5c9aff79750`; behind 0 at the correction checkpoint.
 - The final documentation commit containing this checkpoint necessarily has a later SHA; report and verify that exact SHA separately after push.
 
 ## Completed remediation and validation
 
-- P1 `3870426835`: callback lifecycle now has a pre-reconciliation validation receipt and a final post-time-reconciliation validation. Only an accepted opportunity whose exact ordered choice array survives unchanged may restore its callback metadata after Scene Momentum clears `turn.director`. Partial/reordered/unrelated choices and conflicting callback owners fail closed.
-- P1 `3870285419`: canonical `resolution_log.outcome === 'failure'` cannot resolve a callback. With retained retry choices the lifecycle stays on the existing `payoff_opportunity` phase/beat; without a retry boundary the whole turn is rejected rather than stranded. Structured `partial` and existing valid payoff resolution remain supported.
-- Permanent tests cover successful/partial resolution, failed retry, failed-without-retry rejection, final rewrite restoration, unrelated/partial boundary rejection, conflicting owner rejection, pre/post validation ordering, and the existing one-call/save-root/freeze invariants.
-- Focused affected suites, syntax/static checks, `git diff --check`, and full `node scripts/lumensia-pr-check.mjs origin/main HEAD` PASS.
-- Exact hosted checkpoint `4ad566d...`: Safety run `33060466829` / #512 PASS; Vercel Ready; fresh Codex result `5437381146` reports no major issues on reviewed commit `4ad566d83c`; Merge Readiness reports Safety PASS, Vercel PASS, Codex COMPLETE, current P0/P1=0, and no conflict.
-- Exact Preview compressed case PASS: an isolated 10:00 two-hour preparation action reached 12:00, exposed three meaningful choices, and retained callback `rival-proof` as `opportunity`, T9→T13, with beat/phase `payoff_opportunity`. No choice was selected.
-- Exact Preview explicit-failure case PASS: an isolated invalid no-attack attempt advanced 10:05→10:06, produced three retry/exit choices, and retained the same callback as `opportunity`, T9→T13, with beat/phase `payoff_opportunity`. No choice was selected.
-- Current-head P1 `3870781970` identified that the production canonical `api/chat.js` response schema/sanitizer did not preserve the `resolution_log` consumed by lifecycle validation. The final bounded correction adds the existing structured outcome contract to the canonical response, sanitizes it without prose inference, and requires failed payoff/aftermath attempts with retries to emit `outcome='failure'`.
-- Correction checkpoint `d462ba7...` passes focused Setup/Payoff, Combat Growth, Turn Hook, Scene Continuity, core-invariant, syntax/static and full repository regression. Safety run #515 and Vercel PASS.
-- Post-correction Exact Preview explicit-failure PASS: the canonical response produced a failed no-attack result with three retry/exit choices; callback `rival-proof` remained `opportunity`, T9→T13, beat/phase `payoff_opportunity`. No choice was selected.
-- Fresh exact-head review `5039735900` on `d462ba7...` reports P0=0/P1=2. P1 `3870867335` shows that the canonical sanitizer still rewrites schema-valid `triggered=false, outcome='failure'` to `none`, which can hide a non-ability payoff failure. P1 `3870867341` shows that production Context Router instructions replace canonical `GM_RULES`, so the new payoff-failure outcome instruction is absent from the actual routed prompt.
-- Merge Readiness is authoritative BLOCKED on exact `d462ba7...` despite Safety #515, Vercel, full regression and the representative Preview passing. These are structured production-path gaps and must not be hidden by the passing sample.
+- One shared canonical outcome allowlist now feeds the production sanitizer and lifecycle validator. A schema-valid `triggered=false, outcome='failure'` remains `failure`; unknown strings fail closed to `none`, and `none` cannot resolve a payoff.
+- The canonical GM rule and actual production `ROUTER_GM_RULES` carry the same minimal contract: payoff failure is a real outcome, and retry choices keep the same callback unresolved on the existing `payoff_opportunity` phase.
+- Existing lifecycle phases remain authoritative: failure plus retry choices is retryable; explicit terminal failure uses the existing `aftermath` terminal path; `success` and `partial` retain their prior resolution path; payoff-phase failure without a retry boundary rejects the turn.
+- Permanent A–I regressions cover non-ability failure preservation, production routed instructions, same-callback retry continuation, success, terminal failure, none/unknown fail-closed behavior, wrong/stale ownership, and META/AUTO/CONTINUE freeze.
+- Focused Setup/Payoff, syntax/static, `git diff --check`, every repository test, and full `node scripts/lumensia-pr-check.mjs` PASS.
+- Exact hosted code checkpoint `44171b8...`: Safety run `33064281690` PASS and Vercel Ready.
+- Exact failure/retry Preview PASS at 10:05→10:06: the invalid no-attack attempt produced three retry/exit choices and retained `rival-proof` as `opportunity`, T9→T13, beat/phase `payoff_opportunity`. No choice was selected and AUTO remained disabled.
+- Fresh exact-code review `5039911653` on `44171b8...` reports P0=0/P1=0. Its only new finding is non-blocking P2 `3871017313` about ordinary `action-resolved` scene-exit handling of `outcome='none'`; per closure scope it receives no hardening.
+- A late prior-docs-head review `5039830859` reported P1 `3870947146` plus two P2s on `7f82058...` while this authorized correction was running. It is not current-head approval authority; the required fresh `44171b8...` review supersedes it with P0=0/P1=0. No extra lifecycle expansion was made.
 - Architecture remains one canonical core/model call with stable `/api/chat-router -> api/chat.js`, `store:false`, prompt cache/retention, existing Context Router budgets, no new save root/schema/migration, no prose regex/allowlist expansion, and no automatic player choice.
-- Current non-blocking P2 `3870553612` (reserve selected callback context under extreme routing pressure) remains backlog. It is not promoted by current policy and receives no change in this closure.
+- Existing and current P2/P3 findings remain backlog. None is promoted into this bounded correction.
 
 ## Current blocker / NEXT ACTION
 
-1. Commit and push this blocker documentation checkpoint; verify local HEAD equals the remote branch, base/merge-base remain current main, behind remains 0, and the worktree is clean.
-2. The repository-authorized general local two-cycle remediation cap is consumed. Do not patch `3870867335` or `3870867341` without explicit new authority for a further bounded structural correction or trusted-controller continuation.
-3. Any authorized follow-up must preserve explicit failure independently of ability-trigger metadata and place the same structured outcome contract in the actual routed prompt. Do not infer failure from prose or add wording regex.
-4. After a future fix: focused/full regression -> isolated failure/no-ability Preview -> Safety/Vercel -> fresh exact-current-HEAD review. Until then MERGE_GATE remains FAIL.
-5. Keep PR #66 open and unmerged. Do not auto-select any pending Preview choice or restart already-passed lifecycle/Preview analysis. **Do not merge or close PR #66 in this Work.**
+1. Commit and push this documentation checkpoint; verify local/remote equality, base/merge-base=current main, behind 0, clean worktree, and PR #66 still open/unmerged.
+2. Require Safety/Vercel and a fresh exact-current-HEAD Codex review for the final docs SHA. If it reports any lifecycle/outcome P1, stop modifying PR #66, record the blocker, defer Setup -> Payoff Memory V1, and move to the next Narrative Engine NEXT ACTION.
+3. If final docs HEAD remains P0=0/P1=0 with hosted gates green, close the correction as merge-ready with no further P2/P3 hardening. Protected `api/**` keeps the PR human-merge only.
+4. Keep PR #66 open and unmerged. Do not auto-select the pending Preview choices or restart already-passed lifecycle/Preview analysis. **Do not merge or close PR #66 in this Work.**
 
 ---
 
