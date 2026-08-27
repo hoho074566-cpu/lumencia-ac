@@ -773,10 +773,10 @@ function reconcileReturnedTimedTurn(turn,{reason='profile-cap',elapsed=0,boundar
   turn.scene_summary=text;turn.scene=[{kind:'narration',text},...decisionRows];turn.choices=preservedChoices;turn.emotion_updates=retainedEmotionUpdates;turn.cg_id=null;turn.director=null;
   return true;
 }
-function reconcileReturnedRaisedFloorContinuation(turn,{elapsed=0}={}){
+function reconcileReturnedRaisedFloorContinuation(turn){
   if(!turn||typeof turn!=='object')return false;
-  const minutes=Math.max(0,Math.trunc(Number(elapsed)||0)),text=`기존에 드러난 변화 뒤에도 요청한 행동을 이어 ${minutes}분의 최소 진행 시간을 채웠다.`;
-  turn.scene_title='행동 완료';turn.scene_summary=`${minutes}분 동안의 진행과 그 사이 발생한 변화가 함께 반영되었다.`;turn.scene=[...array(turn.scene),{kind:'narration',text}];
+  const text='기존에 드러난 변화 뒤에도 요청한 행동을 이어 최소 진행 시간을 채웠다.';
+  turn.scene_title='행동 완료';turn.scene_summary='요청한 행동의 진행과 그 사이 발생한 변화가 함께 반영되었다.';turn.scene=[...array(turn.scene),{kind:'narration',text}];
   return true;
 }
 function reconcileReturnedConsequenceTurn(turn,{elapsed=0,scene=[]}={}){

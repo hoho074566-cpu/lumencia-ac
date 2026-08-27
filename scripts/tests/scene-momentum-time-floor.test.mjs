@@ -1299,7 +1299,8 @@ assert.deepEqual(turn.state_delta.npc_state_updates,[npcDeparture],'visible NPC 
 assert.deepEqual(turn.state_delta.relationship_changes,[departureRelationship],'visible relationship effects must remain grounded by their retained scene');
 assert.deepEqual(turn.state_delta.memories_add,[departureMemory],'visible memories must remain grounded by their retained scene');
 assert.match(turn.scene.map(item=>item.text).join(' '),/아르테미스.*떠났다/,'the evidence-bearing scene must survive a pure floor raise');
-assert.match(turn.scene_summary,/60분/,'the retained scene must receive an authoritative elapsed-time summary');
+assert.doesNotMatch(turn.scene_summary,/60분|경과분|누적 시간/,'the retained scene summary must keep the authoritative floor internal');
+assert.doesNotMatch(turn.scene.at(-1)?.text||'',/60분|경과분|누적 시간/,'the appended raised-floor reconciliation must not expose elapsed-minute diagnostics');
 assert.equal(preservedRaisedFloorIntent.runtimeSceneTrusted,true,'retained evidence-bearing narration must remain safe for runtime synthesis');
 
 turn={scene_title:'훈련 완료',scene_summary:'10분 만에 훈련을 마쳤고 아르테미스가 떠났다.',scene:[{kind:'narration',text:'10분 만에 훈련을 마쳤고 아르테미스가 교관실로 떠났다.'}],state_delta:{advance_minutes:10,fatigue_delta:2,npc_state_updates:[npcDeparture],relationship_changes:[departureRelationship],memories_add:[departureMemory]},choices:[],event_progress:null};
