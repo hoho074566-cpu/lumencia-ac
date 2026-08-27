@@ -1,9 +1,20 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Narrative Engine continuation — PR #66 Setup -> Payoff Memory V1 is deferred; NPC Significance Evaluator V1 is the active separate-main task.
+Narrative Phase 1 final feature — NPC Significance is merged, PR #66/#68 are deferred and untouched, and Knowledge Boundaries V1 is the active separate-main task. Its fixed successor is Narrative Phase 1 FREEZE.
 
-## NPC Significance Evaluator V1 — Authoritative Current Checkpoint
+## Knowledge Boundaries V1 — Authoritative Current Checkpoint
+- Verified main is `9f2274abeef7f34531c8d0240f66ed39293b9eef`, the human merge of PR #67 exact reviewed head `3293e1c11569e5531518ae7e05918a54693c2bb9`. The task branch `codex/knowledge-boundaries-v1` was created directly from that main.
+- PR #68 remains open/unmerged/deferred at exact head `d58a31022ac7e5bc99c53fb1ee579405e78bd31f`; its current-turn threshold eligibility and rejected-followup P1s remain untouched after correction budget 1/1. PR #66 remains open/unmerged/deferred at `fbf2935c...`; neither branch is an ancestor or a Phase 1 FREEZE blocker.
+- V1 adds one canonical provenance field to the existing memory row: `knowledge_basis = witnessed|told|public|private`. Existing `memories.npc`, `memories.global`, `pcKnowledge`, participant state, Router, and canonical call are reused; no new save root or lifecycle is added.
+- The canonical model judges actual observation/communication and narrative use. Deterministic validation accepts only registered `npc:<key>` or world/global ownership, requires a present/current-response canonical NPC and source for witnessed/told, and permits public only for sourced world/global memories at secret level 0-1. Invalid owners/off-screen claims are rejected; invalid public/unknown provenance fails closed to private.
+- Production Core/Router rules explicitly restrict NPC evidence to owned memory, real direct witness, explicit transfer, and sourced public facts. PC-only, other-NPC, GM, and off-screen information is not evidence. Lack of evidence is silent by default and never forces dialogue or an event.
+- Focused Knowledge Boundaries plus relevant Context Router, authority-tail, core invariant, NPC Significance/Motivation/Relationship, orchestration/momentum, continuity, save migration, CONTINUE, world-result, and faction regressions PASS.
+- Correction budget 1/1 is consumed. The first reserved-input form displaced USER ACTION under minimum adaptive pressure; the bounded correction keeps the general contract in always-preserved instructions and moves only the compact per-turn membership signal to the first optional block. Existing action-head/final-predicate and authority-tail tests pass again.
+- Remaining: full `scripts/lumensia-pr-check.mjs`, publish exact head, Safety, Vercel, and fresh exact-head review. Any separate structural P1 now ends the task as bounded DEFER without another correction or scope expansion.
+- NEXT ACTION after either merge-ready or bounded-DEFER closure: **Narrative Phase 1 FREEZE**.
+
+## NPC Significance Evaluator V1 — Completed / Superseded Checkpoint
 - The task branch is `codex/npc-significance-evaluator-v1`, created directly from verified `origin/main` `9de2b595555000dc462d3db67f4db5c9aff79750`. It contains no PR #66 commit and must not be rebased onto the deferred payoff branch.
 - PR #66 remains open, unmerged, and deferred at `fbf2935c1229b8f16bed404b48c3cdf0abb95809`. Its failure-outcome correction passed focused A-I, full regression, repository check, Exact Preview, Safety, and Vercel. Later lifecycle P1 `3871077298` is a separate schedule-reconciliation receipt-loss blocker. Do not correct, merge, close, preview-mutate, or use that branch as a base.
 - V1 reuses the canonical model-owned `director.spotlight_keys` as the semantic receipt. The model judges zero to one foreground primary and zero to one directly causal support from `AUTHORITATIVE SAVE_STATE.relevantNpcKeys`; deterministic code only enforces routed canonical membership, de-duplication, the 1+1 cap, and META/CONTINUE/player-boundary freeze.
@@ -22,7 +33,8 @@ Narrative Engine continuation — PR #66 Setup -> Payoff Memory V1 is deferred; 
 
 ## Current GitHub State
 - Repo: `hoho074566-cpu/lumencia-ac`
-- Main: `9de2b595555000dc462d3db67f4db5c9aff79750` (PR #65 post-merge Active Threads documentation closure).
+- Main: `9f2274abeef7f34531c8d0240f66ed39293b9eef` (human merge of PR #67 NPC Significance Evaluator V1).
+- PR #66 is open/unmerged/deferred at `fbf2935c1229b8f16bed404b48c3cdf0abb95809`; PR #68 is open/unmerged/deferred at `d58a31022ac7e5bc99c53fb1ee579405e78bd31f`. Both are explicitly untouched and are not ancestors of the Knowledge Boundaries branch.
 - PR #64 reviewed head `4727a468f15c0f8e2990c4ae55cb688e12cc5ec6` and merged main share tree `ce54953f9185642cd294a5bccfe401e002745a42`.
 - PR #64 is `merged=true`. Production Vercel PASS and production `/api/health` HTTP 200 confirm adapter `0.8.7`, canonical `/api/chat`, stable router/context paths, `24h` prompt retention, and preserved HF1 budgets.
 - Merged-main full repository regression and Active Threads focused lifecycle/routing/freeze tests PASS. Production runtime acceptance completed the entrance ceremony, continued by AUTO without replay, then disabled AUTO at the next meaningful player-owned department choice.
