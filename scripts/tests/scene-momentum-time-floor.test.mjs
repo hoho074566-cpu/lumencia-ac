@@ -96,6 +96,12 @@ assert.equal(coincidentTurn.state_delta.fatigue_delta,2,'legitimate completed-ac
 assert.deepEqual(coincidentTurn.state_delta.stat_progress,[{stat:'신체',amount:1}],'completed growth must survive a coincident schedule boundary');
 assert.match(coincidentTurn.scene_summary,/기사과 필수 수업의 시작 시점/,'a coincident but unsurfaced schedule must become visible');
 assert.equal(coincidentScheduleIntent.reconciliationReason,'schedule-boundary','coincident schedule reconciliation must be reported as a schedule boundary');
+let coincidentChoiceTurn={scene:[{kind:'narration',text:'한 시간 훈련을 마치고 옆방 문을 열었다.'}],state_delta:{advance_minutes:60,new_location:'옆방',items_add:['미검증 훈련 보상']},choices:['옆방에 들어간다','문을 닫는다','복도로 간다'],event_progress:null};
+const coincidentUnsurfacedChoiceIntent=applySceneMomentumTimeFloor({action:'1시간 동안 훈련한다.',saveState:coincidentScheduleSave},coincidentChoiceTurn,'game');
+assert.equal(coincidentChoiceTurn.state_delta.advance_minutes,60,'an exact required schedule preempts an unrelated returned decision at the same minute');
+assert.deepEqual(coincidentChoiceTurn.choices,[],'choices not surfaced at the exact required schedule are discarded with their prerequisite scene');
+assert.equal(coincidentUnsurfacedChoiceIntent.reconciliationReason,'schedule-boundary','the exact unsurfaced required schedule remains the authoritative stop');
+assert.equal(coincidentUnsurfacedChoiceIntent.runtimeChoicesTrusted,false,'an unsurfaced exact schedule cannot authenticate unrelated response choices');
 let turn={state_delta:{advance_minutes:0},choices:[]};
 applySceneMomentumTimeFloor({action:'쉰다.',saveState:boundarySave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,10,'forced downtime floor must stop at the next authoritative schedule boundary');
