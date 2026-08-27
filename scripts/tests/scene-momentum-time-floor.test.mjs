@@ -749,7 +749,8 @@ const shortenedScheduleIntent=applySceneMomentumTimeFloor({action:'6시간 쉰�
 assert.equal(turn.state_delta.advance_minutes,300,'an explicit duration that crosses a required schedule must clamp even when the model omits the boundary');
 assert.equal(shortenedScheduleIntent.reconciliationReason,'schedule-boundary','an authoritative schedule truncation must identify its reconciliation boundary');
 assert.equal(turn.scene_title,'일정 경계','the returned title must expose the reached schedule instead of a false completed rest');
-assert.match(turn.scene_summary,/300분 동안 행동을 진행한 뒤, 예정된 일정의 시작 시점에 도달했다/,'the returned narration must agree with the exact schedule boundary');
+assert.match(turn.scene_summary,/행동을 이어가던 중, 예정된 일정의 시작 시점에 도달했다/,'the returned narration must agree with the schedule boundary without exposing internal elapsed-minute diagnostics');
+assert.doesNotMatch(turn.scene_summary,/300분|경과분|누적 시간/,'ordinary schedule reconciliation must keep internal minute arithmetic out of player-facing prose');
 assert.doesNotMatch(turn.scene_summary,/여섯 시간|모두 쉬고/,'post-boundary completion prose must not remain user-visible');
 
 turn={scene:[{kind:'narration',text:'잠에서 깨어나 몸을 일으켰다.'}],state_delta:{advance_minutes:60},choices:['일어난다','일정을 확인한다','더 쉰다']};
@@ -1072,7 +1073,8 @@ const shortenedIntent=applySceneMomentumTimeFloor({action:'5분만 기다린다.
 assert.equal(shortenedIntent.runtimeSceneTrusted,false,'a shortened turn must mark its unreconciled visible scene unsafe for runtime synthesis');
 assert.equal(shortenedIntent.returnedSceneReconciled,true,'a shortened turn must replace the user-visible response as well as runtime input');
 assert.equal(turn.scene_title,'행동 진행 중','a profile-capped response must expose a deterministic nonterminal title');
-assert.match(turn.scene_summary,/5분 동안 행동을 진행한 뒤/,'the returned summary must agree with the shortened authoritative clock');
+assert.match(turn.scene_summary,/행동을 이어가던 중/,'the returned summary must remain natural while the authoritative clock stays internal');
+assert.doesNotMatch(turn.scene_summary,/5분 동안|분이 경과|누적 시간/,'profile reconciliation must not expose internal elapsed-minute diagnostics');
 assert.doesNotMatch(turn.scene_summary,/에밀리|도착/,'the returned summary must not preserve post-cap events');
 assert.notStrictEqual(turn.scene,futureScene,'the user-visible response must no longer retain impossible post-cap narration');
 const safeRuntimeTurn=runtimeSynthesisTurn(turn,shortenedIntent);
@@ -1210,7 +1212,8 @@ assert.equal(turn.state_delta.advance_minutes,60,'a current completion must rema
 turn={scene:[{kind:'narration',text:'한 시간이 흘렀다. 기다리던 복도에 새로운 공지가 붙었다.'}],state_delta:{advance_minutes:10},choices:['공지를 본다','자리를 뜬다','조금 더 기다린다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'1시간 동안 기다린다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,60,'ordinary elapsed-wait completion prose must enforce the declared wait duration before choices');
-assert.match(turn.scene_summary,/60분.*행동을 마쳤다/,'reconciled wait narration must agree that the declared wait completed');
+assert.match(turn.scene_summary,/행동을 마쳤다/,'reconciled wait narration must agree that the declared wait completed without exposing internal elapsed minutes');
+assert.doesNotMatch(turn.scene_summary,/60분|경과분|누적 시간/,'completed wait reconciliation must keep the authoritative minute count internal');
 turn={scene:[{kind:'narration',text:'한 시간이 흘렀을 때 복도 끝에서 경보가 울렸다.'}],state_delta:{advance_minutes:60},choices:['경보를 확인한다','계속 기다린다','자리를 뜬다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'2시간 동안 기다린다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,60,'a shorter elapsed cue must not complete a longer declared wait');
@@ -1282,7 +1285,8 @@ assert.equal(turn.state_delta.advance_minutes,240,'a completed sleep must still 
 assert.equal(turn.state_delta.fatigue_delta,-2,'raising elapsed time must preserve completion effects that remain in scope');
 assert.equal(raisedFloorIntent.returnedSceneReconciled,true,'raising elapsed time must reconcile contradictory visible timing');
 assert.equal(raisedFloorIntent.runtimeSceneTrusted,false,'underreported completion prose must not enter runtime synthesis');
-assert.match(turn.scene_summary,/240분.*최소 시간/,'raised-floor narration must state the authoritative elapsed time');
+assert.match(turn.scene_summary,/최소 시간을 채워 행동을 마쳤다/,'raised-floor narration must retain deterministic completion semantics');
+assert.doesNotMatch(turn.scene_summary,/240분|경과분|누적 시간/,'ordinary raised-floor narration must keep internal elapsed minutes out of player-facing prose');
 assert.equal(turn.scene_title,'행동 완료','raised-floor reconciliation must visibly retain completion semantics for preserved effects');
 assert.match(turn.scene_summary,/행동을 마쳤다/,'preserved completion effects must remain grounded in the replacement narration');
 assert.doesNotMatch(JSON.stringify(turn.scene),/한 시간|60분/,'raised-floor narration must remove the underreported model duration');
