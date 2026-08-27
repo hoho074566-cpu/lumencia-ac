@@ -27,15 +27,15 @@ Repository: `hoho074566-cpu/lumencia-ac`
 
 ---
 
-# 0. PR #66 SETUP -> PAYOFF MEMORY V1 — CURRENT BLOCKER
+# 0. PR #66 SETUP -> PAYOFF MEMORY V1 — FINAL REVIEW PENDING
 
 - PR #65 is merged; current `origin/main` is `9de2b595555000dc462d3db67f4db5c9aff79750`. PR #66 branch `codex/setup-payoff-memory-v1` is based and merge-based on that main with behind 0.
-- Exact code checkpoint `80e24075ad9297708bd8cc7ac016c894f5240eff` implements the one authorized structural priority correction. A required schedule/hard boundary remains first; only an unresolved/reachable payoff whose stable ID, awaiting choice turn, presented option, and exact player selection all match may precede generic `ACTIVE_COMBAT_FIXED_FLOW`.
+- Exact lifecycle code checkpoint `0426d472d3680a1985fb55ce1781719a7b1977ed` contains the authorized priority and lifecycle-contract corrections. A required schedule/hard boundary remains first; only an unresolved/reachable payoff whose stable ID, awaiting choice turn, presented option, and exact player selection all match may precede generic `ACTIVE_COMBAT_FIXED_FLOW`.
 - Wrong/stale/resolved/other-turn/other-option/unselected cases fail closed and do not consume a payoff. Ordinary active combat retains its original route. No regex/parser/save-root/model-call/time/combat redesign was added.
-- Focused affected suites, syntax/static checks, `git diff --check`, and full repository regression PASS. Repository/Vercel checks are green for the code checkpoint.
-- Exact Preview proves the priority root cause is closed: the owned selection no longer fails as `unselected-payoff-opportunity` and routes the exact callback through `CALLBACK_PRIORITY`.
-- A separate downstream blocker is now authoritative: the canonical response supplies `callback_phase=payoff_opportunity` with a beat rejected by the lifecycle validator, causing `payoff-opportunity-beat-mismatch`. State remains fail-closed; this is not a recurrence of the generic-combat priority bug.
-- The user authorized one bounded correction only. Do not add a second phase/beat semantic expansion to this cycle. PR #66 is unmerged and `MERGE_GATE: FAIL`; the mismatch must be handled as a separately bounded lifecycle-contract task before merge readiness can be reconsidered.
+- The existing canonical beat enum is now bound by an explicit minimal contract: open-to-opportunity accepts `choice|payoff_opportunity`; an already presented and exactly selected continuation additionally accepts only `combat`; resolution accepts only the exact `payoff` or `aftermath` beat. Arbitrary canonical beats and phase skipping remain blocked.
+- Focused affected suites, syntax/static checks, `git diff --check`, full repository regression, Repository checks, and Vercel PASS for the code checkpoint.
+- Exact Preview PASS: the original selected rule choice no longer returns either lifecycle 409, advances into the agreed duel, and offers the next player-owned choice. Five subsequent owned combat selections continue under the exact same `rival-proof` callback. The public turn-13 checkpoint remains `status=opportunity`, `lastTurn=13`, beat/phase `payoff_opportunity`, with an exact current choice hook; it neither auto-resolves nor skips to aftermath.
+- Final fresh exact-docs-head review and merge-state revalidation remain. Do not add further allowlist entries or P2/P3 hardening. PR #66 changes protected paths and remains human-merge only.
 
 ---
 
@@ -951,14 +951,14 @@ Fresh direct review `5037414704` on initial PR #61 exact head `4dc7f4f3768b4635e
 
 # 12. NEXT ACTION — CURRENT START POINT
 
-1. Keep protected PR #66 unmerged and complete the current docs exact-head hosted/fresh-review checkpoint. Exact Preview remains the blocking authority while `payoff-opportunity-beat-mismatch` persists.
-2. Preserve the completed routing fix: hard boundary > exact owned/presented/selected continuation > generic active combat > ordinary flow. Do not reopen the resolved priority root cause or add wording/parser/time/combat patches.
-3. Start only a separately bounded lifecycle-contract analysis for the phase/beat mismatch. Compare the canonical structured response contract with the deterministic validator allowlist and identify one general, fail-closed authority; do not infer ownership from narration or add a model call.
-4. Any separately authorized fix must retain exact callback/action ownership, stale/resolved/wrong-choice rejection, hard-boundary precedence, player sovereignty, and META/AUTO/CONTINUE freeze, with focused/full regression, Exact Preview, Vercel, and fresh exact-head P0/P1 review.
-5. P2/P3 remain backlog. Do not return to time-engine/TPP or expand Setup -> Payoff beyond V1's existing-setup, legitimately selected-payoff continuation goal.
+1. Commit/push the lifecycle acceptance docs and run the full repository check on that exact HEAD.
+2. Require current-head Vercel and fresh direct Codex P0/P1=0; prior-head review is not approval.
+3. If zero, revalidate current main/base/merge-base, behind 0, conflict/thread/check state, and protected-path human-merge policy. Do not add P2/P3 hardening.
+4. If all gates pass, mark PR #66 merge-ready and notify the user of the exact expected HEAD for human merge.
+5. If the same lifecycle/beat P1 recurs, stop correction, retain fail-closed behavior, and record unmerged closure/follow-up rather than widening the contract.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> Read both progress documents first. PR #65 is merged and current main is `9de2b595...`. PR #66 exact code checkpoint `80e24075...` closes the generic-active-combat continuation priority root cause, passes focused/full regression and hosted checks, but Exact Preview exposes the distinct fail-closed `payoff-opportunity-beat-mismatch` lifecycle-contract blocker. Keep PR #66 unmerged, finish the docs exact-head review checkpoint, and make any later phase/beat work a separately bounded general contract task—no wording/parser/time/combat expansion or second model call.
+> Read both progress documents first. PR #65 is merged and current main is `9de2b595...`. PR #66 lifecycle code checkpoint `0426d472...` uses a bounded canonical phase/beat contract, passes focused/full/Repository/Vercel and the exact owned-continuation Preview corpus. Commit/push the final docs checkpoint, require fresh exact-head P0/P1=0, then revalidate the protected human-merge gate. Do not widen the allowlist or add P2/P3 hardening.
