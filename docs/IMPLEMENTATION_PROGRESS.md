@@ -15,13 +15,13 @@ Narrative Phase 1 **FROZEN**. NEXT ACTION is Narrative Phase 2 시작.
 ## PHASE 2 PROGRESS
 
 - Contract: `LUMENSIA_NARRATIVE_PHASE_2_ALL_IN_ONE_WORK_PACKAGE.txt` plus Overnight Autonomous Execution Mode.
-- Base main: `a95bf7e226c4f4e3bddc6cbff76eb116cc6a42c3` (PR #70 Phase 1 FREEZE merge).
-- Branch: `codex/p2-pr01-fate-start-foundation`.
-- Overall: `0 / 9 PR merged`.
-- Terminal: `1 / 9 PR processed`.
-- Deferred: `0`.
-- P2-PR01 Fate Start Foundation — **BLOCKED / HUMAN_MERGE_REQUIRED** at PR #71; last fresh-reviewed pre-closure head is `8dc541dd28ebf60f8693bcddfdad77edf3085d4a`.
-- After P2-PR01 is human-merged, run one separate latest-main Narrative Flavor Baseline bounded hotfix before P2-PR02. It must close completed user intent, prefer world-native hooks over repeated meta choice prompts, preserve explicit action limits, and add acceptance for wait-to-start, dorm/unpack, three-turn hooks, and listen-at-door without entering. It is not P2-PR09 and adds no engine/parser/lifecycle/save root.
+- Current main: `f39fb9976ae7d98f1f66c0226285f041c12238bf` (PR #71 merge); merge and reviewed head `4d118ce9a91a30636e196caca3eceaaaa73c6aeb` share tree `a27d155327eb3ea5c4cf737ec4b3d3c39b3d4c8c`.
+- Overall queue: `1 / 9 PR merged`; P2-PR01 terminal **MERGED**. Separate bounded insertion: `1 DEFERRED`.
+- P2-PR01 Fate Start Foundation — **MERGED** at PR #71. Focused/full/post-merge tests, Safety `33082361212`, Vercel, fresh P0=0/P1=0, repository integrity, and user Preview acceptance PASS.
+- Narrative Flavor Baseline — **DEFERRED** as draft PR #72, branch `codex/narrative-flavor-baseline`, base `f39fb9976ae7d98f1f66c0226285f041c12238bf`, implementation exact head `341598a2f3c2f9054e4079c4ebfa528e752806d3`.
+- Hotfix scope: reserved policy-level completion/autonomy/hook/flow contract plus focused A-D and pressure tests only. No P2-PR09, engine, parser, lifecycle, save root, regex wording list, or Phase 1 deferred change.
+- Hotfix validation: dedicated A-D test, syntax, and `git diff --check` PASS. `context-router-authority-tail.test.mjs` FAILS at the `.76` adaptive pressure case because USER ACTION's beginning is lost; full regression and hosted gates were not run after this local blocker.
+- ROOT_CAUSE_CLASS: **NEW_STRUCTURAL**. Resolving it requires a context priority/budget ownership rule between reserved flavor policy, USER ACTION, and Director/Schedule authority. CORRECTION_BUDGET: **1/1 exhausted** after policy compaction. SCOPE_EXPANSION: **NO**. MERGE_RECOMMENDATION: **DO NOT MERGE / DEFERRED**.
 - P2-PR02 Origin / Starting Character — TODO.
 - P2-PR03 Character Consequences — TODO.
 - P2-PR04 Personal Story Hooks — TODO.
@@ -30,16 +30,10 @@ Narrative Phase 1 **FROZEN**. NEXT ACTION is Narrative Phase 2 시작.
 - P2-PR07 Living World — TODO.
 - P2-PR08 Ending / Fate Book — TODO.
 - P2-PR09 Novel / UI Polish — TODO.
-- Current scope: preserve free/paste creation; add a separate Fate Start mode with male/female, commoner/fallen noble, reused department selection, minimal additive creation state, and legacy save/load compatibility.
-- Explicitly excluded: Procedural Origin, inheritance, relationship behavior, Personal Story, Ending/Fate Book, off-screen simulation, and Phase 1 deferred correction.
-- Tests: focused Fate Start, DEBUG regression, legacy save migration, core invariants, syntax/static, `git diff --check`, and full `scripts/lumensia-pr-check.mjs` PASS. Local tested tree and remote exact-head tree both equal `e2ee9f915e878bd0ae016e4ebd81deba7dfcd9ef`.
-- Hosted: current-head Safety run `33079126915` PASS; Vercel deployment `psFFXWhsRZoRhEG8Xss45qa4fyUb` Ready; fresh exact-head Codex review P0=0/P1=0; GitHub mergeable/conflict-free/behind 0.
-- Exact Preview: **PASS** by user on the protected PR #71 deployment. Existing free/paste controls remained available; Fate Start female + fallen noble + magic department creation succeeded; INFO reflected the selection; reload preserved it.
-- BLOCKER: no code or acceptance blocker remains. Protected `app.js` / `app-runtime.js` make merge human-only, and the next latest-main hotfix depends on this merge.
-- ROOT_CAUSE_CLASS: **NONE**. CORRECTION_BUDGET: **0/1**. SCOPE_EXPANSION: **NO**.
 - PHASE_2_BACKLOG_CANDIDATE: P2 `3872135947` notes that a custom free-mode department appended by pasted input could later be copied into the Fate selector and rejected by its fixed allowlist. P2 `3872204510` notes that `/lib/fate-start.js` is not in the service-worker offline shell, so a fresh offline PWA launch can fail before that module has been cached. Both are non-blocking backlog and are not corrected in this bounded PR.
 - PHASE1_DEFERRED_TOUCHED: **NO**.
-- NEXT ACTION: finish the docs-only exact-head Safety/Vercel/fresh-review cycle, then human-merge PR #71 using the reported expected head. After post-merge verification, run the bounded Narrative Flavor Baseline hotfix from latest main; only after its MERGED or non-blocking DEFERRED terminal state start P2-PR02.
+- REPOSITORY_INTEGRITY: latest main is clean/synchronized and verified; deferred PR #72 remains isolated and must not be used as a base.
+- NEXT ACTION: start **P2-PR02 — Procedural Origin + Starting Character** from latest main `f39fb9976ae7d98f1f66c0226285f041c12238bf`. Do not modify or stack on PR #72; leave #66/#68/#69 untouched.
 
 ## Permanent P0/P1 Operation Rule
 - Current exact HEAD에 P0/P1이 남아 있는 동안 repository-authorized remediation 범위 안에서 수정·focused test·full regression·push·hosted gate·fresh exact-head review를 계속한다. 중간 보고·`MERGE_GATE: FAIL`·새 review·HEAD 변경만으로는 멈추지 않는다.
