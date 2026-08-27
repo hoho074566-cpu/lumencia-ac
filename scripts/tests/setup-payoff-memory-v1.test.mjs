@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import {
+  CALLBACK_PHASE_BEAT_CONTRACT,
   SETUP_PAYOFF_MEMORY_VERSION,
   buildSetupPayoffDirective,
   deriveSetupPayoffPlan,
@@ -34,6 +35,10 @@ const turn = (director, patch = {}) => ({
 });
 
 assert.equal(SETUP_PAYOFF_MEMORY_VERSION, '1');
+assert.deepEqual(CALLBACK_PHASE_BEAT_CONTRACT.payoff_opportunity_open, ['choice', 'payoff_opportunity'], 'opening an opportunity must retain the narrow canonical choice beats');
+assert.deepEqual(CALLBACK_PHASE_BEAT_CONTRACT.payoff_opportunity_continuation, ['choice', 'payoff_opportunity', 'combat'], 'an already-owned continuation may use only the existing combat continuation beat in addition to choice beats');
+assert.deepEqual(CALLBACK_PHASE_BEAT_CONTRACT.payoff, ['payoff']);
+assert.deepEqual(CALLBACK_PHASE_BEAT_CONTRACT.aftermath, ['aftermath']);
 
 {
   const immature = deriveSetupPayoffPlan({ saveState:save({ turnNumber:10, director:{ callbacks:[callback()] } }), reachableNpcKeys:['lena'] });
@@ -93,6 +98,16 @@ for (const mode of ['meta', 'auto', 'continue']) {
   assert.equal(reconcileSetupPayoffTurn({saveState:state,turn:wrong,plan}).reason, 'unselected-payoff-opportunity', 'a different callback cannot hijack the selected setup');
   const wrongBeat = turn({callback_key:'rival-proof',callback_phase:'payoff_opportunity',beat:'routine'}, {choices:['응한다.']});
   assert.equal(reconcileSetupPayoffTurn({saveState:state,turn:wrongBeat,plan}).reason, 'payoff-opportunity-beat-mismatch', 'the semantic phase and visible beat must agree');
+
+  const ownedContinuationState = save({sceneRuntime:{participants:['lena'],turn_hook:payoffBoundary(9)},director:{callbacks:[callback({status:'opportunity'})]}});
+  const ownedContinuationPlan = deriveSetupPayoffPlan({saveState:ownedContinuationState,action:payoffChoice,reachableNpcKeys:['lena']});
+  const combatContinuation = turn({callback_key:'rival-proof',callback_phase:'payoff_opportunity',beat:'combat'}, {choices:['간격을 유지하며 다음 합을 준비한다.']});
+  assert.equal(reconcileSetupPayoffTurn({saveState:ownedContinuationState,turn:combatContinuation,plan:ownedContinuationPlan}).status, 'opportunity', 'an already presented and exactly selected payoff may continue through the existing canonical combat beat');
+  const unrelatedContinuationBeat = turn({callback_key:'rival-proof',callback_phase:'payoff_opportunity',beat:'investigation'}, {choices:['단서를 더 찾는다.']});
+  assert.equal(reconcileSetupPayoffTurn({saveState:ownedContinuationState,turn:unrelatedContinuationBeat,plan:ownedContinuationPlan}).reason, 'payoff-opportunity-beat-mismatch', 'an unrelated canonical beat must remain fail-closed');
+
+  const openCombat = turn({callback_key:'rival-proof',callback_phase:'payoff_opportunity',beat:'combat'}, {choices:['공개 대련에서 직접 증명한다.']});
+  assert.equal(reconcileSetupPayoffTurn({saveState:state,turn:openCombat,plan}).reason, 'payoff-opportunity-beat-mismatch', 'combat must not bypass the narrow open-to-opportunity contract');
 }
 
 {
@@ -102,6 +117,8 @@ for (const mode of ['meta', 'auto', 'continue']) {
   const earlyResult = reconcileSetupPayoffTurn({saveState:openState,turn:earlyPayoff,plan:openPlan});
   assert.equal(earlyResult.reason, 'payoff-requires-owned-opportunity', 'an open setup cannot skip the player-owned opportunity transition');
   assert.equal(earlyResult.reject_turn, true, 'an unauthorized payoff must reject the complete result so narration and rewards cannot leak through');
+  const earlyAftermath = turn({callback_key:'rival-proof',callback_phase:'aftermath',beat:'aftermath'});
+  assert.equal(reconcileSetupPayoffTurn({saveState:openState,turn:earlyAftermath,plan:openPlan}).reason, 'payoff-requires-owned-opportunity', 'an open setup cannot skip directly to aftermath');
 
   const offered = save({sceneRuntime:{participants:['lena'],turn_hook:payoffBoundary(9)},director:{callbacks:[callback({status:'opportunity'})]}});
   const offeredPlan = deriveSetupPayoffPlan({saveState:offered,action:payoffChoice,reachableNpcKeys:['lena']});
