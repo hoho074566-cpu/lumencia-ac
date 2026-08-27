@@ -1,7 +1,7 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Narrative Engine continuation — Adaptive Time Scale V2 checkpoint closure and Time Plan Parser (TPP) structural transition.
+Stack integration only — integrate the reviewed `#54 -> #55 -> #56 -> #57 -> #58 -> #61` safe tree into one main-target PR without new time-engine behavior.
 
 ## Permanent P0/P1 Operation Rule
 - Current exact HEAD에 P0/P1이 남아 있는 동안 repository-authorized remediation 범위 안에서 수정·focused test·full regression·push·hosted gate·fresh exact-head review를 계속한다. 중간 보고·`MERGE_GATE: FAIL`·새 review·HEAD 변경만으로는 멈추지 않는다.
@@ -13,7 +13,11 @@ Narrative Engine continuation — Adaptive Time Scale V2 checkpoint closure and 
 ## Current GitHub State
 - Repo: `hoho074566-cpu/lumencia-ac`
 - Main: `1018d8c27c451dc122982fb14bf7d3e3902c70ca` (PR #53 merge).
-- Working branch: `codex/time-plan-parser-phase3`, PR #57, stacked on reviewed Phase 2 exact head `f0971430af351c4a007e18daa0bd18454e6aab4f`.
+- Integration branch: `codex/time-stack-integration`, created exactly from PR #61 safe head `de854414d525d1fbaffc5f048ef4b8a08e8fbdac`; only the integration documentation checkpoint may differ.
+- Included lineage: PR #54 Adaptive Time Scale V2, #55 TPP Phase 1, #56 Phase 2, #57 Phase 3, #58 bounded Phase 4 cleanup, and #61 safe Narrative Time Policy V1.
+- Explicit exclusions: closed-unmerged PR #59 head `4325d604edff3b2a7bd2cab11bb40b95087b5819` and PR #60 head `1a623867ec58fb1fd7dbba1a644efa889a24524f` are not ancestors of the integration branch; their exclusive commits/diffs remain outside this tree.
+- Integration scope is docs plus already-reviewed cumulative code only. No feature, hardening, Korean wording/regex, compound semantic change, parser expansion, TPP phase, or model call is authorized here.
+- Historical Phase 3 branch: `codex/time-plan-parser-phase3`, PR #57, stacked on reviewed Phase 2 exact head `f0971430af351c4a007e18daa0bd18454e6aab4f`; it is now an included ancestor, not the active working branch.
 - Current Adaptive Time Scale V2 runtime code head: `24407193b59d0f9e9cf2f9d8f1a4589b4b92c95c`; local focused/full regression, Safety run `32947576791`, Vercel, current-base `1018d8c...`, behind 0, and conflict-free mergeability pass. Fresh exact-head review `5028340142` reports four remaining P1s, all caused by the wording-specific string parser. PR #54 is therefore a stable checkpoint but is not merge-ready.
 - TPP Phase 1 is implemented locally as a shadow-only structured parser. It emits ordered clauses with actor, action type, start/date/clock, duration/range, destination, deadline, sequence relation, commitment/completion, hypothetical, quoted, and third-party fields. Legacy `classifySceneIntent` and every execution/arbitration/mutation path remain authoritative.
 - A compact runtime comparison reports only clause counts/types and terminal legacy agreement; raw player input and actor names are not echoed. Input is bounded and parser failure degrades to diagnostic telemetry instead of failing the turn. No save root, schema, model call, route, or budget changes exist.
@@ -615,8 +619,8 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 
 ## NEXT ACTION — AUTHORITATIVE
 
-1. Commit/push the P1 correction docs checkpoint to protected stacked PR #61.
-2. Verify the new exact head's base/merge-base/behind/conflict, Vercel, and fresh direct P0/P1=0. Stacked main-only Safety must not be synthesized as PASS.
-3. Rerun only representative safe-policy Preview acceptance affected by the changed presentation path; do not explore compound semantics or the non-blocking P2.
-4. On PASS, close the safe policy scope without P2/P3 hardening. Then leave the time engine and continue the latest unfinished Narrative Engine action.
-5. Any later compound semantics work must be a separate bounded AI Semantic Receipt task using the existing canonical response plus deterministic validation; no wording-specific regex or second model call.
+1. Commit/push the integration-only documentation checkpoint and open one PR from `codex/time-stack-integration` directly to current `main`.
+2. Verify current main/base/merge-base/behind/conflict, `git diff --check`, focused suites, full `scripts/lumensia-pr-check.mjs`, main-target Safety, Vercel, and fresh exact-current-HEAD P0/P1=0.
+3. Run only six representative Preview categories: ordinary no-debug-minute prose, hard schedule, meaningful choice, one compound boundary case, CONTINUE/META/AUTO freeze, and Scene Momentum movement compression. Use permanent regression for all other historic cases.
+4. If all gates pass, do not add P2/P3 hardening. Mark merge gate PASS and wait for human expected-head merge because the PR changes protected `api/**`.
+5. Post-merge only: fetch main, verify production health/Vercel/full regression/tree equality, mark #54/#55/#56/#57/#58/#61 integrated/superseded, keep #59/#60 closed-unmerged, and continue the latest non-time Narrative Engine action.

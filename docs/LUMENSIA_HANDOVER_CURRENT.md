@@ -27,6 +27,18 @@ Repository: `hoho074566-cpu/lumencia-ac`
 
 ---
 
+# 0. CURRENT STACK INTEGRATION — AUTHORITATIVE
+
+- 작업 모드는 **stack integration only**다. 새 Narrative Time Policy 기능, hardening, parser/regex, compound semantics, TPP phase, model call을 추가하지 않는다.
+- 최신 fetched `origin/main`은 `1018d8c27c451dc122982fb14bf7d3e3902c70ca`이며, integration source는 PR #61의 exact safe head `de854414d525d1fbaffc5f048ef4b8a08e8fbdac`다.
+- 안전 누적 계보는 `main -> #54 -> #55 -> #56 -> #57 -> #58 -> #61`이다. 새 branch `codex/time-stack-integration`은 exact safe head에서 생성하고 PR base는 `main`으로 한다.
+- PR #59 head `4325d604edff3b2a7bd2cab11bb40b95087b5819`와 PR #60 head `1a623867ec58fb1fd7dbba1a644efa889a24524f`는 모두 safe head의 조상이 아니다. 두 closed-unmerged PR의 전용 commits/diff를 integration tree에 포함하지 않는다.
+- 기존 stacked PR별 검증을 재실행하지 않는다. main-target integration PR 한 번에서 diff/static/focused/full regression, Safety, Vercel, 대표 Preview, fresh exact-head P0/P1=0을 요구한다.
+- 대표 Preview는 ordinary Narrative Time Policy, hard schedule, meaningful choice, compound boundary ownership, CONTINUE/META/AUTO freeze, Scene Momentum 이동 압축으로 제한한다. 나머지는 permanent automated corpus를 authority로 사용한다.
+- 모든 final gate가 PASS하면 P2/P3 hardening 없이 closure하고, `api/**` 보호 정책에 따라 사람이 expected exact head를 병합한다.
+
+---
+
 # 0. SESSION STOP CHECKPOINT — 가장 먼저 읽을 것
 
 ## Live state immediately before this handover update
@@ -911,15 +923,14 @@ Fresh direct review `5037414704` on initial PR #61 exact head `4dc7f4f3768b4635e
 
 # 12. NEXT ACTION — CURRENT START POINT
 
-1. Commit the docs checkpoint, push the exact head, and open a protected stacked PR against exact safe base `codex/time-plan-parser-phase4` / `9458633...`.
-2. Require exact-head Vercel, fresh direct P0/P1=0, no conflict, base=merge-base=`9458633...`, and behind 0. Do not synthesize a stacked main-only Safety PASS.
-3. Run only representative Narrative Time Policy Preview acceptance: ordinary routine/elapsed prose hides internal minute diagnostics, a real schedule boundary still interrupts naturally, and a direct time question may surface exact time. Do not rerun compound semantic permutations.
-4. If direct P0/P1=0 and Preview passes, close the safe policy scope without P2/P3 hardening. The PR changes `api/**` and remains human-merge-only.
-5. Preserve the PR #60 compound findings for a separate AI Semantic Receipt task. Do not return to deterministic Korean classifier priority or time-arithmetic expansion.
-6. After policy closure, leave the time engine and read the latest unfinished Narrative Engine NEXT ACTION. Do not redo completed HF1/HF2/HF3 through Event Director V3.
+1. Keep `codex/time-stack-integration` implementation-identical to PR #61 exact safe tree apart from this integration-only documentation checkpoint.
+2. Prove `origin/main` is the exact base/merge-base, behind 0, conflict-free; prove PR #59/#60 heads and their exclusive commits are absent.
+3. Open one main-target integration PR and run focused/full regression, main Safety, Vercel, fresh exact-head P0/P1=0, and only the six representative Preview categories listed above.
+4. If all gates pass, make no P2/P3 or semantic hardening changes. Record `MERGE_GATE: PASS` and wait for a person to merge the protected `api/**` PR by expected exact head.
+5. After merge, fetch main, verify tree/production health/Vercel/full regression, mark #54/#55/#56/#57/#58/#61 integrated or superseded, retain #59/#60 closed-unmerged, then leave the time engine for the latest unfinished Narrative Engine action.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> Read both progress documents first. PR #60 exact `1a62386...` is closed unmerged after two compound semantic-arbitration P1s; do not add another classifier/regex/time patch there. Current work is protected stacked PR #61, branch `codex/narrative-time-policy-v1-safe`, exact base `9458633...`, code checkpoint `e956dfc...`. The first direct review found one safe-presentation P1; its parallel raised-floor path is now corrected, and focused/full regression passes. Continue with docs commit/push → Vercel/fresh exact-head P0/P1=0 → representative Preview rerun. Do not implement the non-blocking zero-minute consequence P2 here. Preserve one canonical call, stable routing, `store:false`, cache/retention, budgets, canon, player sovereignty, freezes, hard schedule/consequence/deadline boundaries, and human-only merge for `api/**`.
+> Read both progress documents first. Work only on `codex/time-stack-integration`, sourced from PR #61 exact safe head `de854414d525d1fbaffc5f048ef4b8a08e8fbdac` and targeted directly at current `main` `1018d8c27c451dc122982fb14bf7d3e3902c70ca`. The included stack is #54/#55/#56/#57/#58/#61. PR #59/#60 remain closed-unmerged and excluded. Add no feature/hardening/parser/regex/model-call change. Finish the single main-target Safety/Vercel/regression/fresh-review/representative-Preview authority cycle, then leave the protected PR for human expected-head merge.
