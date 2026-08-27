@@ -37,6 +37,25 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - These deferred blockers are explicitly **not** Narrative Phase 1 FREEZE blockers. They are separate stabilization candidates for Phase 2/backlog, to be reassessed after Phase 2 using actual-play impact. Phase 1 adds no further Narrative Engine feature, correction, edge-case task, or scope expansion.
 - **NEXT ACTION: Narrative Phase 2 시작.** Do not return to Phase 1 deferred items before starting Phase 2.
 
+## PHASE 2 PROGRESS — CURRENT
+
+- Base main: `a95bf7e226c4f4e3bddc6cbff76eb116cc6a42c3` (PR #70 Phase 1 FREEZE merge).
+- Branch: `codex/p2-pr01-fate-start-foundation`.
+- Overall: `0 / 9 PR merged`; Terminal: `0 / 9 processed`; Deferred: `0`.
+- P2-PR01 Fate Start Foundation — **IN_PROGRESS**.
+- P2-PR02 Origin / Starting Character — TODO.
+- P2-PR03 Character Consequences — TODO.
+- P2-PR04 Personal Story Hooks — TODO.
+- P2-PR05 Inheritance — TODO.
+- P2-PR06 Character-driven NPC — TODO.
+- P2-PR07 Living World — TODO.
+- P2-PR08 Ending / Fate Book — TODO.
+- P2-PR09 Novel / UI Polish — TODO.
+- P2-PR01 scope is bounded to the existing free/paste creator plus a separate Fate Start entry with male/female, commoner/fallen noble, the existing department choices, minimal additive creation state, and legacy save/load compatibility.
+- Do not add Procedural Origin, inheritance, NPC relationship changes, Personal Story, Ending/Fate Book, off-screen simulation, or any Phase 1 deferred correction in this PR.
+- PHASE1_DEFERRED_TOUCHED: **NO**.
+- NEXT ACTION: finish P2-PR01 validation, open its dedicated main-based PR, and require hosted Safety/Vercel plus fresh exact-head P0=0/P1=0 before terminal disposition.
+
 ---
 
 # 0. ACTIVE THREADS V1 POST-MERGE CLOSURE — AUTHORITATIVE

@@ -12,6 +12,28 @@ Narrative Phase 1 **FROZEN**. NEXT ACTION is Narrative Phase 2 시작.
 - These three deferred blockers do not block the Phase 1 FREEZE. They are Phase 2/backlog stabilization candidates for later actual-play-impact reassessment, not prerequisites for Phase 2.
 - FREEZE: add no new Phase 1 Narrative Engine feature, correction, edge-case task, or scope expansion. NEXT ACTION: Narrative Phase 2 시작.
 
+## PHASE 2 PROGRESS
+
+- Contract: `LUMENSIA_NARRATIVE_PHASE_2_ALL_IN_ONE_WORK_PACKAGE.txt` plus Overnight Autonomous Execution Mode.
+- Base main: `a95bf7e226c4f4e3bddc6cbff76eb116cc6a42c3` (PR #70 Phase 1 FREEZE merge).
+- Branch: `codex/p2-pr01-fate-start-foundation`.
+- Overall: `0 / 9 PR merged`.
+- Terminal: `0 / 9 PR processed`.
+- Deferred: `0`.
+- P2-PR01 Fate Start Foundation — **IN_PROGRESS**.
+- P2-PR02 Origin / Starting Character — TODO.
+- P2-PR03 Character Consequences — TODO.
+- P2-PR04 Personal Story Hooks — TODO.
+- P2-PR05 Inheritance — TODO.
+- P2-PR06 Character-driven NPC — TODO.
+- P2-PR07 Living World — TODO.
+- P2-PR08 Ending / Fate Book — TODO.
+- P2-PR09 Novel / UI Polish — TODO.
+- Current scope: preserve free/paste creation; add a separate Fate Start mode with male/female, commoner/fallen noble, reused department selection, minimal additive creation state, and legacy save/load compatibility.
+- Explicitly excluded: Procedural Origin, inheritance, relationship behavior, Personal Story, Ending/Fate Book, off-screen simulation, and Phase 1 deferred correction.
+- PHASE1_DEFERRED_TOUCHED: **NO**.
+- NEXT ACTION: complete P2-PR01 focused/UI/save acceptance, full regression, hosted Safety/Vercel, and fresh exact-head review. Apply at most one SAME_ROOT correction; otherwise DEFER/BLOCK under v2.1.
+
 ## Permanent P0/P1 Operation Rule
 - Current exact HEAD에 P0/P1이 남아 있는 동안 repository-authorized remediation 범위 안에서 수정·focused test·full regression·push·hosted gate·fresh exact-head review를 계속한다. 중간 보고·`MERGE_GATE: FAIL`·새 review·HEAD 변경만으로는 멈추지 않는다.
 - 사용자 요청의 5-cycle 연속 원칙은 trusted Auto-PR controller 경로에 적용한다. 현재 `AGENTS.md`가 정한 일반 Codex-local 최대 2회 / trusted controller 최대 5회 한도가 우선하며, 소진 뒤에는 P0/P1 gate를 FAIL로 유지하고 사람에게 인계한다.

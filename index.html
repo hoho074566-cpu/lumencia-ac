@@ -113,11 +113,18 @@
   <dialog id="pcCreatorDialog" class="panel-dialog wide-dialog">
     <form id="pcCreatorForm">
       <header><h2>PC 생성</h2><button id="pcCreatorClose" type="button" class="close-btn">✕</button></header>
-      <div class="creator-note">새 게임은 완전한 빈 시트에서 시작한다. 직접 입력하거나, 아래에 미리 만든 PC 설정을 붙여넣어 자동으로 채울 수 있다.</div>
+      <input id="pcCreationMode" type="hidden" value="free" />
+      <div class="creation-mode-switch" role="tablist" aria-label="캐릭터 생성 방식">
+        <button id="pcFreeModeBtn" type="button" class="creation-mode-btn active" role="tab" aria-selected="true" aria-controls="pcFreeCreationFields">자유 생성</button>
+        <button id="pcFateModeBtn" type="button" class="creation-mode-btn" role="tab" aria-selected="false" aria-controls="pcFateStartFields">운명 시작</button>
+      </div>
 
-      <section class="pc-paste-box">
-        <div class="creator-section-title">PC 설정 붙여넣기</div>
-        <textarea id="pcPasteText" rows="7" maxlength="12000" placeholder="자연어 또는 JSON 가능. 예:
+      <div id="pcFreeCreationFields" class="creation-mode-fields" role="tabpanel" aria-labelledby="pcFreeModeBtn">
+        <div class="creator-note">새 게임은 완전한 빈 시트에서 시작한다. 직접 입력하거나, 아래에 미리 만든 PC 설정을 붙여넣어 자동으로 채울 수 있다.</div>
+
+        <section class="pc-paste-box">
+          <div class="creator-section-title">PC 설정 붙여넣기</div>
+          <textarea id="pcPasteText" rows="7" maxlength="12000" placeholder="자연어 또는 JSON 가능. 예:
 이름: Aaa
 나이: 20
 성별: 남성
@@ -127,12 +134,12 @@
 스탯: 신체 A-, 마나 B+, 지능 C, 신성 F
 스킬: 대검술:A++, 오러 운용:A
 장비: 강철 양손대검, 예비 단검 2자루"></textarea>
-        <div class="pc-paste-actions">
-          <button id="pcPasteApplyBtn" type="button" class="secondary-btn">붙여넣은 설정 자동채우기</button>
-          <button id="pcCreatorClearBtn" type="button" class="ghost-btn">전부 비우기</button>
-        </div>
-        <div id="pcPasteResult" class="field-help pc-paste-result">붙여넣은 내용은 자동 적용 후에도 직접 수정할 수 있음.</div>
-      </section>
+          <div class="pc-paste-actions">
+            <button id="pcPasteApplyBtn" type="button" class="secondary-btn">붙여넣은 설정 자동채우기</button>
+            <button id="pcCreatorClearBtn" type="button" class="ghost-btn">전부 비우기</button>
+          </div>
+          <div id="pcPasteResult" class="field-help pc-paste-result">붙여넣은 내용은 자동 적용 후에도 직접 수정할 수 있음.</div>
+        </section>
 
       <div class="creator-grid">
         <label>이름<input id="pcName" required maxlength="40" placeholder="예: Aaa" /></label>
@@ -177,9 +184,35 @@
       <label>초기 스킬 <span class="field-help">한 줄에 `스킬명:등급`</span><textarea id="pcSkillsText" rows="7" placeholder="예:
 대검술:A++
 오러 운용:A"></textarea></label>
-      <label>초기 장비 <span class="field-help">쉼표 또는 줄바꿈으로 구분</span><textarea id="pcInventoryText" rows="4" placeholder="예: 강철 양손대검, 가죽 장갑"></textarea></label>
+        <label>초기 장비 <span class="field-help">쉼표 또는 줄바꿈으로 구분</span><textarea id="pcInventoryText" rows="4" placeholder="예: 강철 양손대검, 가죽 장갑"></textarea></label>
+      </div>
+
+      <section id="pcFateStartFields" class="creation-mode-fields fate-start-fields hidden" role="tabpanel" aria-labelledby="pcFateModeBtn">
+        <div class="creator-note">운명 시작은 최소 선택만 정한다. 출신과 과거, 초기 능력은 다음 생성 단계에서 이 선택을 바탕으로 결정된다.</div>
+        <div class="creator-grid">
+          <label>성별
+            <select id="fateGender" required disabled>
+              <option value="">-- 선택 --</option>
+              <option value="male">남성</option>
+              <option value="female">여성</option>
+            </select>
+          </label>
+          <label>신분
+            <select id="fateSocialClass" required disabled>
+              <option value="">-- 선택 --</option>
+              <option value="commoner">평민</option>
+              <option value="fallen_noble">몰락귀족</option>
+            </select>
+          </label>
+          <label>학과
+            <select id="fateDepartment" required disabled>
+              <option value="">-- 선택 --</option>
+            </select>
+          </label>
+        </div>
+      </section>
       <div class="creator-actions">
-        <button type="submit" class="primary-btn">이 설정으로 새 게임</button>
+        <button id="pcCreatorSubmit" type="submit" class="primary-btn">이 설정으로 새 게임</button>
       </div>
     </form>
   </dialog>
