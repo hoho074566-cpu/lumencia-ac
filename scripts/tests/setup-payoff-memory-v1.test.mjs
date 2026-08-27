@@ -50,10 +50,12 @@ assert.equal(SETUP_PAYOFF_MEMORY_VERSION, '1');
 }
 
 {
-  const awaiting = save({ sceneRuntime:{participants:['lena'],turn_hook:{status:'awaiting-player'}}, director:{callbacks:[callback()]} });
+  const awaiting = save({ sceneRuntime:{participants:['lena'],turn_hook:{status:'awaiting-player',established_turn:12}}, director:{callbacks:[callback()]} });
   assert.equal(deriveSetupPayoffPlan({saveState:awaiting,reachableNpcKeys:['lena']}).selected, null, 'an unrelated player-owned boundary blocks a new payoff opportunity');
-  const ownedOpportunity = save({ sceneRuntime:{participants:['lena'],turn_hook:{status:'awaiting-player'}}, director:{callbacks:[callback({status:'opportunity'})]} });
+  const ownedOpportunity = save({ sceneRuntime:{participants:['lena'],turn_hook:{status:'awaiting-player',established_turn:9}}, director:{callbacks:[callback({status:'opportunity'})]} });
   assert.equal(deriveSetupPayoffPlan({saveState:ownedOpportunity,reachableNpcKeys:['lena']}).selected?.key, 'rival-proof', 'an already offered opportunity remains available for the player response that resolves it');
+  const unrelatedLaterChoice = save({ sceneRuntime:{participants:['lena'],turn_hook:{status:'awaiting-player',established_turn:12}}, director:{callbacks:[callback({status:'opportunity'})]} });
+  assert.equal(deriveSetupPayoffPlan({saveState:unrelatedLaterChoice,reachableNpcKeys:['lena']}).selected, null, 'a later unrelated player choice cannot consume an older payoff opportunity');
 }
 
 for (const mode of ['meta', 'auto', 'continue']) {
@@ -93,14 +95,16 @@ for (const mode of ['meta', 'auto', 'continue']) {
   const openState = save({director:{callbacks:[callback()]}});
   const openPlan = deriveSetupPayoffPlan({saveState:openState,reachableNpcKeys:['lena']});
   const earlyPayoff = turn({callback_key:'rival-proof',callback_phase:'payoff',beat:'payoff'});
-  assert.equal(reconcileSetupPayoffTurn({saveState:openState,turn:earlyPayoff,plan:openPlan}).reason, 'payoff-requires-owned-opportunity', 'an open setup cannot skip the player-owned opportunity transition');
+  const earlyResult = reconcileSetupPayoffTurn({saveState:openState,turn:earlyPayoff,plan:openPlan});
+  assert.equal(earlyResult.reason, 'payoff-requires-owned-opportunity', 'an open setup cannot skip the player-owned opportunity transition');
+  assert.equal(earlyResult.reject_turn, true, 'an unauthorized payoff must reject the complete result so narration and rewards cannot leak through');
 
-  const offered = save({director:{callbacks:[callback({status:'opportunity'})]}});
+  const offered = save({sceneRuntime:{participants:['lena'],turn_hook:{status:'awaiting-player',established_turn:9}},director:{callbacks:[callback({status:'opportunity'})]}});
   const offeredPlan = deriveSetupPayoffPlan({saveState:offered,reachableNpcKeys:['lena']});
   const payoff = turn({callback_key:'rival-proof',callback_phase:'payoff',beat:'payoff'});
   assert.equal(reconcileSetupPayoffTurn({saveState:offered,turn:payoff,plan:offeredPlan}).status, 'resolved', 'the exact owned opportunity may resolve after the player acts');
 
-  const legacyCase = save({director:{callbacks:[callback({key:'Rival-Proof',status:'opportunity'})]}});
+  const legacyCase = save({sceneRuntime:{participants:['lena'],turn_hook:{status:'awaiting-player',established_turn:9}},director:{callbacks:[callback({key:'Rival-Proof',status:'opportunity'})]}});
   const legacyPlan = deriveSetupPayoffPlan({saveState:legacyCase,reachableNpcKeys:['lena']});
   const legacyPayoff = turn({callback_key:'rival-proof',callback_phase:'payoff',beat:'payoff'});
   assert.equal(reconcileSetupPayoffTurn({saveState:legacyCase,turn:legacyPayoff,plan:legacyPlan}).status, 'resolved');
@@ -141,6 +145,7 @@ const appSource = readFileSync(new URL('../../app.js', import.meta.url), 'utf8')
 assert.doesNotMatch(routerSource, /responses\.create|chat\.completions|new OpenAI/, 'Setup -> Payoff routing must not add a model call');
 assert.equal((adapterSource.match(/=>coreHandler\(/g) || []).length, 1, 'the adapter must retain one canonical core call');
 assert.match(adapterSource, /reconcileSetupPayoffTurn/, 'the returned semantic transition must pass the deterministic validator before persistence');
+assert.match(adapterSource, /setupPayoffLifecycle\.reject_turn[\s\S]*SETUP_PAYOFF_LIFECYCLE_REJECTED/, 'a rejected payoff must fail the complete response before its narration or state delta can persist');
 assert.match(appSource, /callback_phase[\s\S]*payoff_opportunity[\s\S]*payoff[\s\S]*resolved/, 'V1 must reuse the existing callback lifecycle instead of adding a save root');
 assert.doesNotMatch(adapterSource, /setupPayoffMemory\s*=|setup_payoff_memory_add/, 'V1 must not create parallel persistent setup authority');
 
