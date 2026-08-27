@@ -737,7 +737,7 @@ function rebuildRollingSummary() {
 
 function compactState() {
   return {
-    version: save.version, turnNumber: save.turnNumber, world: save.world, pc: save.pc, relationships: save.relationships, intimacyStates: save.intimacyStates, npcStates: save.npcStates,
+    version: save.version, turnNumber: save.turnNumber, world: save.world, creation: save.creation, pc: save.pc, relationships: save.relationships, intimacyStates: save.intimacyStates, npcStates: save.npcStates,
     emotionStates: save.emotionStates, activeEvents: save.activeEvents, completedEvents: save.completedEvents,
     pcKnowledge: save.pcKnowledge, memories: save.memories, hooks:save.hooks, scheduledEvents:save.scheduledEvents, scheduleContext:save.scheduleContext, director:save.director, flags: save.flags,
   };
@@ -1134,7 +1134,8 @@ function createNewSaveFromCreator() {
     const labels=fateStartLabels(generated.creation.fateStart);
     base.creation=generated.creation;
     base.pc={...base.pc,...generated.pc,gender:labels.gender,socialStatus:labels.socialClass,department:labels.department};
-    base.rollingSummary=`입학식 당일 08:40. ${base.pc.name}은(는) 루멘시아 아카데미 대강당 앞에 도착했으며 입학식 개막 전이다.`;
+    const startRoute=generated.creation.fateStart.background.startingRoute;
+    base.rollingSummary=`입학식 당일 08:40. ${base.pc.name}은(는) ${startRoute.arrivalFocus}에 도착했다. ${startRoute.eventMeaning}이며 첫 확인 지점은 ${startRoute.checkpoint}이다. 입학식 개막 전이다.`;
     return normalizeSave(base);
   }
   base.creation=createFreeCharacterCreation();
