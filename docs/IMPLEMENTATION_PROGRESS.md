@@ -1,7 +1,7 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Narrative Engine continuation — time stack post-merge closure complete; Active Threads V1 is the next unfinished foundation.
+Narrative Engine continuation — Active Threads V1 post-merge closure complete; Setup -> Payoff Memory V1 is the next unfinished foundation.
 
 ## Permanent P0/P1 Operation Rule
 - Current exact HEAD에 P0/P1이 남아 있는 동안 repository-authorized remediation 범위 안에서 수정·focused test·full regression·push·hosted gate·fresh exact-head review를 계속한다. 중간 보고·`MERGE_GATE: FAIL`·새 review·HEAD 변경만으로는 멈추지 않는다.
@@ -12,13 +12,18 @@ Narrative Engine continuation — time stack post-merge closure complete; Active
 
 ## Current GitHub State
 - Repo: `hoho074566-cpu/lumencia-ac`
-- Main: `113cd14b3857f73eba1be3bdd24297ceeaa6681d` (PR #62 merge).
+- Main: `609c2bc0e4dd7931156687c32e59ed2ed2f28fa6` (PR #64 merge).
+- PR #64 reviewed head `4727a468f15c0f8e2990c4ae55cb688e12cc5ec6` and merged main share tree `ce54953f9185642cd294a5bccfe401e002745a42`.
+- PR #64 is `merged=true`. Production Vercel PASS and production `/api/health` HTTP 200 confirm adapter `0.8.7`, canonical `/api/chat`, stable router/context paths, `24h` prompt retention, and preserved HF1 budgets.
+- Merged-main full repository regression and Active Threads focused lifecycle/routing/freeze tests PASS. Production runtime acceptance completed the entrance ceremony, continued by AUTO without replay, then disabled AUTO at the next meaningful player-owned department choice.
+- Active Threads V1 reuses existing event/hook/schedule/arc/callback/current-and-paused-progress/completed-event authority as a read-only derived view. It adds no save root or model call.
+- Current PR #64 review findings are P2 backlog only. Per user direction they are recorded but untouched; no Active Threads correction or hardening phase is opened from them.
 - Reviewed integration head `c58ce40bd970ab9032bfc2441310bd226eafa9c1` and merged main share tree `66bc75a0ef3bc222f0a2e2ac541988453bfa7a33`.
 - Production Vercel PASS; `/api/health` HTTP 200 reports observed deploy metadata app `1.5.6` and adapter `0.8.7`, plus canonical `/api/chat`, stable router/context paths, `store:false` coverage, `24h` prompt retention, and preserved budgets. The repository contract remains stable app `1.5.4`; the observed deploy metadata is not canonical version authority and must not be propagated into runtime/version changes by this checkpoint.
 - Merged-main full repository regression PASS. One canonical call, stable routing, cache/retention, budgets, canon, player sovereignty, and META/AUTO/CONTINUE freeze all pass their permanent invariants.
 - PR #54/#55/#56/#57/#58/#61 are integrated through #62 and closed as superseded. They must not be merged separately.
 - PR #59 and #60 remain closed-unmerged. Their 29 and 6 safe-tree-exclusive commits have zero inclusion in merged main.
-- Time systems are now a completed base. The four non-blocking PR #62 P2 findings remain backlog and do not trigger a new correction.
+- Time systems and Active Threads V1 are now completed bases. Their non-blocking P2 findings remain backlog and do not trigger a new correction.
 # HISTORICAL ARCHIVE — NON-ACTIONABLE
 
 The entries below preserve the former #54-#61 development/review chronology only. Their old P0/P1, blocker, MERGE_GATE, and NEXT ACTION wording is superseded by the authoritative closure above and must not restart time-engine work. PR #57 is now an included ancestor rather than an active branch.
@@ -625,8 +630,8 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 
 # NEXT ACTION — AUTHORITATIVE
 
-1. Treat Event Consequence V1 as the completed Consequence Queue/Lifetime roadmap item and begin Active Threads V1.
-2. Inventory existing `activeEvents`, unresolved hooks, scheduled events, world arcs, Director callbacks, `sceneRuntime.eventProgress`, paused `sceneRuntime.eventProgressByInstance`, and `completedEvents`; do not create a duplicate authoritative save root. Lifecycle regressions must cover pause/resume and completed-occurrence suppression.
-3. Produce a bounded design for a derived/canonical active-thread view, deterministic ordering and relevance, lifecycle removal, routing budget, player-choice protection, and META/AUTO/CONTINUE behavior.
-4. Implement only after that read-only plan on a separate focused branch. Add no model call, canon expansion, time-system hardening, or incompatible save migration.
-5. Validate with focused lifecycle/routing/freeze tests and full repository regression before hosted review/Preview.
+1. Treat Active Threads V1 as completed and begin Setup -> Payoff Memory V1 from the latest verified main. Do not reopen time-engine/TPP work or PR #64 P2 hardening.
+2. Inventory existing hooks, Director callbacks, event-consequence sources, visible world-result facts, recent-turn memory, event progress/completion, and routed context. Reuse existing canonical IDs and lifecycle state; do not add a parallel save root.
+3. Produce a bounded analysis/plan before implementation: setup registration, public/PC knowledge boundary, deterministic payoff eligibility and priority, causal evidence, once-only consumption, expiry/cancellation, meaningful-stop behavior, and META/AUTO/CONTINUE freezes.
+4. Preserve one canonical model call, stable `/api/chat-router -> api/chat.js`, `store:false`, prompt cache/retention, Context Router budgets, save compatibility, canon, and player sovereignty. Fail closed on hidden, ambiguous, completed, cancelled, or unowned setup/payoff claims.
+5. Add permanent focused regressions for unrelated-turn persistence, evidence-gated payoff, no replay after consumption/cancellation, unrelated-hook isolation, meaningful player-choice STOP, and freeze modes; then run full regression and hosted exact-head review/representative Preview on a separate focused PR.
