@@ -11,7 +11,7 @@ Narrative Phase 1 **FROZEN**. `PHASE_2_IMPLEMENTATION_PASS: COMPLETE` and `PHASE
 - P3-PR03 Context / Token Diet: **TODO**.
 - P3-PR04 Runtime / Loading Optimization: **TODO**.
 - P3-PR05 Mobile Reading / Character UX: **TODO**.
-- Current PR: [#88 P3-PR01 — Novel Director V2](https://github.com/hoho074566-cpu/lumencia-ac/pull/88), branch `codex/p3-pr01-novel-director-v2`, base main `6f1f45a644e2ece54a74577ce8a39afe4859e686`, Novel Director Diet / Reset code checkpoint `0e36b7dcc28c161c98da349ace40933eadfc1bd4`.
+- Current PR: [#88 P3-PR01 — Novel Director V2](https://github.com/hoho074566-cpu/lumencia-ac/pull/88), branch `codex/p3-pr01-novel-director-v2`, base main `6f1f45a644e2ece54a74577ce8a39afe4859e686`, Novel Director Diet / Reset code checkpoint `f07c473c35b9d84e1c61eaddfa1a71f6516adc4f`.
 - Latest human exact-Preview acceptance remains **CORE ACCEPTANCE FAIL**. The prior version moved the world farther but confused Scene Completion with consuming ceremony→dorm notice→orientation→evaluation schedule stages. Emily/Lena/Artemis also paraphrased autonomy/discovery philosophy, explained meaning before dialogue, delivered administrative manuals, and could disguise generic turn return as an NPC question. Slight improvement remains FAIL; P3-PR02 is not started.
 - Production-path trace confirmed that orchestration, Momentum, Purpose, Exit, Hook, novelty, character behavior, Active Threads, consequence/background/personal-story and action-tail prose guidance accumulated after the nominal Director contract. High-level concepts became a turn-execution checklist and leaked into fiction.
 - Diet / Reset removes those writer-facing runtime directives while preserving deterministic derivation, telemetry, persistence, canonical selection, post-processing and safety. Due consequence, public world result and selected NPC initiative are compact data facts, not prose instructions.
@@ -758,7 +758,7 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 
 # NEXT ACTION — AUTHORITATIVE
 
-1. P3-PR01 is **BLOCKED — CORE ACCEPTANCE FAIL / HUMAN EXACT PREVIEW RE-RUN REQUIRED** at PR #88. Novel Director Diet / Reset code checkpoint is `0e36b7dcc28c161c98da349ace40933eadfc1bd4`; deterministic/full PASS does not make it MERGE_READY.
+1. P3-PR01 is **BLOCKED — CORE ACCEPTANCE FAIL / HUMAN EXACT PREVIEW RE-RUN REQUIRED** at PR #88. Novel Director Diet / Reset code checkpoint is `f07c473c35b9d84e1c61eaddfa1a71f6516adc4f`; deterministic/full PASS does not make it MERGE_READY.
 2. Keep `PHASE_2_IMPLEMENTATION_PASS: COMPLETE` and `PHASE_2_STATUS: COMPLETE`; do not reopen Phase 1/2 or the Origin reroll P2.
 3. Keep PR #66/#68/#69/#72/#76/#78/#79/#83/#84 frozen/deferred and untouched. Do not modify, merge, rebase, cherry-pick, reuse, or stack them.
 4. Do not retry local Browser recovery. Publish the exact deployment and give it to the human for Named NPC, routine, already-chosen intent, quiet conversation, NPC-vs-NPC, combat, suspense, failure/aftermath, canonical progression and unseen generalization.
