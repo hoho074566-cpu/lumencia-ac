@@ -172,6 +172,18 @@ function scoreGeneric(block,keywords,names){
   for(const kw of keywords){if(title.includes(kw))score+=12;else if(text.includes(kw))score+=1;}
   return score;
 }
+function relevantBlockText(block,keywords,names,maxChars){
+  const budget=Math.max(0,Number(maxChars)||0),title=String(block?.title||''),body=String(block?.body||''),needles=uniq([...array(keywords),...array(names)].map(norm).filter(value=>value.length>=2));
+  if(!budget)return'';
+  if(needles.some(value=>norm(title).includes(value)))return clampText(block?.text||'',budget);
+  const chunks=body.split(/\n{2,}/).map((text,index)=>({text:text.trim(),index})).filter(row=>row.text);
+  const matched=chunks.map(row=>({...row,score:needles.reduce((score,value)=>score+(norm(row.text).includes(value)?1:0),0)})).filter(row=>row.score>0).sort((a,b)=>b.score-a.score||a.index-b.index);
+  if(!matched.length)return clampText(block?.text||'',budget);
+  const selected=[];let used=title.length+1;
+  for(const row of matched){if(selected.some(item=>item.index===row.index))continue;const left=budget-used;if(left<=24)break;const text=clampText(row.text,left);if(!text)continue;selected.push({...row,text});used+=text.length+2;}
+  selected.sort((a,b)=>a.index-b.index);
+  return clampText([title,...selected.map(row=>row.text)].filter(Boolean).join('\n\n'),budget);
+}
 function chooseBlocks(blocks,{budget,keywords,names,secretAllowed=false,mode='generic',combat=false}={}){
   const rows=[];
   for(let i=0;i<blocks.length;i++){
@@ -186,14 +198,13 @@ function chooseBlocks(blocks,{budget,keywords,names,secretAllowed=false,mode='ge
     }else if(mode==='world'){
       if(/주요\s*인물|NPC\s*상세|관계망|L5|비밀\s*관계/i.test(b.title))score-=100;
       if(combat&&/힘의\s*기본|재능|BCAS|신체|마나|전투|경지|마법/i.test(b.title))score+=60;
-      if(!combat&&/아카데미|공간\s*구조|학사\s*일정|일정|시간|사회/i.test(b.title))score+=45;
     }else if(mode==='pc'){
       if(/PC|스탯|스킬|성장|기억|관계|캐릭터/i.test(b.title))score+=35;
     }
     if(!allowed||score<=0)continue; rows.push({b,i,score});
   }
   rows.sort((a,b)=>b.score-a.score||a.i-b.i); const chosen=[]; let used=0;
-  for(const row of rows){const left=budget-used;if(left<=120)break;const clip=clampText(row.b.text,left);chosen.push({...row,text:clip});used+=clip.length+2;if(used>=budget)break;}
+  for(const row of rows){const left=budget-used;if(left<=120)break;const clip=mode==='world'?relevantBlockText(row.b,keywords,names,left):clampText(row.b.text,left);chosen.push({...row,text:clip});used+=clip.length+2;if(used>=budget)break;}
   chosen.sort((a,b)=>a.i-b.i); return{text:chosen.map(x=>x.text).join('\n\n'),titles:chosen.map(x=>x.b.title)};
 }
 
@@ -419,14 +430,17 @@ function requestedScheduleWindow(incoming={},registry={}){
   const visible=new Set([...(firstBoundary?[firstBoundary]:[]),...requested]);
   return prefix.filter((event)=>visible.has(event)).slice(0,3);
 }
-function deriveKeys(incoming,registry,maxNpcs,directorV2=null){
+function carriesCurrentScene(incoming,registry={},mode='game'){
+  const action=String(incoming?.action||''),save=incoming?.saveState||{};
+  if(!isFreshPlayerAction(action,mode))return true;
+  const intent=classifySceneIntent(action,{location:save?.world?.location||'',currentTime:save?.world?.time||'',currentDate:save?.world?.date||'',currentWeekday:save?.world?.weekday||'',actorName:save?.pc?.name||'',resumeTimedAction:save?.sceneRuntime?.timed_action});
+  const eventProgress=object(save?.sceneRuntime?.eventProgress),activeEvent=Boolean(eventProgress.eventInstanceId||eventProgress.event_instance_id);
+  return activeEvent||['dialogue','wait'].includes(String(intent.kind||''))||DIRECT_NPC_PRONOUN_RE.test(action)||mentionedNpcKeys(action,registry).length>0;
+}
+function deriveKeys(incoming,registry,maxNpcs,directorV2=null,mode='game'){
   const save=incoming.saveState||{}, set=new Set();
-  const authoritative=array(save?.sceneRuntime?.participants).map(String), present=new Set(authoritative);
+  const authoritative=array(save?.sceneRuntime?.participants).map(String), present=new Set(authoritative),carryCurrentScene=carriesCurrentScene(incoming,registry,mode);
   const last=array(incoming.recentTurns).slice(-1)[0], latestSpeaker=[...array(last?.scene)].reverse().find(item=>item?.speaker_key)?.speaker_key;
-  if(latestSpeaker&&present.has(String(latestSpeaker))&&registry[latestSpeaker])set.add(String(latestSpeaker));
-  if(directorV2?.selectedKey&&registry[directorV2.selectedKey]&&set.size<maxNpcs)set.add(String(directorV2.selectedKey));
-  for(const key of array(directorV2?.worldResultKeys)){if(set.size>=maxNpcs)break;if(registry[key])set.add(String(key));}
-  for(const key of array(directorV2?.consequenceKeys)){if(set.size>=maxNpcs)break;if(registry[key])set.add(String(key));}
   const requestedEvents=requestedUpcomingEvents(incoming,registry);
   const requestedIds=new Set(requestedEvents.map((event)=>String(event?.id||'')).filter(Boolean));
   addExplicitKeys(set,incoming.action||'',registry,maxNpcs);
@@ -437,9 +451,13 @@ function deriveKeys(incoming,registry,maxNpcs,directorV2=null){
   for(const k of requestedScheduleWindow(incoming,registry).filter((event)=>!requestedIds.has(String(event?.id||''))).flatMap((event)=>array(event?.participants)))if(set.size<maxNpcs&&registry[k])set.add(String(k));
   for(const k of requestedEvents.flatMap(event=>array(event?.participants)))if(set.size<maxNpcs&&registry[k])set.add(String(k));
   for(const k of array(save?.scheduleContext?.due).flatMap(ev=>array(ev?.participants)))if(set.size<maxNpcs&&registry[k])set.add(String(k));
-  for(const k of authoritative)if(set.size<maxNpcs&&registry[k])set.add(String(k));
-  if(!Object.hasOwn(object(save?.sceneRuntime),'participants'))for(const item of array(last?.scene).slice(-4)){if(set.size>=maxNpcs)break;if(item?.speaker_key&&registry[item.speaker_key])set.add(String(item.speaker_key));}
-  for(const row of array(save?.director?.recentSpotlights).slice(-1)){for(const k of array(row?.keys).slice(0,2)){if(set.size>=maxNpcs)break;if(registry[k])set.add(String(k));}}
+  if(directorV2?.selectedKey&&registry[directorV2.selectedKey]&&set.size<maxNpcs)set.add(String(directorV2.selectedKey));
+  for(const key of array(directorV2?.worldResultKeys)){if(set.size>=maxNpcs)break;if(registry[key])set.add(String(key));}
+  for(const key of array(directorV2?.consequenceKeys)){if(set.size>=maxNpcs)break;if(registry[key])set.add(String(key));}
+  if(carryCurrentScene&&latestSpeaker&&present.has(String(latestSpeaker))&&registry[latestSpeaker])set.add(String(latestSpeaker));
+  if(carryCurrentScene)for(const k of authoritative)if(set.size<maxNpcs&&registry[k])set.add(String(k));
+  if(carryCurrentScene&&!Object.hasOwn(object(save?.sceneRuntime),'participants'))for(const item of array(last?.scene).slice(-4)){if(set.size>=maxNpcs)break;if(item?.speaker_key&&registry[item.speaker_key])set.add(String(item.speaker_key));}
+  if(carryCurrentScene)for(const row of array(save?.director?.recentSpotlights).slice(-1)){for(const k of array(row?.keys).slice(0,2)){if(set.size>=maxNpcs)break;if(registry[k])set.add(String(k));}}
   for(const ev of array(save?.scheduleContext?.due).slice(0,2)){
     const parts=array(ev?.participants).filter(k=>registry[k]);
     if(parts.length<=4){for(const k of parts){if(set.size>=maxNpcs)break;set.add(String(k));}}
@@ -516,12 +534,12 @@ function compactEventContinuity(progress={},canonicalActorKeys=[]){
   if(!eventInstanceId)return null;
   return{eventInstanceId,completedBeats:array(row.completedBeats||row.completed_beats).slice(-24).map((value)=>clampText(value,100)),omittedCompletedCount:Math.max(0,Number(row.omittedCompletedCount||row.omitted_completed_count||0)),paused:row.paused===true,...(canonicalActorKeys.length?{canonical_actor_keys:canonicalActorKeys.slice(0,3)}:{})};
 }
-function compactSceneRuntime(sceneRuntime={},keywords=[],text='',registeredNpcKeys=null,maxFactions=3,historyLimit=2,recentTexts=[],{freshPlayerAction=false,canonicalActorKeys=[]}={}){
-  const source=object(sceneRuntime),factionSocial=compactFactionSocialForContext(source.faction_social,{text,recentTexts,keywords,maxFactions,historyLimit,registeredNpcKeys}),continuity=compactEventContinuity(source.eventProgress,canonicalActorKeys),runtime={
-    scene_key:clampText(source.scene_key||'',120)||null,
-    participants:array(source.participants).slice(0,6),
-    ongoing_topic:clampText(source.ongoing_topic||'',180)||null,
-    ...(!freshPlayerAction&&clampText(source.unresolved_question||'',180)?{unresolved_question:clampText(source.unresolved_question||'',180)}:{}),
+function compactSceneRuntime(sceneRuntime={},keywords=[],text='',registeredNpcKeys=null,maxFactions=3,historyLimit=2,recentTexts=[],{freshPlayerAction=false,canonicalActorKeys=[],relevantNpcKeys=[],carryCurrentScene=true}={}){
+  const source=object(sceneRuntime),selected=new Set(array(relevantNpcKeys).map(String)),factionSocial=compactFactionSocialForContext(source.faction_social,{text,recentTexts,keywords,maxFactions,historyLimit,registeredNpcKeys}),continuity=compactEventContinuity(source.eventProgress,canonicalActorKeys),runtime={
+    ...(carryCurrentScene&&clampText(source.scene_key||'',120)?{scene_key:clampText(source.scene_key||'',120)}:{}),
+    participants:carryCurrentScene?array(source.participants).map(String).filter(key=>selected.has(key)).slice(0,6):[],
+    ...(carryCurrentScene&&clampText(source.ongoing_topic||'',180)?{ongoing_topic:clampText(source.ongoing_topic||'',180)}:{}),
+    ...(carryCurrentScene&&!freshPlayerAction&&clampText(source.unresolved_question||'',180)?{unresolved_question:clampText(source.unresolved_question||'',180)}:{}),
     ...(continuity?{eventProgress:continuity}:{}),
     ...(source.timed_action?{timed_action:source.timed_action}:{}),
   };
@@ -536,8 +554,8 @@ function compactSave(incoming,keys,registry,profile,keywords,text='',recentTexts
   const relevantEvents=array(save?.activeEvents).filter(ev=>{const t=norm(ev);return keywords.some(k=>k.length>=2&&t.includes(k));}).slice(0,6);
   const fateBackground=compactFateBackgroundForModel(save?.creation,save?.pc),personalStory=compactFatePersonalStoryForModel(save?.creation,{existingHooks:save?.hooks}),pc=compactPc(save?.pc||{},profile.name.includes('important')||profile.name.includes('critical'),text);
   if(fateBackground){delete pc.characterSetting;delete pc.admission;const publicRegion=fateBackground.detail.public_facts.find(row=>row.id==='home_region')?.fact;if(publicRegion)pc.origin=publicRegion;}
-  const boundEvent=currentEventRow(save,registry),boundActors=canonicalActorKeys(boundEvent,registry),freshPlayerAction=isFreshPlayerAction(text,mode);
-  return{version:save?.version,turnNumber:Number(save?.turnNumber||0),world:save?.world||{},pc,...(fateBackground?{characterBackground:fateBackground.detail}:{}),...(personalStory?{characterPersonalStory:personalStory.detail}:{}),...(Object.keys(intimacy).length?{intimacyStates:intimacy}:{}),npcStates,relevantNpcKeys:keys,activeEvents:relevantEvents,completedEvents:array(save?.completedEvents).slice(-8),pcKnowledge:knowledge,memories:{global:globalMem},hooks:array(save?.hooks).filter(x=>!['resolved','expired'].includes(x?.status)&&!x?.event_consequence).slice(-4),flags:save?.flags||{},sceneRuntime:compactSceneRuntime(save?.sceneRuntime,keywords,text,Object.keys(registry),2,1,recentTexts,{freshPlayerAction,canonicalActorKeys:boundActors}),backgroundDigest:clampText(save?.backgroundDigest||'',450)};
+  const boundEvent=currentEventRow(save,registry),boundActors=canonicalActorKeys(boundEvent,registry),freshPlayerAction=isFreshPlayerAction(text,mode),carryCurrentScene=carriesCurrentScene(incoming,registry,mode);
+  return{version:save?.version,turnNumber:Number(save?.turnNumber||0),world:save?.world||{},pc,...(fateBackground?{characterBackground:fateBackground.detail}:{}),...(personalStory?{characterPersonalStory:personalStory.detail}:{}),...(Object.keys(intimacy).length?{intimacyStates:intimacy}:{}),npcStates,relevantNpcKeys:keys,activeEvents:relevantEvents,completedEvents:array(save?.completedEvents).slice(-8),pcKnowledge:knowledge,memories:{global:globalMem},hooks:array(save?.hooks).filter(x=>!['resolved','expired'].includes(x?.status)&&!x?.event_consequence).slice(-4),flags:save?.flags||{},sceneRuntime:compactSceneRuntime(save?.sceneRuntime,keywords,text,Object.keys(registry),2,1,recentTexts,{freshPlayerAction,canonicalActorKeys:boundActors,relevantNpcKeys:keys,carryCurrentScene}),backgroundDigest:clampText(save?.backgroundDigest||'',450)};
 }
 function compactRecent(recentTurns,count){
   const turns=array(recentTurns).slice(-count);
@@ -559,9 +577,13 @@ function classifyProfile(incoming={},mode='game'){
 function adjustedProfile(base,incoming={}){
   const fb=object(incoming.saveState?.routerFeedback);if(fb.routerVersion!==VERSION||fb.profile!==base.name)return{...base,scale:1};const last=Number(fb.lastInputTokens||0);if(!last||last<=base.softMaxTokens)return{...base,scale:1};const scale=Math.max(.76,Math.min(1,(base.targetTokens*.94)/last));return{...base,scale,instructionChars:Math.floor(base.instructionChars*scale),inputChars:Math.floor(base.inputChars*scale),worldChars:Math.floor(base.worldChars*scale),npcChars:Math.floor(base.npcChars*scale),speechChars:Math.floor(base.speechChars*scale),pcChars:Math.floor(base.pcChars*scale)};
 }
-function contextSeed(incoming){const save=incoming.saveState||{},last=array(incoming.recentTurns).slice(-1)[0];return[incoming.action,save?.world?.location,save?.pc?.department,clampText(incoming.rollingSummary||'',900),safeJson(save?.sceneRuntime||{}),safeJson(array(save?.scheduleContext?.due).map(x=>({title:x?.title,location:x?.location,time:x?.time}))),last?.summary,array(last?.scene).map(x=>`${x?.speaker_key||''} ${x?.text||''}`).join(' ')].filter(Boolean).join('\n');}
+function contextSeed(incoming,registry={},mode='game'){
+  const save=incoming.saveState||{},last=array(incoming.recentTurns).slice(-1)[0],carryCurrentScene=carriesCurrentScene(incoming,registry,mode);
+  const scene=carryCurrentScene?safeJson({scene_key:save?.sceneRuntime?.scene_key,ongoing_topic:save?.sceneRuntime?.ongoing_topic,eventProgress:save?.sceneRuntime?.eventProgress}):'';
+  return[incoming.action,save?.world?.location,scene,safeJson(array(save?.scheduleContext?.due).map(x=>({title:x?.title,location:x?.location,time:x?.time}))),carryCurrentScene?clampText(incoming.rollingSummary||'',900):'',carryCurrentScene?last?.summary:'',carryCurrentScene?array(last?.scene).map(x=>`${x?.speaker_key||''} ${x?.text||''}`).join(' '):''].filter(Boolean).join('\n');
+}
 function buildInstructions(original,incoming,profile,originalInput,mode){
-  const sec=parseInstructionSections(original),registry=parseRegistry(sec.registry),directorV2=buildEventDirectorV2(incoming,originalInput,registry,mode),orchestration=deriveSceneOrchestrationPlan({action:incoming.action||'',saveState:incoming.saveState||{},mode,directorTelemetry:directorV2?.telemetry,registry}),directorSuppressed=sceneOrchestrationSuppressesDirectorResult(orchestration,directorV2?.telemetry),routingDirectorV2=directorSuppressed?{...directorV2,selectedKey:null,consequenceKeys:[]}:directorV2,seed=contextSeed(incoming),keywords=extractKeywords(seed,36),keys=deriveKeys(incoming,registry,profile.maxNpcs,routingDirectorV2),names=keys.map(k=>registry[k]).filter(Boolean),secretAllowed=secretAccess(incoming,keywords),combat=hasAffirmedActionKeyword(incoming.action||'',COMBAT_RE);
+  const sec=parseInstructionSections(original),registry=parseRegistry(sec.registry),directorV2=buildEventDirectorV2(incoming,originalInput,registry,mode),orchestration=deriveSceneOrchestrationPlan({action:incoming.action||'',saveState:incoming.saveState||{},mode,directorTelemetry:directorV2?.telemetry,registry}),directorSuppressed=sceneOrchestrationSuppressesDirectorResult(orchestration,directorV2?.telemetry),routingDirectorV2=directorSuppressed?{...directorV2,selectedKey:null,consequenceKeys:[]}:directorV2,carryCurrentScene=carriesCurrentScene(incoming,registry,mode),seed=contextSeed(incoming,registry,mode),keywords=extractKeywords(seed,36),keys=deriveKeys(incoming,registry,profile.maxNpcs,routingDirectorV2,mode),names=keys.map(k=>registry[k]).filter(Boolean),secretAllowed=secretAccess(incoming,keywords),combat=hasAffirmedActionKeyword(incoming.action||'',COMBAT_RE);
   const world=chooseBlocks(parseBlocks(sec.world),{budget:profile.worldChars,keywords,names,secretAllowed,mode:'world',combat});
   const npc=chooseBlocks(parseBlocks(sec.npc),{budget:profile.npcChars,keywords,names,secretAllowed,mode:'npc'});
   const speech=chooseBlocks(parseBlocks(sec.speech),{budget:profile.speechChars,keywords,names,secretAllowed:false,mode:'speech'});
@@ -569,7 +591,7 @@ function buildInstructions(original,incoming,profile,originalInput,mode){
   let adult='';if(incoming.adultMode&&Number(incoming.saveState?.pc?.age||0)>=18)adult=clampText(sec.adult,Math.min(1800,profile.speechChars));
   const registryText=Object.entries(registry).map(([k,n])=>`${k}=${n}`).join(', ');
   let text=[ROUTER_GM_RULES,NATURAL_STYLE,ROUTER_NOTE,combat?COMBAT_RULE:'',`===== CHARACTER REGISTRY =====\n${registryText}`,world.text?`===== ROUTED WORLD CANON =====\n${world.text}`:'',npc.text?`===== ROUTED NPC CANON =====\n${npc.text}`:'',speech.text?`===== ROUTED NPC SPEECH =====\n${speech.text}`:'',adult?`===== ROUTED ADULT LAYER =====\n${adult}`:'',pc.text?`===== ROUTED PC SYSTEM =====\n${pc.text}`:''].filter(Boolean).join('\n\n');
-  text=clampText(text,profile.instructionChars);return{text,registry,keys,names,keywords,moduleTitles:{world:world.titles,npc:npc.titles,speech:speech.titles,pc:pc.titles,adult:Boolean(adult)},originalChars:sec.originalChars,secretAllowed,directorV2,orchestration};
+  text=clampText(text,profile.instructionChars);return{text,registry,keys,names,keywords,moduleTitles:{world:world.titles,npc:npc.titles,speech:speech.titles,pc:pc.titles,adult:Boolean(adult)},originalChars:sec.originalChars,secretAllowed,directorV2,orchestration,carryCurrentScene};
 }
 function clampMiddleText(value,max=5200){
   const text=String(value??''),limit=Math.max(0,Math.floor(Number(max)||0));
@@ -626,7 +648,7 @@ function buildInput(incoming,originalInput,profile,routed,mode='game'){
   const essentialFactionSocial=compactFactionSocialForContext(incoming.saveState?.sceneRuntime?.faction_social,{text:action,recentTexts:recentFactionTexts,keywords:routed.keywords,maxFactions:2,historyLimit:1,registeredNpcKeys});
   const essentialTalents=compactTalents(pc.talents),essentialTraits=compactAbilityMap(pc.traits,false,action),essentialAuthorities=compactAbilityMap(pc.authorities,false,action),essentialAwakening=compactMandatoryAwakeningCandidates(pc.awakeningCandidates);
   const essentialPc=pressureBoundEssentialPc({name:clampText(pc.name||'',80),department:clampText(pc.department||'',100),status:clampText(pc.status||'',160),skills:Object.fromEntries(Object.entries(compactSkills(pc.skills)).map(([key,row])=>[key,{grade:row.grade}])),skillCandidates:compactMandatorySkillCandidates(pc.skillCandidates),...(Object.keys(essentialTalents).length?{talents:essentialTalents}:{}),...(Object.keys(essentialTraits).length?{traits:essentialTraits}:{}),...(Object.keys(essentialAuthorities).length?{authorities:essentialAuthorities}:{}),...(Object.values(essentialAwakening).some((bucket)=>Object.keys(bucket).length)?{awakeningCandidates:essentialAwakening}:{})},action);
-  const essentialSave={version:save.version,turnNumber:save.turnNumber,world:{date:world.date||null,...(world.weekday?{weekday:world.weekday}:{}),time:world.time||null,location:clampText(world.location||'',140)},pc:essentialPc,...(fateBackground?{characterBackground:fateBackground.essential}:{}),...(personalStory?{characterPersonalStory:{version:personalStory.essential.version,layers:personalStory.essential.layers,candidates:array(personalStory.essential.candidates).slice(0,3)}}:{}),relevantNpcKeys:array(save.relevantNpcKeys).slice(0,3),npcStates:Object.fromEntries(Object.entries(object(save.npcStates)).slice(0,3).map(([key,row])=>[key,{location:clampText(row?.location||'',100),status:clampText(row?.status||row?.state||'',120)}])),sceneRuntime:{participants:array(sourceRuntime.participants).slice(0,6),...(playerBoundary?{player_boundary:playerBoundary}:{}),...(sourceRuntime.timed_action?{timed_action:sourceRuntime.timed_action}:{}),...(Object.keys(eventContinuity).length?{eventProgress:eventContinuity}:{}),...(Object.keys(essentialFactionSocial.reputations).length?{faction_social:essentialFactionSocial}:{})}};
+  const selectedNpcKeys=new Set(array(routed.keys).map(String)),essentialSave={version:save.version,turnNumber:save.turnNumber,world:{date:world.date||null,...(world.weekday?{weekday:world.weekday}:{}),time:world.time||null,location:clampText(world.location||'',140)},pc:essentialPc,...(fateBackground?{characterBackground:fateBackground.essential}:{}),...(personalStory?{characterPersonalStory:{version:personalStory.essential.version,layers:personalStory.essential.layers,candidates:array(personalStory.essential.candidates).slice(0,3)}}:{}),relevantNpcKeys:array(save.relevantNpcKeys).slice(0,3),npcStates:Object.fromEntries(Object.entries(object(save.npcStates)).slice(0,3).map(([key,row])=>[key,{location:clampText(row?.location||'',100),status:clampText(row?.status||row?.state||'',120)}])),sceneRuntime:{participants:routed.carryCurrentScene?array(sourceRuntime.participants).map(String).filter(key=>selectedNpcKeys.has(key)).slice(0,6):[],...(playerBoundary?{player_boundary:playerBoundary}:{}),...(sourceRuntime.timed_action?{timed_action:sourceRuntime.timed_action}:{}),...(Object.keys(eventContinuity).length?{eventProgress:eventContinuity}:{}),...(Object.keys(essentialFactionSocial.reputations).length?{faction_social:essentialFactionSocial}:{})}};
   const saveState=`===== AUTHORITATIVE SAVE_STATE (ROUTED MINIMUM) =====\n${safeJson(essentialSave)}`;
   const threadSignal=array(activeThreads.threads).filter((thread)=>thread?.source!=='schedule'&&thread?.background!==true&&!(freshPlayerAction&&(thread?.player_owned===true||thread?.source==='scene-runtime'))).slice(0,4).map(({id,source,kind,status,title,due_at,player_owned})=>({id,source,kind,status,title,...(due_at?{due_at}:{}),...(player_owned?{player_owned:true}:{})}));
   activeThreads.visible_threads=threadSignal.length;
