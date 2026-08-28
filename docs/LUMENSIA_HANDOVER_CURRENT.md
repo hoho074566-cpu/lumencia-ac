@@ -37,7 +37,21 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - These deferred blockers are explicitly **not** Narrative Phase 1 FREEZE blockers. They are separate stabilization candidates for Phase 2/backlog, to be reassessed after Phase 2 using actual-play impact. Phase 1 adds no further Narrative Engine feature, correction, edge-case task, or scope expansion.
 - Historical NEXT ACTION satisfied: Narrative Phase 2 Implementation Pass is complete. Keep Phase 1 deferred items untouched during the separately authorized stabilization pass.
 
-## PHASE 2 STABILIZATION PASS — AUTHORITATIVE CURRENT STATE
+## STAB-02R — CANONICAL META PROGRESSION / NEXT LIFE — AUTHORITATIVE CURRENT STATE
+
+- PR #82 STAB-01 is human-merged. Its reviewed exact head `d589f7939a1296d966eeb46fc7c5174f8b9a00a2` matches the merged head; merge commit/latest main is `89fbc5b94d74a3e1927615993e5c7da88b84a4ff`. STAB-01 is not reimplemented.
+- PR #83 is **terminal BLOCKED** at exact head `f0bef9f59ef60274b170cc8bbae2a92c62bb60a7`. Do not modify, merge, rebase, cherry-pick, reuse, or continue stabilization on that branch. Its code was not used.
+- Fresh STAB-02R branch `codex/stab-02r-canonical-meta-next-life` was created directly from latest main `89fbc5b94d74a3e1927615993e5c7da88b84a4ff`; published implementation checkpoint is `ce532350457aba91a890f877bb2cccff964bfed2`.
+- The authority model is deliberately small: immutable historical Ending earned receipts plus immutable historical Inheritance spent receipts determine balance. Current Ending/NPC/Origin registries decide only new eligibility and never rewrite historical accounting. Applied run benefits require a matching canonical purchase receipt.
+- Import/load accepts only equality, subset, or safe superset receipt histories. Divergent earned/spent branches, malformed receipts, orphaned run benefits, and `spent > earned` fail closed before any in-memory mutation. A local recovery journal makes receipt/meta/run writes recoverable as one Next Life operation.
+- Same-device purchase validation and persistence re-read canonical storage inside one browser Web Lock. Rejected purchases create no run benefit; duplicate transaction/run application is rejected. Historical Fate Affinity receipts remain valid after allowlist removal.
+- Next Life supports progressive Stats, Talents, Starting Resources, Fate Affinity, Origin reroll, Region/Occupation locks, explicit incompatible-lock rejection, and final Realm/Circle recalculation after application. Realm/Circle are not purchase targets. Free creation, paste creation, and Fate Start remain separate and unchanged.
+- Focused Fate/Inheritance/Origin/Next Life tests, STAB-01 duplicate-reward tests, free/paste/Fate Start and Background/Personal Story regressions, long USER ACTION/authority-tail/context-pressure, CONTINUE/core, syntax/static, `git diff --check`, and full `scripts/lumensia-pr-check.mjs` PASS at the implementation checkpoint. One canonical model call and existing routing/cache/canon/player-authority contracts remain unchanged.
+- Browser remains on the previously established bounded-unavailable fallback; no repeated recovery attempt is authorized or required for the deterministic acceptance gates.
+- **CURRENT MERGE GATE:** FAIL pending final docs checkpoint, push/new PR, Safety, Vercel, fresh exact-head P0=0/P1=0 review, and repository-integrity verification. Protected runtime/persistence/API paths require human merge.
+- **NEXT ACTION:** commit this single final docs checkpoint, publish/open the fresh STAB-02R PR, then run Safety → Vercel → fresh exact-head review. If and only if all gates pass, report the exact head as human-merge `MERGE_READY`; do not merge it automatically.
+
+## PHASE 2 STABILIZATION PASS — SUPERSEDED STAB-01 SNAPSHOT
 
 - PR #81 Phase 2 implementation-pass closure is **MERGED**. GitHub reports `merged=true`; merged exact head `901b091f596339ec997f78750045dfbcc2cb6a22` matches the reviewed/READY head. Merge commit/latest main is `6438ae114b3b5432b4a581b4207ed3f760b18aa6`, with parents prior main `2af377878fe26e36f4b582f92c64d870ff2dda76` and the exact reviewed head. Main and merge tree are `a258afc54c0dc723b467d856d46a09029a0cb6f0`.
 - PR #81 post-merge integrity PASS: latest main fetched, main equals `origin/main`, behind 0/ahead 0, no conflict, clean worktree, exact parent/tree identity, and full `scripts/lumensia-pr-check.mjs origin/main HEAD` PASS.
@@ -1041,13 +1055,13 @@ Fresh direct review `5037414704` on initial PR #61 exact head `4dc7f4f3768b4635e
 
 # 12. NEXT ACTION — CURRENT START POINT
 
-1. PR #81 is merged as latest main `6438ae114b3b5432b4a581b4207ed3f760b18aa6` from reviewed head `901b091f596339ec997f78750045dfbcc2cb6a22`; post-merge integrity/full regression PASS.
-2. Continue STAB-01 only as PR #82, base main `6438ae114b3b5432b4a581b4207ed3f760b18aa6`, corrected implementation/review head `02e9ed9a8d1527e35f93c86ec825219aab7619f5`, correction `1/1`. Complete only the final docs-head Safety, Vercel, and fresh P0=0/P1=0.
-3. Protected runtime/API changes require human merge of the final validated PR #82 head. Do not start or stack STAB-02 before that merge; after post-merge verification, create STAB-02 from the new latest main.
-4. Keep PR #76/#79 frozen and unused; keep PR #66/#68/#69/#78 and obsolete/superseded PR #72 untouched. Do not retry browser recovery under the bounded fallback.
+1. PR #82 STAB-01 is merged and verified at latest main `89fbc5b94d74a3e1927615993e5c7da88b84a4ff`; do not reimplement it.
+2. PR #83 is terminal BLOCKED at `f0bef9f59ef60274b170cc8bbae2a92c62bb60a7`; do not modify, merge, rebase, cherry-pick, reuse, or continue it.
+3. Continue only fresh STAB-02R branch `codex/stab-02r-canonical-meta-next-life`, published code checkpoint `ce532350457aba91a890f877bb2cccff964bfed2`: publish the final docs checkpoint, open the new PR, then run Safety, Vercel, and fresh exact-head P0=0/P1=0.
+4. If all gates pass, report the exact protected-path head for human merge only. Keep PR #76/#79/#83, PR #66/#68/#69/#78, and obsolete/superseded PR #72 untouched. Do not retry browser recovery under the bounded fallback.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> Read both progress documents first. PR #81 is merged as main `6438ae114b3b5432b4a581b4207ed3f760b18aa6` from exact reviewed head `901b091f596339ec997f78750045dfbcc2cb6a22`; post-merge integrity/full regression PASS. STAB-01 is PR #82, corrected implementation/review head `02e9ed9a8d1527e35f93c86ec825219aab7619f5`, correction `1/1`; its Safety/Vercel/fresh P0=0/P1=0 and official readiness PASS. Complete only the final docs-head gates and require human merge because protected paths changed. Do not start STAB-02 before STAB-01 is merged and verified. PR #76/#79 remain frozen and unused; PR #66/#68/#69/#78 and obsolete/superseded #72 remain untouched.
+> Read both progress documents first. PR #82 STAB-01 is merged as main `89fbc5b94d74a3e1927615993e5c7da88b84a4ff`. PR #83 is terminal BLOCKED at `f0bef9f59ef60274b170cc8bbae2a92c62bb60a7` and must not be touched. Continue only fresh STAB-02R `codex/stab-02r-canonical-meta-next-life` from published code checkpoint `ce532350457aba91a890f877bb2cccff964bfed2`; focused/relevant/full deterministic gates PASS, while final docs publish/new PR, Safety, Vercel, fresh exact-head review, and repository-integrity verification remain. Protected paths require human merge. Keep PR #76/#79/#83, PR #66/#68/#69/#78, and obsolete/superseded #72 untouched.
