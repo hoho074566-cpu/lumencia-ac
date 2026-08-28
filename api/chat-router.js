@@ -1127,7 +1127,7 @@ export default async function handler(req,res){
       persistedAwakeningTalentState=deriveAwakeningTalentState({existingTraits:incoming0.saveState?.pc?.traits,existingAuthorities:incoming0.saveState?.pc?.authorities,talents:incoming0.saveState?.pc?.talents,previousCandidates:incoming0.saveState?.pc?.awakeningCandidates,previousTalentHistory:incoming0.saveState?.pc?.talentEvolutionHistory,awakeningChanges:structuredEffectRows(data.turn,'awakening_progress'),talentEvolutionChanges:structuredEffectRows(data.turn,'talent_evolution'),action:incoming0.action||'',saveState:incoming0.saveState||{},scene:growthValidationScene,turnNumber:Number(incoming0.saveState?.turnNumber||0)+1,allowProgress:growthAllowed});
       replaceStructuredEffectRows(data.turn,'awakening_progress',persistedAwakeningTalentState.accepted_awakening_changes);replaceStructuredEffectRows(data.turn,'talent_evolution',persistedAwakeningTalentState.accepted_talent_evolution);
     }
-    if(data.turn?.state_delta)data.turn.state_delta.ending_discoveries=sanitizeEndingDiscoveries({saveState:incoming0.saveState||{},discoveries:data.turn.state_delta.ending_discoveries,mode});
+    if(data.turn?.state_delta)data.turn.state_delta.ending_discoveries=sanitizeEndingDiscoveries({saveState:incoming0.saveState||{},discoveries:data.turn.state_delta.ending_discoveries,mode,turnDelta:data.turn.state_delta,synthesizeCurrentTurn:true});
     const npcSignificance=routedNpcSignificance(data.turn,telemetry,mode);
     const runtimeTurn=runtimeSynthesisTurn(data.turn,sceneIntent);
     const sceneRuntime=localSceneRuntime({...incoming0,saveState:incoming.saveState,action:incoming0.action||''},runtimeTurn,telemetry?.event_director_v2,mode,telemetry?.scene_orchestration,sceneIntent);

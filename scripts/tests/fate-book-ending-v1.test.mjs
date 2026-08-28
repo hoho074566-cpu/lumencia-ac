@@ -11,6 +11,8 @@ import {
   buildFateBookDirective,
   createFateBookState,
   deriveEndingCandidates,
+  isIrrecoverableStatus,
+  mergeFateBookStates,
   normalizeFateBookState,
   recordEndingDiscoveries,
   renderFateBookSummary,
@@ -48,6 +50,12 @@ const save = (patch = {}) => ({
 assert.deepEqual(deriveEndingCandidates(save({ pc: { name: '카인', status: '시험 실패' } })), [], 'ordinary failure must remain Fail Forward');
 assert.equal(deriveEndingCandidates(save({ completedEvents: ['일반 졸업'] }))[0]?.endingId, 'graduation.standard');
 assert.equal(deriveEndingCandidates(save({ pc: { name: '카인', status: '회복 불가능' } }))[0]?.endingId, 'dead.irrecoverable');
+for (const status of ['치명상으로 사망', '사망(소생 불가)', '회복 불가능한 상태', 'dead after the collapse']) {
+  assert.equal(isIrrecoverableStatus(status), true, `descriptive terminal status must be recognized: ${status}`);
+}
+for (const status of ['사망 위험', '사망 가능', '사망하지 않았음', '소생 가능', 'not dead']) {
+  assert.equal(isIrrecoverableStatus(status), false, `recoverable/non-terminal status must not become a Dead Ending: ${status}`);
+}
 assert.equal(deriveEndingCandidates(save({ completedEvents: ['ending:world:academy'] }))[0]?.endingId, 'world.academy');
 assert.equal(deriveEndingCandidates(save({ completedEvents: ['ending:character:rival_respect:artemis'] }))[0]?.endingId, 'character.rival_respect:artemis');
 assert.deepEqual(deriveEndingCandidates(save({ completedEvents: ['ending:character:companion:unknown'] })), [], 'unknown NPC keys must not authorize a Character Ending');
@@ -61,6 +69,9 @@ assert.deepEqual(sanitizeEndingDiscoveries({ saveState: graduationSave, discover
 for (const mode of ['meta', 'auto', 'continue']) {
   assert.deepEqual(sanitizeEndingDiscoveries({ saveState: graduationSave, discoveries: proposed, mode }), [], `${mode} must freeze Ending discovery`);
 }
+assert.equal(sanitizeEndingDiscoveries({ saveState: save(), discoveries: [], mode: 'game', turnDelta: { completed_events_add: ['일반 졸업'] }, synthesizeCurrentTurn: true })[0]?.ending_id, 'graduation.standard', 'a trusted current-turn graduation delta must create its Ending receipt without an artificial extra turn');
+assert.equal(sanitizeEndingDiscoveries({ saveState: save(), discoveries: [], mode: 'game', turnDelta: { pc_status: '치명상으로 사망' }, synthesizeCurrentTurn: true })[0]?.ending_id, 'dead.irrecoverable', 'a trusted current-turn terminal status must create its Dead Ending receipt');
+assert.deepEqual(sanitizeEndingDiscoveries({ saveState: save(), discoveries: [], mode: 'auto', turnDelta: { pc_status: '사망' }, synthesizeCurrentTurn: true }), [], 'AUTO must remain frozen even for a terminal-looking delta');
 
 const first = recordEndingDiscoveries(graduationSave.fateBook, proposed, {
   runId: graduationSave.id,
@@ -79,6 +90,13 @@ const repeated = recordEndingDiscoveries(first.state, proposed, { runId: graduat
 assert.equal(repeated.newRecords.length, 0, 'repeated Ending must not create a second record');
 assert.equal(repeated.rewardsGranted.length, 0, 'repeated Ending must not grant a second reward');
 assert.equal(repeated.state.rewardTotal, 1);
+
+const other = recordEndingDiscoveries(createFateBookState('run:other'), [{ ending_id: 'world.academy', characters: [], reason: '아카데미 결말' }], { runId: 'run:other', turnNumber: 20 });
+const staleImport = mergeFateBookStates(first.state, [other.state], { runId: graduationSave.id });
+assert.deepEqual(staleImport.records.map((row) => row.endingId).sort(), ['graduation.standard', 'world.academy']);
+assert.equal(staleImport.rewardTotal, 4, 'a stale imported run must retain later first-discovery receipts and rewards from the live Fate Book');
+const manyRecords = Array.from({ length: 140 }, (_, index) => ({ endingId: `character.companion:npc_${index}`, characters: [`npc_${index}`], reason: `record ${index}`, reward: { kind: 'fate_mark', amount: 2 }, discovered: true }));
+assert.equal(normalizeFateBookState({ records: manyRecords }).records.length, 140, 'normalization must not discard attainable Character Ending receipts at the former 120-row boundary');
 
 const nextRun = beginFateBookRun(first.state, { runId: 'run:next' });
 assert.equal(nextRun.records.length, 1, 'Fate Book records must persist across a new run');
@@ -144,6 +162,7 @@ const serviceWorker = readFileSync('sw.js', 'utf8');
 assert.match(app, /fateBook:\s*createFateBookState/);
 assert.match(app, /next\.fateBook\s*=\s*normalizeFateBookState/);
 assert.match(app, /base\.fateBook=beginFateBookRun/);
+assert.match(app, /mergeFateBookStates\(parsed\.fateBook,\[save\?\.fateBook\]/);
 assert.match(app, /recordEndingDiscoveries\(save\.fateBook/);
 assert.match(app, /renderFateBookSummary\(save\.fateBook\)/);
 assert.match(runtime, /fateBook:\s*save\.fateBook/);

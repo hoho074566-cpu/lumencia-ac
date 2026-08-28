@@ -792,8 +792,8 @@ async function boot() {
     );
     source = replaceOnce(
       source,
-      "import { beginFateBookRun, createFateBookState, normalizeFateBookState, recordEndingDiscoveries, renderFateBookSummary } from './lib/fate-book.js';",
-      `import { beginFateBookRun, createFateBookState, normalizeFateBookState, recordEndingDiscoveries, renderFateBookSummary } from '${location.origin}/lib/fate-book.js?v=156';`,
+      "import { beginFateBookRun, createFateBookState, mergeFateBookStates, normalizeFateBookState, recordEndingDiscoveries, renderFateBookSummary } from './lib/fate-book.js';",
+      `import { beginFateBookRun, createFateBookState, mergeFateBookStates, normalizeFateBookState, recordEndingDiscoveries, renderFateBookSummary } from '${location.origin}/lib/fate-book.js?v=156';`,
       'fate book import'
     );
 
