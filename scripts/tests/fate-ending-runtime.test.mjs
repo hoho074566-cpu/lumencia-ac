@@ -105,7 +105,7 @@ assert.equal(reconciled.rewardTotal,currentBook.rewardTotal,'stale import must n
 const earlierImported=normalizeFateBook({discoveries:[{...currentBook.discoveries['general.graduation'],discoveredAt:'2026-08-01T03:00:00.000Z',runId:'actual-first',turnNumber:100}]},options);
 const earliestReconciled=reconcileFateBooks(currentBook,earlierImported,options);
 assert.equal(earliestReconciled.discoveries['general.graduation'].runId,'actual-first','reconciliation must preserve the earliest known first-discovery record');
-assert.equal(earliestReconciled.rewardLedger['general.graduation'].grantedAt,'2026-08-01T03:00:00.000Z');
+assert.equal(earliestReconciled.rewardLedger['general.graduation'].grantedAt,currentBook.rewardLedger['general.graduation'].grantedAt,'canonical committed earned receipt must not be rewritten by an imported display record');
 
 const characterTemplates=['companion','alliance','co_rule','journey','rival'];
 const longCollection={};
@@ -146,10 +146,10 @@ assert.match(router,/applyEndingReceipts\(\{fateBook:incoming0\.fateBook[\s\S]*,
 assert.match(router,/completed_events_add=projectEndingSignals\(data\.turn\.state_delta\.completed_events_add,fateEnding\.validReceipts,\{allow:mode==='game'\}\)/,'the stable router must retain only validated game-mode terminal signals');
 assert.match(router,/AUTO에서는 회차를 종결하거나 Ending\/Dead Ending을 서술·기록하지 않는다/,'AUTO guidance must forbid terminal narration before deterministic receipts are discarded');
 assert.match(app,/const FATE_BOOK_KEY = 'lumensia\.fate-book\.v1'/,'Fate Book must persist outside the replaceable run save');
-assert.match(app,/reconcileFateBooks\(loadJson\(FATE_BOOK_KEY\), loadedRunSave\?\.fateBook/,'a legacy embedded Fate Book must migrate into the independent ledger');
+assert.match(app,/incomingFateBook:embeddedFateBook/,'a legacy embedded Fate Book must enter the canonical migration boundary');
 assert.match(app,/delete save\.fateBook/,'the replaceable run save must not retain a parallel Fate Book root');
-assert.match(app,/format:'lumensia\.save\.bundle\.v2',save,fateBook/,'exports must include the persistent Fate Book');
-assert.match(app,/fateBook=reconcileFateBooks\(fateBook,importedBook/,'imports must reconcile rather than replace the live Fate Book');
+assert.match(app,/format:'lumensia\.save\.bundle\.v3',save:persistedRun,fateBook:canonical\.fateBook,inheritanceMeta:canonical\.inheritanceMeta/,'exports must include canonical Fate and Inheritance ledgers');
+assert.match(app,/prepareCanonicalProgressionImport\(\{currentFateBook:canonical\.fateBook[\s\S]*incomingFateBook:importedBook/,'imports must pass through fail-closed canonical progression validation');
 assert.match(runtime,/fetch\('\/api\/chat-router'/,'deployed stable runtime must keep the canonical router');
 assert.match(runtime,/fateBook: fateBookRuntimeSnapshot/,'deployed stable runtime must send the bounded discovery ledger');
 assert.match(runtime,/applyFateEndingRuntime\(data\.fate_ending\)/,'deployed stable runtime must persist accepted discoveries');
