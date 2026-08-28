@@ -208,6 +208,11 @@ function renderChoicesStable(choices) {
     return;
   }
 
+  const label = document.createElement('div');
+  label.className = 'suggested-actions-label';
+  label.textContent = 'Suggested Actions · 직접 입력 가능';
+  choicesEl.append(label);
+
   choices.forEach((choice, idx) => {
     const b = document.createElement('button');
     b.className = 'choice-btn';
@@ -228,6 +233,7 @@ function renderChoicesStable(choices) {
 function renderAllStable() {
   const flowControls = $('flowControlsStable');
   story.innerHTML = '';
+  resetNovelPresentationState(novelPresentation);
   if (!save.renderedTurns?.length) appendWelcome();
   else save.renderedTurns.forEach(renderTurnRecord);
   updateStatus();
@@ -240,14 +246,15 @@ function renderAllStable() {
 function updateStatusStable(route) {
   $('timeStatus').textContent = `D+${save.world.dayElapsed} · ${save.world.date} ${save.world.weekday} ${save.world.time}`;
   $('locationStatus').textContent = save.world.location;
-  if (route) {
+  if (settings.developerMode && route) {
     const mode = String(route.input_mode || 'game').toUpperCase();
     const modeTag = mode !== 'GAME' ? `${mode} · ` : '';
     const tier = String(route.tier || 'demo').toUpperCase();
     const qualityTag = route.quality_pipeline && route.quality_pipeline !== 'legacy' ? ' · Q3' : '';
     $('routeStatus').textContent = `${modeTag}${tier} · ${route.reasoning_effort || 'none'}${route.reasoning_mode === 'pro' ? ' · PRO' : ''}${qualityTag}`;
   }
-  $('costStatus').textContent = `턴 $${Number(save.usage.lastTurnUsd || 0).toFixed(4)} / Σ$${Number(save.usage.estimatedUsd || 0).toFixed(3)}`;
+  if (settings.developerMode) $('costStatus').textContent = `턴 $${Number(save.usage.lastTurnUsd || 0).toFixed(4)} / Σ$${Number(save.usage.estimatedUsd || 0).toFixed(3)}`;
+  updateDeveloperUi();
 }
 
 function continuationSceneTailStable(scene, limit = 10) {
@@ -635,13 +642,6 @@ async function sendActionStable(action, requestedMode = null) {
 
     loader.remove();
     if (!data?.turn) throw new Error('API 응답에 turn이 없습니다.');
-    if (isAuto && !String(data.turn.scene_title || '').startsWith('AUTO · ')) {
-      data.turn.scene_title = `AUTO · ${data.turn.scene_title || '자동 진행'}`;
-    }
-    if (isContinue && !String(data.turn.scene_title || '').startsWith('CONTINUE · ')) {
-      data.turn.scene_title = `CONTINUE · ${data.turn.scene_title || '이어서 생성'}`;
-    }
-
     let notices = [];
     if (!isMeta && !isContinue) {
       materializeEventConsequencesStable(data.turn, data.pipeline, action);
@@ -789,6 +789,12 @@ async function boot() {
       "import { createFreeCharacterCreation, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation } from './lib/fate-start.js';",
       `import { createFreeCharacterCreation, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation } from '${location.origin}/lib/fate-start.js?v=156';`,
       'fate start import'
+    );
+    source = replaceOnce(
+      source,
+      "import { createNovelPresentationState, novelSceneTitle, resetNovelPresentationState, shouldShowNovelPortrait } from './lib/novel-presentation.js';",
+      `import { createNovelPresentationState, novelSceneTitle, resetNovelPresentationState, shouldShowNovelPortrait } from '${location.origin}/lib/novel-presentation.js?v=156';`,
+      'novel presentation import'
     );
 
     source = replaceRegexOnce(
