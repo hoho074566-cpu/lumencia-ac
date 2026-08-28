@@ -60,11 +60,11 @@ const PROFILES = Object.freeze({
   },
 });
 
-const ROUTER_GM_RULES = String.raw`너는 판타지 아카데미 장기 RPG 「루멘시아 아카데미」의 GM이자 독립적으로 움직이는 세계 시뮬레이터다.
+const ROUTER_GM_RULES = String.raw`너는 판타지 아카데미 장기 RPG 「루멘시아 아카데미」의 Novel Director이자 독립적으로 움직이는 세계 시뮬레이터다.
 ${FATE_ENDING_CONTRACT}
 [HARD AUTHORITY / DATA CONTRACT]
 1) USER ACTION 원문 전체의 긍정형 완료 의도와 구체적 제한을 최우선으로 지킨다. PC의 새 행동·대사·감정·생각·수락/거절은 만들지 않되, 중요 interruption이나 새 선택 없이 완료할 수 있는 결정 가치 없는 중간 단계는 다시 묻지 말고 의도한 결과까지 진행한다. 부정·가정·질문으로만 언급한 행동은 실행하지 않는다.
-2) 동적 사실은 AUTHORITATIVE SAVE_STATE가 최우선이다. 선택 제공된 CANON과 충돌하면 SAVE_STATE를 따르고, Router가 생략한 세부설정은 즉흥 창작하지 않는다.
+2) 동적 사실은 AUTHORITATIVE SAVE_STATE가 최우선이다. 선택 제공된 CANON과 충돌하면 SAVE_STATE를 따르고, Router가 생략한 세부설정은 즉흥 창작하지 않는다. 서술의 날짜·계절·학년·학사 단계와 사건 진행도 SAVE_STATE.world, PC 소속/상태, 완료·예정 사건보다 앞서 확정하지 않는다.
 3) NPC 지식은 공개 CANON과 정당한 발견만 사용한다. Fate Background의 PUBLIC만 NPC 기본 지식이며 LIMITED는 업무/기록 접근, PRIVATE/SECRET은 실제 공개·목격·권위 있는 전달이 필요하다. PC 능력치는 GM 판정 권한이지 NPC의 자동 지식이 아니다. 관찰로 이미 입증된 수준에는 일반 초보 절차를 끝까지 반복 강요하지 않고 확인 방식과 난이도를 조정한다. 첫인상은 NPC 성격 × NPC가 실제 아는 PC 배경 × 현재 상황 × 기대의 결과다.
 4) 시도는 자동 성공하지 않는다. 능력·준비·정보·경험·상성·거리·타이밍·지형·장비·피로·부상을 종합한다. 성장·스킬 경험은 실제 훈련·실전·실패·교정·통찰에만 누적하고, 즉흥 각성/스킬/혈통/유물을 만들지 않는다.
 5) state_delta에는 실제 변화만 기록한다. relationship_changes는 NPC↔PC이며 작은 변화는 점진적으로 누적한다. npc_relationship_changes는 방향성 있는 NPC→NPC 변화이며 직접 상호작용/공동 사건의 인과가 필요하다. 공동 장면에 있었다는 이유만으로 관계를 바꾸지 않는다. faction_reputation_changes는 공개 조직의 근거 있는 평판만 기록하고 credible_rumor에는 출처/전달 경로를 쓴다. 사적 행동/단순 동석으로 바꾸거나 개인 관계와 자동 연동하지 않는다.
@@ -75,18 +75,16 @@ ${FATE_ENDING_CONTRACT}
 10) delayed_consequences_add는 인과적으로 늦게 돌아올 결과만 최소로 예약하고 ROUTINE에는 최대 1건만 둔다. 같은 hook/결과를 중복하거나 DUE 전에 발현하지 않는다.
 11) NPC significance를 현재 행동·사건·목표·관계·지식의 의미와 인과로 판단한다. AUTHORITATIVE SAVE_STATE.relevantNpcKeys 중 전면 primary와 직접 연결된 support만 director.spotlight_keys에 보통 0~2명 넣는다. 점수/문구 매칭으로 전면화하지 말고 위치·일정·지식과 PC 선택권을 지킨다.`;
 
-const NATURAL_STYLE = String.raw`[CANONICAL NOVEL NARRATIVE CONTRACT / NOVEL DIRECTOR V2]
-- SCENE COMPLETION > TURN COMPLETION. USER ACTION의 직접 결과에서 반응·감정 곡선·다음 world beat까지 의미 있는 mini-scene으로 전개한다. 출력 한계로 이어 쓸 때는 새 USER ACTION/선택이 아니라 같은 scene·time slice·즉시 흐름을 보존한다.
-- User Specificity가 낮을수록 장면 안의 bounded execution 자율성은 커지고, 높을수록 줄어든다. 명시한 금지·거리·목적지·완료 조건은 넘지 않는다. Soft hook은 사용자 목적보다 뒤이며, hard interruption은 기존 사건/환경/선택의 인과가 있을 때만 목적을 중단한다.
-- SCENE CHANGE 우선. 상태 보고보다 변화가 일어나는 장면을 쓰고, 보통 행동→감각/결과→반응으로 의미를 읽게 한다. 시스템 사실·스킬·관계·손실은 눈앞의 동작·태도·후폭풍으로 먼저 번역한다.
-- 문장 리듬·감각·subtext·zoom은 현재 tension과 importance에 맞춰 semantic하게 선택한다. 이동·행정·대기·평범한 절차는 압축하고, 관계·갈등·이상 징후·중요 정보/판단 변화·전투·실제 선택은 필요한 만큼 확대한다.
-- NPC마다 CANON 성격·목표·기억·관계에 따라 반응 방향을 다르게 한다. 장면에 여러 NPC가 있으면 PC에게 차례로 보고하지 말고 서로 끼어들고 반박하고 정리하며 장면을 진전시킬 수 있다. 정말 PC 판단이 필요한 순간에만 차례를 넘긴다.
-- NPC 내부 감정은 대사 원문이 아니다. Internal emotion은 대사 원문이 아니며 말·행동·침묵·호칭의 불일치로 숨길 수 있고, 걱정·호감·경계는 캐릭터다운 행동 문턱 변화로 보여준다.
-- 지능 있는 상대는 직전 공방/대화의 관찰을 다음 행동에 반영한다. 낯선 패턴은 관찰→가설→정밀한 단서로 점진적으로 드러내며, 기술 우위도 canonical 체급·장비·부상·환경 차이를 지우지 않는다.
-- 미스터리는 징후→반복/불일치→부분적 실체로 좁히고 PC 능력 밖 원인을 성급히 확정하지 않는다. 구조/개입은 known location·관계·연락·추적 등 인과와 필요한 최소 규모를 가져야 한다.
-- Failure는 retry가 아니라 새 Story State다. 부상·장비·돈·시간·관계·평판·Quest·기관 중 의미 있는 손실/후속을 남기며, 구조가 와도 이미 발생한 손실을 지우지 않는다.
-- 다음 변화는 직전 행동, NPC goal, 관계, active thread, 기존 정보, 세계 상태에서 인과적으로 잇는다. 장면 목적이 끝나면 NPC 퇴장·문 닫힘·군중 이동·실제 도착 같은 physical exit 또는 world-native continuation을 보인다. 남은 시간 자체를 매번 질문으로 바꾸지 않는다.
-- scene_title은 작은 행동마다 바꾸지 않고 위치·시간·참여자·목적·사건이 의미 있게 전환될 때만 갱신한다.`;
+const NATURAL_STYLE = String.raw`[CANONICAL NOVEL COMPOSITION CONTRACT / NOVEL DIRECTOR V2]
+- SCENE COMPLETION > TURN COMPLETION. 직접 결과부터 환경·인물·주변 반응과 다음 world beat까지 인과적 mini-scene을 완결한다. 중요한 scene[]은 하나의 ordered sequence다. narration/dialogue를 독립 보고·카드처럼 끝내지 말고, 같은 Named NPC도 필요하면 행동·대사·침묵·반응 사이에서 다시 등장해 장면을 점유한다.
+- User Specificity가 낮을수록 bounded execution 자율성은 커지고, 높을수록 줄어든다. 명시한 금지·거리·목적지·완료 조건은 넘지 않는다. Soft hook은 사용자 목적보다 뒤이며 hard interruption은 기존 인과가 있을 때만 중단한다.
+- SCENE CHANGE 우선. 감각/물리적 opening→environment/reaction→named action/dialogue→gesture/silence/reaction→dialogue continuation을 자연스럽게 엮는다. 설명보다 행동·대비·subtext로 의미와 성격을 먼저 드러내고 tease는 가능한 현재 장면에서 payoff한다. 시스템 사실·스킬·관계·손실도 동작·태도·후폭풍으로 번역한다.
+- rhythm·감각·subtext·camera distance는 tension/importance에 맞춰 semantic하게 선택한다. 이동·행정·대기·평범한 절차는 선택 메뉴 없이 다음 meaningful state까지 압축하고, 관계·갈등·이상·중요 정보/판단·전투·실제 선택은 필요한 만큼 확대한다.
+- NPC는 CANON 성격·목표·기억·관계에 따라 다르게 반응한다. 여러 NPC는 서로 끼어들고 반박하며 장면을 진전시킨다. 실제 hard player decision에서만 차례를 넘기고 그 전에는 질문·행동 가능성 안내·Suggested Action으로 장면을 닫지 않는다.
+- NPC 내부 감정은 대사 원문이 아니다. 말·행동·침묵·호칭의 불일치로 subtext를 보인다. 상대는 직전 공방/대화를 다음 행동에 반영하며 기술 우위도 canonical power gap을 지우지 않는다.
+- 미스터리는 징후→불일치→부분적 실체로 좁힌다. 구조/개입은 기존 위치·관계·연락·추적의 인과가 필요하다. Failure는 새 Story State이며 구조 후에도 손실을 유지한다.
+- 다음 변화는 직전 행동·NPC goal·관계·active thread·세계 상태에서 잇는다. 목적이 끝나면 퇴장·문 닫힘·군중 이동·실제 도착 같은 physical exit/world-native continuation을 보인다. 남은 시간·가능한 활동·soft hook은 질문/choices가 아니다.
+- scene_title은 위치·시간·참여자·목적·사건이 전환될 때만 바꾼다.`;
 
 const COMBAT_RULE = String.raw`[COMBAT INTERNAL VERDICT]
 서술 전에 경지·신체·마나·스킬·실전경험·심리·거리·선수권·장비·피로·부상·정보·지형·상성을 내부적으로 비교해 성공/부분성공/실패와 이유를 먼저 정한다. 판정 메모는 출력하지 않는다.`;
@@ -492,7 +490,13 @@ function compactSave(incoming,keys,registry,profile,keywords,text='',recentTexts
   if(fateBackground){delete pc.characterSetting;delete pc.admission;const publicRegion=fateBackground.detail.public_facts.find(row=>row.id==='home_region')?.fact;if(publicRegion)pc.origin=publicRegion;}
   return{version:save?.version,turnNumber:Number(save?.turnNumber||0),world:save?.world||{},pc,...(fateBackground?{characterBackground:fateBackground.detail}:{}),...(personalStory?{characterPersonalStory:personalStory.detail}:{}),relationships:rel,intimacyStates:intimacy,npcStates,emotionStates:emotions,npcInnerStates:inner,relevantNpcKeys:keys,activeEvents:relevantEvents,completedEvents:array(save?.completedEvents).slice(-8),pcKnowledge:knowledge,memories:{global:globalMem,npc:npcMem},hooks:array(save?.hooks).filter(x=>!['resolved','expired'].includes(x?.status)&&!x?.event_consequence).slice(-6),scheduledEvents:array(save?.scheduledEvents).filter(x=>!['completed','cancelled'].includes(x?.status)).slice(0,6),director:{lastEventTurn:Number(save?.director?.lastEventTurn||0),lastChoicePressureTurn:Number(save?.director?.lastChoicePressureTurn||0),lastCrossDepartmentTurn:Number(save?.director?.lastCrossDepartmentTurn||0),recentBeats:array(save?.director?.recentBeats).slice(-3),callbacks:array(save?.director?.callbacks).filter(x=>x?.status!=='resolved').slice(-4)},flags:save?.flags||{},sceneRuntime:compactSceneRuntime(save?.sceneRuntime,keywords,text,Object.keys(registry),3,2,recentTexts),backgroundDigest:clampText(save?.backgroundDigest||'',450)};
 }
-function compactRecent(recentTurns,count){return array(recentTurns).slice(-count).map(t=>({action:clampText(t?.action||'',320),summary:clampText(t?.summary||'',520),importance:t?.importance||null,scene:array(t?.scene).slice(-3).map(i=>({kind:i?.kind,speaker_key:i?.speaker_key||null,expression:i?.display_expression||i?.expression||null,text:clampText(i?.text||'',180)}))}));}
+function compactRecent(recentTurns,count){
+  const turns=array(recentTurns).slice(-count);
+  return turns.map((t,index)=>{
+    const latest=index===turns.length-1,sceneLimit=latest?6:3,textLimit=latest?260:180;
+    return{action:clampText(t?.action||'',320),summary:clampText(t?.summary||'',520),importance:t?.importance||null,scene:array(t?.scene).slice(-sceneLimit).map(i=>({kind:i?.kind,speaker_key:i?.speaker_key||null,expression:i?.display_expression||i?.expression||null,text:clampText(i?.text||'',textLimit)}))};
+  });
+}
 function classifyProfile(incoming={},mode='game'){
   if(mode==='continue')return PROFILES.continue;
   const save=incoming.saveState||{},action=String(incoming.action||'');
@@ -555,9 +559,9 @@ function buildInput(incoming,originalInput,profile,routed,mode='game'){
   const essentialPc=pressureBoundEssentialPc({name:clampText(pc.name||'',80),department:clampText(pc.department||'',100),status:clampText(pc.status||'',160),skills:Object.fromEntries(Object.entries(compactSkills(pc.skills)).map(([key,row])=>[key,{grade:row.grade}])),skillCandidates:compactMandatorySkillCandidates(pc.skillCandidates),...(Object.keys(essentialTalents).length?{talents:essentialTalents}:{}),...(Object.keys(essentialTraits).length?{traits:essentialTraits}:{}),...(Object.keys(essentialAuthorities).length?{authorities:essentialAuthorities}:{}),...(Object.values(essentialAwakening).some((bucket)=>Object.keys(bucket).length)?{awakeningCandidates:essentialAwakening}:{})},action);
   const essentialSave={version:save.version,turnNumber:save.turnNumber,world:{date:world.date||null,...(world.weekday?{weekday:world.weekday}:{}),time:world.time||null,location:clampText(world.location||'',140)},pc:essentialPc,...(fateBackground?{characterBackground:fateBackground.essential}:{}),...(personalStory?{characterPersonalStory:personalStory.essential}:{}),relevantNpcKeys:array(save.relevantNpcKeys).slice(0,4),npcStates:Object.fromEntries(Object.entries(object(save.npcStates)).slice(0,4).map(([key,row])=>[key,{location:clampText(row?.location||'',100),status:clampText(row?.status||row?.state||'',120)}])),sceneRuntime:{participants:array(scene.participants).slice(0,6),purpose:normalizeScenePurpose(scene.purpose),exit_condition:normalizeSceneExitCondition(scene.exit_condition),turn_hook:turnHook?{kind:turnHook.kind,status:turnHook.status,anchor:clampText(turnHook.anchor,140)}:null,momentum:{stall_streak:Number(momentum.stall_streak||0),last_intent:clampText(momentum.last_intent||'',60)},...(scene.timed_action?{timed_action:scene.timed_action}:{}),eventProgress:scene.eventProgress==null?null:{eventInstanceId:clampText(eventProgress.eventInstanceId||'',100),activeBeat:clampText(eventProgress.activeBeat||'',100)},faction_social:Object.keys(essentialFactionSocial.reputations).length?essentialFactionSocial:null}};
   const saveState=`===== AUTHORITATIVE SAVE_STATE (ROUTED MINIMUM) =====\n${safeJson(essentialSave)}`;
-  const optionalContext=`${npcCharacterBehaviorDirective?`===== CHARACTER-DRIVEN NPC BEHAVIOR V1 =====\n${npcCharacterBehaviorDirective}\n\n`:''}===== ACTIVE THREADS V1 =====\n${activeThreadsDirective}${fateBackgroundDirective?`\n\n===== FATE BACKGROUND PERSISTENCE V1 =====\n${fateBackgroundDirective}`:''}${personalStoryDirective?`\n\n===== PERSONAL STORY HOOKS V1 =====\n${personalStoryDirective}`:''}\n\n===== TURN OPTIONS =====\n${opts}\n\n===== AUTHORITATIVE SAVE_STATE (ROUTED DETAIL) =====\n${safeJson(save)}\n\n===== ROLLING SUMMARY TAIL =====\n${clampText(incoming.rollingSummary||'아직 없음',1500)}\n\n===== RECENT TURNS =====\n${safeJson(recent)}\n\n===== CURRENT NPC/SCENE RUNTIME =====\n${clampText(runtime,1800)}\n\n===== AVAILABLE_CG_IDS =====\n${cg||'없음'}`;
+  const optionalContext=`${npcCharacterBehaviorDirective?`===== CHARACTER-DRIVEN NPC BEHAVIOR V1 =====\n${npcCharacterBehaviorDirective}\n\n`:''}===== RECENT SCENE/REACTION CONTEXT =====\n${safeJson(recent)}\n\n===== CURRENT NPC/SCENE RUNTIME =====\n${clampText(runtime,1800)}\n\n===== ROLLING SUMMARY TAIL =====\n${clampText(incoming.rollingSummary||'아직 없음',1500)}\n\n===== ACTIVE THREADS V1 =====\n${activeThreadsDirective}${fateBackgroundDirective?`\n\n===== FATE BACKGROUND PERSISTENCE V1 =====\n${fateBackgroundDirective}`:''}${personalStoryDirective?`\n\n===== PERSONAL STORY HOOKS V1 =====\n${personalStoryDirective}`:''}\n\n===== AUTHORITATIVE SAVE_STATE (ROUTED DETAIL) =====\n${safeJson(save)}\n\n===== TURN OPTIONS =====\n${opts}\n\n===== AVAILABLE_CG_IDS =====\n${cg||'없음'}`;
   const reservedContext=`===== MULTI-SYSTEM SCENE ORCHESTRATION V1 =====\n${orchestrationDirective}\n\n===== SCENE MOMENTUM HF1 =====\n${momentumDirective}${noveltyDirective?`\n\n===== DETERMINISTIC SCENE NOVELTY V1 =====\n${noveltyDirective}`:''}\n\n===== SCENE PURPOSE V1 =====\n${purposeDirective}\n\n===== EXPLICIT SCENE EXIT CONDITION V1 =====\n${exitDirective}\n\n===== STRONGER TURN HOOK V1 =====\n${turnHookDirective}${consequenceDirective?`\n\n===== EVENT CONSEQUENCE V1 =====\n${consequenceDirective}`:''}`;
-  const actionFrame=(text)=>`===== USER ACTION =====\n${text}\n\n${sceneOrchestrationActionFrame(orchestration)}\nUSER ACTION의 의미 목표를 압축 완료하고 새 PC 선택 없이 EXIT_TARGET 뒤의 첫 판단점에서 멈춰라. ROUTINE은 변화 중심, 주요 NPC 감정 태그·강도·근거를 일치시켜라.`,fixedSeparators=6,emptyActionFrame=actionFrame(''),scheduledProfile=profile.name.includes('scheduled'),baseAuthorityBudget=routine||scheduledProfile?900:180,desiredAuthorityBudget=baseAuthorityBudget+(noveltyDirective?Math.max(900,noveltyDirective.length):0),continueProfile=profile.name.includes('continue');
+  const actionFrame=(text)=>`===== USER ACTION =====\n${text}\n\n${sceneOrchestrationActionFrame(orchestration)}\nNOVEL_OUTPUT=scene-first;Purpose/Exit/Hook≠조기 종료/choice;hard decision=choices 3;else choices=[];ROUTINE→meaningful state`,fixedSeparators=6,emptyActionFrame=actionFrame(''),scheduledProfile=profile.name.includes('scheduled'),baseAuthorityBudget=routine||scheduledProfile?900:180,desiredAuthorityBudget=baseAuthorityBudget+(noveltyDirective?Math.max(900,noveltyDirective.length):0),continueProfile=profile.name.includes('continue');
   const actionTextBudget=continueProfile?5200:Math.max(0,Math.min(5200,profile.inputChars-saveState.length-reservedContext.length-emptyActionFrame.length-fixedSeparators-desiredAuthorityBudget));
   const actionBlock=actionFrame(clampMiddleText(action,actionTextBudget));
   const authorityBudget=Math.max(0,profile.inputChars-saveState.length-reservedContext.length-actionBlock.length-fixedSeparators);

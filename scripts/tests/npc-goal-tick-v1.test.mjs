@@ -178,6 +178,6 @@ assert.match(chatRouter,/npc_goal_tick_v1:true/,'pipeline telemetry must adverti
 const pressuredAction=`${'조용히 생각을 정리한다. '.repeat(220)} 주변을 살펴본다.`;
 const pressured=route(pressuredAction,{routerFeedback:{routerVersion:'1.5.6-hf1',profile:'routine-17k-v154',lastInputTokens:26000}});
 assert.match(pressured.params.input,/RESULT=PRESENT_NPC_GOAL_TICK/,'Goal Tick authority must survive the minimum adaptive routine budget');
-assert.match(pressured.params.input,/주변을 살펴본다\.[\s\S]*USER ACTION의 의미 목표/,'the committed ending of a long user action must remain authoritative');
+assert.match(pressured.params.input,/주변을 살펴본다\.[\s\S]*NOVEL_OUTPUT=scene-first/,'the committed ending of a long user action must remain authoritative');
 
 console.log('PASS NPC Goal Tick V1 guarded present-NPC initiative regressions');
