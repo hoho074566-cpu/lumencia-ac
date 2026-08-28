@@ -8,6 +8,7 @@ const source = readFileSync('api/lib/context-router.js', 'utf8');
 const adapter = readFileSync('api/chat-router.js', 'utf8');
 const hardContract = source.match(/const ROUTER_GM_RULES = String\.raw`([\s\S]*?)`;/)?.[1] || '';
 const novelContract = source.match(/const NATURAL_STYLE = String\.raw`([\s\S]*?)`;/)?.[1] || '';
+const combatContract = source.match(/const COMBAT_RULE = String\.raw`([\s\S]*?)`;/)?.[1] || '';
 const previousCombinedFootprint = 5254;
 
 assert.ok(hardContract && novelContract, 'the routed hard and narrative contracts must both exist');
@@ -34,9 +35,12 @@ for (const hardBoundary of [
   'AUTHORITATIVE SAVE_STATE',
   'PUBLIC만 NPC 기본 지식',
   'state_delta에는 실제 변화만',
+  '작은 변화는 점진적으로 누적',
   'event_progress는 현재 논리적 이벤트 occurrence',
+  '짧은 영문 소문자 ID',
   'NPC significance',
 ]) assert.match(hardContract, new RegExp(hardBoundary));
+assert.match(combatContract, /심리/, 'combat verdict must retain established psychological state');
 
 const divider = '='.repeat(20);
 const instructions = `===== CHARACTER REGISTRY =====

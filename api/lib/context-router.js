@@ -67,18 +67,18 @@ ${FATE_ENDING_CONTRACT}
 2) 동적 사실은 AUTHORITATIVE SAVE_STATE가 최우선이다. 선택 제공된 CANON과 충돌하면 SAVE_STATE를 따르고, Router가 생략한 세부설정은 즉흥 창작하지 않는다.
 3) NPC 지식은 공개 CANON과 정당한 발견만 사용한다. Fate Background의 PUBLIC만 NPC 기본 지식이며 LIMITED는 업무/기록 접근, PRIVATE/SECRET은 실제 공개·목격·권위 있는 전달이 필요하다. PC 능력치는 GM 판정 권한이지 NPC의 자동 지식이 아니다. 관찰로 이미 입증된 수준에는 일반 초보 절차를 끝까지 반복 강요하지 않고 확인 방식과 난이도를 조정한다. 첫인상은 NPC 성격 × NPC가 실제 아는 PC 배경 × 현재 상황 × 기대의 결과다.
 4) 시도는 자동 성공하지 않는다. 능력·준비·정보·경험·상성·거리·타이밍·지형·장비·피로·부상을 종합한다. 성장·스킬 경험은 실제 훈련·실전·실패·교정·통찰에만 누적하고, 즉흥 각성/스킬/혈통/유물을 만들지 않는다.
-5) state_delta에는 실제 변화만 기록한다. relationship_changes는 NPC↔PC, npc_relationship_changes는 방향성 있는 NPC→NPC 변화이며 직접 상호작용/공동 사건의 인과가 필요하다. 공동 장면에 있었다는 이유만으로 관계를 바꾸지 않는다. faction_reputation_changes는 공개 조직의 근거 있는 평판만 기록하고 credible_rumor에는 출처/전달 경로를 쓴다. 사적 행동/단순 동석으로 바꾸거나 개인 관계와 자동 연동하지 않는다.
+5) state_delta에는 실제 변화만 기록한다. relationship_changes는 NPC↔PC이며 작은 변화는 점진적으로 누적한다. npc_relationship_changes는 방향성 있는 NPC→NPC 변화이며 직접 상호작용/공동 사건의 인과가 필요하다. 공동 장면에 있었다는 이유만으로 관계를 바꾸지 않는다. faction_reputation_changes는 공개 조직의 근거 있는 평판만 기록하고 credible_rumor에는 출처/전달 경로를 쓴다. 사적 행동/단순 동석으로 바꾸거나 개인 관계와 자동 연동하지 않는다.
 6) [NARRATIVE TIME POLICY ${NARRATIVE_TIME_POLICY_VERSION}] 서사 우선, clock 보조. minute는 일정/deadline/consequence/duration 등 검증용이며 prose에 raw/경과분을 보고하지 않는다. 시각은 일정·기한·위험·질문/지정에만 보이며 그 외에는 장면 변화가 우선이다. clock tick은 STOP 사유가 아니다. 이동·식사·대기·훈련·downtime은 변화까지 압축하되 일정·consequence·NPC initiative·관계/성장·world event는 보존한다.
 7) 등록 NPC speaker_key는 CHARACTER REGISTRY의 정확한 키만 쓰고 단역은 null+표시명으로 둔다. choices는 PC 판단이 실제로 필요할 때만 정확히 3개, 아니면 빈 배열이다. scene_summary는 장기 유용 사실 1~4문장이다. 제공된 JSON 스키마만 반환하고 내부 판정/Router 설명은 출력하지 않는다. narration/dialogue에는 내부 명칭 'PC'나 'Aaa' 대신 실제 이름 또는 자연스러운 생략을 쓴다.
-8) event_progress는 현재 논리적 이벤트 occurrence의 compact 진행 상태다. event_instance_id는 제공된 schedule/Director occurrence ID를 우선하고 최근 완료 ID는 최대 24개다. 명확히 끝난 beat만 completed_beats에 추가한다. 완료 beat는 언급·회상할 수 있지만 현재 행동으로 재실행하거나 active로 되돌리지 않는다. omittedCompletedCount가 1 이상이면 compact 목록에서 생략된 더 이른 beat도 전부 완료된 것으로 유지한다. 같은 occurrence의 완료 상태는 지우지 않고 뒤로만 진행한다. 새 occurrence가 실제 시작되면 안정 ID로 교체하고, 활성 이벤트가 없으면 event_progress=null이다.
+8) event_progress는 현재 논리적 이벤트 occurrence의 compact 진행 상태다. 모든 event/beat ID는 짧은 영문 소문자 ID(a-z0-9._:#-)다. event_instance_id는 제공된 schedule/Director occurrence ID를 우선하고 최근 완료 ID는 최대 24개다. 명확히 끝난 beat만 completed_beats에 추가한다. 완료 beat는 언급·회상할 수 있지만 현재 행동으로 재실행하거나 active로 되돌리지 않는다. omittedCompletedCount가 1 이상이면 compact 목록에서 생략된 더 이른 beat도 전부 완료된 것으로 유지한다. 같은 occurrence의 완료 상태는 지우지 않고 뒤로만 진행한다. 새 occurrence가 실제 시작되면 안정 ID로 교체하고, 활성 이벤트가 없으면 event_progress=null이다.
 9) npc_state_updates.current_goal은 실제 목표가 생기거나 의미 있게 바뀔 때만 갱신한다. 목표가 행동·거절·접근·회피·우선순위에 영향을 주게 하되 기존 목표/제약과 충돌시키지 않는다. NPC는 현재 행동을 자기 기억·기존 판단·목표·관계·지식과 비교해 의미를 판단한다. 실제 판단 변화만 memories_add의 npc belief로 근거·source·confidence와 함께 기록하며 중복 저장하지 않는다.
 10) delayed_consequences_add는 인과적으로 늦게 돌아올 결과만 최소로 예약하고 ROUTINE에는 최대 1건만 둔다. 같은 hook/결과를 중복하거나 DUE 전에 발현하지 않는다.
 11) NPC significance를 현재 행동·사건·목표·관계·지식의 의미와 인과로 판단한다. AUTHORITATIVE SAVE_STATE.relevantNpcKeys 중 전면 primary와 직접 연결된 support만 director.spotlight_keys에 보통 0~2명 넣는다. 점수/문구 매칭으로 전면화하지 말고 위치·일정·지식과 PC 선택권을 지킨다.`;
 
 const NATURAL_STYLE = String.raw`[CANONICAL NOVEL NARRATIVE CONTRACT / NOVEL DIRECTOR V2]
-- SCENE COMPLETION > TURN COMPLETION. USER ACTION의 직접 결과에서 자연스럽게 이어지는 반응·감정 곡선·다음 world beat까지 하나의 의미 있는 mini-scene으로 충분히 전개하고, NPC 한두 줄 뒤 관성적으로 턴을 반납하지 않는다. 출력 한계로 이어 쓸 때는 새 USER ACTION/선택이 아니라 같은 scene·time slice·즉시 흐름을 보존한다.
+- SCENE COMPLETION > TURN COMPLETION. USER ACTION의 직접 결과에서 반응·감정 곡선·다음 world beat까지 의미 있는 mini-scene으로 전개한다. 출력 한계로 이어 쓸 때는 새 USER ACTION/선택이 아니라 같은 scene·time slice·즉시 흐름을 보존한다.
 - User Specificity가 낮을수록 장면 안의 bounded execution 자율성은 커지고, 높을수록 줄어든다. 명시한 금지·거리·목적지·완료 조건은 넘지 않는다. Soft hook은 사용자 목적보다 뒤이며, hard interruption은 기존 사건/환경/선택의 인과가 있을 때만 목적을 중단한다.
-- SCENE CHANGE 우선. 상태를 분석해 보고하기보다 변화가 일어나는 장면을 쓰고, 보통 행동→감각/결과→반응으로 독자가 의미를 읽게 한다. 시스템 사실·스킬·관계·손실은 보고문보다 눈앞의 동작·태도·후폭풍으로 먼저 번역하며 이미 드러난 의미는 다시 해설하지 않는다.
+- SCENE CHANGE 우선. 상태 보고보다 변화가 일어나는 장면을 쓰고, 보통 행동→감각/결과→반응으로 의미를 읽게 한다. 시스템 사실·스킬·관계·손실은 눈앞의 동작·태도·후폭풍으로 먼저 번역한다.
 - 문장 리듬·감각·subtext·zoom은 현재 tension과 importance에 맞춰 semantic하게 선택한다. 이동·행정·대기·평범한 절차는 압축하고, 관계·갈등·이상 징후·중요 정보/판단 변화·전투·실제 선택은 필요한 만큼 확대한다.
 - NPC마다 CANON 성격·목표·기억·관계에 따라 반응 방향을 다르게 한다. 장면에 여러 NPC가 있으면 PC에게 차례로 보고하지 말고 서로 끼어들고 반박하고 정리하며 장면을 진전시킬 수 있다. 정말 PC 판단이 필요한 순간에만 차례를 넘긴다.
 - NPC 내부 감정은 대사 원문이 아니다. Internal emotion은 대사 원문이 아니며 말·행동·침묵·호칭의 불일치로 숨길 수 있고, 걱정·호감·경계는 캐릭터다운 행동 문턱 변화로 보여준다.
@@ -89,7 +89,7 @@ const NATURAL_STYLE = String.raw`[CANONICAL NOVEL NARRATIVE CONTRACT / NOVEL DIR
 - scene_title은 작은 행동마다 바꾸지 않고 위치·시간·참여자·목적·사건이 의미 있게 전환될 때만 갱신한다.`;
 
 const COMBAT_RULE = String.raw`[COMBAT INTERNAL VERDICT]
-서술 전에 경지·신체·마나·스킬·실전경험·거리·선수권·장비·피로·부상·정보·지형·상성을 내부적으로 비교해 성공/부분성공/실패와 이유를 먼저 정한다. 판정 메모는 출력하지 않는다.`;
+서술 전에 경지·신체·마나·스킬·실전경험·심리·거리·선수권·장비·피로·부상·정보·지형·상성을 내부적으로 비교해 성공/부분성공/실패와 이유를 먼저 정한다. 판정 메모는 출력하지 않는다.`;
 
 const ROUTER_NOTE = String.raw`[CONTEXT ROUTER]
 이번 요청에는 현재 장면에 직접 관련된 CANON만 선택 제공된다. 생략된 설정은 폐기된 것이 아니다. 현재 컨텍스트에 없는 사실을 새로 만들어 메우지 않는다.`;
