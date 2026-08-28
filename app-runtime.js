@@ -6,7 +6,7 @@
 // a stable-path V1.5.6 delta at boot. If required source markers disappear, boot stops visibly.
 
 const PATCH_VERSION = '1.5.6';
-const BASE_APP_SHA = '86d35b058a7eb4642ce81de58c8a147b393ef376';
+const BASE_APP_SHA = 'dac8574dc2a7eff20bf1f71b18e9d8ecc38e7ca7';
 const LIVE_BASE_HEAD = 'a9170d6dca82c613436dcc5b3bc6ba86b9f86ba4';
 const AUTO_GESTURE_PX = 84;
 
@@ -554,6 +554,7 @@ async function sendActionStable(action, requestedMode = null) {
     return;
   }
   if (!requested && !action) return;
+  const runOwner = captureActiveRunOwnership();
 
   const inputMode = requested || detectInputMode(action);
   const isMeta = inputMode === 'meta';
@@ -579,6 +580,7 @@ async function sendActionStable(action, requestedMode = null) {
   loader.innerHTML = '<div class="loading-dots"><i></i><i></i><i></i></div>';
   story.append(loader);
   scrollBottom();
+  let stagedTurn = null;
 
   try {
     refreshScheduleContext();
@@ -641,8 +643,10 @@ async function sendActionStable(action, requestedMode = null) {
       }
     }
 
-    loader.remove();
     if (!data?.turn) throw new Error('API 응답에 turn이 없습니다.');
+    assertActiveRunOwner(runOwner);
+    stagedTurn = stageTurnCommit(runOwner);
+    loader.remove();
     let notices = [];
     if (!isMeta && !isContinue) {
       materializeEventConsequencesStable(data.turn, data.pipeline, action);
@@ -699,7 +703,8 @@ async function sendActionStable(action, requestedMode = null) {
     save.debug.lastRoute = data.route || null;
     save.debug.lastUsage = data.usage || null;
     save.debug.lastSchedule = save.scheduleContext;
-    persist();
+    commitTurnState(stagedTurn, runOwner);
+    stagedTurn = null;
 
     const rendered = renderTurnRecord(record);
     updateStatus(data.route);
@@ -708,6 +713,7 @@ async function sendActionStable(action, requestedMode = null) {
     renderFlowControlsStable();
     scrollToTurnStart(rendered?.card || rendered?.user);
   } catch (err) {
+    if (stagedTurn) rollbackTurnCommit(stagedTurn);
     loader.remove();
     const e = document.createElement('div');
     e.className = 'error-card';
@@ -800,6 +806,12 @@ async function boot() {
     );
     source = replaceOnce(
       source,
+      "import { captureRunOwnership, commitRunAndFate, isRunOwnershipCurrent, recoverPendingRunCommit, RUN_COMMIT_PENDING_KEY } from './lib/run-commit-boundary.js';",
+      `import { captureRunOwnership, commitRunAndFate, isRunOwnershipCurrent, recoverPendingRunCommit, RUN_COMMIT_PENDING_KEY } from '${location.origin}/lib/run-commit-boundary.js?v=156';`,
+      'run commit boundary import'
+    );
+    source = replaceOnce(
+      source,
       "import { createNovelPresentationState, novelSceneTitle, resetNovelPresentationState, shouldShowNovelPortrait } from './lib/novel-presentation.js';",
       `import { createNovelPresentationState, novelSceneTitle, resetNovelPresentationState, shouldShowNovelPortrait } from '${location.origin}/lib/novel-presentation.js?v=156';`,
       'novel presentation import'
@@ -842,8 +854,8 @@ async function boot() {
 
     source = replaceRegexOnce(
       source,
-      /function compactState\(\) \{[\s\S]*?\n\}\n\nfunction applyFateEndingRuntime/,
-      `${renameFunction(compactStateStable, 'compactStateStable', 'compactState')}\n\nfunction applyFateEndingRuntime`,
+      /function compactState\(\) \{[\s\S]*?\n\}(?=\n\n\/\/ LUMENSIA_FATE_ENDING_HANDLER_V1)/,
+      renameFunction(compactStateStable, 'compactStateStable', 'compactState'),
       'compactState runtime fields'
     );
 
@@ -938,7 +950,6 @@ async function boot() {
     );
   } catch (error) {
     showBootError(error, 'patch 준비');
-    try { await import(`/app.js?v=fallback-${Date.now()}`); } catch (fallbackError) { showBootError(fallbackError, 'fallback'); }
     return;
   }
 
