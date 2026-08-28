@@ -62,8 +62,9 @@ assert.match(serviceWorker, /['"]\/save-migrations\.js['"]/, 'offline shell must
 assert.match(serviceWorker, /['"]\/lib\/debug-regression\.js['"]/, 'offline shell must cache the lazy DEBUG console');
 assert.match(serviceWorker, /['"]\/lib\/scene-continuity\.js['"]/, 'offline shell must cache the DEBUG console production helper');
 assert.match(serviceWorker, /['"]\/lib\/novel-presentation\.js['"]/, 'offline shell must cache the presentation helper');
-assert.match(serviceWorker, /lumensia-shell-v13-run-commit-boundary/, 'offline shell cache version must invalidate the previous precache');
+assert.match(serviceWorker, /lumensia-shell-v14-canonical-inheritance/, 'offline shell cache version must invalidate the previous precache');
 assert.match(serviceWorker, /\/lib\/fate-ending\.js/, 'offline shell must precache the canonical Fate Ending runtime');
+assert.match(serviceWorker, /\/lib\/fate-inheritance\.js/, 'offline shell must precache the canonical Inheritance runtime');
 assert.match(serviceWorker, /\/lib\/run-commit-boundary\.js/, 'offline shell must precache the run ownership boundary');
 assert.match(app, /\.filter\(\(row\) => row\.url\)/, 'asset audit must probe only manifest-declared portraits');
 assert.match(app, /char\.fullbody \? \[\{ expression: 'fullbody', url: char\.fullbody \}\]/, 'asset audit must probe declared fullbody images');

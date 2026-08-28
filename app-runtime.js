@@ -6,7 +6,7 @@
 // a stable-path V1.5.6 delta at boot. If required source markers disappear, boot stops visibly.
 
 const PATCH_VERSION = '1.5.6';
-const BASE_APP_SHA = 'dac8574dc2a7eff20bf1f71b18e9d8ecc38e7ca7';
+const BASE_APP_SHA = 'a6c5d407de65c0f7f0d2028bbb37e15b47b40118';
 const LIVE_BASE_HEAD = 'a9170d6dca82c613436dcc5b3bc6ba86b9f86ba4';
 const AUTO_GESTURE_PX = 84;
 
@@ -703,7 +703,7 @@ async function sendActionStable(action, requestedMode = null) {
     save.debug.lastRoute = data.route || null;
     save.debug.lastUsage = data.usage || null;
     save.debug.lastSchedule = save.scheduleContext;
-    commitTurnState(stagedTurn, runOwner);
+    await commitTurnState(stagedTurn, runOwner);
     stagedTurn = null;
 
     const rendered = renderTurnRecord(record);
@@ -794,20 +794,26 @@ async function boot() {
     );
     source = replaceOnce(
       source,
-      "import { createFreeCharacterCreation, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation } from './lib/fate-start.js';",
-      `import { createFreeCharacterCreation, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation } from '${location.origin}/lib/fate-start.js?v=156';`,
+      "import { createFreeCharacterCreation, FATE_START_DEPARTMENTS, fateOriginLockOptions, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation } from './lib/fate-start.js';",
+      `import { createFreeCharacterCreation, FATE_START_DEPARTMENTS, fateOriginLockOptions, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation } from '${location.origin}/lib/fate-start.js?v=156';`,
       'fate start import'
     );
     source = replaceOnce(
       source,
-      "import { fateBookRuntimeSnapshot, normalizeFateBook, reconcileFateBooks } from './lib/fate-ending.js';",
-      `import { fateBookRuntimeSnapshot, normalizeFateBook, reconcileFateBooks } from '${location.origin}/lib/fate-ending.js?v=156';`,
+      "import { fateBookRuntimeSnapshot, inspectFateBook, reconcileFateBooks } from './lib/fate-ending.js';",
+      `import { fateBookRuntimeSnapshot, inspectFateBook, reconcileFateBooks } from '${location.origin}/lib/fate-ending.js?v=156';`,
       'fate ending import'
     );
     source = replaceOnce(
       source,
-      "import { captureRunOwnership, commitRunAndFate, isRunOwnershipCurrent, recoverPendingRunCommit, RUN_COMMIT_PENDING_KEY } from './lib/run-commit-boundary.js';",
-      `import { captureRunOwnership, commitRunAndFate, isRunOwnershipCurrent, recoverPendingRunCommit, RUN_COMMIT_PENDING_KEY } from '${location.origin}/lib/run-commit-boundary.js?v=156';`,
+      "import { FATE_INHERITANCE_KEY, inheritanceBalance, inspectInheritanceMeta, META_PROGRESSION_LOCK, prepareCanonicalProgressionImport, purchaseNextLifeSerialized, quoteInheritanceAllocations } from './lib/fate-inheritance.js';",
+      `import { FATE_INHERITANCE_KEY, inheritanceBalance, inspectInheritanceMeta, META_PROGRESSION_LOCK, prepareCanonicalProgressionImport, purchaseNextLifeSerialized, quoteInheritanceAllocations } from '${location.origin}/lib/fate-inheritance.js?v=156';`,
+      'fate inheritance import'
+    );
+    source = replaceOnce(
+      source,
+      "import { captureRunOwnership, commitRunFateAndInheritance, isRunOwnershipCurrent, recoverPendingRunCommit, RUN_COMMIT_PENDING_KEY } from './lib/run-commit-boundary.js';",
+      `import { captureRunOwnership, commitRunFateAndInheritance, isRunOwnershipCurrent, recoverPendingRunCommit, RUN_COMMIT_PENDING_KEY } from '${location.origin}/lib/run-commit-boundary.js?v=156';`,
       'run commit boundary import'
     );
     source = replaceOnce(

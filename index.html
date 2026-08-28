@@ -41,6 +41,7 @@
 
     <footer class="footer-row">
       <button id="newGameBtn" class="text-btn">새 게임</button>
+      <button id="nextLifeBtn" class="text-btn">다음 생</button>
       <button id="saveBtn" class="text-btn">저장</button>
       <button id="debugBtn" class="text-btn hidden">DEBUG</button>
       <button id="forceTerraBtn" class="text-btn terra-btn">TERRA 1턴</button>
@@ -214,6 +215,46 @@
       <div class="creator-actions">
         <button id="pcCreatorSubmit" type="submit" class="primary-btn">이 설정으로 새 게임</button>
       </div>
+    </form>
+  </dialog>
+
+  <dialog id="nextLifeDialog" class="panel-dialog wide-dialog">
+    <form id="nextLifeForm">
+      <header><h2>Inheritance · Next Life</h2><button id="nextLifeClose" type="button" class="close-btn">✕</button></header>
+      <div id="nextLifeBalance" class="creator-note"></div>
+      <div class="creator-section-title">다음 생의 기본 Fate</div>
+      <div class="creator-grid">
+        <label>성별<select id="nextGender" required><option value="male">남성</option><option value="female">여성</option></select></label>
+        <label>신분<select id="nextSocialClass" required><option value="commoner">평민</option><option value="fallen_noble">몰락귀족</option></select></label>
+        <label>학과<select id="nextDepartment" required></select></label>
+        <label>Fate Affinity<select id="nextAffinity"><option value="">선택 안 함</option></select></label>
+        <label>지역 lock<select id="nextRegionLock"><option value="">선택 안 함</option></select></label>
+        <label>직업 lock<select id="nextOccupationLock"><option value="">선택 안 함</option></select></label>
+      </div>
+      <button id="nextOriginPreviewBtn" type="button" class="secondary-btn">Origin 미리보기</button>
+      <pre id="nextOriginPreview" class="inheritance-preview">아직 Origin을 생성하지 않음.</pre>
+      <div class="creator-section-title">Stats allocation</div>
+      <div class="creator-grid">
+        <label>신체<input id="inheritStatBody" type="number" min="0" max="8" value="0" /></label>
+        <label>마나<input id="inheritStatMana" type="number" min="0" max="8" value="0" /></label>
+        <label>지능<input id="inheritStatIntelligence" type="number" min="0" max="8" value="0" /></label>
+        <label>신성<input id="inheritStatDivinity" type="number" min="0" max="8" value="0" /></label>
+      </div>
+      <div class="creator-section-title">Talents allocation</div>
+      <div class="creator-grid">
+        <label>魔<input id="inheritTalentMagic" type="number" min="0" max="9" value="0" /></label>
+        <label>武<input id="inheritTalentMartial" type="number" min="0" max="9" value="0" /></label>
+        <label>魂<input id="inheritTalentSoul" type="number" min="0" max="9" value="0" /></label>
+        <label>智<input id="inheritTalentKnowledge" type="number" min="0" max="9" value="0" /></label>
+      </div>
+      <div class="creator-section-title">Starting Resources</div>
+      <div class="creator-grid">
+        <label>금화 묶음 (+50G)<input id="inheritGold" type="number" min="0" max="10" value="0" /></label>
+        <label>보급품 묶음<input id="inheritSupplies" type="number" min="0" max="10" value="0" /></label>
+        <label>Fate Affinity 단계 (+5)<input id="inheritAffinityUnits" type="number" min="0" max="5" value="0" /></label>
+      </div>
+      <div id="nextLifeQuote" class="creator-note">Origin 미리보기 후 비용을 확인할 수 있음.</div>
+      <div class="creator-actions"><button id="nextLifeSubmit" type="submit" class="primary-btn">계승을 확정하고 다음 생 시작</button></div>
     </form>
   </dialog>
 
