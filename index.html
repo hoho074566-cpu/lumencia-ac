@@ -41,6 +41,7 @@
 
     <footer class="footer-row">
       <button id="newGameBtn" class="text-btn">새 게임</button>
+      <button id="nextLifeBtn" class="text-btn">Next Life</button>
       <button id="saveBtn" class="text-btn">저장</button>
       <button id="debugBtn" class="text-btn hidden">DEBUG</button>
       <button id="forceTerraBtn" class="text-btn terra-btn">TERRA 1턴</button>
@@ -214,6 +215,34 @@
       <div class="creator-actions">
         <button id="pcCreatorSubmit" type="submit" class="primary-btn">이 설정으로 새 게임</button>
       </div>
+    </form>
+  </dialog>
+
+  <dialog id="nextLifeDialog" class="panel-dialog wide-dialog">
+    <form id="nextLifeForm">
+      <header><h2>Inheritance / Next Life</h2><button id="nextLifeClose" type="button" class="close-btn">✕</button></header>
+      <div id="inheritanceBalance" class="creator-note">계승 원천 계산 중…</div>
+      <div class="creator-grid">
+        <label>성별<select id="nextLifeGender" required><option value="">-- 선택 --</option><option value="male">남성</option><option value="female">여성</option></select></label>
+        <label>신분<select id="nextLifeSocialClass" required><option value="">-- 선택 --</option><option value="commoner">평민</option><option value="fallen_noble">몰락귀족</option></select></label>
+        <label>학과<select id="nextLifeDepartment" required><option value="">-- 선택 --</option><option>기사과 1학년</option><option>마법과 1학년</option><option>신학부 1학년</option><option>일반학부 1학년</option></select></label>
+      </div>
+      <div class="creator-section-title">계승 배분</div>
+      <div class="creator-grid">
+        <label>종류<select id="inheritanceKind"><option value="stat">Stats</option><option value="talent">Talents</option><option value="resource">Starting Resources</option><option value="affinity">Fate Affinity</option></select></label>
+        <label>대상<select id="inheritanceTarget"></select></label>
+      </div>
+      <button id="inheritanceAdd" type="button" class="secondary-btn">배분 추가</button>
+      <div id="inheritanceDraft" class="field-help">아직 배분 없음.</div>
+      <div class="creator-section-title">Origin</div>
+      <div class="creator-grid">
+        <label>Region lock<select id="originRegionLock"><option value="">잠그지 않음</option></select></label>
+        <label>Occupation lock<select id="originOccupationLock"><option value="">잠그지 않음</option></select></label>
+      </div>
+      <div class="pc-paste-actions"><button id="originReroll" type="button" class="secondary-btn">Origin reroll (+cost)</button></div>
+      <div id="originPreview" class="creator-note">Next Life를 시작하면 새 Origin을 생성한다.</div>
+      <div class="field-help">Realm / Circle은 구매 항목이 아니며 모든 계승 적용 뒤 최종 캐릭터 평가에서 다시 계산된다.</div>
+      <div class="creator-actions"><button id="nextLifeSubmit" type="submit" class="primary-btn">이 배분으로 Next Life</button></div>
     </form>
   </dialog>
 

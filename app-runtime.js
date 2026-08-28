@@ -788,15 +788,21 @@ async function boot() {
     );
     source = replaceOnce(
       source,
-      "import { createFreeCharacterCreation, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation } from './lib/fate-start.js';",
-      `import { createFreeCharacterCreation, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation } from '${location.origin}/lib/fate-start.js?v=156';`,
+      "import { createFreeCharacterCreation, FATE_ORIGIN_OPTIONS, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation, validateFateOriginLocks } from './lib/fate-start.js';",
+      `import { createFreeCharacterCreation, FATE_ORIGIN_OPTIONS, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation, validateFateOriginLocks } from '${location.origin}/lib/fate-start.js?v=156';`,
       'fate start import'
     );
     source = replaceOnce(
       source,
-      "import { fateBookRuntimeSnapshot, normalizeFateBook, reconcileFateBooks } from './lib/fate-ending.js';",
-      `import { fateBookRuntimeSnapshot, normalizeFateBook, reconcileFateBooks } from '${location.origin}/lib/fate-ending.js?v=156';`,
+      "import { fateBookRuntimeSnapshot, inspectFateBook, normalizeFateBook, reconcileFateBooks } from './lib/fate-ending.js';",
+      `import { fateBookRuntimeSnapshot, inspectFateBook, normalizeFateBook, reconcileFateBooks } from '${location.origin}/lib/fate-ending.js?v=156';`,
       'fate ending import'
+    );
+    source = replaceOnce(
+      source,
+      "import { applyInheritanceReceipt, createInheritancePurchase, createRunInheritance, inheritanceBalance, inspectInheritanceMeta, inspectRunInheritance, normalizeInheritanceMeta, prepareCanonicalImport, quoteInheritanceAllocations } from './lib/fate-inheritance.js';",
+      `import { applyInheritanceReceipt, createInheritancePurchase, createRunInheritance, inheritanceBalance, inspectInheritanceMeta, inspectRunInheritance, normalizeInheritanceMeta, prepareCanonicalImport, quoteInheritanceAllocations } from '${location.origin}/lib/fate-inheritance.js?v=156';`,
+      'fate inheritance import'
     );
     source = replaceOnce(
       source,
