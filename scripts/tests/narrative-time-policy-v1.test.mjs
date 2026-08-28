@@ -62,8 +62,8 @@ const continued=routeOpenAIParams(baseParams,{incoming:{action:'[LUMENSIA V1.5.6
 assert.match(continued.params.instructions,/NARRATIVE TIME POLICY 1\.0/,'CONTINUE keeps the same compact narrative-time rule without a second policy section');
 assert.match(continued.params.input,/SCENE MOMENTUM V1 — CONTINUE HARD FREEZE/,'CONTINUE must freeze clock, schedule, consequence, and action progress through the existing authority tail');
 
-const policyLines=routed.params.instructions.split('\n').filter(line=>/^(?:9\)|21\)|22\))/.test(line));
-assert.equal(policyLines.length,3,'Narrative Time Policy must stay consolidated in the three pre-existing time/compression/STOP rules');
-assert.ok(policyLines.reduce((sum,line)=>sum+line.length,0)<=332,'Narrative Time Policy rules must not exceed the legacy rules they replace or displace routed canon/PC SYSTEM');
+const policyLines=routed.params.instructions.split('\n').filter(line=>/^6\) \[NARRATIVE TIME POLICY/.test(line));
+assert.equal(policyLines.length,1,'Narrative Time Policy must stay consolidated in one hard-authority rule');
+assert.ok(policyLines[0].length<=332,'Narrative Time Policy must not exceed the three legacy rules it replaces or displace routed canon/PC SYSTEM');
 
 console.log('PASS Narrative Time Policy V1 narrative-first prose, hard-boundary, compression, freeze, and one-call contract');
