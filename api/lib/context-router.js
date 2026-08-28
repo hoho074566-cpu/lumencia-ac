@@ -3,7 +3,7 @@
 // NPC Goal Tick V1: guarded present-NPC initiative without an additional model call.
 // Stable path: api/lib/context-router.js
 
-import { NARRATIVE_TIME_POLICY_VERSION, activityRangeLimitMinutes, buildSceneMomentumDirective, classifySceneIntent, nextScheduleBoundaryMinutes, scheduleBoundaryLimitMinutes } from '../../lib/scene-momentum.js';
+import { NARRATIVE_TIME_POLICY_VERSION, activityRangeLimitMinutes, buildSceneMomentumDirective, classifySceneIntent, isPcRelevantScheduleEvent, isRequestedScheduledActivity, nextScheduleBoundaryMinutes, scheduleBoundaryLimitMinutes } from '../../lib/scene-momentum.js';
 import { buildSceneNoveltyDirective } from '../../lib/scene-novelty.js';
 import { buildScenePurposeDirective, normalizeScenePurpose } from '../../lib/scene-purpose.js';
 import { buildSceneExitDirective, normalizeSceneExitCondition } from '../../lib/scene-exit.js';
@@ -60,12 +60,12 @@ const PROFILES = Object.freeze({
   },
 });
 
-const ROUTER_GM_RULES = String.raw`너는 판타지 아카데미 장기 RPG 「루멘시아 아카데미」의 Novel Director이자 독립적으로 움직이는 세계 시뮬레이터다.
+const ROUTER_GM_RULES = String.raw`너는 state reporter가 아니라 canonical facts를 장면으로 실행하는 「루멘시아 아카데미」 Novel Director다.
 ${FATE_ENDING_CONTRACT}
 [HARD AUTHORITY / DATA CONTRACT]
-1) USER ACTION 원문 전체의 긍정형 완료 의도와 구체적 제한을 최우선으로 지킨다. PC의 새 행동·대사·감정·생각·수락/거절은 만들지 않되, 중요 interruption이나 새 선택 없이 완료할 수 있는 결정 가치 없는 중간 단계는 다시 묻지 말고 의도한 결과까지 진행한다. 부정·가정·질문으로만 언급한 행동은 실행하지 않는다.
+1) USER ACTION 원문 전체의 긍정형 완료 의도와 구체적 제한을 최우선으로 지킨다. PC의 새 의도·대사·감정·생각·수락/거절·자발적 행동은 만들지 않는다. 이는 세계의 STOP 규칙이 아니다: NPC initiative/dialogue/NPC-vs-NPC, 환경·군중·결과, routine progression, 이미 촉발된 사건 완결은 새 PC 입력 없이 진행한다. 결정 가치 없는 중간 단계는 다시 묻지 않고 완료한다. 부정·가정·질문만인 행동은 실행하지 않는다.
 2) 동적 사실은 AUTHORITATIVE SAVE_STATE가 최우선이다. 선택 제공된 CANON과 충돌하면 SAVE_STATE를 따르고, Router가 생략한 세부설정은 즉흥 창작하지 않는다. 서술의 날짜·계절·학년·학사 단계와 사건 진행도 SAVE_STATE.world, PC 소속/상태, 완료·예정 사건보다 앞서 확정하지 않는다.
-3) NPC 지식은 공개 CANON과 정당한 발견만 사용한다. Fate Background의 PUBLIC만 NPC 기본 지식이며 LIMITED는 업무/기록 접근, PRIVATE/SECRET은 실제 공개·목격·권위 있는 전달이 필요하다. PC 능력치는 GM 판정 권한이지 NPC의 자동 지식이 아니다. 관찰로 이미 입증된 수준에는 일반 초보 절차를 끝까지 반복 강요하지 않고 확인 방식과 난이도를 조정한다. 첫인상은 NPC 성격 × NPC가 실제 아는 PC 배경 × 현재 상황 × 기대의 결과다.
+3) NPC 지식은 공개 CANON과 정당한 발견만 쓴다. Fate Background의 PUBLIC만 NPC 기본 지식이며 LIMITED는 업무/기록, PRIVATE/SECRET은 공개·목격·권위 있는 전달이 필요하다. PC 능력치는 자동 지식이 아니다. 관찰로 이미 입증된 수준에는 일반 초보 절차를 끝까지 반복 강요하지 않고 확인 방식과 난이도를 조정한다. 첫인상은 NPC 성격 × NPC가 실제 아는 PC 배경 × 현재 상황 × 기대의 결과다.
 4) 시도는 자동 성공하지 않는다. 능력·준비·정보·경험·상성·거리·타이밍·지형·장비·피로·부상을 종합한다. 성장·스킬 경험은 실제 훈련·실전·실패·교정·통찰에만 누적하고, 즉흥 각성/스킬/혈통/유물을 만들지 않는다.
 5) state_delta에는 실제 변화만 기록한다. relationship_changes는 NPC↔PC이며 작은 변화는 점진적으로 누적한다. npc_relationship_changes는 방향성 있는 NPC→NPC 변화이며 직접 상호작용/공동 사건의 인과가 필요하다. 공동 장면에 있었다는 이유만으로 관계를 바꾸지 않는다. faction_reputation_changes는 공개 조직의 근거 있는 평판만 기록하고 credible_rumor에는 출처/전달 경로를 쓴다. 사적 행동/단순 동석으로 바꾸거나 개인 관계와 자동 연동하지 않는다.
 6) [NARRATIVE TIME POLICY ${NARRATIVE_TIME_POLICY_VERSION}] 서사 우선, clock 보조. minute는 일정/deadline/consequence/duration 등 검증용이며 prose에 raw/경과분을 보고하지 않는다. 시각은 일정·기한·위험·질문/지정에만 보이며 그 외에는 장면 변화가 우선이다. clock tick은 STOP 사유가 아니다. 이동·식사·대기·훈련·downtime은 변화까지 압축하되 일정·consequence·NPC initiative·관계/성장·world event는 보존한다.
@@ -76,11 +76,11 @@ ${FATE_ENDING_CONTRACT}
 11) NPC significance를 현재 행동·사건·목표·관계·지식의 의미와 인과로 판단한다. AUTHORITATIVE SAVE_STATE.relevantNpcKeys 중 전면 primary와 직접 연결된 support만 director.spotlight_keys에 보통 0~2명 넣는다. 점수/문구 매칭으로 전면화하지 말고 위치·일정·지식과 PC 선택권을 지킨다.`;
 
 const NATURAL_STYLE = String.raw`[CANONICAL NOVEL COMPOSITION CONTRACT / NOVEL DIRECTOR V2]
-- SCENE COMPLETION > TURN COMPLETION. 직접 결과부터 환경·인물·주변 반응과 다음 world beat까지 인과적 mini-scene을 완결한다. 중요한 scene[]은 하나의 ordered sequence다. narration/dialogue를 독립 보고·카드처럼 끝내지 말고, 같은 Named NPC도 필요하면 행동·대사·침묵·반응 사이에서 다시 등장해 장면을 점유한다.
+- SCENE COMPLETION > TURN COMPLETION. 직접 결과→환경·인물·주변 반응→next world beat의 mini-scene을 완결한다. scene[]=ordered sequence다. narration/dialogue를 독립 보고·카드로 끊지 말고 같은 Named NPC도 행동·대사·침묵·반응 간 장면을 점유한다.
 - User Specificity가 낮을수록 bounded execution 자율성은 커지고, 높을수록 줄어든다. 명시한 금지·거리·목적지·완료 조건은 넘지 않는다. Soft hook은 사용자 목적보다 뒤이며 hard interruption은 기존 인과가 있을 때만 중단한다.
 - SCENE CHANGE 우선. 감각/물리적 opening→environment/reaction→named action/dialogue→gesture/silence/reaction→dialogue continuation을 자연스럽게 엮는다. 설명보다 행동·대비·subtext로 의미와 성격을 먼저 드러내고 tease는 가능한 현재 장면에서 payoff한다. 시스템 사실·스킬·관계·손실도 동작·태도·후폭풍으로 번역한다.
 - rhythm·감각·subtext·camera distance는 tension/importance에 맞춰 semantic하게 선택한다. 이동·행정·대기·평범한 절차는 선택 메뉴 없이 다음 meaningful state까지 압축하고, 관계·갈등·이상·중요 정보/판단·전투·실제 선택은 필요한 만큼 확대한다.
-- NPC는 CANON 성격·목표·기억·관계에 따라 다르게 반응한다. 여러 NPC는 서로 끼어들고 반박하며 장면을 진전시킨다. 실제 hard player decision에서만 차례를 넘기고 그 전에는 질문·행동 가능성 안내·Suggested Action으로 장면을 닫지 않는다.
+- NPC는 CANON 성격·목표·기억·관계에 따라 다르게 반응하고, 여럿이면 서로 끼어들고 반박한다. 실제 hard player decision 전에는 질문·행동 가능성 안내·Suggested Action으로 닫지 않는다.
 - NPC 내부 감정은 대사 원문이 아니다. 말·행동·침묵·호칭의 불일치로 subtext를 보인다. 상대는 직전 공방/대화를 다음 행동에 반영하며 기술 우위도 canonical power gap을 지우지 않는다.
 - 미스터리는 징후→불일치→부분적 실체로 좁힌다. 구조/개입은 기존 위치·관계·연락·추적의 인과가 필요하다. Failure는 새 Story State이며 구조 후에도 손실을 유지한다.
 - 다음 변화는 직전 행동·NPC goal·관계·active thread·세계 상태에서 잇는다. 목적이 끝나면 퇴장·문 닫힘·군중 이동·실제 도착 같은 physical exit/world-native continuation을 보인다. 남은 시간·가능한 활동·soft hook은 질문/choices가 아니다.
@@ -295,6 +295,7 @@ function buildEventDirectorV2(incoming,originalInput,registry,mode='game'){
   const base={version:DIRECTOR_V2_VERSION,event_director_v3_version:DIRECTOR_V3_VERSION,world_result_surfacing_version:WORLD_RESULT_SURFACING_VERSION,goal_tick_version:NPC_GOAL_TICK_VERSION,seed_tag:seedTag,cooldown_turns:DIRECTOR_COOLDOWN_TURNS,intervention:plan.intervention,routine_streak:plan.routineStreak,event_gap:plan.eventGap,momentum_stall_streak:stallStreak,momentum_pressure:momentumPressure?'required':stallStreak===1?'watch':'normal',selected_key:null,selected_name:null,event_style:'none',eligible_keys:[],roll:null,none_weight:null,result:'NO_ROLL',mode:'fixed-flow',goal_signals:{},selected_goal:null};
   const fixedDirective=(reason)=>({telemetry:{...base,result:reason},selectedKey:null,directive:`[EVENT DIRECTOR V2.1]\nMODE=FIXED_FLOW\n${reason}. 기존 일정·사용자 직접 행동·진행 중인 훅을 우선하고, 이 지시 때문에 새 우연 사건을 추가하지 마라.`});
   if(['meta','continue'].includes(mode))return fixedDirective(`RNG_DISABLED_${mode.toUpperCase()}`);
+  if(requestedUpcomingEvents(incoming,registry).length)return fixedDirective('REQUESTED_SCHEDULE_FIXED_FLOW');
   const explicit=mentionedNpcKeys(incoming.action||'',registry);
   const directUserFocus=Boolean(explicit.length||plan.focused.length||DIRECT_NPC_PRONOUN_RE.test(String(incoming.action||'')));
   if(!directUserFocus&&(plan.payoffDue||plan.callbacks))return fixedDirective('CALLBACK_PRIORITY');
@@ -404,6 +405,11 @@ function buildEventDirectorV2(incoming,originalInput,registry,mode='game'){
 }
 
 function addExplicitKeys(set,text,registry,limit){for(const key of mentionedNpcKeys(text,registry)){if(set.size>=limit)break;set.add(key);}}
+function requestedUpcomingEvents(incoming={},registry={}){
+  const save=incoming.saveState||{},action=String(incoming.action||'').trim();if(!action)return[];
+  const intent=classifySceneIntent(action,{location:save?.world?.location||'',currentTime:save?.world?.time||'',currentDate:save?.world?.date||'',currentWeekday:save?.world?.weekday||'',actorName:save?.pc?.name||'',resumeTimedAction:save?.sceneRuntime?.timed_action});
+  return array(save?.scheduleContext?.upcoming).filter(event=>isPcRelevantScheduleEvent(save,event)&&isRequestedScheduledActivity(save,event,action,intent,registry)).slice(0,2);
+}
 function deriveKeys(incoming,registry,maxNpcs,directorV2=null){
   const save=incoming.saveState||{}, set=new Set();
   const authoritative=array(save?.sceneRuntime?.participants).map(String), present=new Set(authoritative);
@@ -412,6 +418,7 @@ function deriveKeys(incoming,registry,maxNpcs,directorV2=null){
   if(directorV2?.selectedKey&&registry[directorV2.selectedKey]&&set.size<maxNpcs)set.add(String(directorV2.selectedKey));
   for(const key of array(directorV2?.worldResultKeys)){if(set.size>=maxNpcs)break;if(registry[key])set.add(String(key));}
   for(const key of array(directorV2?.consequenceKeys)){if(set.size>=maxNpcs)break;if(registry[key])set.add(String(key));}
+  for(const k of requestedUpcomingEvents(incoming,registry).flatMap(event=>array(event?.participants)))if(set.size<maxNpcs&&registry[k])set.add(String(k));
   addExplicitKeys(set,incoming.action||'',registry,maxNpcs);
   for(const k of array(save?.scheduleContext?.due).flatMap(ev=>array(ev?.participants)))if(set.size<maxNpcs&&registry[k])set.add(String(k));
   for(const k of authoritative)if(set.size<maxNpcs&&registry[k])set.add(String(k));
@@ -502,7 +509,8 @@ function classifyProfile(incoming={},mode='game'){
   const save=incoming.saveState||{},action=String(incoming.action||'');
   if(save?.flags?.majorScene||hasAffirmedActionKeyword(action,CRITICAL_ACTION_RE))return PROFILES.critical;
   const dueMajor=array(save?.scheduleContext?.due).some(ev=>Number(ev?.importance||0)>=4);
-  if(dueMajor)return PROFILES.scheduled;
+  const requestedMajor=requestedUpcomingEvents(incoming).some(ev=>Number(ev?.importance||0)>=4);
+  if(dueMajor||requestedMajor)return PROFILES.scheduled;
   if(incoming.proReasoning||hasAffirmedActionKeyword(action,IMPORTANT_RE))return PROFILES.important;
   return PROFILES.routine;
 }
@@ -515,7 +523,7 @@ function buildInstructions(original,incoming,profile,originalInput,mode){
   const world=chooseBlocks(parseBlocks(sec.world),{budget:profile.worldChars,keywords,names,secretAllowed,mode:'world',combat});
   const npc=chooseBlocks(parseBlocks(sec.npc),{budget:profile.npcChars,keywords,names,secretAllowed,mode:'npc'});
   const speech=chooseBlocks(parseBlocks(sec.speech),{budget:profile.speechChars,keywords,names,secretAllowed:false,mode:'speech'});
-  const pc=chooseBlocks(parseBlocks(sec.pc),{budget:profile.pcChars,keywords,names,secretAllowed:false,mode:'pc',combat});
+  const pc=chooseBlocks(parseBlocks(sec.pc).filter(block=>!block.title.includes('플레이어 주권')),{budget:profile.pcChars,keywords,names,secretAllowed:false,mode:'pc',combat});
   let adult='';if(incoming.adultMode&&Number(incoming.saveState?.pc?.age||0)>=18)adult=clampText(sec.adult,Math.min(1800,profile.speechChars));
   const registryText=Object.entries(registry).map(([k,n])=>`${k}=${n}`).join(', ');
   let text=[ROUTER_GM_RULES,NATURAL_STYLE,ROUTER_NOTE,combat?COMBAT_RULE:'',`===== CHARACTER REGISTRY =====\n${registryText}`,world.text?`===== ROUTED WORLD CANON =====\n${world.text}`:'',npc.text?`===== ROUTED NPC CANON =====\n${npc.text}`:'',speech.text?`===== ROUTED NPC SPEECH =====\n${speech.text}`:'',adult?`===== ROUTED ADULT LAYER =====\n${adult}`:'',pc.text?`===== ROUTED PC SYSTEM =====\n${pc.text}`:''].filter(Boolean).join('\n\n');

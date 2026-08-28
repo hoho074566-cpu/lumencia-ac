@@ -54,7 +54,7 @@ assert.match(combatContract, /심리/, 'combat verdict must retain established p
 
 const divider = '='.repeat(20);
 const instructions = `===== CHARACTER REGISTRY =====
-artemis=아르테미스, lillia=릴리아, sera=세라
+artemis=아르테미스, emily=에밀리, lena=레나, lillia=릴리아, sera=세라
 ===== WORLD CANON =====
 ${divider}
 PUBLIC
@@ -65,18 +65,38 @@ ${divider}
 NPC RULES
 ${divider}
 Character facts.
+${divider}
+EMILY 에밀리
+${divider}
+Emily leads the academy and gives the entrance welcome speech.
+${divider}
+LENA 레나
+${divider}
+Lena is the incoming student representative.
 ===== NPC SPEECH =====
 ${divider}
 NPC SPEECH
 ${divider}
 Character voices.
+${divider}
+EMILY SPEECH 에밀리
+${divider}
+Emily speaks warmly and with institutional authority.
+${divider}
+LENA SPEECH 레나
+${divider}
+Lena speaks clearly but carries first-day tension.
 ===== OPTIONAL ADULT / INTIMACY SPEECH LAYER =====
 None.
 ===== PC SYSTEM =====
 ${divider}
 PC RULES
 ${divider}
-Resolve declared actions.`;
+Resolve declared actions.
+${divider}
+11. 플레이어 주권
+${divider}
+상황, NPC 반응, 결과와 선택 가능한 환경만 제시한다.`;
 
 function route(action, { recentTurns = [], savePatch = {} } = {}) {
   return routeOpenAIParams(
@@ -122,6 +142,37 @@ assert.match(restricted.params.instructions, /명시한 금지·거리·목적�
 const routineTransition = route('입학식 뒤 기숙사로 이동한다.');
 assert.match(routineTransition.params.input, /ROUTINE→meaningful state/);
 assert.match(routineTransition.params.input, /else choices=\[\]/);
+
+const entranceEvent = {
+  id: 'entrance_ceremony', title: '입학식', date: '1285-03-01', time: '09:00',
+  location: '루멘시아 아카데미 대강당', kind: 'academic', participants: ['emily', 'lena'],
+  importance: 4, note: '09:00 에밀리 환영사. 09:15 레나 신입생 대표 연설.', status: 'scheduled',
+};
+const openingAction = '게임을 시작한다. 입학식에 오전 9시에 참석한다.';
+const opening = route(openingAction, { savePatch: {
+  turnNumber: 0,
+  world: { date: '1285-03-01', weekday: '월요일', time: '08:40', location: '루멘시아 아카데미 대강당 앞' },
+  pc: { name: 'Ari', department: '기사과 1학년', status: '입학식 전', skills: {}, skillCandidates: {} },
+  sceneRuntime: { participants: [] },
+  scheduledEvents: [entranceEvent],
+  scheduleContext: {
+    due: [], upcoming: [entranceEvent],
+    npc_schedule: {
+      emily: { commitment: '09:00 환영사', area: '대강당', confidence: 'fixed' },
+      lena: { commitment: '09:00 입학식 참석', area: '대강당 일대', confidence: 'fixed' },
+    },
+  },
+} });
+assert.equal(opening.telemetry.profile, 'scheduled-18k-v154', 'an explicitly requested major upcoming event must receive scheduled scene space');
+assert.deepEqual(opening.telemetry.selected_npcs, ['emily', 'lena'], 'the requested event participants must become canonical scene context');
+assert.equal(opening.telemetry.event_director_v2?.result, 'REQUESTED_SCHEDULE_FIXED_FLOW', 'the requested event must outrank a random routine encounter');
+assert.match(opening.params.instructions, /Emily leads the academy/);
+assert.match(opening.params.instructions, /Lena is the incoming student representative/);
+assert.doesNotMatch(opening.params.instructions, /11\. 플레이어 주권|선택 가능한 환경만 제시/, 'the obsolete report-only sovereignty block must be consolidated into the hard authority contract');
+assert.match(opening.params.input, /"participants":\["emily","lena"\]/);
+assert.match(opening.params.input, /SCHEDULED_START_OFFSET=20min/);
+assert.doesNotMatch(opening.params.input, /SCHEDULE_BOUNDARY=20min/, 'attending the requested entrance ceremony must not stop before that same ceremony');
+assert.match(rendererSource, /sendAction\('게임을 시작한다\. 입학식에 오전 9시에 참석한다\.'\)/, 'the first-scene button must express event attendance rather than ask for an 08:40 state report');
 
 const reactionScene = Array.from({ length: 8 }, (_, index) => ({
   kind: index % 2 ? 'dialogue' : 'narration',

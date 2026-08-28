@@ -27,9 +27,9 @@ assert.match(novelContract, /관계·갈등·이상·중요 정보\/판단·전�
 assert.match(novelContract, /직전 행동·NPC goal·관계·active thread·세계 상태/);
 assert.match(novelContract, /scene_title은 위치·시간·참여자·목적·사건이 전환될 때만/);
 assert.match(routerRules, /USER ACTION 원문 전체의 긍정형 완료 의도와 구체적 제한을 최우선/);
-assert.match(routerRules, /중요 interruption이나 새 선택 없이 완료할 수 있는 결정 가치 없는 중간 단계/);
-assert.match(routerRules, /다시 묻지 말고 의도한 결과까지 진행/);
-assert.match(routerRules, /부정·가정·질문으로만 언급한 행동은 실행하지 않는다/);
+assert.match(routerRules, /이는 세계의 STOP 규칙이 아니다/);
+assert.match(routerRules, /결정 가치 없는 중간 단계는 다시 묻지 않고 완료/);
+assert.match(routerRules, /부정·가정·질문만인 행동은 실행하지 않는다/);
 assert.ok(routerRules.length + novelContract.length <= 5321, 'consolidated production narrative/style instructions must not exceed the pre-PR09 footprint');
 assert.doesNotMatch(context, /generic prose scoring|sentence rhythm validator|sensory-detail quota|subtext parser/i);
 

@@ -442,7 +442,7 @@ function appendWelcome() {
   const btn = document.createElement('button');
   btn.className = 'start-btn';
   btn.textContent = '첫 장면 시작';
-  btn.addEventListener('click', () => sendAction(`게임을 시작한다. 입학식 당일 오전 8시 40분, 대강당 앞의 현재 장면을 열어라. ${save.pc.name}의 행동이나 대사는 대신 정하지 마라.`));
+  btn.addEventListener('click', () => sendAction('게임을 시작한다. 입학식에 오전 9시에 참석한다.'));
   box.append(btn);
   story.append(box);
 }
