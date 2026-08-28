@@ -110,9 +110,9 @@ const runtime=fs.readFileSync(new URL('../../app-runtime.js',import.meta.url),'u
 assert.match(router,/deriveSceneNovelty/);
 assert.match(router,/scene_novelty_v1:true/);
 assert.match(router,/novelty,scene_delta:sceneDelta/);
-assert.match(context,/buildSceneNoveltyDirective/);
+assert.doesNotMatch(context,/buildSceneNoveltyDirective/,'novelty telemetry must remain deterministic without becoming writer-facing prose control');
 assert.match(noveltySource,/classifySceneIntent\(rawAction,\{location:saveState\?\.world\?\.location\|\|'',currentTime:saveState\?\.world\?\.time\|\|''/,'novelty intent classification must receive the canonical current time');
-assert.match(context,/DETERMINISTIC SCENE NOVELTY V1/);
+assert.doesNotMatch(context,/DETERMINISTIC SCENE NOVELTY V1/,'the Novel Director Diet must move novelty principles from generation prompt to acceptance/runtime telemetry');
 assert.doesNotMatch(context,/actionTextLimit=noveltyDirective/,'novelty context must not independently truncate a user action already covered by the routed input budget');
 assert.match(health,/sceneNovelty:/);
 assert.match(runtime,/save\.sceneRuntime = \{ \.\.\.\(save\.sceneRuntime \|\| \{\}\), \.\.\.runtime\.scene_runtime \}/,'the stable runtime must persist bounded novelty inside the existing sceneRuntime root');

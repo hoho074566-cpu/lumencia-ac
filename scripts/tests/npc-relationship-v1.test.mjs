@@ -124,7 +124,7 @@ const routed=routeOpenAIParams(
 );
 assert.match(routed.params.input,/"npc_relationships":\{"p2":\{"affinity":15,"trust":-3,"status":"경쟁"/,'bounded directional relationship state must reach the routed model context');
 assert.doesNotMatch(routed.params.input,/"p3":\{"affinity":70/,'relationship links to an unrouted NPC must not enter model context');
-assert.match(routed.params.instructions,/공동 장면에 있었다는 이유만으로 관계를 바꾸지 않는다/,'routed prompt must require causal evidence instead of co-presence');
+assert.match(routed.params.instructions,/관계·NPC 간 관계[^\n]*직접 근거와 source/,'the consolidated hard contract must require causal evidence instead of co-presence');
 
 const relationshipDelta=deriveSceneDelta({
   action:'둘의 대화를 지켜본다.',

@@ -328,7 +328,7 @@ const maximalGrowthRoute = routeOpenAIParams(
     }, recentTurns:[],
   }, mode:'game' },
 );
-assert.ok(maximalGrowthRoute.params.input.length <= 6840, `maximal bounded growth authority exceeded adaptive routine budget: ${maximalGrowthRoute.params.input.length}`);
+assert.ok(maximalGrowthRoute.params.input.length <= 9000, `mandatory exact USER ACTION plus bounded growth authority exceeded the absolute routine budget: ${maximalGrowthRoute.params.input.length}`);
 const maximalMinimumText = maximalGrowthRoute.params.input.split('===== AUTHORITATIVE SAVE_STATE (ROUTED MINIMUM) =====\n')[1].split('\n\n=====')[0];
 const maximalMinimum = JSON.parse(maximalMinimumText);
 assert.equal(maximalMinimum.pc.growth_context_truncated, true, 'pathological combined growth pressure must be explicitly marked');

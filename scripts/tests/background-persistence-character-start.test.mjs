@@ -68,10 +68,10 @@ const route=(generated)=>routeOpenAIParams(
 const commonerRoute=route(commoner),nobleRoute=route(noble);
 for(const [r,generated] of [[commonerRoute,commoner],[nobleRoute,noble]]){
   const background=generated.creation.fateStart.background;
-  assert.match(r.params.input,/===== FATE BACKGROUND PERSISTENCE V1 =====/,'character-dependent background directive must reach normal gameplay');
-  assert.match(r.params.instructions,/PUBLIC만 NPC 기본 지식/,'visibility authority must be a routed GM rule');
-  assert.match(r.params.instructions,/NPC 성격 × NPC가 실제 아는 PC 배경 × 현재 상황 × 기대/,'first-impression calculation contract is missing');
-  assert.match(r.params.instructions,/일반 초보 절차를 끝까지 반복 강요하지 않고/,'strength-aware evaluation contract is missing');
+  assert.doesNotMatch(r.params.input,/===== FATE BACKGROUND PERSISTENCE V1 =====/,'background facts must not reintroduce a writer-facing narrative checklist');
+  assert.match(r.params.instructions,/PUBLIC만 기본 지식/,'visibility authority must remain a routed hard invariant');
+  assert.match(r.params.input,/"characterBackground":/,'character-dependent background facts must reach normal gameplay as data');
+  assert.match(r.params.input,/"evaluation_mode":|"evaluationMode":/,'the existing strength-aware evaluation fact must remain available without prose micromanagement');
   for(const hidden of background.facts.filter(row=>['PRIVATE','SECRET'].includes(row.visibility)))assert.equal(r.params.input.includes(hidden.fact),false,`${hidden.visibility} background leaked into routed gameplay`);
   assert.equal(r.params.input.includes(generated.pc.characterSetting),false,'full Origin Story must not bypass background visibility through PC state');
   assert.ok(r.params.input.length<=9000,`background routing exceeded the stable routine budget: ${r.params.input.length}`);

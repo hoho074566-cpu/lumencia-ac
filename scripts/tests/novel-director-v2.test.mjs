@@ -11,47 +11,40 @@ const rendererSource = readFileSync('app.js', 'utf8');
 const hardContract = source.match(/const ROUTER_GM_RULES = String\.raw`([\s\S]*?)`;/)?.[1] || '';
 const novelContract = source.match(/const NATURAL_STYLE = String\.raw`([\s\S]*?)`;/)?.[1] || '';
 const combatContract = source.match(/const COMBAT_RULE = String\.raw`([\s\S]*?)`;/)?.[1] || '';
-const previousCombinedFootprint = 5254;
+const previousCombinedFootprint = 4246;
 
 assert.ok(hardContract && novelContract, 'the routed hard and narrative contracts must both exist');
 assert.ok(
-  hardContract.length + novelContract.length <= previousCombinedFootprint - 1000,
-  'Novel Director V2 must replace/consolidate prompt rules and save at least 1,000 chars',
+  hardContract.length + novelContract.length <= 2300,
+  'Novel Director Diet must cut the prior 4k contract nearly in half without dropping hard facts',
 );
-assert.equal((novelContract.match(/IMPORTANT SCENE: DEPTH > DISTANCE/g) || []).length, 1);
 for (const marker of [
-  'SCENE WRITER / WORLD ACTOR',
-  '비가시 composition 메타',
-  'narrator moral',
-  '한 active Scene/한 schedule occurrence',
-  'Scene Completion은 다음 일정 소비가 아니다',
-  'ROUTINE: DISTANCE > DEPTH',
-  '사건 quota는 없다',
-  'User Specificity',
-  'hard interruption',
-  'ordered sequence',
-  '같은 NPC도 여러 beat',
-  '미리 요약하거나 재해설하지 않는다',
-  'CHARACTER MUST SURVIVE FUNCTION',
-  '현재 순간에 필요한 만큼만',
-  '서로 끼어들고 반박',
-  'canonical power gap',
-  'Failure의 손실은 Story State',
-  'later schedule/event로 점프하지 않는다',
-  'HARD_DECISION',
-  'generic NPC 질문/choices',
+  'serialized fantasy novel',
+  'not an RPG turn report',
+  'natural stopping point',
+  'Compress routine process',
+  'ordinary execution of the action',
+  'never invent a new player intention',
+  'immutable',
+  'Do not explain a beat before playing it',
+  'control composition only',
+  'Never paraphrase them as character dialogue',
 ]) assert.match(novelContract, new RegExp(marker));
+for (const removedMicromanagement of [
+  'Reaction Field', 'Subtext', 'Conversation in Motion', 'Progressive Attrition', 'CHARACTER MUST SURVIVE FUNCTION',
+  'DEPTH > DISTANCE', 'HARD_DECISION', 'physical opening', 'gesture/silence/reaction', 'Failure의 손실은 Story State',
+]) assert.doesNotMatch(novelContract, new RegExp(removedMicromanagement));
 
 for (const hardBoundary of [
-  'USER ACTION 원문 전체',
+  'USER ACTION은 사용자가 이미 고른 행동',
+  '일상적 신체 동작·필요한 이동·즉각 결과',
+  '새로운 PC 의도·목표·대사·감정',
   'AUTHORITATIVE SAVE_STATE',
-  '날짜·계절·학년·학사 단계',
-  'PUBLIC만 NPC 기본 지식',
-  'state_delta에는 실제 변화만',
-  '작은 변화는 점진적으로 누적',
-  'event_progress는 현재 논리적 이벤트 occurrence',
-  '짧은 영문 소문자 ID',
-  'NPC significance',
+  '날짜·계절·학년·학기·졸업·장기 progression',
+  'PUBLIC만 기본 지식',
+  'state_delta에는 실제 발생한 변화만',
+  'event_progress는 현재 occurrence',
+  '실제로 새로운 PC 결정을 요구',
 ]) assert.match(hardContract, new RegExp(hardBoundary));
 assert.match(combatContract, /심리/, 'combat verdict must retain established psychological state');
 
@@ -148,30 +141,27 @@ const broad = route(broadAction);
 assert.equal(broad.telemetry.enabled, true);
 assert.ok(broad.params.input.includes(broadAction), 'broad USER ACTION must survive routing unchanged');
 assert.match(broad.params.instructions, /NOVEL DIRECTOR V2/);
-assert.match(broad.params.instructions, /IMPORTANT SCENE: DEPTH > DISTANCE/);
-assert.match(broad.params.instructions, /Director 규칙은 비가시 composition 메타/);
-assert.match(broad.params.instructions, /학년·학사 단계/);
+assert.match(broad.params.instructions, /serialized fantasy novel/);
+assert.match(broad.params.instructions, /날짜·계절·학년·학기·졸업·장기 progression/);
 assert.match(broad.params.input, /"date":"1285-03-02"/);
 assert.match(broad.params.input, /"department":"기사과 1학년"/);
 assert.match(broad.params.input, /"status":"초기 기량평가 직후"/);
-assert.match(broad.params.input, /ROLE=SCENE_WRITER/);
-assert.match(broad.params.input, /POLICY≠FICTION/);
-assert.match(broad.params.input, /DEPTH>DISTANCE;ONE_ACTIVE_SCENE/);
-assert.match(broad.params.input, /HARD_DECISION_ONLY/);
-assert.doesNotMatch(broad.params.input, /EXIT_TARGET 뒤의 첫 판단점|EXIT_TARGET 뒤에 실제 판단/);
-assert.ok(
-  broad.params.input.lastIndexOf('ROLE=SCENE_WRITER') > broad.params.input.lastIndexOf('===== STRONGER TURN HOOK V1 ====='),
-  'the final action-adjacent authority must resolve late Exit/Hook pressure in favor of depth and the fiction firewall',
-);
+assert.match(broad.params.input, /===== HARD EXECUTION FACTS \(DATA, NOT FICTION\) =====/);
+assert.ok(broad.params.input.endsWith(`===== USER ACTION (EXACT) =====\n${broadAction}`), 'USER ACTION must be the exact final block');
+for (const removedRuntimeBlock of [
+  'MULTI-SYSTEM SCENE ORCHESTRATION', 'SCENE MOMENTUM HF1', 'DETERMINISTIC SCENE NOVELTY',
+  'SCENE PURPOSE V1', 'EXPLICIT SCENE EXIT CONDITION', 'STRONGER TURN HOOK',
+  'GM EVENT DIRECTOR (ROUTED)', 'EVENT DIRECTOR V2.1 (ROUTED)',
+]) assert.doesNotMatch(broad.params.input, new RegExp(removedRuntimeBlock));
 
 const restrictedAction = '문 앞에서 안쪽 소리만 듣는다. 문은 열지 않고 안으로 들어가지 않는다.';
 const restricted = route(restrictedAction);
 assert.ok(restricted.params.input.includes(restrictedAction), 'specific USER restriction must survive routing unchanged');
-assert.match(restricted.params.instructions, /명시한 금지·거리·목적지·완료 조건은 넘지 않/);
+assert.ok(restricted.params.input.endsWith(restrictedAction));
 
 const routineTransition = route('입학식 뒤 기숙사로 이동한다.');
-assert.match(routineTransition.params.input, /ROUTINE→SCENE_THRESHOLD/);
-assert.match(routineTransition.params.input, /else choices=\[\]/);
+assert.match(routineTransition.params.input, /"intent_kind":"travel"/);
+assert.doesNotMatch(routineTransition.params.input, /ROUTINE→SCENE_THRESHOLD|HARD_DECISION_ONLY/);
 
 const entranceEvent = {
   id: 'entrance_ceremony', title: '입학식', date: '1285-03-01', time: '09:00',
@@ -209,9 +199,25 @@ assert.doesNotMatch(opening.params.instructions, /Elena collision|Serena collisi
 assert.doesNotMatch(opening.params.instructions, /11\. 플레이어 주권|선택 가능한 환경만 제시/, 'the obsolete report-only sovereignty block must be consolidated into the hard authority contract');
 assert.doesNotMatch(opening.params.input, /===== CHARACTER-DRIVEN NPC BEHAVIOR V1 =====/, 'fresh NPCs with no goal, relationship, emotion, memory, or judgment must not spend context on empty profiles');
 assert.match(opening.params.input, /"participants":\["emily","lena"\]/);
-assert.match(opening.params.input, /SCHEDULED_START_OFFSET=20min/);
-assert.doesNotMatch(opening.params.input, /SCHEDULE_BOUNDARY=20min/, 'attending the requested entrance ceremony must not stop before that same ceremony');
+assert.match(opening.params.input, /"scheduled_start_offset_minutes":20/);
+assert.doesNotMatch(opening.params.input, /"schedule_boundary_minutes":20(?:,|})/, 'attending the requested entrance ceremony must not stop before that same ceremony');
 assert.doesNotMatch(opening.params.input, /knight_orientation|기사과 1학년 오리엔테이션/, 'later schedule items must remain boundaries outside the active requested scene instead of becoming narrative tasks');
+
+const deepCurrentScene = route('강당의 반응을 지켜본다.', { savePatch: {
+  world: { date: '1285-03-01', weekday: '월요일', time: '09:05', location: '루멘시아 아카데미 대강당' },
+  sceneRuntime: { participants: ['emily', 'lena'] },
+  scheduledEvents: [laterOrientationEvent],
+  scheduleContext: { due: [], upcoming: [laterOrientationEvent] },
+} });
+assert.doesNotMatch(deepCurrentScene.params.input, /knight_orientation|기사과 1학년 오리엔테이션/, 'an unrelated future schedule must not pull an active important scene into distance-first reporting');
+
+const waitForOrientation = route('정오 오리엔테이션까지 기다린다.', { savePatch: {
+  world: { date: '1285-03-01', weekday: '월요일', time: '10:00', location: '1학년 A동 기숙사' },
+  sceneRuntime: { participants: [] },
+  scheduledEvents: [laterOrientationEvent],
+  scheduleContext: { due: [], upcoming: [laterOrientationEvent] },
+} });
+assert.match(waitForOrientation.params.input, /"schedule_boundary_minutes":120/, 'an already-chosen wait intent must retain its next hard schedule boundary without duplicating administrative content');
 
 const mentorBoundary = {
   id: 'mentor_meeting', title: '에밀리와 사전 면담', date: '1285-03-01', time: '09:30',
@@ -232,7 +238,7 @@ const boundedRequestedClass = route('이사벨과 10시에 기사과 기초 수�
   scheduleContext: { due: [], upcoming: [mentorBoundary, requestedClass, afterClass] },
 } });
 assert.deepEqual(boundedRequestedClass.telemetry.selected_npcs.slice(0, 2), ['isabel', 'emily'], 'explicit USER ACTION and the immediate boundary participant must outrank requested-event bulk participants');
-assert.match(boundedRequestedClass.params.input, /SCHEDULE_BOUNDARY=30min/, 'the earlier PC appointment must remain the deterministic stop boundary');
+assert.match(boundedRequestedClass.params.input, /"schedule_boundary_minutes":30/, 'the earlier PC appointment must remain the deterministic stop boundary');
 assert.match(boundedRequestedClass.params.input, /mentor_meeting/);
 assert.match(boundedRequestedClass.params.input, /본관 응접실/);
 assert.match(boundedRequestedClass.params.input, /"participants":\["emily"\]/, 'the intervening boundary participant must retain routed character authority');
@@ -254,9 +260,10 @@ const seraCharacterSignal = route('세라와 함께 기숙사 복도를 걷는�
   emotionStates: { sera: { current: 'wary', intensity: 0.4, reason: '아직 서로를 잘 모른다.' } },
   memories: { npc: { sera: [{ type: 'observer', subject: 'pc', fact: '복도에서 먼저 거리를 지켰다.', turn: 11, confidence: 0.7, source: '직접 목격' }] } },
 } });
-assert.match(seraCharacterSignal.params.input, /===== CHARACTER-DRIVEN NPC BEHAVIOR V1 =====/);
+assert.match(seraCharacterSignal.params.input, /===== ACTIVE NPC SIGNAL \(READ-ONLY FACTS\) =====/);
 assert.match(seraCharacterSignal.params.input, /자기 짐과 장비를 확인한다/);
 assert.match(seraCharacterSignal.params.input, /손익을 먼저 재는 현실주의자/);
+assert.doesNotMatch(seraCharacterSignal.params.input, /같은 유형의 수행은 횟수만 세지 말고|내부 감정을 대사로 그대로 읽지 않는다/);
 
 const unseenGeneralization = route('미라벨과 온실 옆 약초 건조실에서 표본 상태를 기다리며 대화한다.', { savePatch: {
   world: { date: '1285-03-08', time: '16:20', location: '신학부 약초 건조실' },
@@ -269,7 +276,7 @@ const unseenGeneralization = route('미라벨과 온실 옆 약초 건조실에�
 assert.deepEqual(unseenGeneralization.telemetry.selected_npcs, ['mirabelle'], 'a non-reference location and NPC must route from current canonical relevance');
 assert.match(unseenGeneralization.params.instructions, /Mirabelle is a theology student/);
 assert.match(unseenGeneralization.params.input, /변색된 약초 표본/);
-assert.match(unseenGeneralization.params.input, /DEPTH>DISTANCE;ONE_ACTIVE_SCENE/);
+assert.match(unseenGeneralization.params.input, /ACTIVE NPC SIGNAL/);
 assert.doesNotMatch(unseenGeneralization.params.input, /Sera|Lena|Emily|기숙사|입학식/, 'unseen composition must not inherit reference-scene content templates');
 
 const dormCandidates = ['lillia(릴리아)', 'laris(라리스)', 'sera(세라)', 'isabel(이사벨)']
@@ -327,14 +334,14 @@ const withRecentReactions = route('입학식 연설이 끝날 때까지 지켜�
   recentTurns: [{ action: '연설을 듣는다.', summary: '강당의 반응이 변했다.', importance: 'important', scene: reactionScene }],
 });
 const recentContext = withRecentReactions.params.input
-  .split('===== RECENT SCENE/REACTION CONTEXT =====\n')[1]
-  ?.split('\n\n===== CURRENT NPC/SCENE RUNTIME =====')[0] || '';
-assert.match(withRecentReactions.params.input, /===== RECENT SCENE\/REACTION CONTEXT =====/);
+  .split('===== RECENT SCENE CONTEXT =====\n')[1]
+  ?.split(/\n\n===== (?:ACTIVE NPC SIGNAL|CURRENT SCENE FACTS)/)[0] || '';
+assert.match(withRecentReactions.params.input, /===== RECENT SCENE CONTEXT =====/);
 assert.match(recentContext, /recent-reaction-beat-3/);
 assert.match(recentContext, /recent-reaction-beat-8/);
 assert.doesNotMatch(recentContext, /recent-reaction-beat-[12](?!\d)/, 'latest scene context must retain six ordered beats rather than the former final three');
 assert.ok(
-  withRecentReactions.params.input.indexOf('===== RECENT SCENE/REACTION CONTEXT =====') < withRecentReactions.params.input.indexOf('===== AUTHORITATIVE SAVE_STATE (ROUTED DETAIL) ====='),
+  withRecentReactions.params.input.indexOf('===== RECENT SCENE CONTEXT =====') < withRecentReactions.params.input.indexOf('===== AUTHORITATIVE SAVE_STATE (ROUTED DETAIL) ====='),
   'recent reaction context must survive optional-context tail truncation ahead of detailed save data',
 );
 
@@ -345,4 +352,4 @@ assert.match(rendererSource, /for \(const item of turn\.scene \|\| \[\]\)/, 'ren
 assert.equal((adapter.match(/coreHandler\(/g) || []).length, 1, 'Novel Director V2 must keep one canonical model call');
 assert.doesNotMatch(source, /novelDirectorState|novel_director_receipt|prose_score|subtext_state/i, 'V2 must not add a narrative engine or persistence lifecycle');
 
-console.log(`PASS Novel Director V2 lean AI contract (${previousCombinedFootprint} -> ${hardContract.length + novelContract.length} chars), USER ACTION safety, and one-call architecture`);
+console.log(`PASS Novel Director Diet / Reset (${previousCombinedFootprint} -> ${hardContract.length + novelContract.length} chars), no runtime scene checklist, USER ACTION safety, and one-call architecture`);
