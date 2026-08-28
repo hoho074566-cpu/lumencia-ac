@@ -16,14 +16,14 @@ Narrative Phase 1 **FROZEN**. Phase 2 Implementation Pass is **COMPLETE** with `
 
 - PR #82 STAB-01 is merged at reviewed head `d589f7939a1296d966eeb46fc7c5174f8b9a00a2`; merge/latest main is `89fbc5b94d74a3e1927615993e5c7da88b84a4ff`.
 - PR #83 is terminal **BLOCKED** at `f0bef9f59ef60274b170cc8bbae2a92c62bb60a7`. No modification, merge, rebase, cherry-pick, reuse, or continued stabilization is allowed.
-- Fresh branch `codex/stab-02r-canonical-meta-next-life` was created directly from main `89fbc5b94d74a3e1927615993e5c7da88b84a4ff`; published code checkpoint `ce532350457aba91a890f877bb2cccff964bfed2`. No #83 code or deferred branch was reused.
+- Fresh PR #84 on `codex/stab-02r-canonical-meta-next-life` was created directly from main `89fbc5b94d74a3e1927615993e5c7da88b84a4ff`; current published code checkpoint `133c553ef1b61b4752b07834b48850573b4e3ca7`. No #83 code or deferred branch was reused.
 - Canonical authority: immutable historical Ending earned receipts + immutable historical Inheritance spent receipts. Current registries/allowlists gate only new actions; historical accounting survives rename, retirement, or target removal. Applied run inheritance must reference a matching committed receipt.
-- Integrity: equality/subset/safe-superset import only; divergent branches, malformed/orphaned receipt-benefit pairs, and `spent > earned` fail closed before mutation. Web Lock serialization and a local recovery journal bind validation → receipt persistence → run application and prevent same-device double spend.
+- Integrity: equality/subset/safe-superset import only; divergent branches, malformed/orphaned receipt-benefit pairs, and `spent > earned` fail closed before mutation. One shared Web Lock covers canonical Ending writes, purchase, recovery load, and import; each re-reads current storage before mutation, while export never writes stale in-memory meta. The recovery journal binds validation → receipt persistence → run application and prevents same-device double spend or receipt/benefit skew.
 - Runtime scope: progressive Stats/Talents/Starting Resources, Fate Affinity, Origin reroll, Region/Occupation lock with explicit compatibility rejection, receipt-backed Next Life, and post-application Realm/Circle recalculation. Realm/Circle direct purchase is absent.
 - Validation PASS: focused `fate-meta-next-life`, STAB-01 Ending/dedupe, Fate Start/Origin/Background/Personal Story, free/paste creation, long USER ACTION/authority-tail/context-pressure, CONTINUE/core, syntax/static, `git diff --check`, service-worker regression, and full `scripts/lumensia-pr-check.mjs`.
 - Architecture: no generic meta engine, distributed ledger, CRDT, generic transaction/conflict framework, parser, lifecycle, model call, or narrative/deferred-PR correction. One canonical call, routing/cache/canon/player-authority contracts unchanged.
-- MERGE_GATE: **FAIL pending** final docs commit, publish/new PR, Safety, Vercel, fresh exact-head P0=0/P1=0, and repository integrity. Protected paths remain human-merge-only.
-- NEXT ACTION: commit the final docs checkpoint, publish/open STAB-02R, run hosted gates and fresh exact-head review, then report the exact head for human merge only if every gate passes.
+- MERGE_GATE: **FAIL pending** publication of this final docs checkpoint, new exact-head Safety, Vercel, fresh P0=0/P1=0, and repository integrity. Earlier PR #84 hosted results are prior-head evidence only. Protected paths remain human-merge-only.
+- NEXT ACTION: publish the final docs checkpoint to PR #84, run new exact-head hosted gates and fresh review, then report that exact head for human merge only if every gate passes.
 
 ## PHASE 2 STABILIZATION PASS — SUPERSEDED STAB-01 SNAPSHOT
 
@@ -744,5 +744,5 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 
 1. PR #82 STAB-01 is merged and verified at latest main `89fbc5b94d74a3e1927615993e5c7da88b84a4ff`; do not reimplement it.
 2. PR #83 is terminal BLOCKED at `f0bef9f59ef60274b170cc8bbae2a92c62bb60a7`; do not modify, merge, rebase, cherry-pick, reuse, or continue that branch.
-3. Continue only fresh STAB-02R branch `codex/stab-02r-canonical-meta-next-life` from published code checkpoint `ce532350457aba91a890f877bb2cccff964bfed2`: publish this final docs checkpoint, open the new PR, then require Safety, Vercel, and fresh exact-head P0=0/P1=0.
+3. Continue only fresh STAB-02R PR #84 on `codex/stab-02r-canonical-meta-next-life` from published code checkpoint `133c553ef1b61b4752b07834b48850573b4e3ca7`: publish this final docs checkpoint, then require new exact-head Safety, Vercel, and fresh P0=0/P1=0.
 4. If every hosted/integrity gate passes, report the exact STAB-02R head for human merge; do not merge automatically. Keep PR #76/#79/#83, PR #66/#68/#69/#78, and obsolete/superseded PR #72 untouched.
