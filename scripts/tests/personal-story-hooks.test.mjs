@@ -94,7 +94,8 @@ const routed=routeOpenAIParams(
   {instructions,input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}'},
   {incoming:{action:'북부에서 온 학생과 고향 이야기를 나눈다.',saveState:{...baseSave,sceneRuntime:{participants:['guide']}},recentTurns:[]},mode:'game'},
 );
-assert.match(routed.params.input,/===== PERSONAL STORY HOOKS V1 =====/,'personal story candidates must reach normal gameplay context');
+assert.doesNotMatch(routed.params.input,/===== PERSONAL STORY HOOKS V1 =====/,'personal story facts must not reintroduce a writer-facing narrative checklist');
+assert.match(routed.params.input,/"characterPersonalStory":/,'personal story candidates must reach normal gameplay as bounded data');
 assert.match(routed.params.input,/PC_ORIGIN_PLOT/,'the routed context must preserve all three story-layer contracts');
 assert.equal(routed.telemetry.personal_story_v1?.candidate_count,3,'router telemetry must expose only the bounded candidate count');
 for(const hidden of commoner.creation.fateStart.personalStory.hooks.filter((row)=>['PRIVATE','SECRET'].includes(row.visibility))){

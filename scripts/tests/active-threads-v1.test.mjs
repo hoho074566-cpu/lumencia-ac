@@ -36,6 +36,7 @@ const save = (patch = {}) => ({
   assert.equal(threads[0].player_owned, true, 'an awaiting-player boundary must remain the top active thread');
   assert.equal(threads[1].id, 'event:sealed_archive#12', 'the current event must remain ahead of schedules and background work');
   assert.equal(threads[2].id, 'schedule:class:10', 'a due schedule must be retained as a hard boundary');
+  assert.doesNotMatch(JSON.stringify(threads), /choose_seal/, 'semantic event checkpoints must stay private to the internal ledger');
   assert.equal(JSON.stringify(before), snapshot, 'deriving active threads must never mutate authoritative save state');
   const auto = buildActiveThreadsDirective({ action: '[AUTO FLOW: PC 새 행동 없음]', saveState: before, mode: 'auto' });
   assert.equal(auto.mode, 'await-player', 'AUTO must fail closed at a player-owned active thread');
@@ -70,6 +71,7 @@ const save = (patch = {}) => ({
   });
   const threads = deriveActiveThreads({ saveState: lifecycleSave });
   assert.ok(threads.some((thread) => thread.id === 'event:paused-archive#7' && thread.status === 'paused'), 'a paused occurrence ledger entry must remain resumable continuity authority');
+  assert.doesNotMatch(JSON.stringify(threads), /return_to_archive/, 'paused semantic checkpoint names must not become Writer continuity titles');
   assert.ok(!threads.some((thread) => /finished-schedule|이미 끝난/.test(`${thread.id} ${thread.title}`)), 'completed event authority must suppress stale active, world, and schedule threads');
 
   const completedPause = deriveActiveThreads({ saveState: save({
@@ -129,7 +131,8 @@ guide=가이드
 `;
 const input = '===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}';
 const routed = routeOpenAIParams({ instructions, input }, { incoming: { action: '주변을 살펴본다.', saveState: save({ activeEvents: ['입학식 준비'] }), recentTurns: [] }, mode: 'game' });
-assert.match(routed.params.input, /===== ACTIVE THREADS V1 =====/, 'the derived view must reach the existing canonical model context');
+assert.match(routed.params.input, /===== RELEVANT CONTINUITY THREADS =====/, 'the relevant derived facts must reach the canonical model context');
+assert.doesNotMatch(routed.params.input, /ACTIVE THREADS V1 — DERIVED READ-ONLY VIEW|player_owned\/awaiting-player는/, 'thread data must not carry its generation checklist into runtime prose');
 assert.equal(routed.telemetry.active_threads_v1?.version, '1.0', 'router telemetry must expose the active-thread version');
 assert.equal(routed.telemetry.active_threads_v1?.count, 1, 'router telemetry must report the bounded thread count');
 

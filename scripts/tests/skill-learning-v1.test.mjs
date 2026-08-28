@@ -347,7 +347,7 @@ const pressureRouted = routeOpenAIParams(
     recentTurns: [],
   }, mode: 'game' },
 );
-assert.ok(pressureRouted.params.input.length <= 6840, `maximal bounded learning context exceeded adaptive routine budget: ${pressureRouted.params.input.length}`);
+assert.ok(pressureRouted.params.input.length <= 9000, `mandatory exact USER ACTION plus bounded learning authority exceeded the absolute routine budget: ${pressureRouted.params.input.length}`);
 const pressureMinimumText = pressureRouted.params.input.split('===== AUTHORITATIVE SAVE_STATE (ROUTED MINIMUM) =====\n')[1].split('\n\n=====')[0];
 const pressureMinimum = JSON.parse(pressureMinimumText);
 assert.equal(Object.keys(pressureMinimum.pc.skills).length, 24, 'mandatory learning authority must retain the bounded existing skill-name set');

@@ -297,7 +297,7 @@ const relevantAbilityRoute = routeOpenAIParams(
   }, mode:'game' },
 );
 const relevantAbilityMinimum = JSON.parse(relevantAbilityRoute.params.input.split('===== AUTHORITATIVE SAVE_STATE (ROUTED MINIMUM) =====\n')[1].split('\n\n=====')[0]);
-const relevantAbilityDetail = JSON.parse(relevantAbilityRoute.params.input.split('===== AUTHORITATIVE SAVE_STATE (ROUTED DETAIL) =====\n')[1].split('\n\n===== ROLLING SUMMARY TAIL =====')[0]);
+const relevantAbilityDetail = JSON.parse(relevantAbilityRoute.params.input.split('===== AUTHORITATIVE SAVE_STATE (ROUTED DETAIL) =====\n')[1].split('\n\n=====')[0]);
 assert.equal(relevantAbilityMinimum.pc.traits[directlyMentionedOverflowTrait], true, 'a directly invoked Trait beyond the first eight must survive minimum routing');
 assert.equal(relevantAbilityMinimum.pc.authorities[directlyMentionedOverflowAuthority], true, 'a directly invoked Authority beyond the first eight must survive minimum routing');
 assert.equal(relevantAbilityDetail.pc.traits[directlyMentionedOverflowTrait].description, '특성 정의 9', 'directly relevant Trait definition must survive detail routing');
@@ -328,7 +328,7 @@ const maximalGrowthRoute = routeOpenAIParams(
     }, recentTurns:[],
   }, mode:'game' },
 );
-assert.ok(maximalGrowthRoute.params.input.length <= 6840, `maximal bounded growth authority exceeded adaptive routine budget: ${maximalGrowthRoute.params.input.length}`);
+assert.ok(maximalGrowthRoute.params.input.length <= 9000, `mandatory exact USER ACTION plus bounded growth authority exceeded the absolute routine budget: ${maximalGrowthRoute.params.input.length}`);
 const maximalMinimumText = maximalGrowthRoute.params.input.split('===== AUTHORITATIVE SAVE_STATE (ROUTED MINIMUM) =====\n')[1].split('\n\n=====')[0];
 const maximalMinimum = JSON.parse(maximalMinimumText);
 assert.equal(maximalMinimum.pc.growth_context_truncated, true, 'pathological combined growth pressure must be explicitly marked');

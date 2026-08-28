@@ -78,7 +78,7 @@ assert.equal(scheduleBoundary.trigger_minutes, 30);
 assert.ok(scheduleBoundary.suppressed.includes('present-npc-goal'), 'a reachable hard schedule must defer a competing NPC goal beat');
 const scheduleDirective = buildSceneOrchestrationDirective({ plan: scheduleBoundary });
 assert.match(scheduleDirective, /TRIGGER_MINUTES=30/);
-assert.match(scheduleDirective, /PRIMARY를 TRIGGER_MINUTES의 경계까지만 진행한 뒤 SECONDARY를 처리/,
+assert.match(scheduleDirective, /action-until-interruption은 TRIGGER_MINUTES까지만 진행/,
   'an interrupting boundary must cut off compressed primary action instead of waiting for its full completion');
 
 const resumedTimedScheduleBoundary=deriveSceneOrchestrationPlan({
@@ -104,7 +104,7 @@ const ownScheduledActivity=deriveSceneOrchestrationPlan({
   saveState:{world:{date:'1285-03-01',time:'09:00',location:'기숙사'},pc:{department:'기사과'},scheduleContext:{due:[],upcoming:[requestedClass]},scheduledEvents:[requestedClass],sceneRuntime:{}},
   directorTelemetry:{result:'NO_RANDOM_EVENT_DUE'},
 });
-assert.equal(ownScheduledActivity.secondary,'world-response','the orchestration layer must not reintroduce the requested class as its own interruption');
+assert.equal(ownScheduledActivity.secondary,'none','the orchestration layer must not reintroduce the requested class or a redundant world-response driver');
 assert.equal(ownScheduledActivity.trigger_minutes,null);
 
 const requestedConsult={id:'personal-consult',title:'개인 상담',kind:'personal',date:'1285-03-01',time:'10:00',status:'scheduled',participants:['emily']};
@@ -115,7 +115,7 @@ const namedScheduledActivity=deriveSceneOrchestrationPlan({
   directorTelemetry:{result:'DIRECT_USER_FOCUS'},
   registry:{emily:'에밀리'},
 });
-assert.equal(namedScheduledActivity.secondary,'world-response','canonical participant labels must keep a requested personal appointment out of schedule arbitration');
+assert.equal(namedScheduledActivity.secondary,'none','canonical participant labels must keep a requested personal appointment out of schedule arbitration and redundant drivers');
 assert.equal(namedScheduledActivity.trigger_minutes,null);
 
 const futureDateInterrupted=deriveSceneOrchestrationPlan({
@@ -140,8 +140,8 @@ const dueScheduleDoesNotFreezeAction = deriveSceneOrchestrationPlan({
   },
   directorTelemetry: { result: 'NO_RANDOM_EVENT_DUE' },
 });
-assert.equal(dueScheduleDoesNotFreezeAction.secondary, 'world-response',
-  'a due or overdue row is current context and must not become a new schedule interruption');
+assert.equal(dueScheduleDoesNotFreezeAction.secondary, 'none',
+  'a due or overdue row is current context and must not become a new schedule interruption or redundant driver');
 assert.equal(dueScheduleDoesNotFreezeAction.trigger_minutes, null,
   'a newly committed action must never receive a contradictory 0-minute hard stop from overdue context');
 
@@ -192,7 +192,7 @@ assert.match(directive, /PRIMARY=user-action/);
 assert.match(directive, /SECONDARY=present-npc-goal/);
 assert.match(directive, /MAX_DRIVERS=2/);
 assert.match(directive, /EFFECT_ONLY=relationship\|faction\|growth\|offscreen\|novelty/);
-assert.match(directive, /PC의 새 행동·대사·감정·생각·수락·거절·선택/);
+assert.match(directive, /HARD_DECISION.*종료용 NPC 질문은 금지/);
 assert.match(sceneOrchestrationActionFrame(presentGoal), /TURN_PLAN=user-action>present-npc-goal/);
 assert.match(sceneOrchestrationActionFrame(activeEvent), /BLOCK=director-event; EFFECT_ONLY/);
 
@@ -212,8 +212,8 @@ assert.deepEqual(observed.observed_axes, ['location', 'time', 'relationship', 'g
 assert.deepEqual(observed.effect_axes, ['relationship', 'growth']);
 assert.equal(observed.actual_delta_score, 4);
 
-assert.match(contextRouter, /MULTI-SYSTEM SCENE ORCHESTRATION V1/, 'the cross-system plan must live in reserved routed context');
-assert.match(contextRouter, /sceneOrchestrationActionFrame\(orchestration\)/, 'the final action frame must repeat the compact arbitration result after lower-priority authority blocks');
+assert.match(contextRouter, /deriveSceneOrchestrationPlan/, 'the cross-system plan must still provide deterministic routing telemetry');
+assert.doesNotMatch(contextRouter, /buildSceneOrchestrationDirective|sceneOrchestrationActionFrame\(orchestration\)/, 'the orchestration checklist must no longer supervise runtime prose');
 assert.match(contextRouter, /scene_orchestration:built\.orchestration/, 'route telemetry must expose the exact pre-response orchestration plan');
 assert.match(adapter, /deriveSceneOrchestrationState/, 'the stable adapter must persist bounded post-response orchestration evidence');
 assert.match(adapter, /orchestration:sceneOrchestration/, 'the compact orchestration state must remain inside the existing sceneRuntime root');
@@ -262,8 +262,9 @@ const routed = routeOpenAIParams(
 );
 assert.equal(routed.telemetry.adaptive_scale, .76);
 assert.ok(routed.params.input.length <= 6840, `orchestration authority exceeded the adaptive routine budget: ${routed.params.input.length}`);
-assert.match(routed.params.input, /===== MULTI-SYSTEM SCENE ORCHESTRATION V1 =====/);
-assert.match(routed.params.input, /TURN_PLAN=user-action>present-npc-goal/);
+assert.doesNotMatch(routed.params.input, /===== MULTI-SYSTEM SCENE ORCHESTRATION V1 =====|TURN_PLAN=/);
+assert.match(routed.params.input, /===== ACTIVE NPC SIGNAL \(READ-ONLY FACTS\) =====/);
+assert.match(routed.params.input, /신입생의 기본기를 확인한다/);
 assert.equal(routed.telemetry.scene_orchestration.primary, 'user-action');
 assert.equal(routed.telemetry.scene_orchestration.secondary, 'present-npc-goal');
 
@@ -275,7 +276,7 @@ const routedNamedAppointment=routeOpenAIParams(
     recentTurns:[],
   },mode:'game'},
 );
-assert.equal(routedNamedAppointment.telemetry.scene_orchestration.secondary,'world-response','the routed orchestration plan must receive canonical labels parsed from the registry');
+assert.equal(routedNamedAppointment.telemetry.scene_orchestration.secondary,'none','the routed orchestration plan must receive canonical labels without adding a redundant driver');
 assert.equal(routedNamedAppointment.telemetry.scene_orchestration.trigger_minutes,null,'the routed requested appointment must not become its own stop boundary');
 
 const suppressedDirector = routeOpenAIParams(
@@ -313,8 +314,8 @@ assert.equal(suppressedDirector.telemetry.event_director_v2.result, 'NPC_EVENT',
 assert.equal(suppressedDirector.telemetry.scene_orchestration.secondary, 'active-event');
 assert.ok(suppressedDirector.telemetry.scene_orchestration.suppressed.includes('director-event'));
 assert.ok(!suppressedDirector.telemetry.selected_npcs.includes('mirabelle'), 'a suppressed Director candidate must not displace active-event context selection');
-assert.match(suppressedDirector.params.input, /RESULT=SUPPRESSED_BY_SCENE_ORCHESTRATION/);
-assert.match(suppressedDirector.params.input, /BLOCK=director-event; EFFECT_ONLY/);
+assert.doesNotMatch(suppressedDirector.params.input, /RESULT=SUPPRESSED_BY_SCENE_ORCHESTRATION|BLOCK=director-event|EVENT DIRECTOR/);
+assert.match(suppressedDirector.params.input, /practice_duel/);
 assert.doesNotMatch(suppressedDirector.params.input, /SELECTED=mirabelle/,
   'the lower-priority selected cameo must not remain as a contradictory routed instruction');
 
@@ -327,13 +328,15 @@ const autoBoundaryRouted = routeOpenAIParams(
   }, mode: 'auto' },
 );
 assert.equal(autoBoundaryRouted.telemetry.scene_orchestration.primary, 'player-boundary', 'AUTO must preserve an unanswered player boundary');
-assert.match(autoBoundaryRouted.params.input, /TURN_PLAN=player-boundary; ORDER=stop; MAX_DRIVERS=0/);
+assert.match(autoBoundaryRouted.params.input, /"player_boundary":\{"kind":"player-choice","anchor":"대답"\}/);
+assert.match(autoBoundaryRouted.params.input, /"status":"awaiting-player"[^]*"player_owned":true/);
+assert.doesNotMatch(autoBoundaryRouted.params.input, /TURN_PLAN=/, 'deterministic orchestration telemetry must not become writer-facing prose control');
 
 const continueRouted = routeOpenAIParams(
   { instructions, input: '===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}' },
   { incoming: { action: '[LUMENSIA V1.5.6 CONTINUE]', saveState: { world: { location: '학생회실' }, pc: { name: '아리아' }, sceneRuntime: {} }, recentTurns: [] }, mode: 'continue' },
 );
 assert.equal(continueRouted.telemetry.scene_orchestration.primary, 'frozen', 'CONTINUE must route a frozen cross-system plan');
-assert.match(continueRouted.params.input, /TURN_PLAN=frozen; ORDER=freeze; MAX_DRIVERS=0/);
+assert.doesNotMatch(continueRouted.params.input, /TURN_PLAN=/, 'CONTINUE must retain telemetry without exposing a narrative control checklist');
 
 console.log('PASS Multi-System Scene Orchestration V1 priority, chaining, sovereignty, budget, persistence, and one-call regressions');

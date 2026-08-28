@@ -68,22 +68,24 @@ const route=(generated)=>routeOpenAIParams(
 const commonerRoute=route(commoner),nobleRoute=route(noble);
 for(const [r,generated] of [[commonerRoute,commoner],[nobleRoute,noble]]){
   const background=generated.creation.fateStart.background;
-  assert.match(r.params.input,/===== FATE BACKGROUND PERSISTENCE V1 =====/,'character-dependent background directive must reach normal gameplay');
-  assert.match(r.params.instructions,/PUBLIC만 NPC 기본 지식/,'visibility authority must be a routed GM rule');
-  assert.match(r.params.instructions,/NPC 성격 × NPC가 실제 아는 PC 배경 × 현재 상황 × 기대/,'first-impression calculation contract is missing');
-  assert.match(r.params.instructions,/일반 초보 절차를 끝까지 반복 강요하지 않고/,'strength-aware evaluation contract is missing');
+  assert.doesNotMatch(r.params.input,/===== FATE BACKGROUND PERSISTENCE V1 =====/,'background facts must not reintroduce a writer-facing narrative checklist');
+  assert.match(r.params.instructions,/PUBLIC만 기본 지식/,'visibility authority must remain a routed hard invariant');
+  assert.match(r.params.input,/"characterBackground":/,'character-dependent background facts must reach normal gameplay as data');
+  assert.match(r.params.input,/"realm":"[^"]+"/,'canonical PC strength remains available as a fact without a derived evaluation recipe');
   for(const hidden of background.facts.filter(row=>['PRIVATE','SECRET'].includes(row.visibility)))assert.equal(r.params.input.includes(hidden.fact),false,`${hidden.visibility} background leaked into routed gameplay`);
   assert.equal(r.params.input.includes(generated.pc.characterSetting),false,'full Origin Story must not bypass background visibility through PC state');
   assert.ok(r.params.input.length<=9000,`background routing exceeded the stable routine budget: ${r.params.input.length}`);
 }
-assert.equal(commonerRoute.params.input.includes(commoner.creation.fateStart.background.startingRoute.eventMeaning),true);
-assert.equal(nobleRoute.params.input.includes(noble.creation.fateStart.background.startingRoute.eventMeaning),true);
+for(const routed of [commonerRoute,nobleRoute]){
+  assert.doesNotMatch(routed.params.input,/"starting_route"|"checkpoint"|"evaluation_mode"|"evaluationMode"|"expectation"|"limited_records"|"knownBasis"/,'character-start planning and generic audience metadata must stay internal instead of becoming Writer procedure authority');
+}
 assert.notEqual(commonerRoute.params.input,nobleRoute.params.input,'same event must receive character-dependent context');
 
 const app=readFileSync('app.js','utf8');
 const runtime=readFileSync('app-runtime.js','utf8');
 const router=readFileSync('api/lib/context-router.js','utf8');
-assert.match(app,/startRoute\.arrivalFocus[\s\S]*startRoute\.eventMeaning[\s\S]*startRoute\.checkpoint/,'Fate creation must start from its persisted route');
+assert.match(app,/startRoute\.arrivalFocus/,'Fate creation must start from its persisted arrival route');
+assert.doesNotMatch(app,/rollingSummary=`[^`]*startRoute\.(?:eventMeaning|checkpoint)/,'Fate starting procedure metadata must not become the opening Writer summary');
 assert.match(app,/world: save\.world, creation: save\.creation, pc: save\.pc/,'base compact request must carry persistent creation state');
 const compactStateStableSource=runtime.match(/function compactStateStable\(\) \{[\s\S]*?\n\}/)?.[0];
 assert.ok(compactStateStableSource,'stable runtime compact request function is missing');

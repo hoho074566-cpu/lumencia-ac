@@ -50,7 +50,7 @@ function pcDirectorDept() {
   return 'common';
 }
 const DEFAULT_SCHEDULE_EVENTS = [
-  { id:'entrance_ceremony', title:'입학식', date:'1285-03-01', time:'09:00', location:'루멘시아 아카데미 대강당', kind:'academic', participants:['emily','lena'], importance:4, note:'09:00 에밀리 환영사. 09:15 레나 신입생 대표 짧은 연설과 기숙사/정오 학과 오리엔테이션 안내.', status:'scheduled' },
+  { id:'entrance_ceremony', title:'입학식', date:'1285-03-01', time:'09:00', location:'루멘시아 아카데미 대강당', kind:'academic', participants:['emily','lena'], importance:4, note:'09:00 에밀리 환영사. 09:15 레나 신입생 대표의 짧은 연설. 이후 교직원이 기숙사와 정오 학과 오리엔테이션을 안내.', status:'scheduled' },
   { id:'knight_orientation', title:'기사과 1학년 오리엔테이션', date:'1285-03-01', time:'12:00', location:'기사과 지정 오리엔테이션 장소', kind:'academic', participants:['artemis','lillia','laris','sera','isabel'], importance:3, note:'기사과 1학년 대상.', status:'scheduled' },
   { id:'magic_orientation', title:'마법과 1학년 오리엔테이션', date:'1285-03-01', time:'12:00', location:'마법과 지정 오리엔테이션 장소', kind:'academic', participants:['elena','lena','sia','serena','chloe'], importance:3, note:'마법과 1학년 대상.', status:'scheduled' },
   { id:'theology_orientation', title:'신학부 1학년 오리엔테이션', date:'1285-03-01', time:'12:00', location:'신학부 지정 오리엔테이션 장소', kind:'academic', participants:['mirabelle'], importance:3, note:'신학부 1학년 대상.', status:'scheduled' },
@@ -442,7 +442,7 @@ function appendWelcome() {
   const btn = document.createElement('button');
   btn.className = 'start-btn';
   btn.textContent = '첫 장면 시작';
-  btn.addEventListener('click', () => sendAction(`게임을 시작한다. 입학식 당일 오전 8시 40분, 대강당 앞의 현재 장면을 열어라. ${save.pc.name}의 행동이나 대사는 대신 정하지 마라.`));
+  btn.addEventListener('click', () => sendAction('게임을 시작한다. 입학식에 오전 9시에 참석한다.'));
   box.append(btn);
   story.append(box);
 }
@@ -1235,7 +1235,7 @@ function createNewSaveFromCreator() {
     base.creation=generated.creation;
     base.pc={...base.pc,...generated.pc,gender:labels.gender,socialStatus:labels.socialClass,department:labels.department};
     const startRoute=generated.creation.fateStart.background.startingRoute;
-    base.rollingSummary=`입학식 당일 08:40. ${base.pc.name}은(는) ${startRoute.arrivalFocus}에 도착했다. ${startRoute.eventMeaning}이며 첫 확인 지점은 ${startRoute.checkpoint}이다. 입학식 개막 전이다.`;
+    base.rollingSummary=`입학식 당일 08:40. ${base.pc.name}은(는) ${startRoute.arrivalFocus}에 도착했다. 입학식 개막 전이다.`;
     return normalizeSave(base);
   }
   base.creation=createFreeCharacterCreation();
@@ -1344,7 +1344,7 @@ async function submitNextLife(){
       commitCanonical:(prepared)=>{
         assertActiveRunOwner(owner);prepared.nextRun.updatedAt=new Date().toISOString();
         const route=prepared.nextRun.creation.fateStart.background.startingRoute;
-        prepared.nextRun.rollingSummary=`입학식 당일 08:40. ${prepared.nextRun.pc.name}은(는) ${route.arrivalFocus}에 도착했다. ${route.eventMeaning}이며 첫 확인 지점은 ${route.checkpoint}이다. 계승 receipt가 적용된 다음 생이다.`;
+        prepared.nextRun.rollingSummary=`입학식 당일 08:40. ${prepared.nextRun.pc.name}은(는) ${route.arrivalFocus}에 도착했다. 계승 receipt가 적용된 다음 생이며 입학식 개막 전이다.`;
         commitRunFateAndInheritance(localStorage,RUN_COMMIT_KEYS,{owner,isOwnerCurrent:isActiveRunOwner,nextRun:prepared.nextRun,nextFateBook:prepared.fateBook,nextInheritanceMeta:prepared.inheritanceMeta});
       },
     });

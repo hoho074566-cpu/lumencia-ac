@@ -154,7 +154,8 @@ const routed=routeOpenAIParams(
   {incoming:{action:'백장미회가 나를 어떻게 보는지 루시아에게 묻는다.',saveState:{turnNumber:10,world:{location:'academy'},sceneRuntime:{participants:['lucia'],faction_social:{reputations:{student_council:{reputation:9,stance:'관심',updated_turn:99,history:[]},white_rose:{reputation:-2,stance:'경계',updated_turn:2,history:[{turn:2,reputation_delta:-2,evidence_type:'credible_rumor',observer_npc_keys:['lucia'],source:'엘리제의 전달',reason:'전달된 소문'}]},blue_knights:{reputation:3,stance:'중립',updated_turn:80,history:[]},knight_department:{reputation:2,stance:'중립',updated_turn:70,history:[]}}}},npcInnerStates:{}},recentTurns:[]},mode:'game'},
 );
 assert.match(routed.params.input,/"white_rose":\{"reputation":-2,"stance":"경계"/,'relevant faction reputation must reach authoritative routed context');
-assert.match(routed.params.instructions,/사적 행동\/단순 동석으로 바꾸거나 개인 관계와 자동 연동하지 않는다/,'routed prompt must preserve evidence and personal-relation boundaries');
+assert.match(routed.params.instructions,/관계·NPC 간 관계·조직 평판·소문[^\n]*직접 근거[^\n]*서로 자동 전이하지 않는다/,'the consolidated hard contract must preserve evidence and cross-system boundaries');
+assert.match(routed.params.input,/"evidence_type":"credible_rumor"/,'the causal reputation evidence must remain available as data');
 
 const denseFactionState={reputations:Object.fromEntries(FACTION_KEYS.map((key,index)=>[key,{
   reputation:index+1,stance:'관심',updated_turn:100-index,

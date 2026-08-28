@@ -178,7 +178,7 @@ assert.equal(m3.stall_streak,0);
 // TEST D — NPC Initiative is explicitly allowed and PC-centric freezing is forbidden.
 const genericDirective = buildSceneMomentumDirective({ action:'복도를 걷는다.', saveState:{world:{location:'A동'},sceneRuntime:{}} });
 assert.match(genericDirective,/NPC는 목표·일정·관계·감정.*먼저 말하거나 움직이거나 떠나거나 다른 NPC와 상호작용/);
-assert.match(genericDirective,/PC가 찾아오기를 항상 기다리지 않는다/);
+assert.match(genericDirective,/현재 Scene 안에서/);
 
 // TEST E — downtime compresses low-value steps and advances meaningful time.
 const restIntent = classifySceneIntent('좀 쉰다.', { location:'기숙사 개인실' });
@@ -193,7 +193,8 @@ const duelIntent = classifySceneIntent('결투를 받아들일지 고민한다.'
 assert.equal(duelIntent.kind,'decision-sensitive');
 assert.equal(duelIntent.compression,false);
 assert.equal(duelIntent.deltaTarget,0);
-assert.match(genericDirective,/STOP은 전투 돌입\/되돌리기 어려운 위험\/중대한 관계 선택\/중요 대화의 직접 질문\/갈림길\/능력 사용 여부/);
+assert.match(genericDirective,/HARD_DECISION은 세계·인물의 구체적 목표가 비용 있는 PC 답·수락·거절을 실제 요구/);
+assert.match(genericDirective,/출력을 닫으려고 NPC 질문이나 choices를 만들지 않/);
 
 // Internal naming leak guard.
 assert.match(genericDirective,/내부 명칭 "PC"나 자리표시자 "Aaa"를 주어로 출력하지 않는다/);

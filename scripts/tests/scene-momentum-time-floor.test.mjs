@@ -549,7 +549,9 @@ const rejectedNoneIntent=applySceneMomentumTimeFloor({action:'1시간 훈련하�
 assert.equal(turn.state_delta.advance_minutes,60,'an invalid no-boundary receipt cannot trigger the full compound profile floor');
 assert.deepEqual(turn.state_delta.items_add,[],'an invalid no-boundary receipt fails closed on every untrusted effect');
 assert.equal(rejectedNoneIntent.reconciliationReason,'invalid-structured-execution','the caller records a deterministic fail-closed reason for the rejected receipt');
-assert.match(turn.scene_summary,/검증할 수 없어/,'the returned narration exposes a bounded stop instead of claiming suffix completion');
+assert.equal(turn.scene_summary,'','an internal structured-execution rejection never becomes fiction summary text');
+assert.deepEqual(turn.scene,[],'an internal structured-execution rejection never becomes a narration card');
+assert.equal(turn.runtime_incomplete_boundary,true,'the rejected turn remains marked uncommitted for the non-fiction API error path');
 
 turn={scene_title:'수면 중 가짜 화재',scene:[{kind:'dialogue',speaker_key:'artemis',text:'불을 끌까?'}],choices:['끈다.','대피한다.','살핀다.'],director:ongoingDirector,event_progress:{event_instance_id:'director:invented-fire',active_beat:'choice',completed_beats:[]},state_delta:{advance_minutes:60,items_add:['화재 보상'],active_events_add:['director:invented-fire']}};
 turn.time_execution=choiceExecution(turn,{completed:[],interrupted:'action_1',boundaryEventId:'director:invented-fire',owners:[effectOwner('items_add',0,'director:invented-fire','boundary-event'),effectOwner('event_progress',null,'director:invented-fire','boundary-event','turn'),effectOwner('director',null,'director:invented-fire','boundary-event','turn')]});
