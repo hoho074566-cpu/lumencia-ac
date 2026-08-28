@@ -212,6 +212,31 @@ assert.match(opening.params.input, /"participants":\["emily","lena"\]/);
 assert.match(opening.params.input, /SCHEDULED_START_OFFSET=20min/);
 assert.doesNotMatch(opening.params.input, /SCHEDULE_BOUNDARY=20min/, 'attending the requested entrance ceremony must not stop before that same ceremony');
 assert.doesNotMatch(opening.params.input, /knight_orientation|기사과 1학년 오리엔테이션/, 'later schedule items must remain boundaries outside the active requested scene instead of becoming narrative tasks');
+
+const mentorBoundary = {
+  id: 'mentor_meeting', title: '에밀리와 사전 면담', date: '1285-03-01', time: '09:30',
+  location: '본관 응접실', kind: 'personal', participants: ['emily'], pc_required: true, status: 'scheduled',
+};
+const requestedClass = {
+  id: 'basic_class', title: '기사과 기초 수업', date: '1285-03-01', time: '10:00',
+  location: '기사과 강의실', kind: 'academic', participants: ['artemis'], status: 'scheduled',
+};
+const afterClass = {
+  id: 'after_class_drill', title: '오후 자율 훈련', date: '1285-03-01', time: '13:00',
+  location: '기사과 연무장', kind: 'academic', participants: ['lillia'], status: 'scheduled',
+};
+const boundedRequestedClass = route('10시에 기사과 기초 수업에 참석한다.', { savePatch: {
+  world: { date: '1285-03-01', time: '09:00', location: '기숙사' },
+  sceneRuntime: { participants: [] },
+  scheduledEvents: [mentorBoundary, requestedClass, afterClass],
+  scheduleContext: { due: [], upcoming: [mentorBoundary, requestedClass, afterClass] },
+} });
+assert.match(boundedRequestedClass.params.input, /SCHEDULE_BOUNDARY=30min/, 'the earlier PC appointment must remain the deterministic stop boundary');
+assert.match(boundedRequestedClass.params.input, /mentor_meeting/);
+assert.match(boundedRequestedClass.params.input, /본관 응접실/);
+assert.match(boundedRequestedClass.params.input, /"participants":\["emily"\]/, 'the intervening boundary participant must retain routed character authority');
+assert.match(boundedRequestedClass.params.input, /basic_class/);
+assert.doesNotMatch(boundedRequestedClass.params.input, /after_class_drill|오후 자율 훈련/, 'schedule rows after the requested occurrence must not become narrative tasks');
 assert.match(rendererSource, /sendAction\('게임을 시작한다\. 입학식에 오전 9시에 참석한다\.'\)/, 'the first-scene button must express event attendance rather than ask for an 08:40 state report');
 assert.match(rendererSource, /레나 신입생 대표의 짧은 연설\. 이후 교직원이 기숙사와 정오 학과 오리엔테이션을 안내/, 'the canonical schedule must not assign the staff notice to Lena');
 assert.doesNotMatch(rendererSource, /레나 신입생 대표 짧은 연설과 기숙사\/정오 학과 오리엔테이션 안내/, 'the ambiguous administrative Lena role must be removed');

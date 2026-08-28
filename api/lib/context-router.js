@@ -419,6 +419,15 @@ function requestedUpcomingEvents(incoming={},registry={}){
   const intent=classifySceneIntent(action,{location:save?.world?.location||'',currentTime:save?.world?.time||'',currentDate:save?.world?.date||'',currentWeekday:save?.world?.weekday||'',actorName:save?.pc?.name||'',resumeTimedAction:save?.sceneRuntime?.timed_action});
   return array(save?.scheduleContext?.upcoming).filter(event=>isPcRelevantScheduleEvent(save,event)&&isRequestedScheduledActivity(save,event,action,intent,registry)).slice(0,2);
 }
+function requestedScheduleWindow(incoming={},registry={}){
+  const save=incoming.saveState||{},requested=requestedUpcomingEvents(incoming,registry);if(!requested.length)return[];
+  const relevant=array(save?.scheduleContext?.upcoming).filter((event)=>isPcRelevantScheduleEvent(save,event)),requestedSet=new Set(requested);
+  const lastRequestedIndex=relevant.reduce((last,event,index)=>requestedSet.has(event)?index:last,-1);
+  if(lastRequestedIndex<0)return requested;
+  const prefix=relevant.slice(0,lastRequestedIndex+1),firstBoundary=prefix.find((event)=>!requestedSet.has(event));
+  const visible=new Set([...(firstBoundary?[firstBoundary]:[]),...requested]);
+  return prefix.filter((event)=>visible.has(event)).slice(0,3);
+}
 function deriveKeys(incoming,registry,maxNpcs,directorV2=null){
   const save=incoming.saveState||{}, set=new Set();
   const authoritative=array(save?.sceneRuntime?.participants).map(String), present=new Set(authoritative);
@@ -427,7 +436,10 @@ function deriveKeys(incoming,registry,maxNpcs,directorV2=null){
   if(directorV2?.selectedKey&&registry[directorV2.selectedKey]&&set.size<maxNpcs)set.add(String(directorV2.selectedKey));
   for(const key of array(directorV2?.worldResultKeys)){if(set.size>=maxNpcs)break;if(registry[key])set.add(String(key));}
   for(const key of array(directorV2?.consequenceKeys)){if(set.size>=maxNpcs)break;if(registry[key])set.add(String(key));}
-  for(const k of requestedUpcomingEvents(incoming,registry).flatMap(event=>array(event?.participants)))if(set.size<maxNpcs&&registry[k])set.add(String(k));
+  const requestedEvents=requestedUpcomingEvents(incoming,registry);
+  for(const k of requestedEvents.flatMap(event=>array(event?.participants)))if(set.size<maxNpcs&&registry[k])set.add(String(k));
+  const requestedIds=new Set(requestedEvents.map((event)=>String(event?.id||'')).filter(Boolean));
+  for(const k of requestedScheduleWindow(incoming,registry).filter((event)=>!requestedIds.has(String(event?.id||''))).flatMap((event)=>array(event?.participants)))if(set.size<maxNpcs&&registry[k])set.add(String(k));
   addExplicitKeys(set,incoming.action||'',registry,maxNpcs);
   for(const k of array(save?.scheduleContext?.due).flatMap(ev=>array(ev?.participants)))if(set.size<maxNpcs&&registry[k])set.add(String(k));
   for(const k of authoritative)if(set.size<maxNpcs&&registry[k])set.add(String(k));
@@ -463,18 +475,18 @@ function selectRelevantGrowthEntries(value={},text='',max=1){const action=norm(t
 function pressureBoundEssentialPc(value={},action=''){const pc=object(value);if(safeJson(pc).length<=3600)return pc;const awakening=object(pc.awakeningCandidates);return{...pc,skills:selectRelevantGrowthEntries(pc.skills,action,14),skillCandidates:selectRelevantGrowthEntries(pc.skillCandidates,action,5),...(pc.traits?{traits:selectRelevantGrowthEntries(pc.traits,action,2)}:{}),...(pc.authorities?{authorities:selectRelevantGrowthEntries(pc.authorities,action,2)}:{}),...(pc.awakeningCandidates?{awakeningCandidates:{trait:selectRelevantGrowthEntries(awakening.trait,action,1),authority:selectRelevantGrowthEntries(awakening.authority,action,1)}}:{}),growth_context_truncated:true};}
 function compactPc(pc={},important=false,text=''){const out={...object(pc)};if('characterSetting'in out)out.characterSetting=clampText(out.characterSetting||'',important?1700:1100);if('appearance'in out)out.appearance=clampText(out.appearance||'',350);if(Array.isArray(out.inventory))out.inventory=out.inventory.slice(0,18);if('talents'in out)out.talents=compactTalents(out.talents);out.skills=compactSkills(out.skills);out.skillCandidates=compactSkillCandidates(out.skillCandidates,2);if('traits'in out)out.traits=compactAbilityMap(out.traits,true,text);if('authorities'in out)out.authorities=compactAbilityMap(out.authorities,true,text);if('awakeningCandidates'in out)out.awakeningCandidates=compactAwakeningCandidates(out.awakeningCandidates,2);if('talentEvolutionHistory'in out)out.talentEvolutionHistory=compactTalentEvolutionHistory(out.talentEvolutionHistory);return out;}
 function compactSchedule(save,keys,action='',registry={}){
-  const sc=object(save?.scheduleContext),selected=new Set(keys),requested=requestedUpcomingEvents({saveState:save,action},registry),requestedIds=new Set(requested.map((event)=>String(event?.id||'')).filter(Boolean));
+  const sc=object(save?.scheduleContext),selected=new Set(keys),requested=requestedUpcomingEvents({saveState:save,action},registry),window=requestedScheduleWindow({saveState:save,action},registry);
   const clean=(ev)=>({...ev,participants:array(ev?.participants).filter(k=>selected.has(k)).slice(0,4)});
   const npc={};for(const k of keys)if(sc?.npc_schedule?.[k])npc[k]=sc.npc_schedule[k];
   const due=array(sc.due).filter((event)=>isPcRelevantScheduleEvent(save,event)).slice(0,4);
   const relevantUpcoming=array(sc.upcoming).filter((event)=>isPcRelevantScheduleEvent(save,event));
-  const upcoming=requestedIds.size?relevantUpcoming.filter((event)=>requestedIds.has(String(event?.id||''))).slice(0,2):relevantUpcoming.slice(0,5);
+  const upcoming=requested.length?window:relevantUpcoming.slice(0,5);
   return{due:due.map(clean),upcoming:upcoming.map(clean),npc_schedule:npc};
 }
 function compactScheduledEventsForScene(save,action='',registry={}){
   const active=array(save?.scheduledEvents).filter((event)=>!['completed','cancelled'].includes(String(event?.status||'').toLowerCase())&&isPcRelevantScheduleEvent(save,event));
-  const requestedIds=new Set(requestedUpcomingEvents({saveState:save,action},registry).map((event)=>String(event?.id||'')).filter(Boolean));
-  return(requestedIds.size?active.filter((event)=>requestedIds.has(String(event?.id||''))):active).slice(0,6);
+  const windowIds=new Set(requestedScheduleWindow({saveState:save,action},registry).map((event)=>String(event?.id||'')).filter(Boolean));
+  return(windowIds.size?active.filter((event)=>windowIds.has(String(event?.id||''))):active).slice(0,6);
 }
 function compactScheduleAuthority(schedule,max=2400){
   const compactEvent=(ev)=>{const src=object(ev);return{id:clampText(src.id||'',80),title:clampText(src.title||'',120),note:clampText(src.note||'',180),date:src.date||null,time:src.time||null,location:clampText(src.location||'',100),importance:src.importance??null,status:src.status||null,participants:array(src.participants).slice(0,4)};};
