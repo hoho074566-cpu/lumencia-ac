@@ -10,6 +10,19 @@ Repository: `hoho074566-cpu/lumencia-ac`
 
 ---
 
+# PHASE 3 — AUTHORITATIVE CURRENT STATE
+
+- Execution contract: `LUMENSIA_PHASE_3_ALL_IN_ONE_WORK_PACKAGE.txt`. Phase 3 started directly from verified remote main `6f1f45a644e2ece54a74577ce8a39afe4859e686`; Phase 2 remains COMPLETE and no deferred/frozen PR was used or modified.
+- Queue: P3-PR01 **BLOCKED — HUMAN EXACT PREVIEW + MERGE REQUIRED**; P3-PR02 through P3-PR05 **TODO**. Overall `0 / 5 PR merged`.
+- Active PR: [#88 P3-PR01 — Novel Director V2](https://github.com/hoho074566-cpu/lumencia-ac/pull/88), branch `codex/p3-pr01-novel-director-v2`, corrected implementation head `b3ef60e9f3d696c01ceb56427b05cbe9a3d1686b`, base main `6f1f45a644e2ece54a74577ce8a39afe4859e686`.
+- P3-PR01 replaces/consolidates the production routed narrative guidance with the AI-first Novel Director V2 contract. Prompt footprint is `5,254 → 4,214 chars` (`-1,040 / -19.8%`). One canonical call and all hard data/security/persistence/canon/user-constraint boundaries remain; no narrative engine, parser, persistence root, lifecycle, prose scorer, wording-regex collection, or extra call was added.
+- Initial fresh review found one SAME_ROOT consolidation omission (event/beat ID format P1, combat psychology P2, gradual PC relationship change P2). Bounded correction `1/1` restored those invariants with regression assertions. Corrected-head focused/full regression and `git diff --check` PASS; Safety `33163848036` PASS; Vercel `9L7t3pARagacQ3QYgUXNm7mkRkKD` Ready/PASS; fresh review `5050324233` on `b3ef60e9f3d696c01ceb56427b05cbe9a3d1686b` is P0=0/P1=0/P2=1.
+- Browser/Preview remains bounded-unavailable and was not retried. The runtime-semantic A–O cases and Context Safety P therefore require human Exact Preview verification; the exact A–P checklist is recorded in `docs/IMPLEMENTATION_PROGRESS.md`.
+- Review P2/backlog: the fail-forward line may over-apply persistent loss to low-stakes/reversible failures. Correction budget is exhausted; do not start another wording loop. Human Preview must add the harmless-failure observation recorded in `docs/IMPLEMENTATION_PROGRESS.md`, and a reproduced regression requires explicit human/trusted-path disposition.
+- Current blocker/NEXT ACTION: require final docs-head gates, then a human verifies A–P plus the low-stakes-failure observation on PR #88's exact deployed Preview and, only if all pass, human-merges the protected `api/**` PR at the verified expected head. P3-PR02 starts from post-merge latest main, not from this open branch.
+
+---
+
 # GLOBAL P0/P1 CONTINUOUS FIX & REVIEW RULE — 상시 적용
 
 이 규칙은 Lumensia의 모든 구현·리뷰·수정 Phase에 계속 적용한다.
@@ -50,7 +63,7 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - Hosted authority PASS: Safety `33158387423`; exact-head Vercel `5WPeU4soMhCHeMCr5QYBAn7UczM1`; production-main Vercel `496xBy5yC1FLkuVdtfW9p4bDvGU7`; fresh review `5450723024` P0=0/P1=0.
 - Post-merge focused life-loop integration and full repository regression PASS on latest main. Character Creation → Fate Start → Origin → Background → NPC/World Reaction → Personal Story → World Consequence → Ending/Dead Ending → Fate Book → first-discovery reward/dedupe → Inheritance → Next Life is complete, with inherited state applied to the new run. Free/paste creation, Fail Forward, long USER ACTION, authority tail, context pressure, and player sovereignty remain PASS.
 - Phase state: `PHASE_2_IMPLEMENTATION_PASS: COMPLETE`; `PHASE_2_STATUS: COMPLETE`. Add no new Phase 2 feature, correction, or discovery. Browser/Preview remains on the established bounded-unavailable fallback without retry.
-- **NEXT ACTION:** Prepare LUMENSIA PHASE 3 planning / handover. Planning only; do not start Phase 3 implementation in this closure task.
+- Historical Phase 2 NEXT ACTION is satisfied: Phase 3 began from verified main. Follow the authoritative P3-PR01 Exact Preview/human-merge blocker above; Phase 2 stays closed.
 
 ## PHASE 2 FINAL INTEGRATION CLOSURE — SUPERSEDED PRE-STABILIZATION SNAPSHOT
 
@@ -1040,16 +1053,14 @@ Fresh direct review `5037414704` on initial PR #61 exact head `4dc7f4f3768b4635e
 
 # 12. NEXT ACTION — CURRENT START POINT
 
-1. PR #85 STAB-BASE is merged at `c04ff7398ddd559ba12b409a22b9968725a8048c` from exact READY head `4a7d492b2296b2ead96bdd26eadf151c7c015e7c`; its post-merge verification and hosted gates remain PASS.
-2. Keep PR #83/#84 terminal BLOCKED and frozen at `f0bef9f59ef60274b170cc8bbae2a92c62bb60a7` / `e83f6ec6c625b0ed78a1776f4cd069aa48e9ac47`. No correction, merge, rebase, cherry-pick, branch/code reuse, or stacking.
-3. PR #86 STAB-02R is merged from exact READY head `2d66f2c14865928c1228e5bd87af58963dfd4db2`; merge commit/latest main is `63c1af0fbf63fb7ec559db49095c24fd7c4eb912`, and merged/reviewed tree `7881937d17c9301bd637ecbd5e9a7e17cdb6fd7c` matches. Safety `33158387423`, exact-head Vercel `5WPeU4soMhCHeMCr5QYBAn7UczM1`, production-main Vercel `496xBy5yC1FLkuVdtfW9p4bDvGU7`, and fresh review `5450723024` P0=0/P1=0 PASS.
-4. STAB-02R post-merge PASS: immutable historical earned/spent accounting, `spent <= earned`, stale-save monotonicity, divergent-import rejection, serialized same-device purchase, STAB-BASE run ownership/rollback boundary, Origin compatibility, public-only Fate Affinity eligibility, hidden/rotation-locked/L5 new-purchase exclusion, historical affinity receipt preservation, Realm/Circle purchase rejection, and actual Next Life inheritance application.
-5. Final latest-main life-loop integration PASS: Character Creation → Fate Start → Origin → Background → NPC/World Reaction → Personal Story → World Consequence → General/Character/World/Dead Ending → Fate Book → first-discovery reward/dedupe → Inheritance → Next Life with inherited state. Free/paste creation, terminal-death-only Dead Ending, Fail Forward, long USER ACTION, authority tail, context pressure, and player sovereignty regressions PASS; full repository check and integrity PASS.
-6. `PHASE_2_IMPLEMENTATION_PASS: COMPLETE`; `PHASE_2_STATUS: COMPLETE`. Origin reroll receipt-limit P2 remains non-blocking backlog and unmodified. Add no new Phase 2 feature.
-7. Keep PR #76/#79, PR #66/#68/#69/#78, obsolete/superseded PR #72, and frozen PR #83/#84 untouched. NEXT ACTION: **Prepare LUMENSIA PHASE 3 planning / handover.** Planning only; do not begin Phase 3 implementation in this task.
+1. Keep `PHASE_2_IMPLEMENTATION_PASS: COMPLETE` and `PHASE_2_STATUS: COMPLETE`. Do not reopen Phase 1/2, the Origin reroll P2, or any frozen/deferred PR.
+2. P3-PR01 is **BLOCKED — HUMAN EXACT PREVIEW + MERGE REQUIRED** at PR #88. Corrected implementation head is `b3ef60e9f3d696c01ceb56427b05cbe9a3d1686b`; correction budget `1/1` is exhausted for the SAME_ROOT consolidation omission.
+3. Corrected implementation review P0=0/P1=0, Safety, and Vercel pass. Require the same gates on the final docs head; prior-head findings/review are not final-head merge authority.
+4. Browser/Preview recovery must not be retried. A human runs the A–P checklist and low-stakes-failure P2 observation from `docs/IMPLEMENTATION_PROGRESS.md` against PR #88's exact deployment.
+5. If and only if A–P and every exact-head gate pass, a human merges protected-path PR #88 at the verified expected head. Then verify latest main and create P3-PR02 from main. Human-only merge is the next dependency, so do not stack P3-PR02 on PR #88.
 
 ---
 
 # NEW CHAT START INSTRUCTION
 
-> Read both progress documents first. Latest main `63c1af0fbf63fb7ec559db49095c24fd7c4eb912` is the human merge of PR #86 exact READY head `2d66f2c14865928c1228e5bd87af58963dfd4db2`; STAB-02R post-merge and the final Phase 2 life-loop integration pass. `PHASE_2_IMPLEMENTATION_PASS: COMPLETE`; `PHASE_2_STATUS: COMPLETE`. PR #83/#84 remain terminal BLOCKED/FROZEN, and the Origin reroll receipt-limit P2 remains non-blocking backlog; do not touch them or add another Phase 2 feature. NEXT ACTION is **Prepare LUMENSIA PHASE 3 planning / handover**. Planning only; do not begin Phase 3 implementation in the closure task.
+> Read only these two progress documents and verify GitHub live state. Phase 2 is COMPLETE and frozen/deferred PRs remain untouched. Phase 3 P3-PR01 is open at PR #88 from base main `6f1f45a644e2ece54a74577ce8a39afe4859e686`, corrected implementation head `b3ef60e9f3d696c01ceb56427b05cbe9a3d1686b`, status **BLOCKED — HUMAN EXACT PREVIEW + MERGE REQUIRED**. Corrected implementation review is P0=0/P1=0/P2=1. Require final docs-head gates, then a human runs A–P plus the low-stakes-failure observation and merges only on PASS. Do not retry Browser recovery or start/stack P3-PR02 before the human-only merge dependency is satisfied.

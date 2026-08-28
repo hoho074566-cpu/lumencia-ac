@@ -1,7 +1,26 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Narrative Phase 1 **FROZEN**. `PHASE_2_IMPLEMENTATION_PASS: COMPLETE` and `PHASE_2_STATUS: COMPLETE`. STAB-01, STAB-BASE, and fresh STAB-02R are merged, and the final latest-main life-loop integration passes. No new Phase 2 feature discovery or implementation is allowed; the next task is **Prepare LUMENSIA PHASE 3 planning / handover** without starting Phase 3 implementation.
+Narrative Phase 1 **FROZEN**. `PHASE_2_IMPLEMENTATION_PASS: COMPLETE` and `PHASE_2_STATUS: COMPLETE`. Phase 3 execution has started from verified main `6f1f45a644e2ece54a74577ce8a39afe4859e686`; no Phase 1/2 feature, correction, or deferred/frozen branch is reopened.
+
+## PHASE 3 PROGRESS — AUTHORITATIVE
+
+- Overall: `0 / 5 PR merged`.
+- P3-PR01 Novel Director V2: **BLOCKED — HUMAN EXACT PREVIEW + MERGE REQUIRED**.
+- P3-PR02 Admin / Diagnostics: **TODO**.
+- P3-PR03 Context / Token Diet: **TODO**.
+- P3-PR04 Runtime / Loading Optimization: **TODO**.
+- P3-PR05 Mobile Reading / Character UX: **TODO**.
+- Current PR: [#88 P3-PR01 — Novel Director V2](https://github.com/hoho074566-cpu/lumencia-ac/pull/88), branch `codex/p3-pr01-novel-director-v2`, base main `6f1f45a644e2ece54a74577ce8a39afe4859e686`, corrected implementation head `b3ef60e9f3d696c01ceb56427b05cbe9a3d1686b`.
+- Completed scope: the production Context Router now uses one consolidated Novel Director V2 contract for scene completion, specificity-scaled autonomy, soft/hard interruption priority, action-to-prose translation, importance-sensitive zoom, NPC-to-NPC scene movement, subtext, adaptive conflict, suspense, fail-forward consequences, causal rescue, and physical/world-native continuation. It adds no narrative engine, parser, save root, lifecycle, prose scorer, Korean wording-regex collection, or model call.
+- Prompt/context: routed hard+narrative contract `5,254 → 4,214 chars`, delta `-1,040 / -19.8%`. One canonical model call, stable routing, authority tail, context pressure, USER ACTION original text, explicit restrictions, canon, player sovereignty, and existing persistence authorities remain intact.
+- Fresh review of prior head `2a963a427a545cd844571e389c69f7b6248d68d3` found one shared consolidation root: event/beat ID format P1, combat psychology P2, and gradual PC relationship change P2 were omitted from the routed contract. Bounded correction `1/1` restored all three compact invariants and permanent assertions without new architecture. Corrected-head Safety `33163848036` PASS; Vercel `9L7t3pARagacQ3QYgUXNm7mkRkKD` Ready/PASS; fresh review `5050324233` on `b3ef60e9f3d696c01ceb56427b05cbe9a3d1686b` reports P0=0/P1=0/P2=1.
+- Focused Novel Director, Context Router, authority-tail, Narrative Time, NPC behavior/relationship/significance/motivation, Event Progress, Combat Growth, faction/background, and Scene Momentum suites PASS. Full `node scripts/lumensia-pr-check.mjs 6f1f45a... HEAD` PASS; `git diff --check` PASS.
+- Deterministic acceptance proves the contract, one-call architecture, long/broad USER ACTION preservation, specific restriction preservation, authority tail, and context pressure. Semantic runtime acceptance A–O cannot be established from prompt-string tests alone.
+- Browser/Preview remains on the inherited bounded-unavailable fallback; the allowed availability attempt was already consumed and was not retried. Human Exact Preview must verify: A scene completion; B broad intent; C specific restriction; D soft-hook non-capture; E 3+ NPC interaction; F character reveal through action; G system-to-prose; H adaptive combat; I power gap; J persistent failure consequence; K suspense without premature answer; L institutional consequence; M causal rescue with loss retained; N routine compression versus important-scene dilation; O novel-scene prose; P long USER ACTION + authority-tail + context-pressure.
+- Known non-blocking review P2/backlog: the fail-forward line may over-apply lasting loss to a low-stakes or reversible failure whose stakes were not established. It does not negate required acceptance J for consequential combat defeat, but Exact Preview should include one harmless failed attempt and reject invented lasting injury/money/relationship/reputation/Quest/institutional loss. Correction budget is exhausted, so do not start another wording loop in this PR; a reproduced acceptance regression requires explicit human/trusted-path disposition.
+- ROOT_CAUSE_CLASS: **SAME_ROOT**; CORRECTION_BUDGET: **1/1**; SCOPE_EXPANSION: **NO**; DEFERRED/FROZEN PR TOUCHED: **NO**.
+- NEXT ACTION: require fresh exact-current-docs-head P0=0/P1=0 and hosted gates, then a human runs Exact Preview A–P plus the recorded low-stakes-failure P2 observation on PR #88. If all pass, a human merges the protected-path PR at the verified expected head. Only after post-merge main verification may P3-PR02 begin.
 
 ## Narrative Phase 1 FREEZE — Authoritative Closure
 - Verified main is `9f2274abeef7f34531c8d0240f66ed39293b9eef`, the human merge of PR #67 NPC Significance Evaluator V1 exact head `3293e1c11569e5531518ae7e05918a54693c2bb9`.
@@ -30,7 +49,7 @@ Narrative Phase 1 **FROZEN**. `PHASE_2_IMPLEMENTATION_PASS: COMPLETE` and `PHASE
 - STAB-02R post-merge and final Phase 2 integration PASS on latest main: canonical immutable earned/spent accounting; `spent <= earned`; stale-save monotonicity; divergent import fail-closed; same-device concurrency; STAB-BASE run ownership/atomic rollback journal; Origin compatibility; public-only Fate Affinity eligibility with hidden/rotation-locked/L5 exclusion; historical affinity receipt preservation; no Realm/Circle purchase; and actual inherited state in Next Life.
 - Final life-loop focused integration PASS covers Character Creation → Fate Start → Origin → Background → NPC/World Reaction → Personal Story → World Consequence → General/Character/World/Dead Ending → Fate Book → first-discovery reward/dedupe → Inheritance → Next Life. Existing free/paste creation, terminal-death-only Dead Ending, Fail Forward, long USER ACTION, authority tail, context pressure, and player sovereignty remain PASS. Full `node scripts/lumensia-pr-check.mjs c04ff739... 63c1af0...` and repository integrity PASS.
 - Known non-blocking backlog: Origin reroll count above the receipt limit can leave later submission rejected for the current browser session. It is P2 and remains unmodified. PR #83/#84 remain terminal BLOCKED/FROZEN; all other deferred/frozen records remain backlog only.
-- NEXT ACTION: **Prepare LUMENSIA PHASE 3 planning / handover.** Do not start Phase 3 implementation in this closure task, and do not discover or add another Phase 2 feature.
+- Historical Phase 2 NEXT ACTION is satisfied: Phase 3 began from verified main. The authoritative current action is the P3-PR01 Exact Preview/human-merge blocker above; Phase 2 remains closed.
 
 ## PHASE 2 FINAL INTEGRATION CLOSURE — SUPERSEDED PRE-STABILIZATION SNAPSHOT
 
@@ -733,10 +752,8 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 
 # NEXT ACTION — AUTHORITATIVE
 
-1. Keep PR #83/#84 terminal BLOCKED and frozen at `f0bef9f59ef60274b170cc8bbae2a92c62bb60a7` / `e83f6ec6c625b0ed78a1776f4cd069aa48e9ac47`; do not modify, merge, rebase, cherry-pick, reuse, or stack them.
-2. PR #85 STAB-BASE is merged at `c04ff7398ddd559ba12b409a22b9968725a8048c` from exact READY head `4a7d492b2296b2ead96bdd26eadf151c7c015e7c`; do not reopen it.
-3. PR #86 STAB-02R is merged at latest main `63c1af0fbf63fb7ec559db49095c24fd7c4eb912` from exact READY head `2d66f2c14865928c1228e5bd87af58963dfd4db2`; post-merge and final life-loop integration PASS. Do not reopen it.
-4. `PHASE_2_IMPLEMENTATION_PASS: COMPLETE`; `PHASE_2_STATUS: COMPLETE`. Add no new Phase 2 feature discovery, correction, or implementation.
-5. Keep the Origin reroll receipt-limit P2 as non-blocking backlog; do not correct it during closure.
-6. Keep PR #76/#79, Phase 1 PR #66/#68/#69, Phase 2 PR #78, obsolete/superseded PR #72, and frozen PR #83/#84 untouched. Browser/Preview remains on the bounded-unavailable fallback without retry.
-7. NEXT ACTION: **Prepare LUMENSIA PHASE 3 planning / handover.** Planning only; do not start Phase 3 implementation in this task.
+1. P3-PR01 is **BLOCKED — HUMAN EXACT PREVIEW + MERGE REQUIRED** at PR #88. Corrected implementation review is P0=0/P1=0; do not label it MERGE_READY until final docs-head gates and human Exact Preview A–P plus the low-stakes-failure P2 observation pass.
+2. Keep `PHASE_2_IMPLEMENTATION_PASS: COMPLETE` and `PHASE_2_STATUS: COMPLETE`; do not reopen Phase 1/2 or the Origin reroll P2.
+3. Keep PR #66/#68/#69/#72/#76/#78/#79/#83/#84 frozen/deferred and untouched. Do not modify, merge, rebase, cherry-pick, reuse, or stack them.
+4. Browser/Preview remains bounded-unavailable; do not retry recovery. A human must use PR #88's exact deployed Preview to verify A–P.
+5. If exact-head review/gates and A–P pass, a human merges PR #88 at the verified expected head. Then verify merged main and start P3-PR02 from that latest main; do not begin P3-PR02 before the required human-only merge dependency is satisfied.
