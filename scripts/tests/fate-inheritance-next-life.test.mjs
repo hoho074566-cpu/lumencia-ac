@@ -12,6 +12,7 @@ import {
   inheritanceRuntimeSnapshot,
   normalizeInheritanceAllocation,
   quoteInheritanceAllocation,
+  reconcileInheritanceImport,
   reconcileInheritanceStates,
   serializeInheritancePurchase,
 } from '../../lib/fate-inheritance.js';
@@ -72,6 +73,11 @@ const staleSubset={version:1,purchases:{'life-2':firstCommit.purchase},purchaseO
 assert.deepEqual(reconcileInheritanceStates(firstCommit.state,staleSubset,options),firstCommit.state,'a stale subset must not roll back the live ledger');
 const historicalNpcState={version:1,purchases:{'old-life':{lifeId:'old-life',cost:2,allocation:{fateAffinity:{npcKey:'retired_canonical_npc',level:1}}}},purchaseOrder:['old-life']};
 assert.equal(reconcileInheritanceStates(historicalNpcState,null,options).purchases['old-life'].cost,2,'a later registry change must not delete the cost of a historically valid purchase');
+const historicalAffinityRun=generateFateStartingCharacter({gender:'female',socialClass:'commoner',department:'마법과 1학년',seed:'historical-affinity',inheritance:{fateAffinity:{npcKey:'retired_canonical_npc',level:1}},inheritancePurchase:{lifeId:'old-life'},allowedNpcKeys:['retired_canonical_npc']});
+const reloadedHistoricalAffinity=normalizeCharacterCreation(JSON.parse(JSON.stringify(historicalAffinityRun.creation)),{allowedNpcKeys:affinityKeys});
+assert.equal(reloadedHistoricalAffinity.fateStart.inheritance.lifeId,'old-life','a committed historical receipt must survive a narrower current affinity allowlist');
+assert.equal(reloadedHistoricalAffinity.fateStart.inheritance.allocation.fateAffinity.npcKey,'retired_canonical_npc');
+assert.equal(reloadedHistoricalAffinity.fateStart.inheritance.cost,2,'historical accounting must remain attached to the applied affinity benefit');
 assert.throws(()=>commitInheritancePurchase(null,{fateBook,allocation,lifeId:'__proto__',...options}),/유효한 Next Life/,'prototype keys must never enter the meta ledger');
 
 class InheritanceLockManager {
@@ -113,6 +119,11 @@ assert.equal(contested.state.purchaseOrder.length,1,'a rejected concurrent purch
 assert.ok(inheritancePointSummary(contested.state,onePurchaseBook,options).spent<=onePurchaseBook.rewardTotal,'concurrent rejection must preserve spent <= earned');
 
 const twoPointAllocation=normalizeInheritanceAllocation({stats:{body:1}},options);
+const deviceA=commitInheritancePurchase(null,{fateBook:onePurchaseBook,allocation:fourPointAllocation,lifeId:'device-a',...options});
+const deviceB=commitInheritancePurchase(null,{fateBook:onePurchaseBook,allocation:fourPointAllocation,lifeId:'device-b',...options});
+assert.throws(()=>reconcileInheritanceImport(deviceA.state,deviceB.state,{...options,fateBook:onePurchaseBook}),/분기된 계승 원장/,'divergent device ledgers must fail closed instead of creating an overspent union');
+assert.ok(inheritancePointSummary(deviceA.state,onePurchaseBook,options).spent<=onePurchaseBook.rewardTotal,'a rejected divergent import must leave canonical accounting valid');
+assert.deepEqual(reconcileInheritanceImport(deviceA.state,null,{...options,fateBook:onePurchaseBook}),deviceA.state,'a stale non-divergent import must preserve newer canonical progression');
 const sufficient=await runConcurrentPurchases({book:onePurchaseBook,purchaseAllocation:twoPointAllocation,lifeIds:['enough-a','enough-b']});
 assert.equal(sufficient.results.every((row)=>row.status==='fulfilled'),true,'both serialized requests may succeed only when the shared balance covers both');
 assert.equal(sufficient.state.purchaseOrder.length,2);
@@ -171,9 +182,10 @@ assert.equal(evaluateFateStartingRealm({department:'기사과 1학년',baseStats
 
 const app=readFileSync('app.js','utf8'),runtime=readFileSync('app-runtime.js','utf8'),html=readFileSync('index.html','utf8'),serviceWorker=readFileSync('sw.js','utf8'),router=readFileSync('api/chat-router.js','utf8'),health=readFileSync('api/health.js','utf8');
 assert.match(app,/const FATE_INHERITANCE_KEY = 'lumensia\.inheritance\.v1'/,'inheritance spending must persist outside replaceable run saves');
-assert.match(app,/reconcileInheritanceStates\(loadJson\(FATE_INHERITANCE_KEY\), loadedRunSave\?\.inheritance/,'legacy/stale embedded meta state must reconcile with the live ledger');
+assert.match(app,/reconcileInheritanceImport\(storedInheritanceState,loadedRunSave\?\.inheritance,\{\.\.\.INHERITANCE_OPTIONS,fateBook\}\)[\s\S]*inheritanceLoadConflict=error\.message/,'legacy embedded ledgers must preserve canonical state and surface divergent conflicts');
 assert.match(app,/format:'lumensia\.save\.bundle\.v3',save,fateBook,inheritance:inheritanceState/,'exports must carry both canonical meta ledgers');
-assert.match(app,/fateBook=reconcileFateBooks\(fateBook,importedBook[\s\S]*inheritanceState=reconcileInheritanceStates\(inheritanceState,importedInheritance/,'imports must reconcile Fate Book authority before inheritance spending');
+assert.match(app,/nextBook=reconcileFateBooks\(currentBook,importedBook[\s\S]*nextInheritance=reconcileInheritanceImport\(currentInheritance,importedInheritance,\{\.\.\.INHERITANCE_OPTIONS,fateBook:nextBook\}\)/,'imports must reconcile Fate Book authority before fail-closed inheritance import');
+assert.match(app,/navigator\.locks\?\.request\)await serializeInheritancePurchase\(navigator\.locks,importTask\)[\s\S]*else if\(hasImportedPurchases\)await serializeInheritancePurchase\(navigator\.locks,importTask\)/,'imports share the purchase lock when available and paid-ledger imports fail closed without it');
 assert.match(app,/serializeInheritancePurchase\(navigator\.locks,\(\)=>\{/,'the complete paid Next Life transaction must use one inheritance-only exclusive lock');
 assert.match(app,/requestedQuote\.cost===0[\s\S]*createNewSaveFromCreator\(\)[\s\S]*return serializeInheritancePurchase\(navigator\.locks/,'zero-cost Fate Start must remain available while paid inheritance fails closed without serialization');
 assert.match(app,/commitInheritancePurchase\(inheritanceLedger,\{fateBook,allocation,lifeId:base\.id/,'Fate Start must commit against the ledger loaded inside the exclusive transaction');

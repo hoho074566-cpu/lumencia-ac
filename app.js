@@ -2,7 +2,7 @@ import { ASSETS } from './assets.js';
 import { migrateLegacyNpcKeys } from './save-migrations.js';
 import { createFreeCharacterCreation, fateOriginLockOptions, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation } from './lib/fate-start.js';
 import { fateBookRuntimeSnapshot, normalizeFateBook, reconcileFateBooks } from './lib/fate-ending.js';
-import { commitInheritancePurchase, FATE_AFFINITY_CANDIDATE_KEYS, inheritancePointSummary, normalizeInheritanceAllocation, quoteInheritanceAllocation, reconcileInheritanceStates, serializeInheritancePurchase } from './lib/fate-inheritance.js';
+import { commitInheritancePurchase, FATE_AFFINITY_CANDIDATE_KEYS, inheritancePointSummary, normalizeInheritanceAllocation, quoteInheritanceAllocation, reconcileInheritanceImport, reconcileInheritanceStates, serializeInheritancePurchase } from './lib/fate-inheritance.js';
 import { createNovelPresentationState, novelSceneTitle, resetNovelPresentationState, shouldShowNovelPortrait } from './lib/novel-presentation.js';
 
 const APP_VERSION = '1.4.8';
@@ -182,7 +182,11 @@ const defaultSave = () => ({
 const loadedRunSave = loadJson(SAVE_KEY) || defaultSave();
 let save = normalizeSave(loadedRunSave);
 let fateBook = reconcileFateBooks(loadJson(FATE_BOOK_KEY), loadedRunSave?.fateBook, { allowedCharacterKeys:CHARACTER_KEYS });
-let inheritanceState = reconcileInheritanceStates(loadJson(FATE_INHERITANCE_KEY), loadedRunSave?.inheritance, INHERITANCE_OPTIONS);
+const storedInheritanceState=loadJson(FATE_INHERITANCE_KEY);
+let inheritanceLoadConflict='';
+let inheritanceState;
+try{inheritanceState=reconcileInheritanceImport(storedInheritanceState,loadedRunSave?.inheritance,{...INHERITANCE_OPTIONS,fateBook});}
+catch(error){inheritanceState=reconcileInheritanceStates(storedInheritanceState,null,INHERITANCE_OPTIONS);inheritanceLoadConflict=error.message;}
 delete save.fateBook;
 delete save.inheritance;
 let settings = { ...defaultSettings, ...(loadJson(SETTINGS_KEY) || {}) };
@@ -201,6 +205,7 @@ function persistInheritance() {
 }
 function persistSettings() { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
 if (loadedRunSave?.fateBook || loadedRunSave?.inheritance) { persist(); persistFateBook(); void persistInheritance(); }
+if(inheritanceLoadConflict)setTimeout(()=>alert(`계승 원장 불러오기 거부: ${inheritanceLoadConflict}`),0);
 function uniq(arr) { return [...new Set((arr || []).filter(Boolean))]; }
 function clamp(n, min, max) { return Math.min(max, Math.max(min, Number(n) || 0)); }
 
@@ -1299,8 +1304,8 @@ function createNewSaveFromCreator({inheritanceLedger=inheritanceState}={}) {
 
 function restoreLocalStorageValue(key,value){if(value===null)localStorage.removeItem(key);else localStorage.setItem(key,value);}
 
-function assertPersistedInheritanceBenefit(persistedState,nextSave,purchase){
-  const summary=inheritancePointSummary(persistedState,fateBook,INHERITANCE_OPTIONS);
+function assertPersistedInheritanceBenefit(persistedState,nextSave,purchase,authorityBook=fateBook){
+  const summary=inheritancePointSummary(persistedState,authorityBook,INHERITANCE_OPTIONS);
   if(summary.overspent>0||summary.spent>summary.earned)throw new Error('계승 원장 무결성 실패: 사용 포인트가 획득 포인트를 초과함.');
   const benefitReceipt=nextSave.creation?.fateStart?.inheritance||null;
   if(!purchase&&benefitReceipt)throw new Error('계승 영수증 없이 다음 생 혜택이 적용됨.');
@@ -1409,7 +1414,38 @@ $('pcCreatorForm').addEventListener('submit',async(e)=>{e.preventDefault();if(pc
 async function exportSave() {
   persist(); persistFateBook(); await persistInheritance(); const bundle={format:'lumensia.save.bundle.v3',save,fateBook,inheritance:inheritanceState}; const blob = new Blob([JSON.stringify(bundle,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`lumensia-save-${save.world.date}-${save.world.time.replace(':','')}.json`; a.click(); URL.revokeObjectURL(a.href);
 }
-async function importSave(e) { const file=e.target.files?.[0]; if(!file)return; try { const parsed=JSON.parse(await file.text()); const bundled=/^lumensia\.save\.bundle\.v[23]$/.test(parsed?.format); const importedSave=bundled?parsed.save:parsed; if(!importedSave?.pc||!importedSave?.world)throw new Error('세이브 형식이 아님'); const importedBook=bundled?parsed.fateBook:parsed?.fateBook; const importedInheritance=bundled?parsed.inheritance:parsed?.inheritance; const importedRun={...importedSave}; delete importedRun.fateBook; delete importedRun.inheritance; save=normalizeSave(importedRun); fateBook=reconcileFateBooks(fateBook,importedBook,{allowedCharacterKeys:CHARACTER_KEYS}); inheritanceState=reconcileInheritanceStates(inheritanceState,importedInheritance,INHERITANCE_OPTIONS); persist(); persistFateBook(); await persistInheritance(); renderAll(); toast('세이브 불러옴'); } catch(err){alert(`불러오기 실패: ${err.message}`);} e.target.value=''; }
+async function importSave(e) {
+  const file=e.target.files?.[0];if(!file)return;
+  try{
+    const parsed=JSON.parse(await file.text()),bundled=/^lumensia\.save\.bundle\.v[23]$/.test(parsed?.format),importedSave=bundled?parsed.save:parsed;
+    if(!importedSave?.pc||!importedSave?.world)throw new Error('세이브 형식이 아님');
+    const importedBook=bundled?parsed.fateBook:parsed?.fateBook,importedInheritance=bundled?parsed.inheritance:parsed?.inheritance,importedRun={...importedSave};
+    delete importedRun.fateBook;delete importedRun.inheritance;
+    const importTask=({writeInheritance=true}={})=>{
+      const previousSave=save,previousFateBook=fateBook,previousInheritance=inheritanceState;
+      const previousStoredSave=localStorage.getItem(SAVE_KEY),previousStoredBook=localStorage.getItem(FATE_BOOK_KEY),previousStoredInheritance=localStorage.getItem(FATE_INHERITANCE_KEY);
+      try{
+        const currentBook=reconcileFateBooks(loadJson(FATE_BOOK_KEY),fateBook,{allowedCharacterKeys:CHARACTER_KEYS});
+        const nextBook=reconcileFateBooks(currentBook,importedBook,{allowedCharacterKeys:CHARACTER_KEYS});
+        const currentInheritance=reconcileInheritanceStates(loadJson(FATE_INHERITANCE_KEY),inheritanceState,INHERITANCE_OPTIONS);
+        const nextInheritance=reconcileInheritanceImport(currentInheritance,importedInheritance,{...INHERITANCE_OPTIONS,fateBook:nextBook});
+        const nextSave=normalizeSave(importedRun),receipt=nextSave.creation?.fateStart?.inheritance||null;
+        assertPersistedInheritanceBenefit(nextInheritance,nextSave,receipt,nextBook);
+        save=nextSave;fateBook=nextBook;inheritanceState=nextInheritance;
+        if(writeInheritance)localStorage.setItem(FATE_INHERITANCE_KEY,JSON.stringify(inheritanceState));persistFateBook();persist();
+      }catch(error){
+        restoreLocalStorageValue(SAVE_KEY,previousStoredSave);restoreLocalStorageValue(FATE_BOOK_KEY,previousStoredBook);restoreLocalStorageValue(FATE_INHERITANCE_KEY,previousStoredInheritance);
+        save=previousSave;fateBook=previousFateBook;inheritanceState=previousInheritance;throw error;
+      }
+    };
+    const hasImportedPurchases=Object.keys(importedInheritance?.purchases||{}).length>0;
+    if(navigator.locks?.request)await serializeInheritancePurchase(navigator.locks,importTask);
+    else if(hasImportedPurchases)await serializeInheritancePurchase(navigator.locks,importTask);
+    else importTask({writeInheritance:false});
+    renderAll();toast('세이브 불러옴');
+  }catch(err){alert(`불러오기 실패: ${err.message}`);}
+  e.target.value='';
+}
 function toast(text) { const d=document.createElement('div'); d.textContent=text; d.style.cssText='position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:99;background:#263449;padding:9px 14px;border-radius:999px'; document.body.append(d); setTimeout(()=>d.remove(),1300); }
 
 async function checkHealth() { try { const r=await fetch('/api/health'); const h=await r.json(); $('apiHealth').textContent=h.apiConfigured?`API 연결 준비됨 · ${h.luna} / ${h.terra}${h.accessTokenRequired ? ' · 접속 토큰 필요' : ''}`:'API 키 미설정. Vercel 환경변수 OPENAI_API_KEY를 추가하거나 데모 모드를 켜세요.'; } catch { $('apiHealth').textContent='API 상태를 확인할 수 없음.'; } }
