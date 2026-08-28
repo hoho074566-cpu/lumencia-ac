@@ -1,7 +1,7 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Narrative Phase 1 **FROZEN**. Phase 2 Implementation Pass is **COMPLETE** with `6 MERGED / 3 DEFERRED`. P2-PR09 is **MERGED** at PR #80. Full Phase 2 completion is **STABILIZATION REQUIRED** because Ending/Fate Book and Inheritance/Next Life are absent from actual main; no new Phase 2 feature PR is started by this closure.
+Narrative Phase 1 **FROZEN**. Phase 2 Implementation Pass is **COMPLETE** with `6 MERGED / 3 DEFERRED`; PR #81 closure is merged. Product completion is **STABILIZATION IN PROGRESS**: STAB-01 Ending/Fate Book is implemented locally from latest main, and STAB-02 Inheritance/Next Life remains ordered after STAB-01 human merge.
 
 ## Narrative Phase 1 FREEZE — Authoritative Closure
 - Verified main is `9f2274abeef7f34531c8d0240f66ed39293b9eef`, the human merge of PR #67 NPC Significance Evaluator V1 exact head `3293e1c11569e5531518ae7e05918a54693c2bb9`.
@@ -10,9 +10,27 @@ Narrative Phase 1 **FROZEN**. Phase 2 Implementation Pass is **COMPLETE** with `
 - PR #68 Relationship Thresholds V1 is DEFERRED at exact head `d58a31022ac7e5bc99c53fb1ee579405e78bd31f`: pre-turn eligibility misses current-turn threshold crossing, and rejected threshold followup can remain in NPC plan/reason. Correction budget 1/1 is exhausted. No correction, commit, merge, close, Preview mutation, or branch reuse is allowed.
 - PR #69 Knowledge Boundaries V1 is DEFERRED as an open draft at exact head `99f7e4975a186e68cfa1340f06019c46d23501ae`: a narration-only NPC can lose current-scene membership without normalized `speaker_key`, so the sanitizer may remove legitimate witnessed/told memory. Correction budget 1/1 is exhausted. No correction, commit, merge, close, Preview mutation, or branch reuse is allowed.
 - These three deferred blockers do not block the Phase 1 FREEZE. They are Phase 2/backlog stabilization candidates for later actual-play-impact reassessment, not prerequisites for Phase 2.
-- FREEZE: add no new Phase 1 Narrative Engine feature, correction, edge-case task, or scope expansion. NEXT ACTION: Narrative Phase 2 시작.
+- FREEZE: add no new Phase 1 Narrative Engine feature, correction, edge-case task, or scope expansion. The historical Phase 2-start action is satisfied; stabilization does not reopen Phase 1.
 
-## PHASE 2 FINAL INTEGRATION CLOSURE — AUTHORITATIVE
+## PHASE 2 STABILIZATION PASS — AUTHORITATIVE CURRENT STATE
+
+- PR #81 closure: **MERGED**. GitHub `merged=true`; merged head `901b091f596339ec997f78750045dfbcc2cb6a22` equals the reviewed/READY head. Merge commit/latest main `6438ae114b3b5432b4a581b4207ed3f760b18aa6`; parents `2af377878fe26e36f4b582f92c64d870ff2dda76` + exact head; main/reviewed merge tree `a258afc54c0dc723b467d856d46a09029a0cb6f0`.
+- PR #81 post-merge verification PASS: latest main fetched; behind 0/ahead 0; no conflict; clean worktree; exact merge parent/tree identity; full `scripts/lumensia-pr-check.mjs origin/main HEAD` PASS.
+- Phase state: Implementation Pass **COMPLETE**; product completion **STABILIZATION IN PROGRESS / NOT COMPLETE**. No additional Phase 2 feature PR is started.
+- STAB-01 is PR #82 on `codex/stab-01-ending-fate-book-runtime`, based directly on latest main `6438ae114b3b5432b4a581b4207ed3f760b18aa6`. Initial implementation `44a9f1cfc25f131c5ca429f9a7e5624fd867e8b5`; corrected implementation/review head `02e9ed9a8d1527e35f93c86ec825219aab7619f5`. No PR #79/#76 implementation, branch, commit, or cherry-pick was used.
+- Completed scope: canonical Ending Registry; General/Character/World/Dead Ending records; Failure/Dead Ending separation; current-turn terminal receipts; first-discovery reward ledger; repeat dedupe; Fate Book separate persistence and export; legacy embedded-ledger migration; stale import monotonic union; bounded context snapshot; canonical discovery/reward source for STAB-02.
+- Integrity guards: mode must be normal game; exact current-turn `ending:<id>` signal required; Dead Ending requires `death|catastrophe` plus `irreversible=true`; non-dead endings require `life_complete`; canonical NPC key validation; rewards are registry-derived and paid once; collection is not destructively capped.
+- Architecture: one canonical model call retained; no generic ending/quest engine, new model call, new parser/lifecycle, Korean wording regex, or deferred-branch correction. Fate Book is deliberately separate from replaceable run saves, while stale/legacy data is reconciled monotonically.
+- Tests PASS: `scripts/tests/fate-ending-runtime.test.mjs`; character/offline-cache regression; Fate Start, Origin, Background, Personal Story, Novel/UI; Context Router and authority-tail; CONTINUE/core; syntax/static; `git diff --check`; full `scripts/lumensia-pr-check.mjs origin/main HEAD`. Corrected implementation head Safety `33136589722`, Vercel `9mQhWrVCDQw1hzKfwnKknfGfxazf`, fresh exact-head P0=0/P1=0 comment `5447759111`, and official Merge Readiness PASS.
+- Initial review `5047465587` P1=2/P2=3 shared one incomplete terminal-receipt contract root. Correction `1/1` removes rejected terminal signals in direct/stable handlers, supplies canonical conditions to semantic judgment, fails closed on inherited registry properties, preserves the earliest known duplicate discovery, and freezes terminal narration in AUTO. Focused/full/hosted/fresh gates PASS. Scope expansion `NO`; old deferred branch touched `NO`; browser remains on the bounded fallback.
+- Deferred authority unchanged: PR #76/#79 frozen and not reusable; PR #66/#68/#69/#78 `STABILIZE LATER`; PR #72 `OBSOLETE / SUPERSEDED`; all untouched.
+- Non-gating `maintain-after-pr` failed only on an informational-comment GitHub integration 403 after a zero-error maintenance scan. Required Repository checks and official readiness PASS.
+- MERGE_GATE: corrected implementation head READY. Publish this final docs-only checkpoint, require its exact-head Safety/Vercel/fresh P0=0/P1=0, then human merge because protected runtime/API paths changed.
+- NEXT ACTION: human-merge PR #82 only at the final validated docs head; post-merge verify; then start STAB-02 from that new main on a separate branch.
+
+## PHASE 2 FINAL INTEGRATION CLOSURE — SUPERSEDED PRE-STABILIZATION SNAPSHOT
+
+> This preserves the pre-PR #81 stabilization decision. The STAB-01 section above is current authority.
 
 - `PHASE_2_IMPLEMENTATION_PASS`: **COMPLETE**; all nine planned PRs are terminal MERGED or DEFERRED.
 - `PHASE_2_STATUS`: **STABILIZATION REQUIRED / NOT YET PHASE 2 COMPLETE**. The merged main loop reaches existing World Consequence but cannot execute Ending → Inheritance → Next Life because PR #79/#76 are unmerged and their runtime contracts are absent.
@@ -711,7 +729,7 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 
 # NEXT ACTION — AUTHORITATIVE
 
-1. Narrative Phase 1 is frozen. Add no new Phase 1 Narrative Engine feature or correction task.
-2. Keep PR #66 `fbf2935c...`, PR #68 `d58a3102...`, and PR #69 `99f7e497...` deferred and untouched; their blockers are not freeze blockers.
-3. Begin Narrative Phase 2 from then-current verified main on a separate branch.
-4. Reassess deferred stabilization only later through Phase 2/backlog and actual-play impact; do not revisit it before Phase 2 starts.
+1. PR #81 closure is merged and post-merge verified at latest main `6438ae114b3b5432b4a581b4207ed3f760b18aa6` from exact reviewed head `901b091f596339ec997f78750045dfbcc2cb6a22`.
+2. Complete only PR #82's final docs-head Safety, Vercel, and fresh P0=0/P1=0; corrected implementation/review head is `02e9ed9a8d1527e35f93c86ec825219aab7619f5`, correction `1/1`.
+3. Require human merge of the final validated PR #82 head for protected runtime/API changes. Only after STAB-01 merge and post-merge verification, start STAB-02 from that new main on a separate branch.
+4. Do not modify, reuse, merge, close, cherry-pick, Preview-mutate, or stack on PR #76/#79. Keep PR #66/#68/#69/#78 and obsolete/superseded PR #72 untouched.

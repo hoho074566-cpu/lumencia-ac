@@ -1,5 +1,5 @@
-const CACHE='lumensia-shell-v11-novel-presentation-v156';
-const SHELL=['/','/index.html','/styles.css','/app-runtime.js','/app.js','/assets.js','/save-migrations.js','/lib/novel-presentation.js','/lib/debug-regression.js','/lib/event-progress.js','/lib/scene-continuity.js','/manifest.webmanifest'];
+const CACHE='lumensia-shell-v12-fate-ending-v1';
+const SHELL=['/','/index.html','/styles.css','/app-runtime.js','/app.js','/assets.js','/save-migrations.js','/lib/fate-ending.js','/lib/novel-presentation.js','/lib/debug-regression.js','/lib/event-progress.js','/lib/scene-continuity.js','/manifest.webmanifest'];
 self.addEventListener('install',e=>{
   self.skipWaiting();
   e.waitUntil(caches.open(CACHE).then(c=>Promise.allSettled(SHELL.map(url=>c.add(url)))));

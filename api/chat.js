@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { zodTextFormat } from 'openai/helpers/zod';
 import { z } from 'zod/v4';
 import { FACTION_EVIDENCE_TYPES, FACTION_KEYS } from '../lib/faction-social-consequence.js';
+import { applyEndingReceipts, FATE_ENDING_CONTRACT, projectEndingSignals } from '../lib/fate-ending.js';
 
 // LUMENSIA MOBILE V1.4.7 single-file API bundle
 // api/lib modules are inlined for mobile-friendly GitHub deployment.
@@ -1047,8 +1048,12 @@ const compactRecentTurns = (recentTurns = []) => recentTurns.slice(-6).map((turn
 }));
 
 // 절대 변하지 않는 prefix. prompt caching의 효율을 위해 설정 토글을 여기에 섞지 않는다.
-function buildInstructions() {
+function buildBaseInstructions() {
   return `${GM_RULES}\n\n===== GM STYLE CANON V4 =====\n${GM_STYLE_V4}\n\n===== CHARACTER REGISTRY =====\n${CHARACTER_REGISTRY_TEXT}\n\n===== WORLD CANON =====\n${CANON.world}\n\n===== NPC CANON =====\n${CANON.npc}\n\n===== NPC SPEECH =====\n${CANON.speech}\n\n===== OPTIONAL ADULT / INTIMACY SPEECH LAYER =====\n${CANON.adult}\n이 레이어는 TURN OPTIONS의 ADULT_MODE가 ON이고, PC와 해당 장면 참여자가 모두 성인이며 자유로운 상호 동의와 관계 맥락이 충족될 때만 활성화한다. OFF이면 친밀/성인 수위 규칙을 사용하지 않는다. ON이면 관계단계에 맞춰 성인다운 직접적 플러팅, 욕망 표현, 깊은 키스, 포옹, 밀착, 목/어깨 입맞춤, 비그래픽 손길, 호흡·체온·떨림·옷매무새, 침실/개인실 장면전환과 관계 후 대화를 충분히 활용한다. 구체적인 성행위 단계별 동작, 성기, 삽입, 구강행위 세부, 체액은 묘사하지 않는다.\n\n===== PC SYSTEM =====\n${CANON.pc_system}\n\n===== INITIAL CURRENT STATE =====\n${CANON.current}`;
+}
+
+function buildInstructions() {
+  return `${FATE_ENDING_CONTRACT}\n\n${buildBaseInstructions()}`;
 }
 
 function buildTurnInput({ action, saveState, recentTurns, rollingSummary, availableCgIds = [], adultMode = false, adultEligible = false, proseLength = 'medium', inputMode = 'game' }) {
@@ -1300,6 +1305,14 @@ const DirectorMeta = z.object({
   reason: z.string().min(1).max(280),
 });
 
+const EndingReceipt = z.object({
+  ending_id: z.string().min(1).max(120),
+  terminal_outcome: z.enum(['life_complete','death','catastrophe']),
+  irreversible: z.boolean(),
+  reason: z.string().min(1).max(500),
+  world_state: z.string().min(1).max(240),
+});
+
 const TurnSchema = z.object({
   director: DirectorMeta,
   scene_title: z.string().min(1).max(120),
@@ -1312,6 +1325,7 @@ const TurnSchema = z.object({
     active_beat: z.string().min(1).max(80).nullable(),
     completed_beats: z.array(z.string().min(1).max(80)).max(24),
   }).nullable(),
+  ending_receipts: z.array(EndingReceipt).max(4),
   state_delta: z.object({
     advance_minutes: z.number().int().min(0).max(1440),
     new_location: z.string().max(160).nullable(),
@@ -1455,6 +1469,13 @@ function sanitizeTurn(turn, { allowedCgIds = [] } = {}) {
     active_beat:/^[a-z0-9][a-z0-9._:#-]{0,79}$/i.test(beatId) ? beatId.toLowerCase() : null,
     completed_beats:[...new Set(arrays(eventProgress?.completed_beats,24).map(String).map(x=>x.trim().toLowerCase()).filter(x=>/^[a-z0-9][a-z0-9._:#-]{0,79}$/i.test(x)))],
   } : eventProgress === null ? null : undefined;
+  turn.ending_receipts = arrays(turn.ending_receipts,4).map((row)=>({
+    ending_id:String(row?.ending_id||'').trim().slice(0,120),
+    terminal_outcome:['life_complete','death','catastrophe'].includes(row?.terminal_outcome)?row.terminal_outcome:'life_complete',
+    irreversible:row?.irreversible===true,
+    reason:String(row?.reason||'').trim().slice(0,500),
+    world_state:String(row?.world_state||'').trim().slice(0,240),
+  })).filter((row)=>row.ending_id&&row.reason&&row.world_state);
   const sceneCap = turn.importance === 'routine' ? 8 : turn.importance === 'important' ? 14 : 18;
   turn.scene = arrays(turn.scene, sceneCap).map((item) => {
     if (item?.kind !== 'dialogue') {
@@ -1652,6 +1673,7 @@ export default async function handler(req, res) {
       turn.importance = 'routine';
       turn.cg_id = null;
       turn.choices = [];
+      turn.ending_receipts = [];
       turn.scene = (turn.scene || []).map(item => ({
         ...item,
         kind:'narration',
@@ -1673,8 +1695,20 @@ export default async function handler(req, res) {
     } else {
       turn = resolveTurnEmotions(turn, saveState);
     }
+    const fateEnding = applyEndingReceipts({
+      fateBook:body.fateBook,
+      receipts:turn.ending_receipts,
+      stateDelta:turn.state_delta,
+      allowedCharacterKeys:Object.keys(CHARACTER_REGISTRY),
+      runId:String(saveState?.id||''),
+      turnNumber:Number(saveState?.turnNumber||0)+1,
+      mode:inputMode === 'meta' ? 'meta' : 'game',
+    });
+    turn.ending_receipts = fateEnding.validReceipts;
+    if(turn.state_delta)turn.state_delta.completed_events_add=projectEndingSignals(turn.state_delta.completed_events_add,fateEnding.validReceipts,{allow:inputMode==='game'});
     return json(res, 200, {
       turn,
+      fate_ending:{version:1,accepted_discoveries:fateEnding.acceptedDiscoveries,repeated_discoveries:fateEnding.repeatedDiscoveries,reward_total:fateEnding.fateBook.rewardTotal},
       route: {
         model: route.model,
         tier: route.tier,
