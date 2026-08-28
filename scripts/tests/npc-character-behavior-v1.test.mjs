@@ -120,7 +120,7 @@ assert.equal(routed.telemetry.npc_character_behavior_v1.mode, 'semantic');
 assert.ok(routed.telemetry.npc_character_behavior_v1.npc_keys.includes('artemis'));
 assert.equal(routed.telemetry.npc_character_behavior_v1.evidence_count, 3);
 assert.match(routed.params.instructions, /NPC는 현재 행동을 자기 기억·기존 판단·목표·관계·지식과 비교/);
-assert.match(routed.params.instructions, /NPC 내부 감정은 대사 원문이 아니다/);
+assert.match(routed.params.instructions, /내부 감정은 대사 원문이 아니다/);
 assert.match(routed.params.input, /===== CHARACTER-DRIVEN NPC BEHAVIOR V1 =====/);
 assert.match(routed.params.input, /세 번째 훈련에서 다른 검으로도 원리를 적용/);
 assert.match(routed.params.input, /state_delta\.memories_add/);

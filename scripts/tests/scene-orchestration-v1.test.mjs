@@ -78,7 +78,7 @@ assert.equal(scheduleBoundary.trigger_minutes, 30);
 assert.ok(scheduleBoundary.suppressed.includes('present-npc-goal'), 'a reachable hard schedule must defer a competing NPC goal beat');
 const scheduleDirective = buildSceneOrchestrationDirective({ plan: scheduleBoundary });
 assert.match(scheduleDirective, /TRIGGER_MINUTES=30/);
-assert.match(scheduleDirective, /PRIMARY를 TRIGGER_MINUTES의 경계까지만 진행한 뒤 SECONDARY를 처리/,
+assert.match(scheduleDirective, /action-until-interruption은 TRIGGER_MINUTES까지만 진행/,
   'an interrupting boundary must cut off compressed primary action instead of waiting for its full completion');
 
 const resumedTimedScheduleBoundary=deriveSceneOrchestrationPlan({
@@ -104,7 +104,7 @@ const ownScheduledActivity=deriveSceneOrchestrationPlan({
   saveState:{world:{date:'1285-03-01',time:'09:00',location:'기숙사'},pc:{department:'기사과'},scheduleContext:{due:[],upcoming:[requestedClass]},scheduledEvents:[requestedClass],sceneRuntime:{}},
   directorTelemetry:{result:'NO_RANDOM_EVENT_DUE'},
 });
-assert.equal(ownScheduledActivity.secondary,'world-response','the orchestration layer must not reintroduce the requested class as its own interruption');
+assert.equal(ownScheduledActivity.secondary,'none','the orchestration layer must not reintroduce the requested class or a redundant world-response driver');
 assert.equal(ownScheduledActivity.trigger_minutes,null);
 
 const requestedConsult={id:'personal-consult',title:'개인 상담',kind:'personal',date:'1285-03-01',time:'10:00',status:'scheduled',participants:['emily']};
@@ -115,7 +115,7 @@ const namedScheduledActivity=deriveSceneOrchestrationPlan({
   directorTelemetry:{result:'DIRECT_USER_FOCUS'},
   registry:{emily:'에밀리'},
 });
-assert.equal(namedScheduledActivity.secondary,'world-response','canonical participant labels must keep a requested personal appointment out of schedule arbitration');
+assert.equal(namedScheduledActivity.secondary,'none','canonical participant labels must keep a requested personal appointment out of schedule arbitration and redundant drivers');
 assert.equal(namedScheduledActivity.trigger_minutes,null);
 
 const futureDateInterrupted=deriveSceneOrchestrationPlan({
@@ -140,8 +140,8 @@ const dueScheduleDoesNotFreezeAction = deriveSceneOrchestrationPlan({
   },
   directorTelemetry: { result: 'NO_RANDOM_EVENT_DUE' },
 });
-assert.equal(dueScheduleDoesNotFreezeAction.secondary, 'world-response',
-  'a due or overdue row is current context and must not become a new schedule interruption');
+assert.equal(dueScheduleDoesNotFreezeAction.secondary, 'none',
+  'a due or overdue row is current context and must not become a new schedule interruption or redundant driver');
 assert.equal(dueScheduleDoesNotFreezeAction.trigger_minutes, null,
   'a newly committed action must never receive a contradictory 0-minute hard stop from overdue context');
 
@@ -192,7 +192,7 @@ assert.match(directive, /PRIMARY=user-action/);
 assert.match(directive, /SECONDARY=present-npc-goal/);
 assert.match(directive, /MAX_DRIVERS=2/);
 assert.match(directive, /EFFECT_ONLY=relationship\|faction\|growth\|offscreen\|novelty/);
-assert.match(directive, /PC의 새 행동·대사·감정·생각·수락·거절·선택/);
+assert.match(directive, /HARD_DECISION.*종료용 NPC 질문은 금지/);
 assert.match(sceneOrchestrationActionFrame(presentGoal), /TURN_PLAN=user-action>present-npc-goal/);
 assert.match(sceneOrchestrationActionFrame(activeEvent), /BLOCK=director-event; EFFECT_ONLY/);
 
@@ -275,7 +275,7 @@ const routedNamedAppointment=routeOpenAIParams(
     recentTurns:[],
   },mode:'game'},
 );
-assert.equal(routedNamedAppointment.telemetry.scene_orchestration.secondary,'world-response','the routed orchestration plan must receive canonical labels parsed from the registry');
+assert.equal(routedNamedAppointment.telemetry.scene_orchestration.secondary,'none','the routed orchestration plan must receive canonical labels without adding a redundant driver');
 assert.equal(routedNamedAppointment.telemetry.scene_orchestration.trigger_minutes,null,'the routed requested appointment must not become its own stop boundary');
 
 const suppressedDirector = routeOpenAIParams(

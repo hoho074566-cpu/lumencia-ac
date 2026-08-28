@@ -21,10 +21,10 @@ const routerRules = context.match(/const ROUTER_GM_RULES = String\.raw`([\s\S]*?
 const novelContract = context.match(/const NATURAL_STYLE = String\.raw`([\s\S]*?)`;/)?.[1] || '';
 assert.match(novelContract, /CANONICAL NOVEL COMPOSITION CONTRACT/);
 assert.match(novelContract, /opening→environment\/reaction→named action\/dialogue/);
-assert.match(novelContract, /NPC 내부 감정은 대사 원문이 아니다/);
-assert.match(novelContract, /이동·행정·대기·평범한 절차는 선택 메뉴 없이 다음 meaningful state까지 압축/);
-assert.match(novelContract, /관계·갈등·이상·중요 정보\/판단·전투·실제 선택/);
-assert.match(novelContract, /직전 행동·NPC goal·관계·active thread·세계 상태/);
+assert.match(novelContract, /내부 감정은 대사 원문이 아니다/);
+assert.match(novelContract, /ROUTINE: DISTANCE > DEPTH/);
+assert.match(novelContract, /CHARACTER MUST SURVIVE FUNCTION/);
+assert.match(novelContract, /현재 Scene의 physical exit\/world response까지 잇되 later schedule\/event로 점프하지 않는다/);
 assert.match(novelContract, /scene_title은 위치·시간·참여자·목적·사건이 전환될 때만/);
 assert.match(routerRules, /USER ACTION 원문 전체의 긍정형 완료 의도와 구체적 제한을 최우선/);
 assert.match(routerRules, /이는 세계의 STOP 규칙이 아니다/);
