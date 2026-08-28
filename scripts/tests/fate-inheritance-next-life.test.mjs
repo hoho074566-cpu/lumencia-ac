@@ -7,6 +7,7 @@ import { ASSETS } from '../../assets.js';
 import { normalizeFateBook } from '../../lib/fate-ending.js';
 import {
   commitInheritancePurchase,
+  FATE_AFFINITY_CANDIDATE_KEYS,
   inheritancePointSummary,
   inheritanceRuntimeSnapshot,
   normalizeInheritanceAllocation,
@@ -21,10 +22,12 @@ import {
   normalizeCharacterCreation,
 } from '../../lib/fate-start.js';
 
-const npcKeys=Object.keys(ASSETS.characters||{}),options={allowedNpcKeys:npcKeys,allowedCharacterKeys:npcKeys};
-const fateBook=normalizeFateBook({discoveredIds:['general.honors','world.secret','world.transcendence','world.demon_cult']},{allowedCharacterKeys:npcKeys});
+const characterKeys=Object.keys(ASSETS.characters||{}),affinityKeys=FATE_AFFINITY_CANDIDATE_KEYS.filter((key)=>Object.hasOwn(ASSETS.characters||{},key)),options={allowedNpcKeys:affinityKeys,allowedCharacterKeys:characterKeys};
+assert.ok(affinityKeys.includes('artemis'));
+for(const restricted of ['delpirem','beelzebub','lily_lumina'])assert.equal(affinityKeys.includes(restricted),false,`${restricted} must remain unavailable before world discovery`);
+const fateBook=normalizeFateBook({discoveredIds:['general.honors','world.secret','world.transcendence','world.demon_cult']},{allowedCharacterKeys:characterKeys});
 assert.equal(fateBook.rewardTotal,5+10+9+8,'only canonical first-discovery Ending rewards may create inheritance-point authority');
-assert.equal(normalizeFateBook({discoveredIds:['general.honors','general.honors']},{allowedCharacterKeys:npcKeys}).rewardTotal,5,'duplicate Ending IDs must not farm inheritance points');
+assert.equal(normalizeFateBook({discoveredIds:['general.honors','general.honors']},{allowedCharacterKeys:characterKeys}).rewardTotal,5,'duplicate Ending IDs must not farm inheritance points');
 
 const allocation=normalizeInheritanceAllocation({
   stats:{mana:2},
@@ -32,6 +35,7 @@ const allocation=normalizeInheritanceAllocation({
   startingResources:1,
   fateAffinity:{npcKey:'artemis',level:1},
   originRerolls:1,
+  originDraw:1,
   originLocks:{regionKey:'south',occupationKey:'dockhand'},
 },options);
 const quote=quoteInheritanceAllocation(allocation,options);
@@ -76,8 +80,8 @@ const southOptions=fateOriginLockOptions({socialClass:'commoner',regionKey:'sout
 assert.equal(southOptions.occupations.every((row)=>row.regionKey==='south'),true);
 
 const seed='stab-02-life';
-const baseline=generateFateStartingCharacter({gender:'female',socialClass:'commoner',department:'마법과 1학년',seed,inheritance:{originRerolls:1,originLocks:{regionKey:'south',occupationKey:'dockhand'}},inheritancePurchase:{lifeId:'baseline'},allowedNpcKeys:npcKeys});
-const inherited=generateFateStartingCharacter({gender:'female',socialClass:'commoner',department:'마법과 1학년',seed,inheritance:allocation,inheritancePurchase:{lifeId:'life-2'},allowedNpcKeys:npcKeys});
+const baseline=generateFateStartingCharacter({gender:'female',socialClass:'commoner',department:'마법과 1학년',seed,inheritance:{originRerolls:1,originDraw:1,originLocks:{regionKey:'south',occupationKey:'dockhand'}},inheritancePurchase:{lifeId:'baseline'},allowedNpcKeys:affinityKeys});
+const inherited=generateFateStartingCharacter({gender:'female',socialClass:'commoner',department:'마법과 1학년',seed,inheritance:allocation,inheritancePurchase:{lifeId:'life-2'},allowedNpcKeys:affinityKeys});
 const origin=inherited.creation.fateStart.origin,baseOrigin=baseline.creation.fateStart.origin;
 assert.equal(origin.regionKey,'south');
 assert.equal(origin.occupationKey,'dockhand');
@@ -87,6 +91,7 @@ assert.equal(inherited.pc.gold,25);
 assert.ok(inherited.pc.inventory.includes('기초 여행 보급품'));
 assert.equal(inherited.initialRelationships.artemis.affinity,2);
 assert.equal(inherited.initialRelationships.artemis.trust,1);
+assert.equal(typeof inherited.initialRelationships.artemis.history[0],'string','Fate Affinity history must use the existing relationship string schema');
 assert.equal(inherited.creation.fateStart.version,3);
 assert.equal(inherited.creation.fateStart.inheritance.lifeId,'life-2');
 assert.equal(inherited.creation.fateStart.inheritance.cost,quote.cost);
@@ -95,14 +100,16 @@ assert.notEqual(inherited.pc.realm,'마스터');
 assert.notEqual(inherited.pc.realm,'고서클');
 assert.deepEqual(normalizeCharacterCreation(JSON.parse(JSON.stringify(inherited.creation))),inherited.creation,'applied inheritance must survive run save normalization');
 
-const occupationOnly=generateFateStartingCharacter({gender:'male',socialClass:'commoner',department:'기사과 1학년',seed:'occupation-only',inheritance:{originLocks:{occupationKey:'dockhand'}},inheritancePurchase:{lifeId:'life-lock'},allowedNpcKeys:npcKeys});
+const occupationOnly=generateFateStartingCharacter({gender:'male',socialClass:'commoner',department:'기사과 1학년',seed:'occupation-only',inheritance:{originLocks:{occupationKey:'dockhand'}},inheritancePurchase:{lifeId:'life-lock'},allowedNpcKeys:affinityKeys});
 assert.equal(occupationOnly.creation.fateStart.origin.regionKey,'south','an occupation-only lock must derive its one compatible region instead of being ignored');
 assert.equal(occupationOnly.creation.fateStart.origin.occupationKey,'dockhand');
-assert.throws(()=>generateFateStartingCharacter({gender:'male',socialClass:'commoner',department:'기사과 1학년',seed:'incompatible',inheritance:{originLocks:{regionKey:'north',occupationKey:'dockhand'}},inheritancePurchase:{lifeId:'bad'},allowedNpcKeys:npcKeys}),/양립할 수 없음/,'an incompatible region/occupation lock must fail visibly');
-assert.throws(()=>generateFateStartingCharacter({gender:'male',socialClass:'commoner',department:'기사과 1학년',seed:'missing-life',inheritance:{startingResources:1},allowedNpcKeys:npcKeys}),/Next Life 식별자/,'inherited benefits must never exist without a durable Next Life receipt');
+assert.throws(()=>generateFateStartingCharacter({gender:'male',socialClass:'commoner',department:'기사과 1학년',seed:'incompatible',inheritance:{originLocks:{regionKey:'north',occupationKey:'dockhand'}},inheritancePurchase:{lifeId:'bad'},allowedNpcKeys:affinityKeys}),/양립할 수 없음/,'an incompatible region/occupation lock must fail visibly');
+assert.throws(()=>generateFateStartingCharacter({gender:'male',socialClass:'commoner',department:'기사과 1학년',seed:'missing-life',inheritance:{startingResources:1},allowedNpcKeys:affinityKeys}),/Next Life 식별자/,'inherited benefits must never exist without a durable Next Life receipt');
 
 const rerollZero=generateFateStartingCharacter({gender:'male',socialClass:'fallen_noble',department:'일반학부 1학년',seed:'reroll-check'});
-const rerollOne=generateFateStartingCharacter({gender:'male',socialClass:'fallen_noble',department:'일반학부 1학년',seed:'reroll-check',inheritance:{originRerolls:1},inheritancePurchase:{lifeId:'reroll-life'}});
+const rerollAllowanceBase=generateFateStartingCharacter({gender:'male',socialClass:'fallen_noble',department:'일반학부 1학년',seed:'reroll-check',inheritance:{originRerolls:1,originDraw:0},inheritancePurchase:{lifeId:'reroll-base'}});
+const rerollOne=generateFateStartingCharacter({gender:'male',socialClass:'fallen_noble',department:'일반학부 1학년',seed:'reroll-check',inheritance:{originRerolls:1,originDraw:1},inheritancePurchase:{lifeId:'reroll-life'}});
+assert.equal(rerollZero.creation.fateStart.origin.seedTag,rerollAllowanceBase.creation.fateStart.origin.seedTag,'buying a reroll must preserve the base candidate for comparison');
 assert.notEqual(rerollZero.creation.fateStart.origin.seedTag,rerollOne.creation.fateStart.origin.seedTag,'an Origin reroll must actually select a different deterministic draw');
 assert.deepEqual(createFreeCharacterCreation(),{mode:'free',fateStart:null},'free creation must remain unchanged');
 
@@ -115,8 +122,14 @@ assert.match(app,/reconcileInheritanceStates\(loadJson\(FATE_INHERITANCE_KEY\), 
 assert.match(app,/format:'lumensia\.save\.bundle\.v3',save,fateBook,inheritance:inheritanceState/,'exports must carry both canonical meta ledgers');
 assert.match(app,/fateBook=reconcileFateBooks\(fateBook,importedBook[\s\S]*inheritanceState=reconcileInheritanceStates\(inheritanceState,importedInheritance/,'imports must reconcile Fate Book authority before inheritance spending');
 assert.match(app,/commitInheritancePurchase\(inheritanceState,\{fateBook,allocation,lifeId:base\.id/,'Fate Start must commit a bounded Next Life purchase');
+assert.match(app,/commitInheritancePurchase\(inheritanceState,\{fateBook,allocation,lifeId:base\.id,sourceRunId:save\.id,allowedNpcKeys,allowedCharacterKeys:CHARACTER_KEYS\}\)/,'purchase authority must retain every canonical Character Ending while affinity stays player-visible only');
+assert.match(app,/persistInheritance\(\) \{ inheritanceState=reconcileInheritanceStates\(loadJson\(FATE_INHERITANCE_KEY\),inheritanceState,INHERITANCE_OPTIONS\)/,'every write must merge the latest cross-tab ledger before persisting');
+assert.match(app,/inheritanceState=reconcileInheritanceStates\(loadJson\(FATE_INHERITANCE_KEY\),inheritanceState,INHERITANCE_OPTIONS\);[\s\S]*commitInheritancePurchase/,'Next Life must re-read cross-tab progression before validating its balance');
+assert.match(app,/FATE_AFFINITY_KEYS\.map/,'the selector must use the explicit player-visible Fate Affinity allowlist');
+assert.match(app,/renderInheritanceOriginPreview[\s\S]*후보 \$\{draw\+1\}\/\$\{allocation\.originRerolls\+1\}/,'purchased rerolls must expose selectable deterministic candidates');
 assert.match(runtime,/fate inheritance import/,'the deployed runtime must rewrite the new module import');
 assert.match(html,/다음 생 계승/);
+assert.match(html,/id="inheritOriginDraw"/);
 assert.match(serviceWorker,/\/lib\/fate-inheritance\.js/,'offline runtime must cache the inheritance dependency');
 assert.match(health,/fateInheritance:/,'health metadata must advertise the STAB-02 runtime');
 assert.equal((router.match(/=>coreHandler\(/g)||[]).length,1,'STAB-02 must retain one canonical model call');

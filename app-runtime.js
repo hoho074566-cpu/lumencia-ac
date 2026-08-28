@@ -800,8 +800,8 @@ async function boot() {
     );
     source = replaceOnce(
       source,
-      "import { commitInheritancePurchase, inheritancePointSummary, normalizeInheritanceAllocation, quoteInheritanceAllocation, reconcileInheritanceStates } from './lib/fate-inheritance.js';",
-      `import { commitInheritancePurchase, inheritancePointSummary, normalizeInheritanceAllocation, quoteInheritanceAllocation, reconcileInheritanceStates } from '${location.origin}/lib/fate-inheritance.js?v=156';`,
+      "import { commitInheritancePurchase, FATE_AFFINITY_CANDIDATE_KEYS, inheritancePointSummary, normalizeInheritanceAllocation, quoteInheritanceAllocation, reconcileInheritanceStates } from './lib/fate-inheritance.js';",
+      `import { commitInheritancePurchase, FATE_AFFINITY_CANDIDATE_KEYS, inheritancePointSummary, normalizeInheritanceAllocation, quoteInheritanceAllocation, reconcileInheritanceStates } from '${location.origin}/lib/fate-inheritance.js?v=156';`,
       'fate inheritance import'
     );
     source = replaceOnce(

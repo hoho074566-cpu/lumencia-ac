@@ -2,7 +2,7 @@ import { ASSETS } from './assets.js';
 import { migrateLegacyNpcKeys } from './save-migrations.js';
 import { createFreeCharacterCreation, fateOriginLockOptions, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation } from './lib/fate-start.js';
 import { fateBookRuntimeSnapshot, normalizeFateBook, reconcileFateBooks } from './lib/fate-ending.js';
-import { commitInheritancePurchase, inheritancePointSummary, normalizeInheritanceAllocation, quoteInheritanceAllocation, reconcileInheritanceStates } from './lib/fate-inheritance.js';
+import { commitInheritancePurchase, FATE_AFFINITY_CANDIDATE_KEYS, inheritancePointSummary, normalizeInheritanceAllocation, quoteInheritanceAllocation, reconcileInheritanceStates } from './lib/fate-inheritance.js';
 import { createNovelPresentationState, novelSceneTitle, resetNovelPresentationState, shouldShowNovelPortrait } from './lib/novel-presentation.js';
 
 const APP_VERSION = '1.4.8';
@@ -10,6 +10,9 @@ const SAVE_KEY = 'lumensia.save.v1';
 const SETTINGS_KEY = 'lumensia.settings.v1';
 const FATE_BOOK_KEY = 'lumensia.fate-book.v1';
 const FATE_INHERITANCE_KEY = 'lumensia.inheritance.v1';
+const CHARACTER_KEYS = Object.freeze(Object.keys(ASSETS.characters || {}));
+const FATE_AFFINITY_KEYS = Object.freeze(FATE_AFFINITY_CANDIDATE_KEYS.filter((key)=>Object.hasOwn(ASSETS.characters||{},key)));
+const INHERITANCE_OPTIONS = Object.freeze({ allowedNpcKeys:FATE_AFFINITY_KEYS, allowedCharacterKeys:CHARACTER_KEYS });
 
 const $ = (id) => document.getElementById(id);
 const story = $('story');
@@ -178,19 +181,20 @@ const defaultSave = () => ({
 
 const loadedRunSave = loadJson(SAVE_KEY) || defaultSave();
 let save = normalizeSave(loadedRunSave);
-let fateBook = reconcileFateBooks(loadJson(FATE_BOOK_KEY), loadedRunSave?.fateBook, { allowedCharacterKeys:Object.keys(ASSETS.characters || {}) });
-let inheritanceState = reconcileInheritanceStates(loadJson(FATE_INHERITANCE_KEY), loadedRunSave?.inheritance, { allowedNpcKeys:Object.keys(ASSETS.characters || {}), allowedCharacterKeys:Object.keys(ASSETS.characters || {}) });
+let fateBook = reconcileFateBooks(loadJson(FATE_BOOK_KEY), loadedRunSave?.fateBook, { allowedCharacterKeys:CHARACTER_KEYS });
+let inheritanceState = reconcileInheritanceStates(loadJson(FATE_INHERITANCE_KEY), loadedRunSave?.inheritance, INHERITANCE_OPTIONS);
 delete save.fateBook;
 delete save.inheritance;
 let settings = { ...defaultSettings, ...(loadJson(SETTINGS_KEY) || {}) };
 let busy = false;
 let forceTerraOnce = false;
 let metaModeOnce = false;
+let fateOriginPreviewSeed = '';
 
 function loadJson(key) { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } }
 function persist() { save.updatedAt = new Date().toISOString(); localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }
 function persistFateBook() { localStorage.setItem(FATE_BOOK_KEY, JSON.stringify(fateBook)); }
-function persistInheritance() { localStorage.setItem(FATE_INHERITANCE_KEY, JSON.stringify(inheritanceState)); }
+function persistInheritance() { inheritanceState=reconcileInheritanceStates(loadJson(FATE_INHERITANCE_KEY),inheritanceState,INHERITANCE_OPTIONS); localStorage.setItem(FATE_INHERITANCE_KEY, JSON.stringify(inheritanceState)); }
 function persistSettings() { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
 if (loadedRunSave?.fateBook || loadedRunSave?.inheritance) { persist(); persistFateBook(); persistInheritance(); }
 function uniq(arr) { return [...new Set((arr || []).filter(Boolean))]; }
@@ -203,7 +207,7 @@ function normalizeSave(raw) {
   next.version = 6;
   next.appVersion = APP_VERSION;
   next.world = { ...base.world, ...(next.world || {}) };
-  next.creation = normalizeCharacterCreation(next.creation,{allowedNpcKeys:Object.keys(ASSETS.characters||{})});
+  next.creation = normalizeCharacterCreation(next.creation,{allowedNpcKeys:FATE_AFFINITY_KEYS});
   next.pc = { ...base.pc, ...(next.pc || {}) };
   next.pc.stats = { ...base.pc.stats, ...(next.pc.stats || {}) };
   next.pc.skills = (next.pc.skills && typeof next.pc.skills === 'object' && !Array.isArray(next.pc.skills)) ? { ...next.pc.skills } : {};
@@ -517,7 +521,7 @@ function updateStatus(route) {
 }
 
 function renderInfo() {
-  const inheritancePoints=inheritancePointSummary(inheritanceState,fateBook,{allowedNpcKeys:Object.keys(ASSETS.characters||{}),allowedCharacterKeys:Object.keys(ASSETS.characters||{})});
+  const inheritancePoints=inheritancePointSummary(inheritanceState,fateBook,INHERITANCE_OPTIONS);
   const rel = Object.entries(save.relationships || {}).map(([key,v]) => `${ASSETS.characters[key]?.name || key}[호감 ${v.affinity||0} / 신뢰 ${v.trust||0}${v.status ? ` / ${v.status}`:''}]`).join(', ') || '-';
   const intimacy = Object.entries(save.intimacyStates || {}).filter(([,v]) => Number(v?.level || 0) > 0)
     .map(([key,v]) => `${ASSETS.characters[key]?.name || key}[L${Math.min(4, Number(v.level||0))}${Number(v.level||0)>=5 ? '/MAX':''}${v.status ? ` · ${v.status}`:''}]`)
@@ -1003,7 +1007,7 @@ function parseList(text='') { return uniq(String(text).split(/[\n,]+/).map(x=>x.
 const INHERITANCE_INPUT_IDS = Object.freeze([
   'inheritStatBody','inheritStatMana','inheritStatIntelligence','inheritStatDivinity',
   'inheritTalentMagic','inheritTalentMartial','inheritTalentSoul','inheritTalentKnowledge',
-  'inheritStartingResources','inheritOriginRerolls','inheritOriginRegion','inheritOriginOccupation','inheritAffinityNpc','inheritAffinityLevel',
+  'inheritStartingResources','inheritOriginRerolls','inheritOriginDraw','inheritOriginRegion','inheritOriginOccupation','inheritAffinityNpc','inheritAffinityLevel',
 ]);
 
 function readInheritanceAllocation() {
@@ -1013,8 +1017,9 @@ function readInheritanceAllocation() {
     startingResources:Number($('inheritStartingResources').value||0),
     fateAffinity:{npcKey:$('inheritAffinityNpc').value,level:Number($('inheritAffinityLevel').value||0)},
     originRerolls:Number($('inheritOriginRerolls').value||0),
+    originDraw:Number($('inheritOriginDraw').value||0),
     originLocks:{regionKey:$('inheritOriginRegion').value,occupationKey:$('inheritOriginOccupation').value},
-  },{allowedNpcKeys:Object.keys(ASSETS.characters||{}),strict:true});
+  },{allowedNpcKeys:FATE_AFFINITY_KEYS,strict:true});
 }
 
 function replaceSelectOptions(select,rows,{emptyLabel,keepValue=true}={}) {
@@ -1034,27 +1039,44 @@ function syncInheritanceOriginOptions() {
 }
 
 function syncInheritanceNpcOptions() {
-  const rows=Object.entries(ASSETS.characters||{}).map(([key,value])=>({key,label:value?.name||key})).sort((a,b)=>a.label.localeCompare(b.label,'ko'));
+  const rows=FATE_AFFINITY_KEYS.map((key)=>({key,label:ASSETS.characters[key]?.name||key})).sort((a,b)=>a.label.localeCompare(b.label,'ko'));
   replaceSelectOptions($('inheritAffinityNpc'),rows,{emptyLabel:'선택 안 함'});
 }
 
+function syncInheritanceDrawOptions() {
+  const select=$('inheritOriginDraw'),previous=select.value,count=Math.max(0,Math.min(2,Number($('inheritOriginRerolls').value||0))),rows=Array.from({length:count+1},(_,index)=>({key:String(index),label:index===0?'기본 추첨':`추가 추첨 ${index}`}));
+  select.replaceChildren(...rows.map((row)=>new Option(row.label,row.key)));
+  select.value=rows.some((row)=>row.key===previous)?previous:'0';
+}
+
+function renderInheritanceOriginPreview(allocation) {
+  const gender=$('fateGender').value,socialClass=$('fateSocialClass').value,department=$('fateDepartment').value;
+  if(!gender||!socialClass||!department||!fateOriginPreviewSeed){$('inheritOriginPreview').textContent='성별·신분·학과를 선택하면 현재 후보를 미리 볼 수 있음.';return;}
+  const candidate=generateFateStartingCharacter({gender,socialClass,department,seed:fateOriginPreviewSeed,inheritance:allocation,inheritancePurchase:{lifeId:'preview'},allowedNpcKeys:FATE_AFFINITY_KEYS});
+  const origin=candidate.creation.fateStart.origin,draw=allocation.originDraw;
+  $('inheritOriginPreview').textContent=`후보 ${draw+1}/${allocation.originRerolls+1} · ${origin.name} · ${origin.region} / ${origin.occupation} · 경지 ${candidate.pc.realm} · 스탯 ${Object.values(origin.baseStats).join('/')} · 재능 ${Object.values(origin.talents).join('/')}`;
+}
+
 function renderInheritanceCreator() {
-  const summary=inheritancePointSummary(inheritanceState,fateBook,{allowedNpcKeys:Object.keys(ASSETS.characters||{}),allowedCharacterKeys:Object.keys(ASSETS.characters||{})});
+  syncInheritanceDrawOptions();
+  const summary=inheritancePointSummary(inheritanceState,fateBook,INHERITANCE_OPTIONS);
   $('inheritancePointSummary').textContent=`운명록 최초 발견 ${summary.rewardSources.length}건 · 획득 ${summary.earned} · 사용 ${summary.spent} · 사용 가능 ${summary.available}`;
   try {
-    const quote=quoteInheritanceAllocation(readInheritanceAllocation(),{allowedNpcKeys:Object.keys(ASSETS.characters||{})});
+    const allocation=readInheritanceAllocation(),quote=quoteInheritanceAllocation(allocation,{allowedNpcKeys:FATE_AFFINITY_KEYS});
     const shortage=Math.max(0,quote.cost-summary.available);
     $('inheritanceCostSummary').textContent=`이번 다음 생 사용 ${quote.cost}${shortage?` · ${shortage} 부족`:''} · Realm / Circle은 직접 구매하지 않고 최종 능력으로 재계산됨.`;
     $('inheritanceCostSummary').classList.toggle('warn',shortage>0);
+    renderInheritanceOriginPreview(allocation);
   } catch(error) {
     $('inheritanceCostSummary').textContent=error.message;
     $('inheritanceCostSummary').classList.add('warn');
+    $('inheritOriginPreview').textContent='현재 계승 선택을 먼저 바로잡아야 후보를 볼 수 있음.';
   }
 }
 
 function resetInheritanceCreator() {
   for(const id of INHERITANCE_INPUT_IDS){const el=$(id);if(el)el.value='';}
-  for(const id of ['inheritStatBody','inheritStatMana','inheritStatIntelligence','inheritStatDivinity','inheritTalentMagic','inheritTalentMartial','inheritTalentSoul','inheritTalentKnowledge','inheritStartingResources','inheritOriginRerolls','inheritAffinityLevel'])$(id).value='0';
+  for(const id of ['inheritStatBody','inheritStatMana','inheritStatIntelligence','inheritStatDivinity','inheritTalentMagic','inheritTalentMartial','inheritTalentSoul','inheritTalentKnowledge','inheritStartingResources','inheritOriginRerolls','inheritOriginDraw','inheritAffinityLevel'])$(id).value='0';
   syncInheritanceOriginOptions();syncInheritanceNpcOptions();renderInheritanceCreator();
 }
 
@@ -1225,6 +1247,7 @@ function applyPastedPcText() {
 }
 
 function openPcCreator() {
+  fateOriginPreviewSeed=crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`;
   clearPcCreatorForm();
   syncFateDepartmentOptions();
   setPcCreationMode('free');
@@ -1233,13 +1256,15 @@ function openPcCreator() {
 function createNewSaveFromCreator() {
   const base=defaultSave();
   if($('pcCreationMode').value==='fate') {
-    const allowedNpcKeys=Object.keys(ASSETS.characters||{}),allocation=readInheritanceAllocation();
-    const quote=quoteInheritanceAllocation(allocation,{allowedNpcKeys}),points=inheritancePointSummary(inheritanceState,fateBook,{allowedNpcKeys,allowedCharacterKeys:allowedNpcKeys});
+    inheritanceState=reconcileInheritanceStates(loadJson(FATE_INHERITANCE_KEY),inheritanceState,INHERITANCE_OPTIONS);
+    const allowedNpcKeys=FATE_AFFINITY_KEYS,allocation=readInheritanceAllocation();
+    const quote=quoteInheritanceAllocation(allocation,{allowedNpcKeys}),points=inheritancePointSummary(inheritanceState,fateBook,INHERITANCE_OPTIONS);
     if(quote.cost>points.available)throw new Error(`계승 포인트 부족: 필요 ${quote.cost}, 사용 가능 ${points.available}`);
     const generated=generateFateStartingCharacter({
       gender:$('fateGender').value,
       socialClass:$('fateSocialClass').value,
       department:$('fateDepartment').value,
+      seed:fateOriginPreviewSeed,
       inheritance:allocation,
       inheritancePurchase:{lifeId:base.id},
       allowedNpcKeys,
@@ -1251,7 +1276,7 @@ function createNewSaveFromCreator() {
     const startRoute=generated.creation.fateStart.background.startingRoute;
     base.rollingSummary=`입학식 당일 08:40. ${base.pc.name}은(는) ${startRoute.arrivalFocus}에 도착했다. ${startRoute.eventMeaning}이며 첫 확인 지점은 ${startRoute.checkpoint}이다. 입학식 개막 전이다.`;
     const next=normalizeSave(base);
-    const committed=commitInheritancePurchase(inheritanceState,{fateBook,allocation,lifeId:base.id,sourceRunId:save.id,allowedNpcKeys,allowedCharacterKeys:allowedNpcKeys});
+    const committed=commitInheritancePurchase(inheritanceState,{fateBook,allocation,lifeId:base.id,sourceRunId:save.id,allowedNpcKeys,allowedCharacterKeys:CHARACTER_KEYS});
     inheritanceState=committed.state;
     return next;
   }
@@ -1323,7 +1348,9 @@ $('pcCreatorClearBtn').addEventListener('click',()=>clearPcCreatorForm({keepPast
 $('pcPasteApplyBtn').addEventListener('click',applyPastedPcText);
 $('pcFreeModeBtn').addEventListener('click',()=>setPcCreationMode('free'));
 $('pcFateModeBtn').addEventListener('click',()=>setPcCreationMode('fate'));
+$('fateGender').addEventListener('change',renderInheritanceCreator);
 $('fateSocialClass').addEventListener('change',()=>{syncInheritanceOriginOptions();renderInheritanceCreator();});
+$('fateDepartment').addEventListener('change',renderInheritanceCreator);
 $('inheritOriginRegion').addEventListener('change',()=>{syncInheritanceOriginOptions();renderInheritanceCreator();});
 for(const id of INHERITANCE_INPUT_IDS)$(id)?.addEventListener('change',renderInheritanceCreator);
 $('pcCreatorForm').addEventListener('submit',(e)=>{e.preventDefault();try{save=createNewSaveFromCreator();refreshScheduleContext();persist();persistInheritance();$('pcCreatorDialog').close();renderAll();toast(save.creation.mode==='fate'?`${save.pc.name}의 다음 운명 시작`:`${save.pc.name} 새 게임 생성`);}catch(error){alert(error.message);}});
@@ -1331,7 +1358,7 @@ $('pcCreatorForm').addEventListener('submit',(e)=>{e.preventDefault();try{save=c
 function exportSave() {
   persist(); persistFateBook(); persistInheritance(); const bundle={format:'lumensia.save.bundle.v3',save,fateBook,inheritance:inheritanceState}; const blob = new Blob([JSON.stringify(bundle,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`lumensia-save-${save.world.date}-${save.world.time.replace(':','')}.json`; a.click(); URL.revokeObjectURL(a.href);
 }
-async function importSave(e) { const file=e.target.files?.[0]; if(!file)return; try { const parsed=JSON.parse(await file.text()); const bundled=/^lumensia\.save\.bundle\.v[23]$/.test(parsed?.format); const importedSave=bundled?parsed.save:parsed; if(!importedSave?.pc||!importedSave?.world)throw new Error('세이브 형식이 아님'); const importedBook=bundled?parsed.fateBook:parsed?.fateBook; const importedInheritance=bundled?parsed.inheritance:parsed?.inheritance; const importedRun={...importedSave}; delete importedRun.fateBook; delete importedRun.inheritance; save=normalizeSave(importedRun); const allowedNpcKeys=Object.keys(ASSETS.characters||{}); fateBook=reconcileFateBooks(fateBook,importedBook,{allowedCharacterKeys:allowedNpcKeys}); inheritanceState=reconcileInheritanceStates(inheritanceState,importedInheritance,{allowedNpcKeys,allowedCharacterKeys:allowedNpcKeys}); persist(); persistFateBook(); persistInheritance(); renderAll(); toast('세이브 불러옴'); } catch(err){alert(`불러오기 실패: ${err.message}`);} e.target.value=''; }
+async function importSave(e) { const file=e.target.files?.[0]; if(!file)return; try { const parsed=JSON.parse(await file.text()); const bundled=/^lumensia\.save\.bundle\.v[23]$/.test(parsed?.format); const importedSave=bundled?parsed.save:parsed; if(!importedSave?.pc||!importedSave?.world)throw new Error('세이브 형식이 아님'); const importedBook=bundled?parsed.fateBook:parsed?.fateBook; const importedInheritance=bundled?parsed.inheritance:parsed?.inheritance; const importedRun={...importedSave}; delete importedRun.fateBook; delete importedRun.inheritance; save=normalizeSave(importedRun); fateBook=reconcileFateBooks(fateBook,importedBook,{allowedCharacterKeys:CHARACTER_KEYS}); inheritanceState=reconcileInheritanceStates(inheritanceState,importedInheritance,INHERITANCE_OPTIONS); persist(); persistFateBook(); persistInheritance(); renderAll(); toast('세이브 불러옴'); } catch(err){alert(`불러오기 실패: ${err.message}`);} e.target.value=''; }
 function toast(text) { const d=document.createElement('div'); d.textContent=text; d.style.cssText='position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:99;background:#263449;padding:9px 14px;border-radius:999px'; document.body.append(d); setTimeout(()=>d.remove(),1300); }
 
 async function checkHealth() { try { const r=await fetch('/api/health'); const h=await r.json(); $('apiHealth').textContent=h.apiConfigured?`API 연결 준비됨 · ${h.luna} / ${h.terra}${h.accessTokenRequired ? ' · 접속 토큰 필요' : ''}`:'API 키 미설정. Vercel 환경변수 OPENAI_API_KEY를 추가하거나 데모 모드를 켜세요.'; } catch { $('apiHealth').textContent='API 상태를 확인할 수 없음.'; } }
