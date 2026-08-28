@@ -1,6 +1,6 @@
 # LUMENSIA — CURRENT INTEGRATED DEVELOPMENT HANDOVER
 
-작성 기준: 2026-08-27
+작성 기준: 2026-08-28
 프로젝트: 긴빠이 프로젝트 / Lumensia Academy  
 Repository: `hoho074566-cpu/lumencia-ac`
 
@@ -37,7 +37,27 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - These deferred blockers are explicitly **not** Narrative Phase 1 FREEZE blockers. They are separate stabilization candidates for Phase 2/backlog, to be reassessed after Phase 2 using actual-play impact. Phase 1 adds no further Narrative Engine feature, correction, edge-case task, or scope expansion.
 - **NEXT ACTION: Narrative Phase 2 시작.** Do not return to Phase 1 deferred items before starting Phase 2.
 
-## PHASE 2 PROGRESS — CURRENT
+## PHASE 2 PROGRESS — AUTHORITATIVE P2-PR09
+
+- Current main/base: `363d120ac5a52ffdc03797fc0baf3e317801e1c9` (human merge of PR #77 READY head `905e4a27eff56667dae14144fbcc3de27ea5e77b`); main tree `12ae972481250b3f5316704da4c9cb2201c2821e`.
+- Active branch: `codex/p2-pr09-novel-experience-ui-polish`, created cleanly and directly from current main. It is not stacked on PR #76/#78/#79 and imports none of their unmerged implementations.
+- Overall: `5 / 9 PR merged`; terminal before current work: `8 / 9 processed`; Phase 2 queue: `3 DEFERRED`; separate Narrative Flavor insertion: `1 DEFERRED`.
+- P2-PR01 through P2-PR04 and P2-PR06 are **MERGED** at PR #71/#73/#74/#75/#77. P2-PR06's five precision P2 findings remain untouched non-blocking backlog.
+- P2-PR05 Inheritance remains terminal **DEFERRED** at PR #76. Exact implementation/review head `cc51c1a2f9bee4cb77958f9e68cf056f7edffb39`; final docs checkpoint `f10897c5424263fdafc133bd27698cd5ff61b1d7`; correction `1/1`. No correction, merge, close, Preview mutation, branch reuse, or dependency inference.
+- P2-PR07 Living World + Consequences remains terminal **DEFERRED** at PR #78. Exact implementation head `72f93c8ab0b9309f755729eecdcef862390684e3`; reviewed docs head `6251e1cc1218381097a33b0a71f668ee24ebfe81`; final docs checkpoint `12d14ae26781a3fae2f2cc3fe14f9da37daa2b52`; correction `1/1`. No correction, merge, close, Preview mutation, branch reuse, or stacking.
+- P2-PR08 Ending / Dead Ending / Fate Book remains terminal **DEFERRED** at PR #79. Corrected implementation/review head `601dcd9c6e84a93c2ec8a82aeb0b35bf7f4f82c5`, reviewed tree `0030f4c30237bc118f2fdd6fca3e38e724ed060e`, final docs checkpoint `5f526b549696a3515c1db9d112f87348f98e4381`, correction `1/1`, fresh review P0=0/P1=1/P2=4. Do not reanalyze or correct its blocker; no merge, close, Preview mutation, branch reuse, or stacking.
+- Narrative Flavor Baseline PR #72 remains draft/unmerged **DEFERRED** at exact head `8991f05a3d0faf65c7cb0aeb6046c23ec50c0a9d`; Phase 1 deferred PR #66/#68/#69 remain untouched at their frozen heads.
+- P2-PR09 Novel Experience + UI Polish — **IMPLEMENTED / LOCAL GATES PASS** at published implementation checkpoint `d8e4dcd9153e68bc4c99a2c7b22cc052a4d68cbb`, tree `5eb83921efd13beaf7ac8da9d0a23da4ae743d46`. The production Router/style instructions were consolidated rather than appended: USER ACTION completion and restrictions are unified at the highest rule, duplicate authority rules were deleted, and a short canonical AI-first Novel Narrative Contract delegates scene prose, rhythm, sensory choice, subtext, density, causal continuation, and character-specific reaction to model semantic judgment.
+- Production narrative/style footprint decreased from `5,321` to `5,230` characters. No prose scorer, wording regex policy, quota, narrative state machine, parser, lifecycle, save root, model call, generic NPC-thought engine, or deferred-PR correction was added.
+- Presentation-only UI polish hides route/cost/cache/internal diagnostics when DEBUG is off, suppresses unnecessary repeated same-NPC/same-expression large portraits while retaining expression changes, stabilizes scene titles across routine micro-actions, labels Suggested Actions as optional/direct-input-compatible, and removes AUTO/CONTINUE prefixes from world-facing scene titles. The helper is ephemeral UI state and is included in the offline shell.
+- P2-PR09 focused Novel/UI, Context Router, authority-tail, CONTINUE, core, Scene Momentum/Purpose/Exit/Hook, and NPC behavior suites PASS. Syntax/static checks, `git diff --check`, and full `scripts/lumensia-pr-check.mjs origin/main HEAD` PASS. Long USER ACTION preservation, user restriction priority, authority-tail, context pressure, and existing router/core invariants remain mandatory PASS.
+- Browser/Preview remains on the already-established bounded-unavailable fallback; no repeated recovery attempt was made. Hosted Safety, Vercel, and fresh exact-head review are pending publication and are not synthesized as PASS.
+- ROOT_CAUSE_CLASS: **NONE**; CORRECTION_BUDGET: **0/1**; SCOPE_EXPANSION: **NO**; PHASE1_DEFERRED_TOUCHED: **NO**; PR08_DEFERRED_TOUCHED: **NO**.
+- **NEXT ACTION:** publish P2-PR09 from exact implementation checkpoint, open a main-target PR, then require exact-head Safety, Vercel, and fresh review. Only an actual P1 contract violation may consume the single bounded correction; prose precision P2/P3 remains non-blocking. Protected `app.js`, `app-runtime.js`, and `api/**` changes make final merge human-only.
+
+## PHASE 2 PROGRESS — SUPERSEDED PRE-PR07 SNAPSHOT
+
+> The section below is historical and non-actionable. Its old branch/status/NEXT ACTION values are superseded by the authoritative P2-PR09 section above.
 
 - Current main/base: `c1f7980fc3b2b15fac5311f6dcd78fdd4d1a9bea` (human merge of PR #75); reviewed final head `887595551facbcfe6a38a46fe77361627e1844b0` and merged main share tree `49deaa2909beb2cb1c8d584203e3786ab4395094`.
 - Branch: `codex/p2-pr06-character-driven-npc-behavior` from current main. PR #76 is not a branch base or dependency.
