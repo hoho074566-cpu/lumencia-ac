@@ -219,18 +219,19 @@ const mentorBoundary = {
 };
 const requestedClass = {
   id: 'basic_class', title: '기사과 기초 수업', date: '1285-03-01', time: '10:00',
-  location: '기사과 강의실', kind: 'academic', participants: ['artemis'], status: 'scheduled',
+  location: '기사과 강의실', kind: 'academic', participants: ['artemis', 'lillia', 'laris', 'sera', 'isabel'], status: 'scheduled',
 };
 const afterClass = {
   id: 'after_class_drill', title: '오후 자율 훈련', date: '1285-03-01', time: '13:00',
   location: '기사과 연무장', kind: 'academic', participants: ['lillia'], status: 'scheduled',
 };
-const boundedRequestedClass = route('10시에 기사과 기초 수업에 참석한다.', { savePatch: {
+const boundedRequestedClass = route('이사벨과 10시에 기사과 기초 수업에 참석한다.', { savePatch: {
   world: { date: '1285-03-01', time: '09:00', location: '기숙사' },
   sceneRuntime: { participants: [] },
   scheduledEvents: [mentorBoundary, requestedClass, afterClass],
   scheduleContext: { due: [], upcoming: [mentorBoundary, requestedClass, afterClass] },
 } });
+assert.deepEqual(boundedRequestedClass.telemetry.selected_npcs.slice(0, 2), ['isabel', 'emily'], 'explicit USER ACTION and the immediate boundary participant must outrank requested-event bulk participants');
 assert.match(boundedRequestedClass.params.input, /SCHEDULE_BOUNDARY=30min/, 'the earlier PC appointment must remain the deterministic stop boundary');
 assert.match(boundedRequestedClass.params.input, /mentor_meeting/);
 assert.match(boundedRequestedClass.params.input, /본관 응접실/);
