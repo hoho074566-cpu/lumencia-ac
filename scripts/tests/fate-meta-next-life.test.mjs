@@ -57,6 +57,7 @@ assert.ok(removedAffinity.meta.purchaseReceipts['purchase-affinity']);
 const progressive=quoteInheritanceAllocations([{kind:'stat',target:'body'},{kind:'stat',target:'body'}],emptyMeta,options);
 assert.deepEqual(progressive.costs,[1,2]);
 assert.throws(()=>quoteInheritanceAllocations([{kind:'stat',target:'realm'}],emptyMeta,options),/구매할 수 없는/);
+assert.throws(()=>quoteInheritanceAllocations([{kind:'affinity',target:'artemis'},{kind:'affinity',target:'artemis'}],emptyMeta,options),/같은 Fate Affinity/,'one receipt must not charge twice for the same non-stacking affinity benefit');
 
 // H — a committed receipt is the only authority for an applied Next Life benefit.
 const generated=generateFateStartingCharacter({gender:'female',socialClass:'commoner',department:'기사과 1학년',seed:'next-life-affinity'});
@@ -78,6 +79,9 @@ const magicApplied=applyInheritanceReceipt(magicBase,fullPurchase.receipt);
 assert.equal(magicApplied.pc.gold,50);
 assert.ok(magicApplied.pc.inventory.includes('계승 보급품 x1'));
 assert.notEqual(magicApplied.pc.realm,'','Realm/Circle must be recalculated only after inheritance is applied');
+assert.equal(magicApplied.creation.fateStart.origin.baseStats.mana,['F','E','D','C','B','A','S','SS','SSS'].indexOf(magicApplied.pc.stats['마나'].grade)+1,'inherited stats must update the canonical Origin evaluation source');
+assert.equal(magicApplied.creation.fateStart.origin.talents.magic,magicApplied.pc.talents.magic,'inherited talents must update the canonical Origin evaluation source');
+assert.equal(magicApplied.creation.fateStart.background.strengthProfile.band,'advanced_start','final background evaluation must include inherited stats and talents');
 assert.equal(normalizeCharacterCreation(magicApplied.creation).fateStart.version,2,'final inherited PC evaluation must preserve the structured Origin lifecycle');
 
 // C — malformed receipt + surviving benefit is rejected before any canonical mutation.
@@ -139,6 +143,9 @@ const app=readFileSync('app.js','utf8'),runtime=readFileSync('app-runtime.js','u
 assert.match(app,/navigator\.locks\?\.request/,'same-device purchases must use the browser Web Lock boundary');
 assert.match(app,/const META_PROGRESSION_LOCK = 'lumensia-meta-progression'/);
 assert.ok((app.match(/withMetaProgressionLock\(/g)||[]).length>=5,'Ending persistence, purchase, export, and import must share one meta lock');
+assert.match(app,/const loadedRunCheck=inspectRunInheritance\(loadedRunSave,fateBookIntegrity&&inheritanceMetaIntegrity\?inheritanceMeta:null\)/,'a malformed auxiliary ledger must not delete an unmarked run');
+assert.match(app,/if\(!nextLifeSessionActive\)[\s\S]*nextLifeDraft=\[\][\s\S]*nextLifeSessionActive=true/,'reopening a cancelled reroll session must preserve its charged draft');
+assert.match(app,/resetNextLifeSession\(\)[\s\S]*Next Life 시작/,'the reroll draft may reset only after Next Life succeeds');
 assert.match(app,/async function persistFateBook\(\)[\s\S]*inspectFateBook\(loadJson\(FATE_BOOK_KEY\)[\s\S]*reconcileFateBooks\(current\.book,fateBook/,'Ending persistence must re-read and preserve newer canonical receipts');
 assert.match(app,/pendingNextLife\?\.meta[\s\S]*await withMetaProgressionLock[\s\S]*currentFateBook:loadJson\(FATE_BOOK_KEY\),currentMeta:loadJson\(FATE_INHERITANCE_KEY\)/,'journal recovery must validate fresh canonical storage inside the shared lock');
 const exportPath=app.slice(app.indexOf('async function exportSave()'),app.indexOf('async function importSave'));

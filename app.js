@@ -198,8 +198,8 @@ if(pendingNextLife?.meta&&pendingNextLife?.save){
     fateBook=recovered.fateBook;fateBookIntegrity=true;inheritanceMeta=recovered.meta;inheritanceMetaIntegrity=true;loadedRunSave=recovered.run;
   }catch(error){inheritanceBootError=`미완료 Next Life 복구 거부: ${error.message}`;console.error('Next Life recovery rejected',error);}
 }
-const loadedRunCheck=fateBookIntegrity&&inheritanceMetaIntegrity?inspectRunInheritance(loadedRunSave,inheritanceMeta):{valid:false,error:'canonical progression integrity failure'};
-if(!loadedRunCheck.valid)inheritanceBootError=`계승 receipt와 일치하지 않는 run을 불러오지 않음: ${loadedRunCheck.error}`;
+const loadedRunCheck=inspectRunInheritance(loadedRunSave,fateBookIntegrity&&inheritanceMetaIntegrity?inheritanceMeta:null);
+if(!loadedRunCheck.valid)inheritanceBootError=inheritanceBootError||`계승 receipt와 일치하지 않는 run을 불러오지 않음: ${loadedRunCheck.error}`;
 let save = normalizeSave(loadedRunCheck.valid?loadedRunSave:defaultSave());
 delete save.fateBook;
 let settings = { ...defaultSettings, ...(loadJson(SETTINGS_KEY) || {}) };
@@ -208,6 +208,8 @@ let forceTerraOnce = false;
 let metaModeOnce = false;
 let nextLifeDraft = [];
 let nextLifeSeed = '';
+let nextLifeSessionActive = false;
+let nextLifePreviewText = 'Next Life를 시작하면 새 Origin을 생성한다.';
 
 function loadJson(key) { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } }
 function persist() { save.updatedAt = new Date().toISOString(); localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }
@@ -1266,9 +1268,12 @@ function renderInheritanceDraft(){
   }catch(error){$('inheritanceDraft').textContent=`배분 불가: ${error.message}`;}
 }
 function openNextLife(){
-  const current=save.creation?.mode==='fate'?save.creation.fateStart:{};
-  $('nextLifeGender').value=current.gender||'';$('nextLifeSocialClass').value=current.socialClass||'';$('nextLifeDepartment').value=current.department||save.pc.department||'';
-  nextLifeDraft=[];nextLifeSeed=transactionId('origin');syncInheritanceTargetOptions();syncOriginLockOptions();renderInheritanceDraft();$('originPreview').textContent='Next Life를 시작하면 새 Origin을 생성한다.';$('nextLifeDialog').showModal();
+  if(!nextLifeSessionActive){
+    const current=save.creation?.mode==='fate'?save.creation.fateStart:{};
+    $('nextLifeGender').value=current.gender||'';$('nextLifeSocialClass').value=current.socialClass||'';$('nextLifeDepartment').value=current.department||save.pc.department||'';
+    nextLifeDraft=[];nextLifeSeed=transactionId('origin');nextLifePreviewText='Next Life를 시작하면 새 Origin을 생성한다.';nextLifeSessionActive=true;
+  }
+  syncInheritanceTargetOptions();syncOriginLockOptions();renderInheritanceDraft();$('originPreview').textContent=nextLifePreviewText;$('nextLifeDialog').showModal();
 }
 function previewNextLifeOrigin({charge=false}={}){
   const selection=nextLifeSelection(),locks=selectedOriginLocks(),seed=transactionId('origin');
@@ -1282,9 +1287,10 @@ function previewNextLifeOrigin({charge=false}={}){
       if(quote.cost>inheritanceBalance(fateBook,inheritanceMeta).available)throw new Error('계승 원천이 부족함.');
       nextLifeDraft=draft;
     }
-    nextLifeSeed=seed;$('originPreview').textContent=`${origin.region} · ${origin.occupation}\n${origin.originStory.join('\n')}`;renderInheritanceDraft();
-  }catch(error){$('originPreview').textContent=`Origin 생성 불가: ${error.message}`;}
+    nextLifeSeed=seed;nextLifePreviewText=`${origin.region} · ${origin.occupation}\n${origin.originStory.join('\n')}`;$('originPreview').textContent=nextLifePreviewText;renderInheritanceDraft();
+  }catch(error){nextLifePreviewText=`Origin 생성 불가: ${error.message}`;$('originPreview').textContent=nextLifePreviewText;}
 }
+function resetNextLifeSession(){nextLifeDraft=[];nextLifeSeed='';nextLifeSessionActive=false;nextLifePreviewText='Next Life를 시작하면 새 Origin을 생성한다.';}
 function buildNextLifeRun({selection,locks,runId,receipt}){
   const generated=generateFateStartingCharacter({...selection,seed:nextLifeSeed||transactionId('origin'),originLocks:locks});
   const inherited=applyInheritanceReceipt(generated,receipt),base=defaultSave(),labels=fateStartLabels(inherited.creation.fateStart);
@@ -1296,7 +1302,7 @@ function buildNextLifeRun({selection,locks,runId,receipt}){
 async function startNextLife(){
   const selection=nextLifeSelection(),locks=selectedOriginLocks(),lockRows=Object.entries(locks).filter(([,value])=>value).map(([field,value])=>({kind:'origin_lock',target:'origin',field,value})),allocations=[...nextLifeDraft,...lockRows],runId=transactionId('life');
   if(!validateFateOriginLocks({...selection,...locks}))throw new Error('지역과 직업 Origin lock이 양립하지 않음.');
-  if(!allocations.length){save=buildNextLifeRun({selection,locks,runId,receipt:null});persist();$('nextLifeDialog').close();renderAll();toast(`${save.pc.name}의 Next Life 시작`);return;}
+  if(!allocations.length){save=buildNextLifeRun({selection,locks,runId,receipt:null});persist();resetNextLifeSession();$('nextLifeDialog').close();renderAll();toast(`${save.pc.name}의 Next Life 시작`);return;}
   const result=await withMetaProgressionLock(async()=>{
     const freshBookCheck=inspectFateBook(loadJson(FATE_BOOK_KEY),{allowedCharacterKeys:Object.keys(ASSETS.characters||{})});
     const freshMetaCheck=inspectInheritanceMeta(loadJson(FATE_INHERITANCE_KEY));
@@ -1306,7 +1312,7 @@ async function startNextLife(){
     localStorage.setItem(NEXT_LIFE_PENDING_KEY,JSON.stringify(pending));localStorage.setItem(FATE_INHERITANCE_KEY,JSON.stringify(purchase.meta));localStorage.setItem(SAVE_KEY,JSON.stringify(run));localStorage.removeItem(NEXT_LIFE_PENDING_KEY);
     return{...purchase,run,fateBook:freshBookCheck.book};
   });
-  fateBook=result.fateBook;inheritanceMeta=result.meta;inheritanceMetaIntegrity=true;save=result.run;$('nextLifeDialog').close();renderAll();toast(`${save.pc.name}의 Next Life 시작 · ${result.receipt.cost} 소비`);
+  fateBook=result.fateBook;inheritanceMeta=result.meta;inheritanceMetaIntegrity=true;save=result.run;resetNextLifeSession();$('nextLifeDialog').close();renderAll();toast(`${save.pc.name}의 Next Life 시작 · ${result.receipt.cost} 소비`);
 }
 
 function renderDebug() {
@@ -1399,7 +1405,7 @@ async function importSave(e) {
       localStorage.setItem(NEXT_LIFE_PENDING_KEY,JSON.stringify(pending));localStorage.setItem(FATE_BOOK_KEY,JSON.stringify(candidate.fateBook));localStorage.setItem(FATE_INHERITANCE_KEY,JSON.stringify(candidate.meta));localStorage.setItem(SAVE_KEY,JSON.stringify(normalizedRun));localStorage.removeItem(NEXT_LIFE_PENDING_KEY);
       return{...candidate,run:normalizedRun};
     });
-    fateBook=result.fateBook;fateBookIntegrity=true;inheritanceMeta=result.meta;inheritanceMetaIntegrity=true;save=result.run;renderAll();toast('세이브 불러옴');
+    fateBook=result.fateBook;fateBookIntegrity=true;inheritanceMeta=result.meta;inheritanceMetaIntegrity=true;save=result.run;resetNextLifeSession();renderAll();toast('세이브 불러옴');
   }catch(err){alert(`불러오기 실패: ${err.message}`);}e.target.value='';
 }
 function toast(text) { const d=document.createElement('div'); d.textContent=text; d.style.cssText='position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:99;background:#263449;padding:9px 14px;border-radius:999px'; document.body.append(d); setTimeout(()=>d.remove(),1300); }
