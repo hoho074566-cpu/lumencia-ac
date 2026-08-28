@@ -1235,7 +1235,7 @@ function createNewSaveFromCreator() {
     base.creation=generated.creation;
     base.pc={...base.pc,...generated.pc,gender:labels.gender,socialStatus:labels.socialClass,department:labels.department};
     const startRoute=generated.creation.fateStart.background.startingRoute;
-    base.rollingSummary=`입학식 당일 08:40. ${base.pc.name}은(는) ${startRoute.arrivalFocus}에 도착했다. ${startRoute.eventMeaning}이며 첫 확인 지점은 ${startRoute.checkpoint}이다. 입학식 개막 전이다.`;
+    base.rollingSummary=`입학식 당일 08:40. ${base.pc.name}은(는) ${startRoute.arrivalFocus}에 도착했다. 입학식 개막 전이다.`;
     return normalizeSave(base);
   }
   base.creation=createFreeCharacterCreation();
@@ -1344,7 +1344,7 @@ async function submitNextLife(){
       commitCanonical:(prepared)=>{
         assertActiveRunOwner(owner);prepared.nextRun.updatedAt=new Date().toISOString();
         const route=prepared.nextRun.creation.fateStart.background.startingRoute;
-        prepared.nextRun.rollingSummary=`입학식 당일 08:40. ${prepared.nextRun.pc.name}은(는) ${route.arrivalFocus}에 도착했다. ${route.eventMeaning}이며 첫 확인 지점은 ${route.checkpoint}이다. 계승 receipt가 적용된 다음 생이다.`;
+        prepared.nextRun.rollingSummary=`입학식 당일 08:40. ${prepared.nextRun.pc.name}은(는) ${route.arrivalFocus}에 도착했다. 계승 receipt가 적용된 다음 생이며 입학식 개막 전이다.`;
         commitRunFateAndInheritance(localStorage,RUN_COMMIT_KEYS,{owner,isOwnerCurrent:isActiveRunOwner,nextRun:prepared.nextRun,nextFateBook:prepared.fateBook,nextInheritanceMeta:prepared.inheritanceMeta});
       },
     });
