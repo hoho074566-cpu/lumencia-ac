@@ -48,7 +48,7 @@ const originalInput=`===== TURN OPTIONS =====\nnormal
 ===== GM EVENT DIRECTOR (SERVER GUIDANCE) =====
 INTERVENTION: light\nDIRECTOR_SENTINEL=KEEP
 ===== SCHEDULE ENGINE (AUTHORITATIVE) =====\nSCHEDULE_SENTINEL`;
-const routed=routeOpenAIParams({instructions,input:originalInput},{mode:'game',incoming:{action:longAction,rollingSummary:'old '.repeat(5000),recentTurns:[],saveState:{turnNumber:8,world:{date:'1285-03-01',time:'09:00',location:'SAVE_WORLD_SENTINEL'},pc:{name:'SAVE_PC_SENTINEL'},npcStates:{guide:{location:'hall'}},sceneRuntime:{participants:['guide'],purpose:{version:'1.0',kind:'interaction',focus:'PURPOSE_RUNTIME_SENTINEL',source:'npc-interaction',established_turn:8},exit_condition:{version:'1.0',kind:'interaction-turn',target:'EXIT_RUNTIME_SENTINEL',source:'scene-purpose',status:'open',established_turn:8,purpose_established_turn:8},turn_hook:{version:'1.0',kind:'npc-address',anchor:'TURN_HOOK_RUNTIME_SENTINEL',source:'scene-dialogue',status:'awaiting-player',established_turn:8,speaker_key:'guide'},momentum:{stall_streak:2}},scheduleContext:{due:[{id:'SCHEDULE_SENTINEL',title:'ceremony',note:'NOTE_SENTINEL',time:'09:10',participants:['guide'],pc_required:true}],npc_schedule:{guide:{location:'hall',activity:'class',commitment:'fixed class',confidence:'fixed',time:'09:10'}}}}}});
+const routed=routeOpenAIParams({instructions,input:originalInput},{mode:'game',incoming:{action:longAction,rollingSummary:'old '.repeat(5000),recentTurns:[],saveState:{turnNumber:8,world:{date:'1285-03-01',time:'09:00',location:'SAVE_WORLD_SENTINEL'},pc:{name:'SAVE_PC_SENTINEL'},npcStates:{guide:{location:'hall'}},sceneRuntime:{participants:['guide'],purpose:{version:'1.0',kind:'interaction',focus:'PURPOSE_RUNTIME_SENTINEL',source:'npc-interaction',established_turn:8},exit_condition:{version:'1.0',kind:'interaction-turn',target:'EXIT_RUNTIME_SENTINEL',source:'scene-purpose',status:'open',established_turn:8,purpose_established_turn:8},turn_hook:{version:'1.0',kind:'npc-address',anchor:'TURN_HOOK_RUNTIME_SENTINEL',source:'scene-dialogue',status:'awaiting-player',established_turn:8,speaker_key:'guide'},momentum:{stall_streak:2}},scheduleContext:{due:[{id:'SCHEDULE_SENTINEL',title:'ceremony',note:'NOTE_SENTINEL',time:'09:10',actor_key:'guide',participants:['guide'],pc_required:true}],npc_schedule:{guide:{location:'hall',activity:'class',commitment:'fixed class',confidence:'fixed',time:'09:10'}}}}}});
 assert.ok(routed.params.input.length<=9000,`long-action routine input exceeded budget: ${routed.params.input.length}`);
 assert.match(routed.params.input,/AUTHORITATIVE SAVE_STATE \(ROUTED MINIMUM\)/);
 assert.match(routed.params.input,/SAVE_WORLD_SENTINEL/);
@@ -56,18 +56,17 @@ assert.match(routed.params.input,/SAVE_PC_SENTINEL/);
 assert.match(routed.params.input,/HARD EXECUTION FACTS \(DATA, NOT FICTION\)/);
 assert.match(routed.params.input,/IMMEDIATE EVENT FACTS \(HARD DATA\)/);
 assert.match(routed.params.input,/SCHEDULE_SENTINEL/);
-assert.match(routed.params.input,/NOTE_SENTINEL/);
-assert.match(routed.params.input,/"commitment":"fixed class"/);
+assert.doesNotMatch(routed.params.input,/NOTE_SENTINEL|"commitment":"fixed class"|"activity":"class"/,'procedural schedule prose must not survive as writer authority');
+assert.match(routed.params.input,/"canonical_actor_keys":\["guide"\]/,'explicit actor binding must survive long-action pressure');
 assert.match(routed.params.input,/"confidence":"fixed"/);
 assert.match(routed.params.input,/"intent_kind":"travel"/,'classified travel intent must reach the model as data under long-action pressure');
-assert.match(routed.params.input,/TURN_HOOK_RUNTIME_SENTINEL/,'the bounded saved Turn Hook must remain in authoritative minimum state');
-assert.doesNotMatch(routed.params.input,/PURPOSE_RUNTIME_SENTINEL|EXIT_RUNTIME_SENTINEL|SCENE PURPOSE V1|EXPLICIT SCENE EXIT|STRONGER TURN HOOK/,'runtime scene-control policy must not reach the writer');
+assert.doesNotMatch(routed.params.input,/TURN_HOOK_RUNTIME_SENTINEL|PURPOSE_RUNTIME_SENTINEL|EXIT_RUNTIME_SENTINEL|SCENE PURPOSE V1|EXPLICIT SCENE EXIT|STRONGER TURN HOOK/,'a fresh exact action must supersede stale runtime scene-control boundaries');
 assert.match(routed.params.input,/도서관에 간다\./,'the bounded USER ACTION must retain its committed travel predicate');
 assert.ok(routed.params.input.endsWith(`===== USER ACTION (EXACT) =====\n${longAction}`),'5,000-character USER ACTION must remain exact and final');
 
 const denseActionSuffix='대도서관으로 간다.';
 const denseAction=`${'밀집 행동 설명 '.repeat(600)}`.slice(0,3900-denseActionSuffix.length)+denseActionSuffix;
-const denseEvents=Array.from({length:5},(_,index)=>({id:`dense-${index}`,title:`기사과 필수 일정 ${index} ${'상세 '.repeat(20)}`,note:`NOTE_DENSE_${index} ${'권위 일정 설명 '.repeat(30)}`,date:'1285-03-01',time:`${String(10+index).padStart(2,'0')}:00`,location:`DENSE_LOCATION_${index}`,status:'scheduled',participants:['guide'],pc_required:true}));
+const denseEvents=Array.from({length:5},(_,index)=>({id:`dense-${index}`,title:`기사과 필수 일정 ${index} ${'상세 '.repeat(20)}`,note:`NOTE_DENSE_${index} ${'권위 일정 설명 '.repeat(30)}`,date:'1285-03-01',time:`${String(10+index).padStart(2,'0')}:00`,location:`DENSE_LOCATION_${index}`,status:'scheduled',actor_key:'guide',participants:['guide'],pc_required:true}));
 const denseOriginalInput=`===== TURN OPTIONS =====\nnormal
 ===== AUTHORITATIVE SAVE_STATE =====\n{}
 ===== GM EVENT DIRECTOR (SERVER GUIDANCE) =====
@@ -95,9 +94,10 @@ const denseSave={
 const denseRouted=routeOpenAIParams({instructions,input:denseOriginalInput},{mode:'game',incoming:{action:denseAction,rollingSummary:'dense old '.repeat(1000),recentTurns:[],saveState:denseSave}});
 assert.ok(denseRouted.params.input.length<=9000,`dense routine authority input exceeded budget: ${denseRouted.params.input.length}`);
 assert.match(denseRouted.params.input,/IMMEDIATE EVENT FACTS \(HARD DATA\)/);
-assert.match(denseRouted.params.input,/NOTE_DENSE_0/);
+assert.doesNotMatch(denseRouted.params.input,/NOTE_DENSE_0|DENSE_ACTIVITY|DENSE_COMMITMENT/,'dense schedule pressure must retain facts without procedural prose');
+assert.match(denseRouted.params.input,/"canonical_actor_keys":\["guide"\]/,'actor binding must survive dense schedule compaction');
 assert.doesNotMatch(denseRouted.params.input,/STRONGER TURN HOOK|DETERMINISTIC SCENE NOVELTY|REPEAT_GUARD=required/);
-assert.match(denseRouted.params.input,/TURN_HOOK_DENSE_SENTINEL/);
+assert.doesNotMatch(denseRouted.params.input,/TURN_HOOK_DENSE_SENTINEL/,'dense pressure must not restore the prior player boundary after a fresh action');
 assert.match(denseRouted.params.input,/대도서관으로 간다\./);
 
 const moderateAction=`${'중간 길이 행동 설명 '.repeat(260)}`.slice(0,2000);

@@ -112,8 +112,7 @@ const hardEvent = route('주변을 살핀다.', {
   },
 });
 assert.match(hardEvent.params.input, /===== IMMEDIATE EVENT FACTS \(HARD DATA\) =====/);
-assert.match(hardEvent.params.input, /현재 시작 종이 울렸고 참가자 입장이 진행 중이다/);
-assert.match(hardEvent.params.input, /현재 오리엔테이션/);
+assert.doesNotMatch(hardEvent.params.input, /현재 시작 종이 울렸고 참가자 입장이 진행 중이다|현재 입장 통제|현재 오리엔테이션/, 'an immediate event keeps occurrence facts without turning note or NPC task text into choreography');
 assert.match(hardEvent.params.input, /"participants":\["artemis"\]/, 'an immediate unavoidable event retains current participants and occurrence facts');
 
 assert.match(routineArrival.params.input, /"name":"테오 에버른"/);

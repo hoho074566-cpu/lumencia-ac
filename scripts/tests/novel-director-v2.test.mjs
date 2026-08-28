@@ -44,7 +44,7 @@ for (const hardBoundary of [
   'PUBLIC만 기본 지식',
   'state_delta에는 실제 발생한 변화만',
   'event_progress는 현재 occurrence',
-  '실제로 새로운 PC 결정을 요구',
+  '실제로 새로운 PC 결정이 필요한',
 ]) assert.match(hardContract, new RegExp(hardBoundary));
 assert.match(combatContract, /심리/, 'combat verdict must retain established psychological state');
 
