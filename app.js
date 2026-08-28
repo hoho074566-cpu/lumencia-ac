@@ -1,6 +1,7 @@
 import { ASSETS } from './assets.js';
 import { migrateLegacyNpcKeys } from './save-migrations.js';
 import { createFreeCharacterCreation, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation } from './lib/fate-start.js';
+import { beginFateBookRun, createFateBookState, mergeFateBookStates, normalizeFateBookState, recordEndingDiscoveries, renderFateBookSummary } from './lib/fate-book.js';
 
 const APP_VERSION = '1.4.8';
 const SAVE_KEY = 'lumensia.save.v1';
@@ -123,6 +124,7 @@ const defaultSave = () => ({
     location: '루멘시아 아카데미 대강당 앞',
   },
   creation: createFreeCharacterCreation(),
+  fateBook: createFateBookState(),
   pc: {
     // 스키마 기본값은 특정 프리셋이 아닌 완전 중립값이어야 한다.
     // 새 캐릭터의 스킬/장비는 생성창에 사용자가 입력한 것만 저장한다.
@@ -190,6 +192,7 @@ function normalizeSave(raw) {
   next.appVersion = APP_VERSION;
   next.world = { ...base.world, ...(next.world || {}) };
   next.creation = normalizeCharacterCreation(next.creation);
+  next.fateBook = normalizeFateBookState(next.fateBook, { runId:next.id });
   next.pc = { ...base.pc, ...(next.pc || {}) };
   next.pc.stats = { ...base.pc.stats, ...(next.pc.stats || {}) };
   next.pc.skills = (next.pc.skills && typeof next.pc.skills === 'object' && !Array.isArray(next.pc.skills)) ? { ...next.pc.skills } : {};
@@ -501,8 +504,11 @@ function renderInfo() {
   const stats = Object.entries(save.pc.stats || {}).map(([k,v]) => `- ${k}: ${v.grade} [${v.progress}/100]`).join('\n');
   const fateOrigin=save.creation?.mode==='fate'?save.creation?.fateStart?.origin:null;
   const fateStory=Array.isArray(fateOrigin?.originStory)?fateOrigin.originStory.join('\n'):'';
+  const fateBook=renderFateBookSummary(save.fateBook);
   $('infoContent').textContent = `PC: ${save.pc.name} (${save.pc.age}세 / ${save.pc.gender})
 출신: ${save.pc.origin || '-'} | 신분: ${save.pc.socialStatus || '-'} | 입학: ${save.pc.admission || '-'}${fateStory?`\n운명 배경:\n${fateStory}\n---------`:''}
+${fateBook}
+---------
 경지: ${save.pc.realm} | 소속: 루멘시아 아카데미\n---------\n직위: ${save.pc.department} | 상황: 🟢\n---------\n스킬: ${skills}\n---------\n스탯:\n${stats}\n---------\n🔮[魔] ${save.pc.talents.magic} | ⚔️[武] ${save.pc.talents.martial} | 🌟[魂] ${save.pc.talents.soul} | 📘[智] ${save.pc.talents.knowledge}\n---------\n상태: ${save.pc.status} | 피로 ${save.pc.fatigue}/100\n💼: ${(save.pc.inventory||[]).join(', ') || '-'} | 금화 ${save.pc.gold}G\n관계: ${rel}\n친밀도(성인모드): ${intimacy}\n---------\n진행 사건: ${save.activeEvents.join(', ') || '-'}\n토큰 누적: 입력 ${save.usage.inputTokens || 0} / 캐시 ${save.usage.cachedTokens || 0} / 출력 ${save.usage.outputTokens || 0} / 추론 ${save.usage.reasoningTokens || 0}\n직전 턴: 입력 ${save.usage.lastInputTokens || 0} / 출력 ${save.usage.lastOutputTokens || 0} / 캐시 적중 ${Math.round(Number(save.usage.lastCacheHitRate || 0)*100)}% / 비용 $${Number(save.usage.lastTurnUsd || 0).toFixed(4)}\n누적 API 비용(추정): $${Number(save.usage.estimatedUsd || 0).toFixed(4)}\n영구 타임라인: ${save.timeline?.length || 0}건 | NPC 감정상태: ${Object.keys(save.emotionStates || {}).length}명
 예약 일정: ${(save.scheduledEvents||[]).filter(x=>x.status!=='completed'&&x.status!=='cancelled').length}건 | 훅: ${(save.hooks||[]).filter(x=>!['resolved','expired'].includes(x.status)).length}건 | 기억: ${(save.memories?.global||[]).length + Object.values(save.memories?.npc||{}).reduce((n,x)=>n+(x?.length||0),0)}건`;
 }
@@ -637,6 +643,11 @@ function applyDelta(delta = {}) {
   }
   save.hooks = (save.hooks || []).slice(-120);
 
+  const endingResult=recordEndingDiscoveries(save.fateBook,delta.ending_discoveries,{runId:save.id,turnNumber:save.turnNumber+1,discoveredAt:new Date().toISOString(),worldState:{...save.world,status:save.pc.status,completedEvents:save.completedEvents,activeEvents:save.activeEvents}});
+  save.fateBook=endingResult.state;
+  for(const row of endingResult.newRecords)notices.push(`운명록 발견: ${row.title}`);
+  for(const reward of endingResult.rewardsGranted)notices.push(`최초 발견 보상: 운명 인장 +${reward.amount}`);
+
   refreshScheduleContext();
   save.debug.lastMemoryAdds = memoryAdds;
   save.debug.lastRelationChanges = relationshipChanges;
@@ -737,7 +748,7 @@ function rebuildRollingSummary() {
 
 function compactState() {
   return {
-    version: save.version, turnNumber: save.turnNumber, world: save.world, creation: save.creation, pc: save.pc, relationships: save.relationships, intimacyStates: save.intimacyStates, npcStates: save.npcStates,
+    version: save.version, turnNumber: save.turnNumber, world: save.world, creation: save.creation, fateBook: save.fateBook, pc: save.pc, relationships: save.relationships, intimacyStates: save.intimacyStates, npcStates: save.npcStates,
     emotionStates: save.emotionStates, activeEvents: save.activeEvents, completedEvents: save.completedEvents,
     pcKnowledge: save.pcKnowledge, memories: save.memories, hooks:save.hooks, scheduledEvents:save.scheduledEvents, scheduleContext:save.scheduleContext, director:save.director, flags: save.flags,
   };
@@ -865,7 +876,7 @@ function demoResponse(action, inputMode='game') {
         scene_title:'META 점검', importance:'routine', cg_id:null,
         scene:[{kind:'narration',text:`데모 META 응답: ${action}`,speaker_key:null,speaker_name:null,expression:null}],
         choices:[],
-        state_delta:{advance_minutes:0,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0,relationship_changes:[],intimacy_changes:[],stat_progress:[],skill_experience:[],items_add:[],items_remove:[],active_events_add:[],active_events_remove:[],completed_events_add:[],pc_knowledge_add:[],scheduled_events_add:[],scheduled_events_complete:[],hooks_add:[],hooks_update:[],memories_add:[],npc_state_updates:[]},
+        state_delta:{advance_minutes:0,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0,relationship_changes:[],intimacy_changes:[],stat_progress:[],skill_experience:[],items_add:[],items_remove:[],active_events_add:[],active_events_remove:[],completed_events_add:[],ending_discoveries:[],pc_knowledge_add:[],scheduled_events_add:[],scheduled_events_complete:[],hooks_add:[],hooks_update:[],memories_add:[],npc_state_updates:[]},
         scene_summary:'META 점검. 게임 상태 변화 없음.'
       },
       route:{model:'demo',tier:'demo',reasoning_effort:'none',reasoning_mode:'standard',reason:'demo-meta',input_mode:'meta'},
@@ -882,13 +893,13 @@ function demoResponse(action, inputMode='game') {
       {kind:'narration', text:`붉은 머리의 소녀가 거리낌 없이 다가오며 ${save.pc.name}의 대검을 흥미롭게 살핀다.`, speaker_key:null, speaker_name:null, expression:null}
     ],
     choices:['소녀에게 이름과 소속을 묻는다.','대검을 살피는 이유를 묻는다.','입학식 전에 가볍게 검을 맞춰보자고 제안한다.'],
-    state_delta:{advance_minutes:3,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0,relationship_changes:[],stat_progress:[],skill_experience:[],items_add:[],items_remove:[],active_events_add:[],active_events_remove:[],completed_events_add:[],pc_knowledge_add:[],scheduled_events_add:[],scheduled_events_complete:[],hooks_add:[],hooks_update:[],memories_add:[{owner:'npc:lillia',fact:`입학식 전 대강당 앞에서 ${save.pc.name}의 오래된 대검에 먼저 관심을 보였다.`,type:'event',importance:2,secret_level:0}],npc_state_updates:[{npc_key:'lillia',location:'루멘시아 아카데미 대강당 앞',status:`${save.pc.name}에게 먼저 말을 건 상태`,current_goal:'신입생 입학식 참가',last_seen:'1285-03-01 08:43'}]},
+    state_delta:{advance_minutes:3,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0,relationship_changes:[],stat_progress:[],skill_experience:[],items_add:[],items_remove:[],active_events_add:[],active_events_remove:[],completed_events_add:[],ending_discoveries:[],pc_knowledge_add:[],scheduled_events_add:[],scheduled_events_complete:[],hooks_add:[],hooks_update:[],memories_add:[{owner:'npc:lillia',fact:`입학식 전 대강당 앞에서 ${save.pc.name}의 오래된 대검에 먼저 관심을 보였다.`,type:'event',importance:2,secret_level:0}],npc_state_updates:[{npc_key:'lillia',location:'루멘시아 아카데미 대강당 앞',status:`${save.pc.name}에게 먼저 말을 건 상태`,current_goal:'신입생 입학식 참가',last_seen:'1285-03-01 08:43'}]},
     scene_summary:`입학식 전 대강당 앞에서 릴리아가 ${save.pc.name}의 대검에 관심을 보이며 먼저 말을 걸었다.`
   } : {
     director:{intervention:'light',beat:'routine',event_kind:'none',spotlight_keys:[],callback_key:null,callback_phase:'none',callback_note:null,reason:'데모'},
     scene_title:'데모 응답',importance:'routine',cg_id:null,
     scene:[{kind:'narration',text:`${save.pc.name}의 행동 「${action}」에 주변 상황이 반응한다. 데모 모드라 실제 AI 판정은 생략된다.`,speaker_key:null,speaker_name:null,expression:null}],choices:[],
-    state_delta:{advance_minutes:1,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0,relationship_changes:[],stat_progress:[],skill_experience:[],items_add:[],items_remove:[],active_events_add:[],active_events_remove:[],completed_events_add:[],pc_knowledge_add:[],scheduled_events_add:[],scheduled_events_complete:[],hooks_add:[],hooks_update:[],memories_add:[],npc_state_updates:[]},scene_summary:'데모 모드로 UI 동작을 확인했다.'
+    state_delta:{advance_minutes:1,new_location:null,pc_status:null,fatigue_delta:0,gold_delta:0,relationship_changes:[],stat_progress:[],skill_experience:[],items_add:[],items_remove:[],active_events_add:[],active_events_remove:[],completed_events_add:[],ending_discoveries:[],pc_knowledge_add:[],scheduled_events_add:[],scheduled_events_complete:[],hooks_add:[],hooks_update:[],memories_add:[],npc_state_updates:[]},scene_summary:'데모 모드로 UI 동작을 확인했다.'
   };
   return { turn, route:{model:'demo',tier:'demo',reasoning_effort:'none',reasoning_mode:'standard',reason:'demo'}, usage:{input_tokens:0,output_tokens:0,cached_tokens:0,estimated_usd:0} };
 }
@@ -1125,6 +1136,7 @@ function openPcCreator() {
 }
 function createNewSaveFromCreator() {
   const base=defaultSave();
+  base.fateBook=beginFateBookRun(save?.fateBook,{runId:base.id});
   if($('pcCreationMode').value==='fate') {
     const generated=generateFateStartingCharacter({
       gender:$('fateGender').value,
@@ -1211,7 +1223,7 @@ $('pcCreatorForm').addEventListener('submit',(e)=>{e.preventDefault();save=creat
 function exportSave() {
   persist(); const blob = new Blob([JSON.stringify(save,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`lumensia-save-${save.world.date}-${save.world.time.replace(':','')}.json`; a.click(); URL.revokeObjectURL(a.href);
 }
-async function importSave(e) { const file=e.target.files?.[0]; if(!file)return; try { const parsed=JSON.parse(await file.text()); if(!parsed.pc||!parsed.world)throw new Error('세이브 형식이 아님'); save=normalizeSave(parsed); persist(); renderAll(); toast('세이브 불러옴'); } catch(err){alert(`불러오기 실패: ${err.message}`);} e.target.value=''; }
+async function importSave(e) { const file=e.target.files?.[0]; if(!file)return; try { const parsed=JSON.parse(await file.text()); if(!parsed.pc||!parsed.world)throw new Error('세이브 형식이 아님'); parsed.fateBook=mergeFateBookStates(parsed.fateBook,[save?.fateBook],{runId:parsed.id}); save=normalizeSave(parsed); persist(); renderAll(); toast('세이브 불러옴'); } catch(err){alert(`불러오기 실패: ${err.message}`);} e.target.value=''; }
 function toast(text) { const d=document.createElement('div'); d.textContent=text; d.style.cssText='position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:99;background:#263449;padding:9px 14px;border-radius:999px'; document.body.append(d); setTimeout(()=>d.remove(),1300); }
 
 async function checkHealth() { try { const r=await fetch('/api/health'); const h=await r.json(); $('apiHealth').textContent=h.apiConfigured?`API 연결 준비됨 · ${h.luna} / ${h.terra}${h.accessTokenRequired ? ' · 접속 토큰 필요' : ''}`:'API 키 미설정. Vercel 환경변수 OPENAI_API_KEY를 추가하거나 데모 모드를 켜세요.'; } catch { $('apiHealth').textContent='API 상태를 확인할 수 없음.'; } }

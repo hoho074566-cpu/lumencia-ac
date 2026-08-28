@@ -287,7 +287,7 @@ function zeroStateDeltaStable() {
   return {
     advance_minutes: 0, new_location: null, pc_status: null, fatigue_delta: 0, gold_delta: 0,
     relationship_changes: [], npc_relationship_changes: [], faction_reputation_changes: [], intimacy_changes: [], stat_progress: [], skill_experience: [], skill_learning: [], awakening_progress: [], talent_evolution: [],
-    items_add: [], items_remove: [], active_events_add: [], active_events_remove: [], completed_events_add: [],
+    items_add: [], items_remove: [], active_events_add: [], active_events_remove: [], completed_events_add: [], ending_discoveries: [],
     pc_knowledge_add: [], scheduled_events_add: [], scheduled_events_complete: [], hooks_add: [], hooks_update: [],
     memories_add: [], npc_state_updates: [],
   };
@@ -296,7 +296,7 @@ function zeroStateDeltaStable() {
 function compactStateStable() {
   return {
     id: save.id || '',
-    version: save.version, turnNumber: save.turnNumber, world: save.world, creation: save.creation, pc: save.pc,
+    version: save.version, turnNumber: save.turnNumber, world: save.world, creation: save.creation, fateBook: save.fateBook, pc: save.pc,
     relationships: save.relationships, intimacyStates: save.intimacyStates, npcStates: save.npcStates,
     emotionStates: save.emotionStates, activeEvents: save.activeEvents, completedEvents: save.completedEvents,
     pcKnowledge: save.pcKnowledge, memories: save.memories, hooks: save.hooks,
@@ -789,6 +789,12 @@ async function boot() {
       "import { createFreeCharacterCreation, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation } from './lib/fate-start.js';",
       `import { createFreeCharacterCreation, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation } from '${location.origin}/lib/fate-start.js?v=156';`,
       'fate start import'
+    );
+    source = replaceOnce(
+      source,
+      "import { beginFateBookRun, createFateBookState, mergeFateBookStates, normalizeFateBookState, recordEndingDiscoveries, renderFateBookSummary } from './lib/fate-book.js';",
+      `import { beginFateBookRun, createFateBookState, mergeFateBookStates, normalizeFateBookState, recordEndingDiscoveries, renderFateBookSummary } from '${location.origin}/lib/fate-book.js?v=156';`,
+      'fate book import'
     );
 
     source = replaceRegexOnce(
