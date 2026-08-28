@@ -6,7 +6,7 @@
 // a stable-path V1.5.6 delta at boot. If required source markers disappear, boot stops visibly.
 
 const PATCH_VERSION = '1.5.6';
-const BASE_APP_SHA = 'b5ca1de1996361638b9e4f5d49a73101302a0a68';
+const BASE_APP_SHA = '86d35b058a7eb4642ce81de58c8a147b393ef376';
 const LIVE_BASE_HEAD = 'a9170d6dca82c613436dcc5b3bc6ba86b9f86ba4';
 const AUTO_GESTURE_PX = 84;
 
@@ -587,6 +587,7 @@ async function sendActionStable(action, requestedMode = null) {
       action: apiAction,
       inputMode,
       saveState: compactState(),
+      fateBook: fateBookRuntimeSnapshot(fateBook, { allowedCharacterKeys:Object.keys(ASSETS.characters || {}) }),
       recentTurns: save.recentTurns,
       rollingSummary: save.rollingSummary,
       availableCgIds: Object.keys(ASSETS.cg || {}),
@@ -646,6 +647,7 @@ async function sendActionStable(action, requestedMode = null) {
     if (!isMeta && !isContinue) {
       materializeEventConsequencesStable(data.turn, data.pipeline, action);
       notices = applyDelta(data.turn.state_delta);
+      notices.push(...applyFateEndingRuntime(data.fate_ending));
       applyEmotionUpdates(data.turn.emotion_updates || []);
       updateDirectorState(data.turn);
       addTimeline(data.turn);
@@ -792,6 +794,12 @@ async function boot() {
     );
     source = replaceOnce(
       source,
+      "import { fateBookRuntimeSnapshot, normalizeFateBook, reconcileFateBooks } from './lib/fate-ending.js';",
+      `import { fateBookRuntimeSnapshot, normalizeFateBook, reconcileFateBooks } from '${location.origin}/lib/fate-ending.js?v=156';`,
+      'fate ending import'
+    );
+    source = replaceOnce(
+      source,
       "import { createNovelPresentationState, novelSceneTitle, resetNovelPresentationState, shouldShowNovelPortrait } from './lib/novel-presentation.js';",
       `import { createNovelPresentationState, novelSceneTitle, resetNovelPresentationState, shouldShowNovelPortrait } from '${location.origin}/lib/novel-presentation.js?v=156';`,
       'novel presentation import'
@@ -834,8 +842,8 @@ async function boot() {
 
     source = replaceRegexOnce(
       source,
-      /function compactState\(\) \{[\s\S]*?\n\}\n\nasync function sendAction/,
-      `${renameFunction(compactStateStable, 'compactStateStable', 'compactState')}\n\nasync function sendAction`,
+      /function compactState\(\) \{[\s\S]*?\n\}\n\nfunction applyFateEndingRuntime/,
+      `${renameFunction(compactStateStable, 'compactStateStable', 'compactState')}\n\nfunction applyFateEndingRuntime`,
       'compactState runtime fields'
     );
 

@@ -1,0 +1,144 @@
+#!/usr/bin/env node
+
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+import { ASSETS } from '../../assets.js';
+import { routeOpenAIParams } from '../../api/lib/context-router.js';
+import {
+  applyEndingReceipts,
+  ENDING_REGISTRY,
+  endingRegistryState,
+  fateBookRuntimeSnapshot,
+  FATE_ENDING_CONTRACT,
+  normalizeFateBook,
+  reconcileFateBooks,
+  resolveEndingDefinition,
+} from '../../lib/fate-ending.js';
+
+const npcKeys=Object.keys(ASSETS.characters||{});
+const options={allowedCharacterKeys:npcKeys};
+
+for(const [id,row] of Object.entries(ENDING_REGISTRY)){
+  assert.equal(row.endingId,id);
+  assert.ok(['general','character','world','secret','dead'].includes(row.category));
+  assert.ok(row.conditions&&row.worldState&&Number(row.reward)>0);
+  assert.ok(Array.isArray(row.characters));
+}
+assert.ok(ENDING_REGISTRY['general.graduation']);
+assert.ok(ENDING_REGISTRY['general.honors']);
+assert.ok(ENDING_REGISTRY['dead.irrecoverable']);
+assert.equal(resolveEndingDefinition('character.companion:artemis',options)?.characterKeys[0],'artemis');
+assert.equal(resolveEndingDefinition('character.companion:not_registered',options),null,'Character Ending must use a canonical NPC key');
+
+const terminalReceipts=[
+  {ending_id:'general.graduation',terminal_outcome:'life_complete',irreversible:true,reason:'정규 과정을 마치고 졸업했다.',world_state:'academy'},
+  {ending_id:'character.companion:artemis',terminal_outcome:'life_complete',irreversible:true,reason:'아르테미스와 동료로서 종장을 함께했다.',world_state:'character'},
+  {ending_id:'world.academy',terminal_outcome:'life_complete',irreversible:true,reason:'아카데미의 다음 시대가 확정되었다.',world_state:'academy'},
+];
+const terminalSignals=terminalReceipts.map((row)=>`ending:${row.ending_id}`);
+const first=applyEndingReceipts({
+  fateBook:null,receipts:terminalReceipts,stateDelta:{completed_events_add:terminalSignals},
+  ...options,runId:'run-1',turnNumber:220,mode:'game',now:'2026-08-28T03:00:00.000Z',
+});
+assert.equal(first.acceptedDiscoveries.length,3,'general, Character, and World Endings must record independently');
+assert.equal(first.repeatedDiscoveries.length,0);
+assert.equal(Object.keys(first.fateBook.discoveries).length,3);
+assert.equal(first.fateBook.rewardTotal,3+4+6,'first-discovery rewards must come from the canonical registry');
+assert.equal(first.validReceipts.length,3);
+const discoveredRegistry=endingRegistryState(first.fateBook,options);
+assert.equal(discoveredRegistry['general.graduation'].discovered,true);
+assert.deepEqual(discoveredRegistry['character.companion'].discoveredIds,['character.companion:artemis']);
+assert.equal(discoveredRegistry['dead.irrecoverable'].discovered,false);
+
+const repeated=applyEndingReceipts({
+  fateBook:first.fateBook,receipts:[...terminalReceipts,terminalReceipts[0]],stateDelta:{completed_events_add:terminalSignals},
+  ...options,runId:'run-2',turnNumber:300,mode:'game',now:'2026-09-01T03:00:00.000Z',
+});
+assert.equal(repeated.acceptedDiscoveries.length,0,'the same Ending must never receive another first-discovery reward');
+assert.equal(repeated.repeatedDiscoveries.length,3);
+assert.equal(repeated.fateBook.rewardTotal,first.fateBook.rewardTotal);
+
+const ordinaryFailure=applyEndingReceipts({
+  fateBook:first.fateBook,
+  receipts:[{ending_id:'dead.irrecoverable',terminal_outcome:'life_complete',irreversible:true,reason:'결투에서 패배했다.',world_state:'academy'}],
+  stateDelta:{completed_events_add:['ending:dead.irrecoverable']},...options,mode:'game',
+});
+assert.equal(ordinaryFailure.validReceipts.length,0,'Failure must not satisfy the Dead Ending terminal contract');
+
+const recoverableDeath=applyEndingReceipts({
+  fateBook:first.fateBook,
+  receipts:[{ending_id:'dead.irrecoverable',terminal_outcome:'death',irreversible:false,reason:'소생 가능성이 남아 있다.',world_state:'dead'}],
+  stateDelta:{completed_events_add:['ending:dead.irrecoverable']},...options,mode:'game',
+});
+assert.equal(recoverableDeath.validReceipts.length,0,'revival/recovery possibility must fail closed without wording classification');
+
+const actualDeath=applyEndingReceipts({
+  fateBook:first.fateBook,
+  receipts:[{ending_id:'dead.irrecoverable',terminal_outcome:'death',irreversible:true,reason:'실제 사망이 확정되었다.',world_state:'dead'}],
+  stateDelta:{completed_events_add:['ending:dead.irrecoverable']},...options,runId:'run-dead',turnNumber:400,mode:'game',now:'2026-09-02T03:00:00.000Z',
+});
+assert.equal(actualDeath.acceptedDiscoveries.length,1,'actual irreversible death must be discoverable');
+assert.equal(actualDeath.acceptedDiscoveries[0].category,'dead');
+
+const missingCurrentSignal=applyEndingReceipts({fateBook:null,receipts:terminalReceipts,stateDelta:{completed_events_add:[]},...options,mode:'game'});
+assert.equal(missingCurrentSignal.validReceipts.length,0,'a receipt without its surviving current-turn terminal signal must be rejected');
+for(const frozenMode of ['meta','auto','continue']){
+  const frozen=applyEndingReceipts({fateBook:null,receipts:terminalReceipts,stateDelta:{completed_events_add:terminalSignals},...options,mode:frozenMode});
+  assert.equal(frozen.acceptedDiscoveries.length,0,`${frozenMode} must not discover Endings`);
+}
+
+const currentBook=actualDeath.fateBook;
+const staleImported=normalizeFateBook({discoveries:{'general.graduation':currentBook.discoveries['general.graduation']}},options);
+const reconciled=reconcileFateBooks(currentBook,staleImported,options);
+assert.deepEqual(Object.keys(reconciled.discoveries).sort(),Object.keys(currentBook.discoveries).sort(),'an older imported run must not roll back newer Fate Book discoveries');
+assert.equal(reconciled.rewardTotal,currentBook.rewardTotal,'stale import must not reduce first-discovery reward authority');
+
+const characterTemplates=['companion','alliance','co_rule','journey','rival'];
+const longCollection={};
+for(const key of npcKeys)for(const template of characterTemplates){
+  const id=`character.${template}:${key}`;
+  longCollection[id]={discoveryId:id,discoveredAt:'2026-08-28T00:00:00.000Z'};
+}
+const normalizedLong=normalizeFateBook({discoveries:longCollection},options);
+assert.equal(Object.keys(normalizedLong.discoveries).length,npcKeys.length*characterTemplates.length,'normalization must retain the full attainable collection without a destructive cap');
+const snapshot=fateBookRuntimeSnapshot(normalizedLong,options);
+assert.equal(snapshot.discoveredIds.length,Object.keys(normalizedLong.discoveries).length);
+assert.equal('discoveries' in snapshot,false,'runtime requests must carry the ledger identity without full prose records');
+
+assert.match(FATE_ENDING_CONTRACT,/일반 실패·패배·부상·후퇴는 Ending이나 Dead Ending이 아니라 새 이야기 상태/);
+assert.match(FATE_ENDING_CONTRACT,/state_delta\.completed_events_add/);
+assert.doesNotMatch(readFileSync('lib/fate-ending.js','utf8'),/(?:사망|죽음|소생|부활).*(?:RegExp|\.test\()|new RegExp\([^)]*(?:사망|죽음|소생|부활)/,'terminal semantics must not become a Korean wording regex engine');
+
+const divider='='.repeat(20);
+const routed=routeOpenAIParams({
+  instructions:`===== CHARACTER REGISTRY =====\nartemis=아르테미스\n===== WORLD CANON =====\n${divider}\nPUBLIC\n${divider}\nWorld.\n===== NPC CANON =====\n${divider}\n아르테미스\n${divider}\nNPC.\n===== NPC SPEECH =====\n${divider}\n아르테미스\n${divider}\nSpeech.\n===== OPTIONAL ADULT / INTIMACY SPEECH LAYER =====\nNone.\n===== PC SYSTEM =====\n${divider}\nPC\n${divider}\nSystem.`,
+  input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}',
+},{incoming:{action:'마지막 학기를 마치고 졸업식을 끝까지 진행한다.',saveState:{id:'run-1',turnNumber:200,world:{date:'1288-02-20',time:'11:00',location:'졸업식장'},pc:{name:'테스트',department:'기사과'},sceneRuntime:{participants:['artemis']},scheduleContext:{due:[],upcoming:[]}},recentTurns:[]},mode:'game'});
+assert.match(routed.params.instructions,/FATE ENDING RUNTIME V1/,'normal routed gameplay must retain the canonical Ending contract');
+
+const app=readFileSync('app.js','utf8');
+const runtime=readFileSync('app-runtime.js','utf8');
+const core=readFileSync('api/chat.js','utf8');
+const router=readFileSync('api/chat-router.js','utf8');
+const serviceWorker=readFileSync('sw.js','utf8');
+const health=readFileSync('api/health.js','utf8');
+assert.match(core,/ending_receipts: z\.array\(EndingReceipt\)\.max\(4\)/,'the canonical response must include bounded structured Ending receipts');
+assert.match(core,/applyEndingReceipts\([\s\S]*stateDelta:turn\.state_delta/,'the direct canonical handler must validate current-turn effects');
+assert.match(router,/applySceneMomentumTimeFloor[\s\S]*applyEndingReceipts/,'the stable router must validate receipts after final current-turn reconciliation');
+assert.match(router,/applyEndingReceipts\(\{fateBook:incoming0\.fateBook[\s\S]*,mode\}\)/,'the stable adapter must pass its actual mode to the Ending guard');
+assert.match(router,/mode!=='game'[\s\S]*startsWith\('ending:'\)/,'AUTO must remove terminal signals instead of mutating a run without a Fate Book discovery');
+assert.match(app,/const FATE_BOOK_KEY = 'lumensia\.fate-book\.v1'/,'Fate Book must persist outside the replaceable run save');
+assert.match(app,/reconcileFateBooks\(loadJson\(FATE_BOOK_KEY\), loadedRunSave\?\.fateBook/,'a legacy embedded Fate Book must migrate into the independent ledger');
+assert.match(app,/delete save\.fateBook/,'the replaceable run save must not retain a parallel Fate Book root');
+assert.match(app,/format:'lumensia\.save\.bundle\.v2',save,fateBook/,'exports must include the persistent Fate Book');
+assert.match(app,/fateBook=reconcileFateBooks\(fateBook,importedBook/,'imports must reconcile rather than replace the live Fate Book');
+assert.match(runtime,/fetch\('\/api\/chat-router'/,'deployed stable runtime must keep the canonical router');
+assert.match(runtime,/fateBook: fateBookRuntimeSnapshot/,'deployed stable runtime must send the bounded discovery ledger');
+assert.match(runtime,/applyFateEndingRuntime\(data\.fate_ending\)/,'deployed stable runtime must persist accepted discoveries');
+assert.match(serviceWorker,/\/lib\/fate-ending\.js/,'the offline shell must cache the Fate Book runtime dependency');
+assert.match(health,/fateEnding:/,'health metadata must advertise the STAB-01 runtime');
+assert.equal((router.match(/=>coreHandler\(/g)||[]).length,1,'STAB-01 must keep one canonical model call');
+assert.doesNotMatch(readFileSync('lib/fate-ending.js','utf8'),/new OpenAI|responses\.create|chat\.completions/,'STAB-01 must not add a model call');
+
+console.log('PASS STAB-01 Ending / Dead Ending / Fate Book persistence, dedupe, current-turn projection, and no-new-engine invariants');

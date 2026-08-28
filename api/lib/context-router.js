@@ -18,6 +18,7 @@ import { deriveNpcSignificanceBoundary } from '../../lib/npc-significance.js';
 import { buildNpcCharacterBehaviorDirective, compactNpcCharacterBehavior } from '../../lib/npc-character-behavior.js';
 import { buildFateBackgroundDirective, compactFateBackgroundForModel } from '../../lib/fate-background.js';
 import { buildFatePersonalStoryDirective, compactFatePersonalStoryForModel } from '../../lib/fate-personal-story.js';
+import { FATE_ENDING_CONTRACT } from '../../lib/fate-ending.js';
 
 const VERSION = '1.5.6-hf1';
 const DIRECTOR_V2_VERSION = '2.1';
@@ -60,6 +61,7 @@ const PROFILES = Object.freeze({
 });
 
 const ROUTER_GM_RULES = String.raw`너는 판타지 아카데미 장기 RPG 「루멘시아 아카데미」의 GM이자 독립적으로 움직이는 세계 시뮬레이터다.
+${FATE_ENDING_CONTRACT}
 절대 규칙:
 1) USER ACTION 원문 전체의 긍정형 완료 의도와 구체적 제한을 최우선으로 지킨다. PC의 새 행동·대사·감정·생각·수락/거절은 만들지 않되, 중요 interruption이나 새 선택 없이 완료할 수 있는 결정 가치 없는 중간 단계(이동·대기·평범한 절차)는 다시 묻지 말고 의도한 결과까지 진행한다. 부정·가정·질문으로만 언급한 행동은 실행하지 않는다.
 2) 동적 사실은 AUTHORITATIVE SAVE_STATE가 최우선이다. 선택 제공된 CANON과 충돌하면 SAVE_STATE의 현재값을 따른다.
