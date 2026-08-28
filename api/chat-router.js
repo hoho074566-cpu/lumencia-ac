@@ -27,7 +27,7 @@ import { compactCombatGrowthTelemetry, deriveCombatGrowthState } from '../lib/co
 import { deriveSceneOrchestrationState } from '../lib/scene-orchestration.js';
 import { deriveWorldResultSurfaceState } from '../lib/world-result-surfacing.js';
 import { applyNpcSignificanceReceipt, deriveNpcSignificanceBoundary } from '../lib/npc-significance.js';
-import { applyEndingReceipts } from '../lib/fate-ending.js';
+import { applyEndingReceipts, projectEndingSignals } from '../lib/fate-ending.js';
 
 export const config = { maxDuration: 300 };
 
@@ -42,6 +42,7 @@ const AUTO_DIRECTIVE = String.raw`[LUMENSIA V1.5.6 AUTO FLOW — SCENE MOMENTUM 
 이 요청은 PC의 새 행동/대사/생각/감정/결정이 아니다. PC의 선택을 대신 만들지 않는다.
 PC 판단이 필요 없는 세계의 자연스러운 흐름은 진행한다: 진행 중/예정된 사건의 후속, NPC의 목표·일정에 따른 접근/퇴장/상호작용, 다른 NPC끼리의 행동, 시간·환경 변화와 이미 발생한 결과의 파급을 허용한다.
 NPC와 사건은 PC가 먼저 찾아오기를 기다릴 필요가 없다. 다만 물리 위치·일정·지식·관계 제약을 지키고 순간이동/새 대형 사건/새 비밀을 억지로 만들지 않는다.
+AUTO에서는 회차를 종결하거나 Ending/Dead Ending을 서술·기록하지 않는다.
 PC가 대답·판단·위험한 선택을 해야 하는 첫 의미 있는 지점에서 즉시 멈춘다.`;
 
 const CONTINUE_DIRECTIVE = String.raw`[LUMENSIA V1.5.6 CONTINUE]
@@ -1117,7 +1118,7 @@ export default async function handler(req,res){
     let timePlan;try{timePlan=parseTimePlan(incoming0.action||'',{location:incoming.saveState?.world?.location||'',currentTime:incoming.saveState?.world?.time||'',currentDate:incoming.saveState?.world?.date||'',currentWeekday:incoming.saveState?.world?.weekday||'',actorName:incoming.saveState?.pc?.name||''});}catch{timePlan={version:TIME_PLAN_PARSER_VERSION,mode:'shadow',clauses:[],diagnostics:['shadow-parser-error']};}const timePlanTelemetry=summarizeTimePlan(timePlan,sceneIntent);
     const fateEnding=applyEndingReceipts({fateBook:incoming0.fateBook,receipts:data.turn.ending_receipts,stateDelta:data.turn.state_delta,allowedCharacterKeys:Object.keys(CHARACTER_REGISTRY),runId:String(incoming0.saveState?.id||''),turnNumber:Number(incoming0.saveState?.turnNumber||0)+1,mode});
     data.turn.ending_receipts=fateEnding.validReceipts;
-    if(mode!=='game'&&data.turn?.state_delta)data.turn.state_delta.completed_events_add=array(data.turn.state_delta.completed_events_add).filter((value)=>!String(value||'').startsWith('ending:'));
+    if(data.turn?.state_delta)data.turn.state_delta.completed_events_add=projectEndingSignals(data.turn.state_delta.completed_events_add,fateEnding.validReceipts,{allow:mode==='game'});
     data.fate_ending={version:1,accepted_discoveries:fateEnding.acceptedDiscoveries,repeated_discoveries:fateEnding.repeatedDiscoveries,reward_total:fateEnding.fateBook.rewardTotal};
     let persistedCombatGrowthState=combatGrowthState,persistedSkillLearningState=skillLearningState,persistedAwakeningTalentState=awakeningTalentState;
     if(data.turn?.state_delta&&(data.turn.state_delta.stat_progress!==combatGrowthState.accepted_stat_progress||data.turn.state_delta.skill_experience!==combatGrowthState.accepted_skill_experience)){

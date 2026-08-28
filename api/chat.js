@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 import { zodTextFormat } from 'openai/helpers/zod';
 import { z } from 'zod/v4';
 import { FACTION_EVIDENCE_TYPES, FACTION_KEYS } from '../lib/faction-social-consequence.js';
-import { applyEndingReceipts, FATE_ENDING_CONTRACT } from '../lib/fate-ending.js';
+import { applyEndingReceipts, FATE_ENDING_CONTRACT, projectEndingSignals } from '../lib/fate-ending.js';
 
 // LUMENSIA MOBILE V1.4.7 single-file API bundle
 // api/lib modules are inlined for mobile-friendly GitHub deployment.
@@ -1705,6 +1705,7 @@ export default async function handler(req, res) {
       mode:inputMode === 'meta' ? 'meta' : 'game',
     });
     turn.ending_receipts = fateEnding.validReceipts;
+    if(turn.state_delta)turn.state_delta.completed_events_add=projectEndingSignals(turn.state_delta.completed_events_add,fateEnding.validReceipts,{allow:inputMode==='game'});
     return json(res, 200, {
       turn,
       fate_ending:{version:1,accepted_discoveries:fateEnding.acceptedDiscoveries,repeated_discoveries:fateEnding.repeatedDiscoveries,reward_total:fateEnding.fateBook.rewardTotal},
