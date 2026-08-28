@@ -11,6 +11,7 @@ const SETTINGS_KEY = 'lumensia.settings.v1';
 const FATE_BOOK_KEY = 'lumensia.fate-book.v1';
 const FATE_INHERITANCE_KEY = 'lumensia.fate-inheritance.v1';
 const NEXT_LIFE_PENDING_KEY = 'lumensia.next-life.pending.v1';
+const META_PROGRESSION_LOCK = 'lumensia-meta-progression';
 
 const $ = (id) => document.getElementById(id);
 const story = $('story');
@@ -189,9 +190,12 @@ let inheritanceBootError = !fateBookIntegrity?`현재 earned receipt가 손상�
 const pendingNextLife=loadJson(NEXT_LIFE_PENDING_KEY);
 if(pendingNextLife?.meta&&pendingNextLife?.save){
   try{
-    const recovered=prepareCanonicalImport({currentFateBook:fateBook,currentMeta:loadedInheritanceRaw,incomingFateBook:pendingNextLife.fateBook||fateBook,incomingMeta:pendingNextLife.meta,incomingRun:pendingNextLife.save,inspectFateBook,options:{allowedCharacterKeys:Object.keys(ASSETS.characters||{}),allowedAffinityKeys:Object.keys(ASSETS.characters||{})}});
+    const recovered=await withMetaProgressionLock(async()=>{
+      const candidate=prepareCanonicalImport({currentFateBook:loadJson(FATE_BOOK_KEY),currentMeta:loadJson(FATE_INHERITANCE_KEY),incomingFateBook:pendingNextLife.fateBook||fateBook,incomingMeta:pendingNextLife.meta,incomingRun:pendingNextLife.save,inspectFateBook,options:{allowedCharacterKeys:Object.keys(ASSETS.characters||{}),allowedAffinityKeys:Object.keys(ASSETS.characters||{})}});
+      localStorage.setItem(FATE_BOOK_KEY,JSON.stringify(candidate.fateBook));localStorage.setItem(FATE_INHERITANCE_KEY,JSON.stringify(candidate.meta));localStorage.setItem(SAVE_KEY,JSON.stringify(candidate.run));localStorage.removeItem(NEXT_LIFE_PENDING_KEY);
+      return candidate;
+    });
     fateBook=recovered.fateBook;fateBookIntegrity=true;inheritanceMeta=recovered.meta;inheritanceMetaIntegrity=true;loadedRunSave=recovered.run;
-    localStorage.setItem(FATE_BOOK_KEY,JSON.stringify(fateBook));localStorage.setItem(FATE_INHERITANCE_KEY,JSON.stringify(inheritanceMeta));localStorage.setItem(SAVE_KEY,JSON.stringify(loadedRunSave));localStorage.removeItem(NEXT_LIFE_PENDING_KEY);
   }catch(error){inheritanceBootError=`미완료 Next Life 복구 거부: ${error.message}`;console.error('Next Life recovery rejected',error);}
 }
 const loadedRunCheck=fateBookIntegrity&&inheritanceMetaIntegrity?inspectRunInheritance(loadedRunSave,inheritanceMeta):{valid:false,error:'canonical progression integrity failure'};
@@ -207,10 +211,19 @@ let nextLifeSeed = '';
 
 function loadJson(key) { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } }
 function persist() { save.updatedAt = new Date().toISOString(); localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }
-function persistFateBook() { if(!fateBookIntegrity)throw new Error('손상된 Fate Book earned receipt를 덮어쓸 수 없음.');localStorage.setItem(FATE_BOOK_KEY, JSON.stringify(fateBook)); }
-function persistInheritanceMeta() { if(!inheritanceMetaIntegrity)throw new Error('손상된 canonical 계승 기록을 덮어쓸 수 없음.');localStorage.setItem(FATE_INHERITANCE_KEY, JSON.stringify(inheritanceMeta)); }
+function withMetaProgressionLock(task){if(!navigator.locks?.request)throw new Error('이 브라우저는 안전한 meta progression lock을 지원하지 않음.');return navigator.locks.request(META_PROGRESSION_LOCK,task);}
+async function persistFateBook() {
+  if(!fateBookIntegrity)throw new Error('손상된 Fate Book earned receipt를 덮어쓸 수 없음.');
+  return withMetaProgressionLock(async()=>{
+    const current=inspectFateBook(loadJson(FATE_BOOK_KEY),fateOptions),metaCheck=inspectInheritanceMeta(loadJson(FATE_INHERITANCE_KEY));
+    if(!current.valid||!metaCheck.valid)throw new Error('canonical meta receipt가 손상되어 운명록 저장을 중단함.');
+    fateBook=reconcileFateBooks(current.book,fateBook,fateOptions);
+    if(!inheritanceBalance(fateBook,metaCheck.meta).valid)throw new Error('계승 소비가 획득량을 초과함.');
+    localStorage.setItem(FATE_BOOK_KEY,JSON.stringify(fateBook));return fateBook;
+  });
+}
 function persistSettings() { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
-if (loadedRunSave?.fateBook&&fateBookIntegrity) { persist(); persistFateBook(); }
+if (loadedRunSave?.fateBook&&fateBookIntegrity) { persist();persistFateBook().catch((error)=>console.error('Fate Book migration rejected',error)); }
 function uniq(arr) { return [...new Set((arr || []).filter(Boolean))]; }
 function clamp(n, min, max) { return Math.min(max, Math.max(min, Number(n) || 0)); }
 
@@ -789,13 +802,13 @@ function compactState() {
   };
 }
 
-function applyFateEndingRuntime(packet = {}) {
+async function applyFateEndingRuntime(packet = {}) {
   const accepted=Array.isArray(packet?.accepted_discoveries)?packet.accepted_discoveries:[];
   const repeated=Array.isArray(packet?.repeated_discoveries)?packet.repeated_discoveries:[];
   if(!accepted.length&&!repeated.length)return[];
   if(!fateBookIntegrity)return['운명록 기록 거부: canonical earned receipt가 손상되어 있음.'];
   fateBook=reconcileFateBooks(fateBook,{discoveries:accepted},{allowedCharacterKeys:Object.keys(ASSETS.characters||{})});
-  persistFateBook();
+  await persistFateBook();
   return [
     ...accepted.map((row)=>`운명록 최초 발견: ${row.title} (+${Number(row.reward||0)} 계승 원천)`),
     ...repeated.map((row)=>`운명록 재발견: ${row.title} (최초 보상 없음)`),
@@ -857,7 +870,7 @@ async function sendAction(action) {
     let notices = [];
     if (!isMeta) {
       notices = applyDelta(data.turn.state_delta);
-      notices.push(...applyFateEndingRuntime(data.fate_ending));
+      notices.push(...await applyFateEndingRuntime(data.fate_ending));
       applyEmotionUpdates(data.turn.emotion_updates || []);
       updateDirectorState(data.turn);
       addTimeline(data.turn);
@@ -1284,8 +1297,7 @@ async function startNextLife(){
   const selection=nextLifeSelection(),locks=selectedOriginLocks(),lockRows=Object.entries(locks).filter(([,value])=>value).map(([field,value])=>({kind:'origin_lock',target:'origin',field,value})),allocations=[...nextLifeDraft,...lockRows],runId=transactionId('life');
   if(!validateFateOriginLocks({...selection,...locks}))throw new Error('지역과 직업 Origin lock이 양립하지 않음.');
   if(!allocations.length){save=buildNextLifeRun({selection,locks,runId,receipt:null});persist();$('nextLifeDialog').close();renderAll();toast(`${save.pc.name}의 Next Life 시작`);return;}
-  if(!navigator.locks?.request)throw new Error('이 브라우저는 안전한 계승 purchase lock을 지원하지 않음.');
-  const result=await navigator.locks.request('lumensia-inheritance-purchase',async()=>{
+  const result=await withMetaProgressionLock(async()=>{
     const freshBookCheck=inspectFateBook(loadJson(FATE_BOOK_KEY),{allowedCharacterKeys:Object.keys(ASSETS.characters||{})});
     const freshMetaCheck=inspectInheritanceMeta(loadJson(FATE_INHERITANCE_KEY));
     if(!freshBookCheck.valid||!freshMetaCheck.valid)throw new Error('canonical 계승 기록이 손상되어 purchase를 중단함.');
@@ -1362,10 +1374,34 @@ $('inheritanceAdd').addEventListener('click',()=>{nextLifeDraft.push({kind:$('in
 $('originReroll').addEventListener('click',()=>previewNextLifeOrigin({charge:true}));
 $('nextLifeForm').addEventListener('submit',async(e)=>{e.preventDefault();const button=$('nextLifeSubmit');button.disabled=true;try{await startNextLife();}catch(error){alert(`Next Life 실패: ${error.message}`);}finally{button.disabled=false;}});
 
-function exportSave() {
-  try{persist(); persistFateBook(); persistInheritanceMeta(); const bundle={format:'lumensia.save.bundle.v3',save,fateBook,inheritanceMeta}; const blob = new Blob([JSON.stringify(bundle,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`lumensia-save-${save.world.date}-${save.world.time.replace(':','')}.json`; a.click(); URL.revokeObjectURL(a.href);}catch(error){alert(`내보내기 실패: ${error.message}`);}
+async function exportSave() {
+  try{
+    const bundle=await withMetaProgressionLock(async()=>{
+      const bookCheck=inspectFateBook(loadJson(FATE_BOOK_KEY),fateOptions),metaCheck=inspectInheritanceMeta(loadJson(FATE_INHERITANCE_KEY));
+      if(!bookCheck.valid||!metaCheck.valid||!inheritanceBalance(bookCheck.book,metaCheck.meta).valid)throw new Error('canonical meta progression이 손상됨.');
+      if(!inspectRunInheritance(save,metaCheck.meta).valid)throw new Error('현재 run benefit과 purchase receipt가 일치하지 않음.');
+      fateBook=bookCheck.book;fateBookIntegrity=true;inheritanceMeta=metaCheck.meta;inheritanceMetaIntegrity=true;persist();
+      return{format:'lumensia.save.bundle.v3',save,fateBook,inheritanceMeta};
+    });
+    const blob=new Blob([JSON.stringify(bundle,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`lumensia-save-${save.world.date}-${save.world.time.replace(':','')}.json`;a.click();URL.revokeObjectURL(a.href);
+  }catch(error){alert(`내보내기 실패: ${error.message}`);}
 }
-async function importSave(e) { const file=e.target.files?.[0]; if(!file)return; try { const parsed=JSON.parse(await file.text()),bundled=['lumensia.save.bundle.v2','lumensia.save.bundle.v3'].includes(parsed?.format); const importedSave=bundled?parsed.save:parsed; if(!importedSave?.pc||!importedSave?.world)throw new Error('세이브 형식이 아님'); const importedBook=bundled?parsed.fateBook:parsed?.fateBook,importedMeta=parsed?.format==='lumensia.save.bundle.v3'?parsed.inheritanceMeta:null,importedRun={...importedSave}; delete importedRun.fateBook; const options={allowedCharacterKeys:Object.keys(ASSETS.characters||{}),allowedAffinityKeys:Object.keys(ASSETS.characters||{})}; const candidate=prepareCanonicalImport({currentFateBook:fateBookIntegrity?fateBook:loadedFateBookRaw,currentMeta:inheritanceMetaIntegrity?inheritanceMeta:loadedInheritanceRaw,incomingFateBook:importedBook,incomingMeta:importedMeta,incomingRun:importedRun,inspectFateBook,options}),normalizedRun=normalizeSave(candidate.run),pending={version:1,fateBook:candidate.fateBook,meta:candidate.meta,save:normalizedRun}; if(!inspectRunInheritance(normalizedRun,candidate.meta).valid)throw new Error('run inheritance receipt가 canonical progression과 일치하지 않음.'); localStorage.setItem(NEXT_LIFE_PENDING_KEY,JSON.stringify(pending)); localStorage.setItem(FATE_BOOK_KEY,JSON.stringify(candidate.fateBook));localStorage.setItem(FATE_INHERITANCE_KEY,JSON.stringify(candidate.meta));localStorage.setItem(SAVE_KEY,JSON.stringify(normalizedRun));localStorage.removeItem(NEXT_LIFE_PENDING_KEY); fateBook=candidate.fateBook;fateBookIntegrity=true;inheritanceMeta=candidate.meta;inheritanceMetaIntegrity=true;save=normalizedRun;renderAll();toast('세이브 불러옴'); } catch(err){alert(`불러오기 실패: ${err.message}`);} e.target.value=''; }
+async function importSave(e) {
+  const file=e.target.files?.[0];if(!file)return;
+  try{
+    const parsed=JSON.parse(await file.text()),bundled=['lumensia.save.bundle.v2','lumensia.save.bundle.v3'].includes(parsed?.format),importedSave=bundled?parsed.save:parsed;
+    if(!importedSave?.pc||!importedSave?.world)throw new Error('세이브 형식이 아님');
+    const importedBook=bundled?parsed.fateBook:parsed?.fateBook,importedMeta=parsed?.format==='lumensia.save.bundle.v3'?parsed.inheritanceMeta:null,importedRun={...importedSave};delete importedRun.fateBook;
+    const result=await withMetaProgressionLock(async()=>{
+      const options={allowedCharacterKeys:Object.keys(ASSETS.characters||{}),allowedAffinityKeys:Object.keys(ASSETS.characters||{})};
+      const candidate=prepareCanonicalImport({currentFateBook:loadJson(FATE_BOOK_KEY),currentMeta:loadJson(FATE_INHERITANCE_KEY),incomingFateBook:importedBook,incomingMeta:importedMeta,incomingRun:importedRun,inspectFateBook,options}),normalizedRun=normalizeSave(candidate.run),pending={version:1,fateBook:candidate.fateBook,meta:candidate.meta,save:normalizedRun};
+      if(!inspectRunInheritance(normalizedRun,candidate.meta).valid)throw new Error('run inheritance receipt가 canonical progression과 일치하지 않음.');
+      localStorage.setItem(NEXT_LIFE_PENDING_KEY,JSON.stringify(pending));localStorage.setItem(FATE_BOOK_KEY,JSON.stringify(candidate.fateBook));localStorage.setItem(FATE_INHERITANCE_KEY,JSON.stringify(candidate.meta));localStorage.setItem(SAVE_KEY,JSON.stringify(normalizedRun));localStorage.removeItem(NEXT_LIFE_PENDING_KEY);
+      return{...candidate,run:normalizedRun};
+    });
+    fateBook=result.fateBook;fateBookIntegrity=true;inheritanceMeta=result.meta;inheritanceMetaIntegrity=true;save=result.run;renderAll();toast('세이브 불러옴');
+  }catch(err){alert(`불러오기 실패: ${err.message}`);}e.target.value='';
+}
 function toast(text) { const d=document.createElement('div'); d.textContent=text; d.style.cssText='position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:99;background:#263449;padding:9px 14px;border-radius:999px'; document.body.append(d); setTimeout(()=>d.remove(),1300); }
 
 async function checkHealth() { try { const r=await fetch('/api/health'); const h=await r.json(); $('apiHealth').textContent=h.apiConfigured?`API 연결 준비됨 · ${h.luna} / ${h.terra}${h.accessTokenRequired ? ' · 접속 토큰 필요' : ''}`:'API 키 미설정. Vercel 환경변수 OPENAI_API_KEY를 추가하거나 데모 모드를 켜세요.'; } catch { $('apiHealth').textContent='API 상태를 확인할 수 없음.'; } }

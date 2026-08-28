@@ -647,7 +647,7 @@ async function sendActionStable(action, requestedMode = null) {
     if (!isMeta && !isContinue) {
       materializeEventConsequencesStable(data.turn, data.pipeline, action);
       notices = applyDelta(data.turn.state_delta);
-      notices.push(...applyFateEndingRuntime(data.fate_ending));
+      notices.push(...await applyFateEndingRuntime(data.fate_ending));
       applyEmotionUpdates(data.turn.emotion_updates || []);
       updateDirectorState(data.turn);
       addTimeline(data.turn);

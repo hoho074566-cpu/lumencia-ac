@@ -137,6 +137,13 @@ assert.equal(locked.creation.fateStart.origin.occupationKey,'dockhand');
 
 const app=readFileSync('app.js','utf8'),runtime=readFileSync('app-runtime.js','utf8'),html=readFileSync('index.html','utf8'),worker=readFileSync('sw.js','utf8');
 assert.match(app,/navigator\.locks\?\.request/,'same-device purchases must use the browser Web Lock boundary');
+assert.match(app,/const META_PROGRESSION_LOCK = 'lumensia-meta-progression'/);
+assert.ok((app.match(/withMetaProgressionLock\(/g)||[]).length>=5,'Ending persistence, purchase, export, and import must share one meta lock');
+assert.match(app,/async function persistFateBook\(\)[\s\S]*inspectFateBook\(loadJson\(FATE_BOOK_KEY\)[\s\S]*reconcileFateBooks\(current\.book,fateBook/,'Ending persistence must re-read and preserve newer canonical receipts');
+assert.match(app,/pendingNextLife\?\.meta[\s\S]*await withMetaProgressionLock[\s\S]*currentFateBook:loadJson\(FATE_BOOK_KEY\),currentMeta:loadJson\(FATE_INHERITANCE_KEY\)/,'journal recovery must validate fresh canonical storage inside the shared lock');
+const exportPath=app.slice(app.indexOf('async function exportSave()'),app.indexOf('async function importSave'));
+assert.doesNotMatch(exportPath,/setItem\(FATE_(?:BOOK|INHERITANCE)_KEY/,'a stale export must never write its in-memory meta snapshot back');
+assert.match(app,/async function importSave[\s\S]*withMetaProgressionLock[\s\S]*currentFateBook:loadJson\(FATE_BOOK_KEY\),currentMeta:loadJson\(FATE_INHERITANCE_KEY\)/,'import must validate against fresh canonical storage inside the shared lock');
 assert.match(app,/localStorage\.setItem\(NEXT_LIFE_PENDING_KEY[\s\S]*FATE_INHERITANCE_KEY[\s\S]*SAVE_KEY[\s\S]*removeItem\(NEXT_LIFE_PENDING_KEY/,'receipt and run application must use the recovery journal');
 assert.match(app,/prepareCanonicalImport\(\{currentFateBook:/,'imports must validate the canonical pair before mutation');
 assert.match(app,/format:'lumensia\.save\.bundle\.v3',save,fateBook,inheritanceMeta/);

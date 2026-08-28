@@ -153,7 +153,7 @@ assert.match(app,/const FATE_BOOK_KEY = 'lumensia\.fate-book\.v1'/,'Fate Book mu
 assert.match(app,/embeddedFateBookCheck=inspectFateBook\(loadedRunSave\?\.fateBook[\s\S]*reconcileFateBooks\(loadedFateBookCheck\.book,embeddedFateBookCheck\.book/,'a legacy embedded Fate Book must validate before migration into the independent ledger');
 assert.match(app,/delete save\.fateBook/,'the replaceable run save must not retain a parallel Fate Book root');
 assert.match(app,/format:'lumensia\.save\.bundle\.v3',save,fateBook,inheritanceMeta/,'exports must include the persistent Fate Book and canonical Inheritance meta');
-assert.match(app,/prepareCanonicalImport\(\{currentFateBook:fateBookIntegrity\?fateBook:loadedFateBookRaw,currentMeta:inheritanceMetaIntegrity\?inheritanceMeta:loadedInheritanceRaw/,'imports must validate Fate and Inheritance receipts as one canonical mutation');
+assert.match(app,/prepareCanonicalImport\(\{currentFateBook:loadJson\(FATE_BOOK_KEY\),currentMeta:loadJson\(FATE_INHERITANCE_KEY\)/,'imports must re-read and validate Fate and Inheritance receipts inside the canonical mutation');
 assert.match(runtime,/fetch\('\/api\/chat-router'/,'deployed stable runtime must keep the canonical router');
 assert.match(runtime,/fateBook: fateBookRuntimeSnapshot/,'deployed stable runtime must send the bounded discovery ledger');
 assert.match(runtime,/applyFateEndingRuntime\(data\.fate_ending\)/,'deployed stable runtime must persist accepted discoveries');
