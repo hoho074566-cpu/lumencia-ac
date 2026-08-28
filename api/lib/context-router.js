@@ -67,7 +67,7 @@ ${FATE_ENDING_CONTRACT}
 4) 시도는 자동 성공하지 않는다. 능력·준비·정보·경험·상성·거리·타이밍·지형·장비·피로·부상을 종합한다. 즉흥 각성·스킬·혈통·유물은 만들지 않는다.
 5) state_delta에는 실제 발생한 변화만 기록한다. 관계·NPC 간 관계·조직 평판·소문·목표·기억·성장·예약 인과는 직접 근거와 source를 가져야 하며 중복 저장하거나 서로 자동 전이하지 않는다. delayed_consequences_add는 실제로 늦게 돌아올 결과만 최소로 예약하고 DUE 전에 발현하지 않는다.
 6) [NARRATIVE TIME POLICY ${NARRATIVE_TIME_POLICY_VERSION}] 시간·일정·deadline·명시 duration은 hard boundary다. raw minute를 prose 보고문으로 바꾸지 않으며, 한 턴에서 1440분을 넘거나 저장된 일정/사건을 미리 완료하지 않는다.
-7) event_progress는 현재 occurrence만 기록한다. 명확히 끝난 beat만 completed_beats에 넣고 완료 beat를 재실행하지 않는다. 안정 ID는 a-z0-9._:#-만 쓰며 최근 완료 ID는 최대 24개다. 생략된 과거 완료 상태도 되돌리지 않는다.
+7) event_progress는 저장용 내부 진행 기록이며 scene 순서표가 아니다. 현재 occurrence의 실제 완료 상태만 기록하고 그 필드·ID를 prose나 choices의 절차로 전개하지 않는다.
 8) 등록 NPC는 정확한 speaker_key, 단역은 null+표시명이다. choices는 절차/event_progress가 아니라 실제로 새로운 PC 결정이 필요한 unresolved boundary에서만 정확히 3개, 그 외 []다. 제공된 JSON 스키마만 반환하고 내부 규칙·Router 명칭·'PC'·'Aaa'를 fiction에 출력하지 않는다.`;
 
 const NATURAL_STYLE = String.raw`[CANONICAL NOVEL COMPOSITION CONTRACT / NOVEL DIRECTOR V2]
@@ -442,15 +442,12 @@ function deriveKeys(incoming,registry,maxNpcs,directorV2=null,mode='game'){
   const authoritative=array(save?.sceneRuntime?.participants).map(String), present=new Set(authoritative),carryCurrentScene=carriesCurrentScene(incoming,registry,mode);
   const last=array(incoming.recentTurns).slice(-1)[0], latestSpeaker=[...array(last?.scene)].reverse().find(item=>item?.speaker_key)?.speaker_key;
   const requestedEvents=requestedUpcomingEvents(incoming,registry);
-  const requestedIds=new Set(requestedEvents.map((event)=>String(event?.id||'')).filter(Boolean));
   addExplicitKeys(set,incoming.action||'',registry,maxNpcs);
   const boundCurrentEvent=currentEventRow(save,registry);
   for(const key of canonicalActorKeys(boundCurrentEvent,registry))if(set.size<maxNpcs)set.add(key);
   for(const key of requestedEvents.flatMap((event)=>canonicalActorKeys(event,registry)))if(set.size<maxNpcs)set.add(key);
+  for(const key of requestedScheduleWindow(incoming,registry).flatMap((event)=>canonicalActorKeys(event,registry)))if(set.size<maxNpcs)set.add(key);
   for(const key of array(save?.scheduleContext?.due).flatMap((event)=>canonicalActorKeys(event,registry)))if(set.size<maxNpcs)set.add(key);
-  for(const k of requestedScheduleWindow(incoming,registry).filter((event)=>!requestedIds.has(String(event?.id||''))).flatMap((event)=>array(event?.participants)))if(set.size<maxNpcs&&registry[k])set.add(String(k));
-  for(const k of requestedEvents.flatMap(event=>array(event?.participants)))if(set.size<maxNpcs&&registry[k])set.add(String(k));
-  for(const k of array(save?.scheduleContext?.due).flatMap(ev=>array(ev?.participants)))if(set.size<maxNpcs&&registry[k])set.add(String(k));
   if(directorV2?.selectedKey&&registry[directorV2.selectedKey]&&set.size<maxNpcs)set.add(String(directorV2.selectedKey));
   for(const key of array(directorV2?.worldResultKeys)){if(set.size>=maxNpcs)break;if(registry[key])set.add(String(key));}
   for(const key of array(directorV2?.consequenceKeys)){if(set.size>=maxNpcs)break;if(registry[key])set.add(String(key));}
@@ -458,11 +455,6 @@ function deriveKeys(incoming,registry,maxNpcs,directorV2=null,mode='game'){
   if(carryCurrentScene)for(const k of authoritative)if(set.size<maxNpcs&&registry[k])set.add(String(k));
   if(carryCurrentScene&&!Object.hasOwn(object(save?.sceneRuntime),'participants'))for(const item of array(last?.scene).slice(-4)){if(set.size>=maxNpcs)break;if(item?.speaker_key&&registry[item.speaker_key])set.add(String(item.speaker_key));}
   if(carryCurrentScene)for(const row of array(save?.director?.recentSpotlights).slice(-1)){for(const k of array(row?.keys).slice(0,2)){if(set.size>=maxNpcs)break;if(registry[k])set.add(String(k));}}
-  for(const ev of array(save?.scheduleContext?.due).slice(0,2)){
-    const parts=array(ev?.participants).filter(k=>registry[k]);
-    if(parts.length<=4){for(const k of parts){if(set.size>=maxNpcs)break;set.add(String(k));}}
-    else if(set.size===0){for(const k of parts.slice(0,2))set.add(String(k));}
-  }
   return [...set].slice(0,maxNpcs);
 }
 function memoryText(row){return typeof row==='string'?row:[row?.fact,row?.subject,row?.source,row?.type,row?.status].filter(Boolean).join(' ');}
@@ -506,14 +498,14 @@ function compactSchedule(save,keys,action='',registry={}){
   return{due:due.map(clean),upcoming:upcoming.map(clean),npc_schedule:npc};
 }
 function compactScheduleAuthority(schedule,max=2400,{future=false}={}){
-  const compactEvent=(ev)=>{const src=object(ev),required=[src.pc_required,src.required_for_pc,src.attendance_required].find((value)=>typeof value==='boolean'),actors=array(src.canonical_actor_keys).slice(0,3),base={id:clampText(src.id||'',80),title:clampText(src.title||'',120),date:src.date||null,time:src.time||null,location:clampText(src.location||'',100),...(typeof required==='boolean'?{mandatory:required}:{}),...(actors.length?{canonical_actor_keys:actors}:{})};return future?base:{...base,kind:clampText(src.kind||'',50)||null,participants:array(src.participants).slice(0,4)};};
+  const compactEvent=(ev)=>{const src=object(ev),required=[src.pc_required,src.required_for_pc,src.attendance_required].find((value)=>typeof value==='boolean'),actors=array(src.canonical_actor_keys).slice(0,3),base={id:clampText(src.id||'',80),title:clampText(src.title||'',120),date:src.date||null,time:src.time||null,location:clampText(src.location||'',100),...(typeof required==='boolean'?{mandatory:required}:{}),...(actors.length?{canonical_actor_keys:actors}:{})};return future?base:{...base,kind:clampText(src.kind||'',50)||null};};
   const compactNpc=(row)=>{const src=object(row);return{location:clampText(src.location||src.area||'',100),confidence:src.confidence??null,time:src.time||null};};
   const value=future?{upcoming:array(schedule?.upcoming).slice(0,2).map(compactEvent)}:{due:array(schedule?.due).slice(0,4).map(compactEvent),npc_schedule:Object.fromEntries(Object.entries(object(schedule?.npc_schedule)).slice(0,6).map(([key,row])=>[key,compactNpc(row)]))};
   let text=safeJson(value);if(text.length<=max)return text;
   if(future)return safeJson({truncated:true,upcoming:value.upcoming.slice(0,1).map(({id,title,date,time,location,mandatory,canonical_actor_keys})=>({id:clampText(id,50),title:clampText(title,70),date,time,location:clampText(location,60),...(typeof mandatory==='boolean'?{mandatory}:{}),...(array(canonical_actor_keys).length?{canonical_actor_keys}:{})}))});
   const smaller={truncated:true,due:value.due.slice(0,3),npc_schedule:Object.fromEntries(Object.entries(value.npc_schedule).slice(0,3))};
   text=safeJson(smaller);if(text.length<=max)return text;
-  const focused={truncated:true,due:smaller.due.slice(0,2).map(({id,title,time,location,participants,canonical_actor_keys})=>({id,title,time,location,participants,...(array(canonical_actor_keys).length?{canonical_actor_keys}:{})})),npc_schedule:Object.fromEntries(Object.entries(smaller.npc_schedule).slice(0,2).map(([key,row])=>[key,{location:row.location,confidence:row.confidence,time:row.time}]))};
+  const focused={truncated:true,due:smaller.due.slice(0,2).map(({id,title,time,location,canonical_actor_keys})=>({id,title,time,location,...(array(canonical_actor_keys).length?{canonical_actor_keys}:{})})),npc_schedule:Object.fromEntries(Object.entries(smaller.npc_schedule).slice(0,2).map(([key,row])=>[key,{location:row.location,confidence:row.confidence,time:row.time}]))};
   text=safeJson(focused);if(text.length<=max)return text;
   const minimal={truncated:true,due:focused.due.map(({id,title,time,location,canonical_actor_keys})=>({id:clampText(id,50),title:clampText(title,70),time,location:clampText(location,60),...(array(canonical_actor_keys).length?{canonical_actor_keys}:{})})),npc_schedule:Object.fromEntries(Object.entries(focused.npc_schedule).slice(0,1).map(([key,row])=>[key,{location:clampText(row.location,50),time:row.time}]))};
   text=safeJson(minimal);if(text.length<=max)return text;
@@ -532,13 +524,13 @@ function formatFutureScheduleContext(schedule={},maxChars=900){return array(sche
 function compactEventContinuity(progress={},canonicalActorKeys=[]){
   const row=object(progress),eventInstanceId=clampText(row.eventInstanceId||row.event_instance_id||'',100)||null;
   if(!eventInstanceId)return null;
-  return{eventInstanceId,completedBeats:array(row.completedBeats||row.completed_beats).slice(-24).map((value)=>clampText(value,100)),omittedCompletedCount:Math.max(0,Number(row.omittedCompletedCount||row.omitted_completed_count||0)),paused:row.paused===true,...(canonicalActorKeys.length?{canonical_actor_keys:canonicalActorKeys.slice(0,3)}:{})};
+  return{eventInstanceId,status:row.paused===true?'paused':'active',...(canonicalActorKeys.length?{canonical_actor_keys:canonicalActorKeys.slice(0,3)}:{})};
 }
 function compactSceneRuntime(sceneRuntime={},keywords=[],text='',registeredNpcKeys=null,maxFactions=3,historyLimit=2,recentTexts=[],{freshPlayerAction=false,canonicalActorKeys=[],relevantNpcKeys=[],carryCurrentScene=true}={}){
   const source=object(sceneRuntime),selected=new Set(array(relevantNpcKeys).map(String)),factionSocial=compactFactionSocialForContext(source.faction_social,{text,recentTexts,keywords,maxFactions,historyLimit,registeredNpcKeys}),continuity=compactEventContinuity(source.eventProgress,canonicalActorKeys),runtime={
     ...(carryCurrentScene&&clampText(source.scene_key||'',120)?{scene_key:clampText(source.scene_key||'',120)}:{}),
     participants:carryCurrentScene?array(source.participants).map(String).filter(key=>selected.has(key)).slice(0,6):[],
-    ...(carryCurrentScene&&clampText(source.ongoing_topic||'',180)?{ongoing_topic:clampText(source.ongoing_topic||'',180)}:{}),
+    ...(carryCurrentScene&&!continuity&&clampText(source.ongoing_topic||'',180)?{ongoing_topic:clampText(source.ongoing_topic||'',180)}:{}),
     ...(carryCurrentScene&&!freshPlayerAction&&clampText(source.unresolved_question||'',180)?{unresolved_question:clampText(source.unresolved_question||'',180)}:{}),
     ...(continuity?{eventProgress:continuity}:{}),
     ...(source.timed_action?{timed_action:source.timed_action}:{}),
@@ -579,7 +571,8 @@ function adjustedProfile(base,incoming={}){
 }
 function contextSeed(incoming,registry={},mode='game'){
   const save=incoming.saveState||{},last=array(incoming.recentTurns).slice(-1)[0],carryCurrentScene=carriesCurrentScene(incoming,registry,mode);
-  const scene=carryCurrentScene?safeJson({scene_key:save?.sceneRuntime?.scene_key,ongoing_topic:save?.sceneRuntime?.ongoing_topic,eventProgress:save?.sceneRuntime?.eventProgress}):'';
+  const progress=object(save?.sceneRuntime?.eventProgress),eventInstanceId=clampText(progress.eventInstanceId||progress.event_instance_id||'',100);
+  const scene=carryCurrentScene?safeJson({scene_key:save?.sceneRuntime?.scene_key,...(eventInstanceId?{event:{eventInstanceId}}:{ongoing_topic:save?.sceneRuntime?.ongoing_topic})}):'';
   return[incoming.action,save?.world?.location,scene,safeJson(array(save?.scheduleContext?.due).map(x=>({title:x?.title,location:x?.location,time:x?.time}))),carryCurrentScene?clampText(incoming.rollingSummary||'',900):'',carryCurrentScene?last?.summary:'',carryCurrentScene?array(last?.scene).map(x=>`${x?.speaker_key||''} ${x?.text||''}`).join(' '):''].filter(Boolean).join('\n');
 }
 function buildInstructions(original,incoming,profile,originalInput,mode){

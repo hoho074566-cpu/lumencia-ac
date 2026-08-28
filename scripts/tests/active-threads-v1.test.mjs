@@ -36,6 +36,7 @@ const save = (patch = {}) => ({
   assert.equal(threads[0].player_owned, true, 'an awaiting-player boundary must remain the top active thread');
   assert.equal(threads[1].id, 'event:sealed_archive#12', 'the current event must remain ahead of schedules and background work');
   assert.equal(threads[2].id, 'schedule:class:10', 'a due schedule must be retained as a hard boundary');
+  assert.doesNotMatch(JSON.stringify(threads), /choose_seal/, 'semantic event checkpoints must stay private to the internal ledger');
   assert.equal(JSON.stringify(before), snapshot, 'deriving active threads must never mutate authoritative save state');
   const auto = buildActiveThreadsDirective({ action: '[AUTO FLOW: PC 새 행동 없음]', saveState: before, mode: 'auto' });
   assert.equal(auto.mode, 'await-player', 'AUTO must fail closed at a player-owned active thread');
@@ -70,6 +71,7 @@ const save = (patch = {}) => ({
   });
   const threads = deriveActiveThreads({ saveState: lifecycleSave });
   assert.ok(threads.some((thread) => thread.id === 'event:paused-archive#7' && thread.status === 'paused'), 'a paused occurrence ledger entry must remain resumable continuity authority');
+  assert.doesNotMatch(JSON.stringify(threads), /return_to_archive/, 'paused semantic checkpoint names must not become Writer continuity titles');
   assert.ok(!threads.some((thread) => /finished-schedule|이미 끝난/.test(`${thread.id} ${thread.title}`)), 'completed event authority must suppress stale active, world, and schedule threads');
 
   const completedPause = deriveActiveThreads({ saveState: save({

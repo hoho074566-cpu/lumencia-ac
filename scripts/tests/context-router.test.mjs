@@ -75,21 +75,22 @@ assert.match(scheduledRest.params.input,/"schedule_boundary_minutes":10/,'hard e
 assert.doesNotMatch(scheduledRest.params.input,/120분 휴식을 경계 너머까지 실행하지 말고|SCENE MOMENTUM/,'schedule facts must not be expanded into narrative control prose');
 assert.match(scheduledRest.params.input,/"id":"combat-orientation"/,'the matching authoritative schedule row must remain in the routed tail');
 const routedContract=route('주변을 살핀다.').params.instructions;
-assert.match(routedContract,/event_progress는 현재 occurrence만 기록/, 'routed GAME prompt is missing event progress contract');
-assert.match(routedContract,/완료 beat를 재실행하지 않는다/, 'routed GAME prompt is missing monotonic completion rule');
-assert.match(routedContract,/생략된 과거 완료 상태도 되돌리지 않는다/, 'routed GAME prompt cannot interpret overflow completions before generation');
+assert.match(routedContract,/event_progress는 저장용 내부 진행 기록이며 scene 순서표가 아니다/, 'routed GAME prompt is missing the event-ledger fiction firewall');
+assert.match(routedContract,/그 필드·ID를 prose나 choices의 절차로 전개하지 않는다/, 'routed GAME prompt must not promote ledger metadata into prose order');
 const overflowContext=route('행사를 계속 지켜본다.',{saveState:{sceneRuntime:{eventProgress:{eventInstanceId:'long_event#1',activeBeat:'beat_25',completedBeats:Array.from({length:24},(_,i)=>`beat_${i+1}`),omittedCompletedCount:1,completionFingerprint:'0'.repeat(256)}}}});
-assert.match(overflowContext.params.input,/"omittedCompletedCount":1/, 'normal GAME generation context is missing overflow completion authority');
-assert.match(overflowContext.params.input,/"beat_24"/, 'normal GAME generation context must retain the bounded explicit completion window');
+assert.match(overflowContext.params.input,/"eventInstanceId":"long_event#1","status":"active"/, 'normal GAME generation keeps opaque occurrence membership');
+assert.doesNotMatch(overflowContext.params.input,/beat_25|beat_24|omittedCompletedCount|completedBeats/, 'normal GAME generation must not see semantic checkpoint history');
 const pausedRuntime={eventProgress:null,eventProgressByInstance:{entrance_ceremony:{eventInstanceId:'entrance_ceremony',activeBeat:'ceremony_close',completedBeats:['welcome_address','freshman_rep_speech']}}};
 const resumedBeforeGeneration=promotePausedEventProgress(pausedRuntime,['entrance_ceremony']);
 const resumedContext=route('입학식을 계속 지켜본다.',{saveState:{sceneRuntime:resumedBeforeGeneration,scheduleContext:{due:[{id:'entrance_ceremony'}]}}});
-assert.match(resumedContext.params.input,/"completedBeats":\["welcome_address","freshman_rep_speech"\]/, 'resumed occurrence completions must reach routed GAME context before prose generation');
+assert.match(resumedContext.params.input,/"eventInstanceId":"entrance_ceremony","status":"active"/, 'resumed occurrence membership must reach routed GAME context');
+assert.doesNotMatch(resumedContext.params.input,/welcome_address|freshman_rep_speech|ceremony_close/, 'resumed checkpoint names remain private to the engine ledger');
 const duelId='started:1285-03-01:t12:abcd1234';
 const pausedDuel={eventProgress:null,eventProgressByInstance:{[duelId]:{eventInstanceId:duelId,activeBeat:'second_exchange',completedBeats:['opening_salute'],resumeKey:'lena duel'}}};
 const duelResumeIds=unscheduledPausedIdsForResume(pausedDuel,'Return and continue the Lena duel.',['lena duel']);
 const duelContext=route('Return and continue the Lena duel.',{saveState:{activeEvents:['lena duel'],sceneRuntime:promotePausedEventProgress(pausedDuel,duelResumeIds)}});
-assert.match(duelContext.params.input,/"completedBeats":\["opening_salute"\]/, 'resumed unscheduled completions must reach GAME context before generation');
+assert.match(duelContext.params.input,new RegExp(`"eventInstanceId":"${duelId}"`), 'resumed unscheduled occurrence membership must reach GAME context');
+assert.doesNotMatch(duelContext.params.input,/opening_salute|second_exchange/, 'unscheduled checkpoint names remain private to the engine ledger');
 
 const continueAction = `[LUMENSIA V1.5.6 CONTINUE]\n${'직전 장면의 같은 순간을 이어 쓴다. '.repeat(120)}`;
 const continuedRouted = routeOpenAIParams(
@@ -157,7 +158,7 @@ assert.equal(koreanExact.telemetry.selected_npcs.includes('elena'),true,'exact K
 assert.equal(koreanExact.telemetry.selected_npcs.includes('lena'),false,'레나 must not match inside 엘레나');
 
 const duePriority=routeOpenAIParams({instructions:crowdedInstructions,input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}'},{incoming:{action:'기다린다.',saveState:{turnNumber:3,world:{location:'academy'},sceneRuntime:{participants:['p1','p2','p3','p4']},scheduleContext:{due:[{participants:['p5']}]}},recentTurns:[]},mode:'game'});
-assert.equal(duePriority.telemetry.selected_npcs.includes('p5'),true,'due scheduled participant must reserve context capacity');
-assert.equal(duePriority.telemetry.selected_npcs.length,4,'due reservation must preserve the NPC cap');
+assert.equal(duePriority.telemetry.selected_npcs.includes('p5'),false,'a due-event attendee list must not become active NPC or narrative queue authority');
+assert.equal(duePriority.telemetry.selected_npcs.length,4,'actual current-scene participants still preserve the NPC cap');
 
 console.log(`PASS context router regressions (${cases.length + 30} checks)`);

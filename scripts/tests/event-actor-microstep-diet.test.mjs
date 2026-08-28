@@ -62,6 +62,7 @@ function route(savePatch = {}, routedAction = action) {
           turn_hook: { kind: 'player-choice', anchor: '목검과 방패 / 창 / 기초 체력', source: 'choices', status: 'awaiting-player', established_turn: 17 },
           exit_condition: { kind: 'player-choice', target: '평가 조를 선택한다', source: 'scene-purpose', status: 'awaiting-player', established_turn: 17 },
         },
+        scheduledEvents: [{ id: 'freshman-aptitude-evaluation', title: '신입생 기량평가', date: '1285-03-08', time: '10:00', location: '기사과 제1연병장', kind: 'academic', actor_key: 'artemis', participants: [] }],
         scheduleContext: { due: [], upcoming: [] },
         ...savePatch,
       },
@@ -79,8 +80,8 @@ assert.deepEqual(resumed.telemetry.selected_npcs, ['artemis'], 'a canonical curr
 assert.match(resumed.params.instructions, /Artemis is the knight department/);
 assert.match(input, /신입생의 실제 기초를 확인한다/);
 assert.equal(input.split('freshman-aptitude-evaluation').length - 1, 1, 'the current event occurrence is routed once as continuity membership');
-assert.equal(input.split('choose-group').length - 1, 1, 'completed event membership is routed once for replay protection');
-assert.doesNotMatch(input, /choose-weapon-and-take-basic-stance/, 'model-authored activeBeat must stay internal instead of choreographing the next scene');
+assert.doesNotMatch(input, /choose-group|choose-weapon-and-take-basic-stance/, 'semantic checkpoint names must stay in the internal ledger instead of outlining prose');
+assert.doesNotMatch(input, /무기술 조 분류 뒤 목검과 방패 선택/, 'model-authored event topic must not become a second procedural outline');
 assert.doesNotMatch(input, /player_boundary|player-boundary:turn-hook|"unresolved_question"/, 'a fresh exact USER ACTION supersedes the previous player menu in writer context');
 assert.doesNotMatch(input, /"source":"scene-runtime"/, 'the current event ledger must not return as a second narrative thread');
 assert.ok(input.endsWith(`===== USER ACTION (EXACT) =====\n${action}`), 'the already-chosen intent remains exact and final');
@@ -107,4 +108,13 @@ const unbound = route({
 assert.deepEqual(unbound.telemetry.selected_npcs, [], 'participant order is not silently reinterpreted as a canonical host');
 assert.doesNotMatch(unbound.params.input, /canonical_actor_keys|stance-check/, 'an unbound event remains AI-selectable without an invented actor special case');
 
-console.log('PASS Event Actor/Micro-step Diet (single continuity ledger, fresh action, explicit actor preservation, no inferred host)');
+const queued = route({
+  sceneRuntime: { scene_key: '기사과 전체 평가', participants: ['artemis'], eventProgress },
+  scheduleContext: { due: [{ id: 'freshman-aptitude-evaluation', title: '신입생 기량평가', date: '1285-03-08', time: '10:00', location: '제1연병장', kind: 'academic', actor_key: 'artemis', participants: ['lillia','sera'] }], upcoming: [] },
+}, '평가를 적당히 하고 내 차례를 끝낸다.');
+assert.deepEqual(queued.telemetry.selected_npcs, ['artemis'], 'event attendee order does not promote each queued student into active character authority');
+assert.doesNotMatch(queued.params.input, /"participants":\["lillia","sera"\]/, 'event attendee lists stay out of Writer event facts');
+assert.doesNotMatch(queued.params.input, /choose-group|choose-weapon-and-take-basic-stance/, 'broad completion intent receives event membership without checkpoint choreography');
+assert.ok(queued.params.input.endsWith('===== USER ACTION (EXACT) =====\n평가를 적당히 하고 내 차례를 끝낸다.'), 'broad completion intent remains exact and final');
+
+console.log('PASS Event Checkpoint/Writer Decoupling (opaque ledger, queue privacy, fresh intent, explicit actor preservation)');

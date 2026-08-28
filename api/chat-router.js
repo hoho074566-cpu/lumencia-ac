@@ -16,7 +16,7 @@ import { SCENE_NOVELTY_VERSION, deriveSceneNovelty } from '../lib/scene-novelty.
 import { deriveScenePurpose } from '../lib/scene-purpose.js';
 import { deriveSceneExitCondition, evaluateSceneExitCondition } from '../lib/scene-exit.js';
 import { deriveTurnHook, filterTurnHookChoices } from '../lib/turn-hook.js';
-import { compactEventProgress, mergeContinuationEventProgressState, mergeRoutedEventProgressState, occurrenceIdFromStartEvidence, promotePausedEventProgress, scheduledIdsDueByTurnEnd, unscheduledPausedIdsForResume } from '../lib/event-progress.js';
+import { mergeContinuationEventProgressState, mergeRoutedEventProgressState, occurrenceIdFromStartEvidence, promotePausedEventProgress, scheduledIdsDueByTurnEnd, unscheduledPausedIdsForResume } from '../lib/event-progress.js';
 import { findEventConsequence, minutesUntilEventConsequence, reconcileEventConsequenceLifecycle } from '../lib/event-consequence.js';
 import { deriveGoalTickState } from '../lib/npc-goal-tick.js';
 import { appendOffscreenDigest, deriveBoundedOffscreenProgression } from '../lib/offscreen-progression.js';
@@ -289,9 +289,9 @@ function emptyStateDelta() {
 
 function continueAction(incoming) {
   const runtime = object(incoming.saveState?.sceneRuntime);
-  const eventAnchor = compactEventProgress(runtime.eventProgress);
-  const continuity={scene_key:runtime.scene_key||'',participants:array(runtime.participants).slice(0,8),ongoing_topic:runtime.ongoing_topic||'',unresolved_question:runtime.unresolved_question||''};
-  return clampText(`${CONTINUE_DIRECTIVE}${eventAnchor?`\n현재 이벤트 진행(권위 상태): ${eventAnchor}`:''}\n직전 장면 연속성: ${clampText(continuity,900)}`,5000);
+  const progress=object(runtime.eventProgress),eventInstanceId=clampText(progress.eventInstanceId||progress.event_instance_id||'',100);
+  const continuity={scene_key:runtime.scene_key||'',...(eventInstanceId?{event_instance_id:eventInstanceId}:{})};
+  return clampText(`${CONTINUE_DIRECTIVE}\n직전 장면 연속성: ${clampText(continuity,400)}`,5000);
 }
 
 function continueRouteSave(saveState={}) {

@@ -80,7 +80,7 @@ const withLena=route('레나와 식사를 한다.');
 assert.deepEqual(withLena.telemetry.selected_npcs,['lena'],'an explicitly relevant NPC still receives full character signal');
 assert.match(withLena.params.input,/ACTIVE NPC SIGNAL/,'explicit NPC relevance still routes the active character profile');
 
-const currentEvaluation=route('기량평가를 계속 받는다.',{saveState:{world:{date:'1285-03-08',time:'10:10',location:'기사과 연병장'},sceneRuntime:{scene_key:'초기 기량평가',participants:['artemis'],eventProgress:{eventInstanceId:'initial-evaluation',completedBeats:['group-choice']}}}});
+const currentEvaluation=route('기량평가를 계속 받는다.',{saveState:{world:{date:'1285-03-08',time:'10:10',location:'기사과 연병장'},sceneRuntime:{scene_key:'초기 기량평가',participants:['artemis'],eventProgress:{eventInstanceId:'initial-evaluation',completedBeats:['group-choice']}},scheduledEvents:[{id:'initial-evaluation',title:'초기 기량평가',date:'1285-03-08',time:'10:00',location:'기사과 연병장',kind:'academic',actor_key:'artemis',participants:[]}]}});
 assert.deepEqual(currentEvaluation.telemetry.selected_npcs,['artemis'],'an active canonical event keeps its current actor signal without a generic fallback');
 
 const routerSource=readFileSync(new URL('../../api/chat-router.js',import.meta.url),'utf8');

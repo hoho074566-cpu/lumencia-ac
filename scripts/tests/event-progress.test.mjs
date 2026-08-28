@@ -107,8 +107,9 @@ const retrospective='Emily later says the representative speech was brief.';
 assert.ok(retrospective.includes('speech')&&isEventBeatEligible(previous,'ceremony_close'),'prose references do not reactivate structured beats');
 
 const router=readFileSync('api/chat-router.js','utf8');
-assert.match(router,/continueAction[\s\S]*compactEventProgress\(runtime\.eventProgress\)/,'CONTINUE action carries compact progress');
+assert.match(router,/continueAction[\s\S]*event_instance_id:eventInstanceId/,'CONTINUE action carries opaque occurrence identity');
 const continueActionSource=router.slice(router.indexOf('function continueAction'),router.indexOf('function continueRouteSave'));
+assert.doesNotMatch(continueActionSource,/compactEventProgress|completedBeats|activeBeat|ongoing_topic|participants/,'CONTINUE Writer input must not contain semantic checkpoints or participant queues');
 assert.doesNotMatch(continueActionSource,/remaining_beats|미처리 같은-장면 beat/,'CONTINUE action must not promote an unstarted pending beat into model instructions');
 assert.match(router,/function continueRouteSave[\s\S]*delete safeRuntime\.remaining_beats/,'CONTINUE routed SAVE_STATE must hide pending beats that would contradict hard freeze');
 assert.match(router,/mode==='continue'[\s\S]*incoming\.saveState=continueRouteSave\(incoming\.saveState\)/,'CONTINUE must route only the freeze-safe runtime view');

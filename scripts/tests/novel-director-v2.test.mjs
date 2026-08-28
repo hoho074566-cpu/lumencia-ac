@@ -43,7 +43,7 @@ for (const hardBoundary of [
   '날짜·계절·학년·학기·졸업·장기 progression',
   'PUBLIC만 기본 지식',
   'state_delta에는 실제 발생한 변화만',
-  'event_progress는 현재 occurrence',
+  'event_progress는 저장용 내부 진행 기록',
   '실제로 새로운 PC 결정이 필요한',
 ]) assert.match(hardContract, new RegExp(hardBoundary));
 assert.match(combatContract, /심리/, 'combat verdict must retain established psychological state');
@@ -165,7 +165,7 @@ assert.doesNotMatch(routineTransition.params.input, /ROUTINE→SCENE_THRESHOLD|H
 
 const entranceEvent = {
   id: 'entrance_ceremony', title: '입학식', date: '1285-03-01', time: '09:00',
-  location: '루멘시아 아카데미 대강당', kind: 'academic', participants: ['emily', 'lena'],
+  location: '루멘시아 아카데미 대강당', kind: 'academic', actor_keys: ['emily', 'lena'], participants: ['emily', 'lena'],
   importance: 4, note: '09:00 에밀리 환영사. 09:15 레나 신입생 대표 연설.', status: 'scheduled',
 };
 const laterOrientationEvent = {
@@ -189,7 +189,7 @@ const opening = route(openingAction, { savePatch: {
   },
 } });
 assert.equal(opening.telemetry.profile, 'scheduled-18k-v154', 'an explicitly requested major upcoming event must receive scheduled scene space');
-assert.deepEqual(opening.telemetry.selected_npcs, ['emily', 'lena'], 'the requested event participants must become canonical scene context');
+assert.deepEqual(opening.telemetry.selected_npcs, ['emily', 'lena'], 'explicit canonical event actors must become scene context without treating attendees as actors');
 assert.equal(opening.telemetry.event_director_v2?.result, 'REQUESTED_SCHEDULE_FIXED_FLOW', 'the requested event must outrank a random routine encounter');
 assert.equal(opening.telemetry.scene_orchestration?.secondary, 'none', 'current-scene NPC/world reactions must stay inside the primary scene instead of forcing a second world-response driver');
 assert.equal(opening.telemetry.scene_orchestration?.max_drivers, 1, 'one requested opening scene must not be treated as multiple schedule drivers');
@@ -223,7 +223,7 @@ assert.match(waitForOrientation.params.input, /"schedule_boundary_minutes":120/,
 
 const mentorBoundary = {
   id: 'mentor_meeting', title: '에밀리와 사전 면담', date: '1285-03-01', time: '09:30',
-  location: '본관 응접실', kind: 'personal', participants: ['emily'], pc_required: true, status: 'scheduled',
+  location: '본관 응접실', kind: 'personal', actor_key: 'emily', participants: ['emily'], pc_required: true, status: 'scheduled',
 };
 const requestedClass = {
   id: 'basic_class', title: '기사과 기초 수업', date: '1285-03-01', time: '10:00',
@@ -239,7 +239,7 @@ const boundedRequestedClass = route('이사벨과 10시에 기사과 기초 수�
   scheduledEvents: [mentorBoundary, requestedClass, afterClass],
   scheduleContext: { due: [], upcoming: [mentorBoundary, requestedClass, afterClass] },
 } });
-assert.deepEqual(boundedRequestedClass.telemetry.selected_npcs.slice(0, 2), ['isabel', 'emily'], 'explicit USER ACTION and the immediate boundary participant must outrank requested-event bulk participants');
+assert.deepEqual(boundedRequestedClass.telemetry.selected_npcs.slice(0, 2), ['isabel', 'emily'], 'explicit USER ACTION and the immediate boundary actor must outrank attendee lists');
 assert.match(boundedRequestedClass.params.input, /"schedule_boundary_minutes":30/, 'the earlier PC appointment must remain the deterministic stop boundary');
 assert.match(boundedRequestedClass.params.input, /mentor_meeting/);
 assert.match(boundedRequestedClass.params.input, /본관 응접실/);

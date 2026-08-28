@@ -113,7 +113,8 @@ const hardEvent = route('주변을 살핀다.', {
 });
 assert.match(hardEvent.params.input, /===== IMMEDIATE EVENT FACTS \(HARD DATA\) =====/);
 assert.doesNotMatch(hardEvent.params.input, /현재 시작 종이 울렸고 참가자 입장이 진행 중이다|현재 입장 통제|현재 오리엔테이션/, 'an immediate event keeps occurrence facts without turning note or NPC task text into choreography');
-assert.match(hardEvent.params.input, /"participants":\["artemis"\]/, 'an immediate unavoidable event retains current participants and occurrence facts');
+assert.match(hardEvent.params.input, /"id":"knight_orientation"/, 'an immediate unavoidable event retains occurrence identity as a hard fact');
+assert.doesNotMatch(hardEvent.params.input, /"participants":\["artemis"\]/, 'an attendee list must not become actor or narrative queue authority');
 
 assert.match(routineArrival.params.input, /"name":"테오 에버른"/);
 assert.doesNotMatch(routineArrival.params.input, /"name":"Aaa"/, 'routed save identity must not be replaced by a placeholder PC');
