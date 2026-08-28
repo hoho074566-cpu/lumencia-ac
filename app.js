@@ -50,7 +50,7 @@ function pcDirectorDept() {
   return 'common';
 }
 const DEFAULT_SCHEDULE_EVENTS = [
-  { id:'entrance_ceremony', title:'입학식', date:'1285-03-01', time:'09:00', location:'루멘시아 아카데미 대강당', kind:'academic', participants:['emily','lena'], importance:4, note:'09:00 에밀리 환영사. 09:15 레나 신입생 대표 짧은 연설과 기숙사/정오 학과 오리엔테이션 안내.', status:'scheduled' },
+  { id:'entrance_ceremony', title:'입학식', date:'1285-03-01', time:'09:00', location:'루멘시아 아카데미 대강당', kind:'academic', participants:['emily','lena'], importance:4, note:'09:00 에밀리 환영사. 09:15 레나 신입생 대표의 짧은 연설. 이후 교직원이 기숙사와 정오 학과 오리엔테이션을 안내.', status:'scheduled' },
   { id:'knight_orientation', title:'기사과 1학년 오리엔테이션', date:'1285-03-01', time:'12:00', location:'기사과 지정 오리엔테이션 장소', kind:'academic', participants:['artemis','lillia','laris','sera','isabel'], importance:3, note:'기사과 1학년 대상.', status:'scheduled' },
   { id:'magic_orientation', title:'마법과 1학년 오리엔테이션', date:'1285-03-01', time:'12:00', location:'마법과 지정 오리엔테이션 장소', kind:'academic', participants:['elena','lena','sia','serena','chloe'], importance:3, note:'마법과 1학년 대상.', status:'scheduled' },
   { id:'theology_orientation', title:'신학부 1학년 오리엔테이션', date:'1285-03-01', time:'12:00', location:'신학부 지정 오리엔테이션 장소', kind:'academic', participants:['mirabelle'], importance:3, note:'신학부 1학년 대상.', status:'scheduled' },

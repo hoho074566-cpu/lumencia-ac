@@ -54,7 +54,7 @@ assert.match(combatContract, /심리/, 'combat verdict must retain established p
 
 const divider = '='.repeat(20);
 const instructions = `===== CHARACTER REGISTRY =====
-artemis=아르테미스, emily=에밀리, lena=레나, lillia=릴리아, sera=세라
+artemis=아르테미스, emily=에밀리, elena=엘레나, lena=레나, lillia=릴리아, laris=라리스, sera=세라, serena=세레나, isabel=이사벨
 ===== WORLD CANON =====
 ${divider}
 PUBLIC
@@ -66,6 +66,10 @@ NPC RULES
 ${divider}
 Character facts.
 ${divider}
+ELENA 엘레나
+${divider}
+Elena collision signal must not route for Lena.
+${divider}
 EMILY 에밀리
 ${divider}
 Emily leads the academy and gives the entrance welcome speech.
@@ -73,11 +77,19 @@ ${divider}
 LENA 레나
 ${divider}
 Lena is the incoming student representative.
+${divider}
+SERENA 세레나
+${divider}
+Serena collision signal must not route for Lena.
 ===== NPC SPEECH =====
 ${divider}
 NPC SPEECH
 ${divider}
 Character voices.
+${divider}
+ELENA SPEECH 엘레나
+${divider}
+Elena collision voice must not route for Lena.
 ${divider}
 EMILY SPEECH 에밀리
 ${divider}
@@ -86,6 +98,10 @@ ${divider}
 LENA SPEECH 레나
 ${divider}
 Lena speaks clearly but carries first-day tension.
+${divider}
+SERENA SPEECH 세레나
+${divider}
+Serena collision voice must not route for Lena.
 ===== OPTIONAL ADULT / INTIMACY SPEECH LAYER =====
 None.
 ===== PC SYSTEM =====
@@ -168,11 +184,77 @@ assert.deepEqual(opening.telemetry.selected_npcs, ['emily', 'lena'], 'the reques
 assert.equal(opening.telemetry.event_director_v2?.result, 'REQUESTED_SCHEDULE_FIXED_FLOW', 'the requested event must outrank a random routine encounter');
 assert.match(opening.params.instructions, /Emily leads the academy/);
 assert.match(opening.params.instructions, /Lena is the incoming student representative/);
+assert.doesNotMatch(opening.params.instructions, /Elena collision|Serena collision/, 'selected NPC names must match whole title names instead of routing Elena/Serena for Lena');
 assert.doesNotMatch(opening.params.instructions, /11\. 플레이어 주권|선택 가능한 환경만 제시/, 'the obsolete report-only sovereignty block must be consolidated into the hard authority contract');
+assert.doesNotMatch(opening.params.input, /===== CHARACTER-DRIVEN NPC BEHAVIOR V1 =====/, 'fresh NPCs with no goal, relationship, emotion, memory, or judgment must not spend context on empty profiles');
 assert.match(opening.params.input, /"participants":\["emily","lena"\]/);
 assert.match(opening.params.input, /SCHEDULED_START_OFFSET=20min/);
 assert.doesNotMatch(opening.params.input, /SCHEDULE_BOUNDARY=20min/, 'attending the requested entrance ceremony must not stop before that same ceremony');
 assert.match(rendererSource, /sendAction\('게임을 시작한다\. 입학식에 오전 9시에 참석한다\.'\)/, 'the first-scene button must express event attendance rather than ask for an 08:40 state report');
+assert.match(rendererSource, /레나 신입생 대표의 짧은 연설\. 이후 교직원이 기숙사와 정오 학과 오리엔테이션을 안내/, 'the canonical schedule must not assign the staff notice to Lena');
+assert.doesNotMatch(rendererSource, /레나 신입생 대표 짧은 연설과 기숙사\/정오 학과 오리엔테이션 안내/, 'the ambiguous administrative Lena role must be removed');
+
+const seraCharacterSignal = route('세라와 함께 기숙사 복도를 걷는다.', { savePatch: {
+  world: { date: '1285-03-01', time: '10:10', location: '1학년 A동 기숙사 복도' },
+  sceneRuntime: { participants: ['sera'] },
+  relationships: { sera: { affinity: 2, trust: 1, status: '경계', history: ['서로 이름을 확인했다.'] } },
+  npcInnerStates: { sera: {
+    active_goal: { desire: '정오 일정 전에 자기 짐과 장비를 확인한다.', state: 'active', progress: 20, next_actions: ['낡은 검의 상태를 살핀다.'] },
+    social_stance: '손익을 먼저 재는 현실주의자',
+    wants_from_pc: '불필요하게 간섭하지 않는지 확인한다.',
+  } },
+  emotionStates: { sera: { current: 'wary', intensity: 0.4, reason: '아직 서로를 잘 모른다.' } },
+  memories: { npc: { sera: [{ type: 'observer', subject: 'pc', fact: '복도에서 먼저 거리를 지켰다.', turn: 11, confidence: 0.7, source: '직접 목격' }] } },
+} });
+assert.match(seraCharacterSignal.params.input, /===== CHARACTER-DRIVEN NPC BEHAVIOR V1 =====/);
+assert.match(seraCharacterSignal.params.input, /자기 짐과 장비를 확인한다/);
+assert.match(seraCharacterSignal.params.input, /손익을 먼저 재는 현실주의자/);
+
+const dormCandidates = ['lillia(릴리아)', 'laris(라리스)', 'sera(세라)', 'isabel(이사벨)']
+  .map((name) => `- ${name} score=18: NPC 일정 expected / 현재 장소와 자연스러움 / 최근 노출 공백 10턴`)
+  .join('\n');
+const dormDirectorInput = `===== TURN OPTIONS =====
+normal
+===== AUTHORITATIVE SAVE_STATE =====
+{}
+===== GM EVENT DIRECTOR (SERVER GUIDANCE) =====
+INTERVENTION: medium
+ROUTINE_STREAK=2 / EVENT_GAP=4 / CHOICE_GAP=1 / CROSS_DEPT_GAP=1
+SPOTLIGHT CANDIDATES (등장 강제가 아니라 개연성 있는 우선 후보):
+${dormCandidates}
+===== SCHEDULE ENGINE (AUTHORITATIVE) =====
+{}`;
+const dormSelections = new Set();
+for (let index = 0; index < 80; index += 1) {
+  const result = routeOpenAIParams(
+    { instructions, input: dormDirectorInput },
+    { incoming: {
+      action: '방에서 짐을 정리한다.',
+      saveState: {
+        id: `npc-selection-independence-${index}`,
+        turnNumber: 4,
+        world: { date: '1285-03-01', time: '10:00', location: '1학년 A동 기숙사' },
+        pc: { name: 'Ari', department: '기사과 1학년' },
+        sceneRuntime: { participants: [] },
+        director: { lastEventTurn: 0 },
+        scheduleContext: { due: [], upcoming: [] },
+      },
+      recentTurns: [],
+    }, mode: 'game' },
+  );
+  dormSelections.add(result.telemetry.event_director_v2?.selected_key || 'NO_EVENT');
+}
+assert.deepEqual(
+  [...dormSelections].sort(),
+  ['NO_EVENT', 'isabel', 'laris', 'lillia', 'sera'].sort(),
+  'equivalent dorm candidates must remain seed-dependent instead of hardcoding Sera or forcing an encounter',
+);
+
+assert.doesNotMatch(
+  `${source}\n${adapter}\n${rendererSource}`,
+  /견본|260828|여행용 트렁크|조용히 거든다|원고를 접|dormitory trunk/i,
+  'qualitative reference files and their distinctive scene content must not enter the production runtime',
+);
 
 const reactionScene = Array.from({ length: 8 }, (_, index) => ({
   kind: index % 2 ? 'dialogue' : 'narration',

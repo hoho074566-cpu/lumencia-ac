@@ -6,7 +6,7 @@
 // a stable-path V1.5.6 delta at boot. If required source markers disappear, boot stops visibly.
 
 const PATCH_VERSION = '1.5.6';
-const BASE_APP_SHA = '142fec9aafa603715d8eff1ec0d515c4f1b78428';
+const BASE_APP_SHA = '2bea4cd17677dfa6e2f4fc625e6a4782c96782c0';
 const LIVE_BASE_HEAD = 'a9170d6dca82c613436dcc5b3bc6ba86b9f86ba4';
 const AUTO_GESTURE_PX = 84;
 

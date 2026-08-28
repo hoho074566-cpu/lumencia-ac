@@ -80,7 +80,7 @@ const NATURAL_STYLE = String.raw`[CANONICAL NOVEL COMPOSITION CONTRACT / NOVEL D
 - User Specificity가 낮을수록 bounded execution 자율성은 커지고, 높을수록 줄어든다. 명시한 금지·거리·목적지·완료 조건은 넘지 않는다. Soft hook은 사용자 목적보다 뒤이며 hard interruption은 기존 인과가 있을 때만 중단한다.
 - SCENE CHANGE 우선. 감각/물리적 opening→environment/reaction→named action/dialogue→gesture/silence/reaction→dialogue continuation을 자연스럽게 엮는다. 설명보다 행동·대비·subtext로 의미와 성격을 먼저 드러내고 tease는 가능한 현재 장면에서 payoff한다. 시스템 사실·스킬·관계·손실도 동작·태도·후폭풍으로 번역한다.
 - rhythm·감각·subtext·camera distance는 tension/importance에 맞춰 semantic하게 선택한다. 이동·행정·대기·평범한 절차는 선택 메뉴 없이 다음 meaningful state까지 압축하고, 관계·갈등·이상·중요 정보/판단·전투·실제 선택은 필요한 만큼 확대한다.
-- NPC는 CANON 성격·목표·기억·관계에 따라 다르게 반응하고, 여럿이면 서로 끼어들고 반박한다. 실제 hard player decision 전에는 질문·행동 가능성 안내·Suggested Action으로 닫지 않는다.
+- Schedule/Director의 참석·동선은 NPC 역할·대사가 아니다. CANON 목표·성격·관계로 행동 이유·정체성을 보이고, 의미가 없으면 조우 없이 압축한다. Suggested Action 금지. 여럿이면 서로 끼어들고 반박한다.
 - NPC 내부 감정은 대사 원문이 아니다. 말·행동·침묵·호칭의 불일치로 subtext를 보인다. 상대는 직전 공방/대화를 다음 행동에 반영하며 기술 우위도 canonical power gap을 지우지 않는다.
 - 미스터리는 징후→불일치→부분적 실체로 좁힌다. 구조/개입은 기존 위치·관계·연락·추적의 인과가 필요하다. Failure는 새 Story State이며 구조 후에도 손실을 유지한다.
 - 다음 변화는 직전 행동·NPC goal·관계·active thread·세계 상태에서 잇는다. 목적이 끝나면 퇴장·문 닫힘·군중 이동·실제 도착 같은 physical exit/world-native continuation을 보인다. 남은 시간·가능한 활동·soft hook은 질문/choices가 아니다.
@@ -158,7 +158,17 @@ function parseBlocks(section=''){
   while((m=re.exec(src)))out.push({title:m[1].trim(),body:m[2].trim(),text:`${m[1].trim()}\n${m[2].trim()}`.trim()});
   if(!out.length&&src.trim())out.push({title:'section',body:src.trim(),text:src.trim()}); return out;
 }
-function titleHasAny(title,names=[]){const t=norm(title);return names.some(n=>{const x=norm(n);return x&&t.includes(x);});}
+function standaloneNameIn(text,name){
+  const source=norm(text),target=norm(name);if(!target)return false;
+  const word=/[\p{L}\p{N}_]/u;let index=source.indexOf(target);
+  while(index>=0){
+    const before=index>0?source[index-1]:'',after=source[index+target.length]||'';
+    if((!before||!word.test(before))&&(!after||!word.test(after)))return true;
+    index=source.indexOf(target,index+1);
+  }
+  return false;
+}
+function titleHasAny(title,names=[]){return names.some(name=>standaloneNameIn(title,name));}
 function textHasAny(text,names=[]){const t=norm(text);return names.some(n=>{const x=norm(n);return x&&t.includes(x);});}
 function secretTitle(title=''){return /(L4|L5|5단계\s*비밀|비밀\s*관계|극비|기밀)/i.test(title);}
 function scoreGeneric(block,keywords,names){
@@ -400,7 +410,7 @@ function buildEventDirectorV2(incoming,originalInput,registry,mode='game'){
   const occurrenceId=`director:${save?.world?.date||'undated'}:t${turn}:${picked.key}`.toLowerCase();
   const telemetry={...base,mode:eventMode,result:'NPC_EVENT',occurrence_id:occurrenceId,selected_key:picked.key,selected_name:registry[picked.key]||picked.name,event_style:style,eligible_keys:rows.map(x=>x.key),roll:Number(roll.toFixed(4)),none_weight:Number(noneWeight.toFixed(2)),weights,goal_signals:goalSignals,selected_goal:picked.goal_signal||null};
   const goalLine=picked.goal_signal?`\nACTIVE_GOAL=${clampText(picked.goal_signal.desire,160)}\nGOAL_TARGET=${picked.goal_signal.target_type}:${picked.goal_signal.target_key||'-'} / P${picked.goal_signal.priority} U${picked.goal_signal.urgency}`:'';
-  const directive=`[EVENT DIRECTOR V2.1 — SEEDED WEIGHTED VARIATION]\nMODE=${eventMode}\nRESULT=NPC_EVENT\nEVENT_INSTANCE_ID=${occurrenceId}\nSELECTED=${picked.key}(${registry[picked.key]||picked.name})\nSTYLE=${style}${goalLine}\n- 고정 일정, 사용자의 직접 행동, 기존 훅이 항상 우선한다.\n- 물리적 위치/일정상 자연스러울 때만 선택 NPC를 작은 접점에 사용한다. 불가능하면 순간이동시키지 말고 NO_EVENT처럼 처리한다.\n- ACTIVE_GOAL이 있으면 왜 이 NPC가 지금 그런 선택을 하는지에 반영하되, 목표가 위치·일정·지식·관계 제약을 무시하는 면허가 아니다.\n- 이 랜덤 슬롯은 작은 조우·마찰·관찰·공개 정보·사소한 실무 문제 수준이다. 새 대형 사건, 새 비밀, 새 능력, 중상, 강제 관계변화는 만들지 않는다.\n- 선택 NPC가 등장해도 PC에게 자동 관심/호감을 주지 않는다.`;
+  const directive=`[EVENT DIRECTOR V2.1 — SEEDED WEIGHTED VARIATION]\nMODE=${eventMode}\nRESULT=NPC_EVENT\nEVENT_INSTANCE_ID=${occurrenceId}\nSELECTED=${picked.key}(${registry[picked.key]||picked.name})\nSTYLE=${style}${goalLine}\n- 고정 일정, 사용자의 직접 행동, 기존 훅이 항상 우선한다.\n- 선택은 등장 가능성만 뜻한다. CANON goal/voice/관계와 ACTIVE_GOAL이 구체 행동 이유를 주고 물리 위치·일정·지식상 자연스러울 때만 사용한다. 일정·안내 자체를 장면 역할로 삼지 말며 이유가 없으면 NO_EVENT처럼 처리한다.\n- 이 랜덤 슬롯은 작은 조우·마찰·관찰·공개 정보·사소한 실무 문제 수준이다. 새 대형 사건, 새 비밀, 새 능력, 중상, 강제 관계변화는 만들지 않는다.\n- 선택 NPC가 등장해도 PC에게 자동 관심/호감을 주지 않는다.`;
   return{telemetry,selectedKey:picked.key,directive};
 }
 
