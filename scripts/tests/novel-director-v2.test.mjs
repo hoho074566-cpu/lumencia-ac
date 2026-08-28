@@ -198,7 +198,9 @@ assert.match(opening.params.instructions, /Lena is the incoming student represen
 assert.doesNotMatch(opening.params.instructions, /Elena collision|Serena collision/, 'selected NPC names must match whole title names instead of routing Elena/Serena for Lena');
 assert.doesNotMatch(opening.params.instructions, /11\. 플레이어 주권|선택 가능한 환경만 제시/, 'the obsolete report-only sovereignty block must be consolidated into the hard authority contract');
 assert.doesNotMatch(opening.params.input, /===== CHARACTER-DRIVEN NPC BEHAVIOR V1 =====/, 'fresh NPCs with no goal, relationship, emotion, memory, or judgment must not spend context on empty profiles');
-assert.match(opening.params.input, /"participants":\["emily","lena"\]/);
+assert.match(opening.params.input, /===== FUTURE CLOCK FACTS \(SOFT CONTINUITY DATA\) =====/);
+assert.match(opening.params.input, /"id":"entrance_ceremony"/);
+assert.doesNotMatch(opening.params.input, /09:00 에밀리 환영사|"importance":4|"status":"scheduled"|"participants":\["emily","lena"\]/, 'a requested future event must reach the writer as minimal clock data rather than a scene script');
 assert.match(opening.params.input, /"scheduled_start_offset_minutes":20/);
 assert.doesNotMatch(opening.params.input, /"schedule_boundary_minutes":20(?:,|})/, 'attending the requested entrance ceremony must not stop before that same ceremony');
 assert.doesNotMatch(opening.params.input, /knight_orientation|기사과 1학년 오리엔테이션/, 'later schedule items must remain boundaries outside the active requested scene instead of becoming narrative tasks');
@@ -241,7 +243,7 @@ assert.deepEqual(boundedRequestedClass.telemetry.selected_npcs.slice(0, 2), ['is
 assert.match(boundedRequestedClass.params.input, /"schedule_boundary_minutes":30/, 'the earlier PC appointment must remain the deterministic stop boundary');
 assert.match(boundedRequestedClass.params.input, /mentor_meeting/);
 assert.match(boundedRequestedClass.params.input, /본관 응접실/);
-assert.match(boundedRequestedClass.params.input, /"participants":\["emily"\]/, 'the intervening boundary participant must retain routed character authority');
+assert.match(boundedRequestedClass.params.input, /\{"key":"emily","name":"에밀리"\}/, 'the intervening boundary participant must retain routed character authority without duplicating the future schedule participant list');
 assert.match(boundedRequestedClass.params.input, /basic_class/);
 assert.doesNotMatch(boundedRequestedClass.params.input, /after_class_drill|오후 자율 훈련/, 'schedule rows after the requested occurrence must not become narrative tasks');
 assert.match(rendererSource, /sendAction\('게임을 시작한다\. 입학식에 오전 9시에 참석한다\.'\)/, 'the first-scene button must express event attendance rather than ask for an 08:40 state report');

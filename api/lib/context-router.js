@@ -381,10 +381,16 @@ function buildEventDirectorV2(incoming,originalInput,registry,mode='game'){
 }
 
 function addExplicitKeys(set,text,registry,limit){for(const key of mentionedNpcKeys(text,registry)){if(set.size>=limit)break;set.add(key);}}
+function explicitlyReferencesScheduledEvent(action,event={}){
+  const source=norm(action).replace(/[\s\p{P}\p{S}]+/gu,''),row=object(event),title=norm(row.title).trim(),compactTitle=title.replace(/[\s\p{P}\p{S}]+/gu,'');
+  if(compactTitle.length>=4&&source.includes(compactTitle))return true;
+  const anchor=title.split(/[\s\p{P}\p{S}]+/u).filter((value)=>value.length>=4).sort((a,b)=>b.length-a.length)[0];
+  return Boolean(anchor&&norm(action).includes(anchor));
+}
 function requestedUpcomingEvents(incoming={},registry={}){
   const save=incoming.saveState||{},action=String(incoming.action||'').trim();if(!action)return[];
   const intent=classifySceneIntent(action,{location:save?.world?.location||'',currentTime:save?.world?.time||'',currentDate:save?.world?.date||'',currentWeekday:save?.world?.weekday||'',actorName:save?.pc?.name||'',resumeTimedAction:save?.sceneRuntime?.timed_action});
-  return array(save?.scheduleContext?.upcoming).filter(event=>isPcRelevantScheduleEvent(save,event)&&isRequestedScheduledActivity(save,event,action,intent,registry)).slice(0,2);
+  return array(save?.scheduleContext?.upcoming).filter(event=>isPcRelevantScheduleEvent(save,event)&&(isRequestedScheduledActivity(save,event,action,intent,registry)||explicitlyReferencesScheduledEvent(action,event))).slice(0,2);
 }
 function requestedScheduleWindow(incoming={},registry={}){
   const save=incoming.saveState||{},requested=requestedUpcomingEvents(incoming,registry);if(!requested.length)return[];
@@ -444,44 +450,45 @@ function compactPc(pc={},important=false,text=''){const out={...object(pc)};if('
 function shouldRouteUpcomingSchedule(save,action='',registry={}){
   if(requestedUpcomingEvents({saveState:save,action},registry).length)return true;
   const intent=classifySceneIntent(action,{location:save?.world?.location||'',currentTime:save?.world?.time||'',currentDate:save?.world?.date||'',currentWeekday:save?.world?.weekday||'',actorName:save?.pc?.name||'',resumeTimedAction:save?.sceneRuntime?.timed_action});
-  return Boolean((intent.compression&&activityRangeLimitMinutes(intent)>0)||Number(intent.boundaryLookaheadMinutes||0)>0);
+  const limit=activityRangeLimitMinutes(intent);
+  if((!intent.compression&&Number(intent.boundaryLookaheadMinutes||0)<=0)||limit<=0)return false;
+  const boundary=nextScheduleBoundaryMinutes(save,{futureOnly:true,action,intent,registry});
+  return boundary!=null&&boundary>0&&boundary<=limit;
 }
 function compactSchedule(save,keys,action='',registry={}){
   const sc=object(save?.scheduleContext),selected=new Set(keys),requested=requestedUpcomingEvents({saveState:save,action},registry),window=requestedScheduleWindow({saveState:save,action},registry);
   const clean=(ev)=>({...ev,participants:array(ev?.participants).filter(k=>selected.has(k)).slice(0,4)});
-  const npc={};for(const k of keys)if(sc?.npc_schedule?.[k])npc[k]=sc.npc_schedule[k];
   const due=array(sc.due).filter((event)=>isPcRelevantScheduleEvent(save,event)).slice(0,2);
   const relevantUpcoming=array(sc.upcoming).filter((event)=>isPcRelevantScheduleEvent(save,event));
   const upcoming=requested.length?window:shouldRouteUpcomingSchedule(save,action,registry)?relevantUpcoming.slice(0,1):[];
+  const immediateNpcKeys=new Set(due.flatMap((event)=>array(event?.participants)).map(String));
+  const npc={};for(const k of keys)if(immediateNpcKeys.has(String(k))&&sc?.npc_schedule?.[k])npc[k]=sc.npc_schedule[k];
   return{due:due.map(clean),upcoming:upcoming.map(clean),npc_schedule:npc};
 }
-function compactScheduledEventsForScene(save,action='',registry={}){
-  const active=array(save?.scheduledEvents).filter((event)=>!['completed','cancelled'].includes(String(event?.status||'').toLowerCase())&&isPcRelevantScheduleEvent(save,event));
-  const requestedWindow=requestedScheduleWindow({saveState:save,action},registry),due=array(save?.scheduleContext?.due).filter((event)=>isPcRelevantScheduleEvent(save,event)).slice(0,2),upcoming=shouldRouteUpcomingSchedule(save,action,registry)?array(save?.scheduleContext?.upcoming).filter((event)=>isPcRelevantScheduleEvent(save,event)).slice(0,1):[];
-  const windowIds=new Set((requestedWindow.length?requestedWindow:[...due,...upcoming]).map((event)=>String(event?.id||'')).filter(Boolean));
-  return(windowIds.size?active.filter((event)=>windowIds.has(String(event?.id||''))):[]).slice(0,3);
-}
-function compactScheduleAuthority(schedule,max=2400){
-  const compactEvent=(ev)=>{const src=object(ev);return{id:clampText(src.id||'',80),title:clampText(src.title||'',120),note:clampText(src.note||'',180),date:src.date||null,time:src.time||null,location:clampText(src.location||'',100),importance:src.importance??null,status:src.status||null,participants:array(src.participants).slice(0,4)};};
+function compactScheduleAuthority(schedule,max=2400,{future=false}={}){
+  const compactEvent=(ev)=>{const src=object(ev),required=[src.pc_required,src.required_for_pc,src.attendance_required].find((value)=>typeof value==='boolean'),base={id:clampText(src.id||'',80),title:clampText(src.title||'',120),date:src.date||null,time:src.time||null,location:clampText(src.location||'',100),...(typeof required==='boolean'?{mandatory:required}:{})};return future?base:{...base,note:clampText(src.note||'',180),kind:clampText(src.kind||'',50)||null,participants:array(src.participants).slice(0,4)};};
   const compactNpc=(row)=>{const src=object(row);return{location:clampText(src.location||src.area||'',100),activity:clampText(src.activity||src.title||'',120),commitment:clampText(src.commitment||'',120),confidence:src.confidence??null,time:src.time||null,next_change_minutes:src.next_change_minutes??null};};
-  const value={due:array(schedule?.due).slice(0,4).map(compactEvent),upcoming:array(schedule?.upcoming).slice(0,5).map(compactEvent),npc_schedule:Object.fromEntries(Object.entries(object(schedule?.npc_schedule)).slice(0,6).map(([key,row])=>[key,compactNpc(row)]))};
+  const value=future?{upcoming:array(schedule?.upcoming).slice(0,2).map(compactEvent)}:{due:array(schedule?.due).slice(0,4).map(compactEvent),npc_schedule:Object.fromEntries(Object.entries(object(schedule?.npc_schedule)).slice(0,6).map(([key,row])=>[key,compactNpc(row)]))};
   let text=safeJson(value);if(text.length<=max)return text;
-  const smaller={truncated:true,due:value.due.slice(0,3),upcoming:value.upcoming.slice(0,3),npc_schedule:Object.fromEntries(Object.entries(value.npc_schedule).slice(0,3))};
+  if(future)return safeJson({truncated:true,upcoming:value.upcoming.slice(0,1).map(({id,title,date,time,location,mandatory})=>({id:clampText(id,50),title:clampText(title,70),date,time,location:clampText(location,60),...(typeof mandatory==='boolean'?{mandatory}:{})}))});
+  const smaller={truncated:true,due:value.due.slice(0,3),npc_schedule:Object.fromEntries(Object.entries(value.npc_schedule).slice(0,3))};
   text=safeJson(smaller);if(text.length<=max)return text;
-  const focused={truncated:true,due:smaller.due.slice(0,2).map(({id,title,note,time,location,participants})=>({id,title,note:clampText(note,100),time,location,participants})),upcoming:smaller.upcoming.slice(0,1).map(({id,title,note,time,location,participants})=>({id,title,note:clampText(note,100),time,location,participants})),npc_schedule:Object.fromEntries(Object.entries(smaller.npc_schedule).slice(0,2).map(([key,row])=>[key,{location:row.location,activity:clampText(row.activity,80),commitment:clampText(row.commitment,80),confidence:row.confidence,time:row.time}]))};
+  const focused={truncated:true,due:smaller.due.slice(0,2).map(({id,title,note,time,location,participants})=>({id,title,note:clampText(note,100),time,location,participants})),npc_schedule:Object.fromEntries(Object.entries(smaller.npc_schedule).slice(0,2).map(([key,row])=>[key,{location:row.location,activity:clampText(row.activity,80),commitment:clampText(row.commitment,80),confidence:row.confidence,time:row.time}]))};
   text=safeJson(focused);if(text.length<=max)return text;
-  const minimal={truncated:true,due:focused.due.map(({id,title,time,location})=>({id:clampText(id,50),title:clampText(title,70),time,location:clampText(location,60)})),upcoming:focused.upcoming.map(({id,title,time})=>({id:clampText(id,50),title:clampText(title,60),time})),npc_schedule:Object.fromEntries(Object.entries(focused.npc_schedule).slice(0,1).map(([key,row])=>[key,{location:clampText(row.location,50),activity:clampText(row.activity,60),time:row.time}]))};
+  const minimal={truncated:true,due:focused.due.map(({id,title,time,location})=>({id:clampText(id,50),title:clampText(title,70),time,location:clampText(location,60)})),npc_schedule:Object.fromEntries(Object.entries(focused.npc_schedule).slice(0,1).map(([key,row])=>[key,{location:clampText(row.location,50),activity:clampText(row.activity,60),time:row.time}]))};
   text=safeJson(minimal);if(text.length<=max)return text;
-  const tiny={truncated:true,due:minimal.due.slice(0,1).map(({id,title,time})=>({id,title:clampText(title,50),time})),upcoming:[]};
+  const tiny={truncated:true,due:minimal.due.slice(0,1).map(({id,title,time})=>({id,title:clampText(title,50),time}))};
   text=safeJson(tiny);if(text.length<=max)return text;
   return safeJson({truncated:true});
 }
-function formatAuthorityTail(scheduleText){return`===== RELEVANT SCHEDULE FACTS (AUTHORITATIVE) =====\n${scheduleText||'없음'}`;}
+function formatAuthorityTail(scheduleText){return`===== IMMEDIATE EVENT FACTS (HARD DATA) =====\n${scheduleText||'없음'}`;}
 function fitAuthorityTail({schedule={},maxChars=1400,routine=false}={}){
+  if(!array(schedule?.due).length&&!Object.keys(object(schedule?.npc_schedule)).length)return'';
   if(maxChars<80)return'';
-  const label=formatAuthorityTail('').length-'없음'.length,scheduleBudget=Math.max(0,maxChars-label),scheduleText=compactScheduleAuthority(schedule,routine?Math.min(900,scheduleBudget):Math.min(1400,scheduleBudget)),full=formatAuthorityTail(scheduleText);
-  return full.length<=maxChars?full:formatAuthorityTail(compactScheduleAuthority(schedule,Math.max(0,scheduleBudget)));
+  const hardSchedule={due:array(schedule?.due),npc_schedule:object(schedule?.npc_schedule)},label=formatAuthorityTail('').length-'없음'.length,scheduleBudget=Math.max(0,maxChars-label),scheduleText=compactScheduleAuthority(hardSchedule,routine?Math.min(900,scheduleBudget):Math.min(1400,scheduleBudget)),full=formatAuthorityTail(scheduleText);
+  return full.length<=maxChars?full:formatAuthorityTail(compactScheduleAuthority(hardSchedule,Math.max(0,scheduleBudget)));
 }
+function formatFutureScheduleContext(schedule={},maxChars=900){return array(schedule?.upcoming).length?`===== FUTURE CLOCK FACTS (SOFT CONTINUITY DATA) =====\n${compactScheduleAuthority({upcoming:schedule.upcoming},maxChars,{future:true})}`:'';}
 function compactSceneRuntime(sceneRuntime={},keywords=[],text='',registeredNpcKeys=null,maxFactions=3,historyLimit=2,recentTexts=[]){
   const source=object(sceneRuntime),factionSocial=compactFactionSocialForContext(source.faction_social,{text,recentTexts,keywords,maxFactions,historyLimit,registeredNpcKeys}),progress=object(source.eventProgress),runtime={
     scene_key:clampText(source.scene_key||'',120)||null,
@@ -502,7 +509,7 @@ function compactSave(incoming,keys,registry,profile,keywords,text='',recentTexts
   const relevantEvents=array(save?.activeEvents).filter(ev=>{const t=norm(ev);return keywords.some(k=>k.length>=2&&t.includes(k));}).slice(0,6);
   const fateBackground=compactFateBackgroundForModel(save?.creation,save?.pc),personalStory=compactFatePersonalStoryForModel(save?.creation,{existingHooks:save?.hooks}),pc=compactPc(save?.pc||{},profile.name.includes('important')||profile.name.includes('critical'),text);
   if(fateBackground){delete pc.characterSetting;delete pc.admission;const publicRegion=fateBackground.detail.public_facts.find(row=>row.id==='home_region')?.fact;if(publicRegion)pc.origin=publicRegion;}
-  return{version:save?.version,turnNumber:Number(save?.turnNumber||0),world:save?.world||{},pc,...(fateBackground?{characterBackground:fateBackground.detail}:{}),...(personalStory?{characterPersonalStory:personalStory.detail}:{}),...(Object.keys(intimacy).length?{intimacyStates:intimacy}:{}),npcStates,relevantNpcKeys:keys,activeEvents:relevantEvents,completedEvents:array(save?.completedEvents).slice(-8),pcKnowledge:knowledge,memories:{global:globalMem},hooks:array(save?.hooks).filter(x=>!['resolved','expired'].includes(x?.status)&&!x?.event_consequence).slice(-4),scheduledEvents:compactScheduledEventsForScene(save,text,registry),flags:save?.flags||{},sceneRuntime:compactSceneRuntime(save?.sceneRuntime,keywords,text,Object.keys(registry),2,1,recentTexts),backgroundDigest:clampText(save?.backgroundDigest||'',450)};
+  return{version:save?.version,turnNumber:Number(save?.turnNumber||0),world:save?.world||{},pc,...(fateBackground?{characterBackground:fateBackground.detail}:{}),...(personalStory?{characterPersonalStory:personalStory.detail}:{}),...(Object.keys(intimacy).length?{intimacyStates:intimacy}:{}),npcStates,relevantNpcKeys:keys,activeEvents:relevantEvents,completedEvents:array(save?.completedEvents).slice(-8),pcKnowledge:knowledge,memories:{global:globalMem},hooks:array(save?.hooks).filter(x=>!['resolved','expired'].includes(x?.status)&&!x?.event_consequence).slice(-4),flags:save?.flags||{},sceneRuntime:compactSceneRuntime(save?.sceneRuntime,keywords,text,Object.keys(registry),2,1,recentTexts),backgroundDigest:clampText(save?.backgroundDigest||'',450)};
 }
 function compactRecent(recentTurns,count){
   const turns=array(recentTurns).slice(-count);
@@ -560,7 +567,7 @@ function compactActiveNpcSignal(context,saveState={},maxChars=2200){
   return safeJson(rows.map(({key,name,goal,relationship,prior_judgment,social_stance,npc_relationships})=>({key,name,goal,relationship,prior_judgment,social_stance,npc_relationships})));
 }
 function buildHardExecutionFacts({action='',saveState={},registry={},mode='game'}={}){
-  const intent=classifySceneIntent(action,{location:saveState?.world?.location||'',currentTime:saveState?.world?.time||'',currentDate:saveState?.world?.date||'',currentWeekday:saveState?.world?.weekday||'',actorName:saveState?.pc?.name||'',resumeTimedAction:saveState?.sceneRuntime?.timed_action}),range=array(intent.suggestedAdvanceMinutes),boundaryLookahead=Math.max(0,Number(intent.boundaryLookaheadMinutes||0)),requested=requestedUpcomingEvents({saveState,action},registry),requestedIds=new Set(requested.map((event)=>String(event?.id||''))),intervening=requestedScheduleWindow({saveState,action},registry).some((event)=>!requestedIds.has(String(event?.id||''))),boundaryRelevant=requested.length?intervening:(intent.compression&&activityRangeLimitMinutes(intent)>0)||boundaryLookahead>0,scheduleBoundary=boundaryRelevant?nextScheduleBoundaryMinutes(saveState,{futureOnly:true,action,intent,registry}):null;
+  const intent=classifySceneIntent(action,{location:saveState?.world?.location||'',currentTime:saveState?.world?.time||'',currentDate:saveState?.world?.date||'',currentWeekday:saveState?.world?.weekday||'',actorName:saveState?.pc?.name||'',resumeTimedAction:saveState?.sceneRuntime?.timed_action}),range=array(intent.suggestedAdvanceMinutes),boundaryLookahead=Math.max(0,Number(intent.boundaryLookaheadMinutes||0)),requested=requestedUpcomingEvents({saveState,action},registry),requestedIds=new Set(requested.map((event)=>String(event?.id||''))),intervening=requestedScheduleWindow({saveState,action},registry).some((event)=>!requestedIds.has(String(event?.id||''))),waitsForRequested=requested.length>0&&intent.kind==='wait',boundaryRelevant=requested.length?intervening:(intent.compression&&activityRangeLimitMinutes(intent)>0)||boundaryLookahead>0,boundaryCandidate=waitsForRequested?nextScheduleBoundaryMinutes(saveState,{futureOnly:true,action:'',intent,registry}):boundaryRelevant?nextScheduleBoundaryMinutes(saveState,{futureOnly:true,action,intent,registry}):null,boundaryLimit=waitsForRequested?1440:activityRangeLimitMinutes(intent),scheduleBoundary=boundaryCandidate!=null&&boundaryCandidate>0&&boundaryCandidate<=boundaryLimit?boundaryCandidate:null;
   const facts={mode,intent_kind:intent.kind,semantic_target:intent.semanticTarget||null,time_window_minutes:range.length===2?range:null,...(intent.turnLimitTruncated?{turn_limit_minutes:1440}:{}),...(intent.scheduledStartOffsetMinutes!=null?{scheduled_start_offset_minutes:intent.scheduledStartOffsetMinutes}:{}),...(intent.strictDurationLowerBoundMinutes!=null?{strict_duration_lower_bound_minutes:intent.strictDurationLowerBoundMinutes}:{}),...(intent.explicitDurationUpperBoundMinutes!=null?{explicit_duration_upper_bound_minutes:intent.explicitDurationUpperBoundMinutes}:{}),...(intent.explicitDurationMinutes!=null?{explicit_duration_minutes:intent.explicitDurationMinutes}:{}),...(intent.explicitDurationRangeMinutes?{explicit_duration_range_minutes:intent.explicitDurationRangeMinutes}:{}),...(intent.precedingActivityRangeMinutes?{preceding_activity_range_minutes:intent.precedingActivityRangeMinutes}:intent.precedingActivityMinutes>0?{preceding_activity_minutes:intent.precedingActivityMinutes}:{}),...(scheduleBoundary!=null?{schedule_boundary_minutes:scheduleBoundary}:{})};
   const plan=intent.structuredExecutionPlan||intent.structuredDecisionPlan,lines=['===== HARD EXECUTION FACTS (DATA, NOT FICTION) =====',safeJson(facts)];
   if(plan?.eligible&&array(plan.clauses).length){
@@ -595,7 +602,7 @@ function buildInput(incoming,originalInput,profile,routed,mode='game'){
   const saveState=`===== AUTHORITATIVE SAVE_STATE (ROUTED MINIMUM) =====\n${safeJson(essentialSave)}`;
   const threadSignal=array(activeThreads.threads).filter((thread)=>thread?.source!=='schedule'&&thread?.background!==true).slice(0,4).map(({id,source,kind,status,title,due_at,player_owned})=>({id,source,kind,status,title,...(due_at?{due_at}:{}),...(player_owned?{player_owned:true}:{})}));
   activeThreads.visible_threads=threadSignal.length;
-  const optionalContext=`===== RECENT SCENE CONTEXT =====\n${safeJson(recent)}${activeNpcSignal!=='[]'?`\n\n===== ACTIVE NPC SIGNAL (READ-ONLY FACTS) =====\n${activeNpcSignal}`:''}\n\n===== CURRENT SCENE FACTS =====\n${safeJson(scene)}${threadSignal.length?`\n\n===== RELEVANT CONTINUITY THREADS =====\n${safeJson(threadSignal)}`:''}\n\n===== ROLLING SUMMARY TAIL =====\n${clampText(incoming.rollingSummary||'아직 없음',900)}\n\n===== AUTHORITATIVE SAVE_STATE (ROUTED DETAIL) =====\n${safeJson(save)}\n\n===== TURN FLAGS =====\n${safeJson({input_mode:mode,adult_mode:Boolean(incoming.adultMode)})}\n\n===== AVAILABLE_CG_IDS =====\n${cg||'없음'}`;
+  const softScheduleContext=formatFutureScheduleContext(schedule),optionalContext=`===== RECENT SCENE CONTEXT =====\n${safeJson(recent)}${activeNpcSignal!=='[]'?`\n\n===== ACTIVE NPC SIGNAL (READ-ONLY FACTS) =====\n${activeNpcSignal}`:''}\n\n===== CURRENT SCENE FACTS =====\n${safeJson(scene)}${threadSignal.length?`\n\n===== RELEVANT CONTINUITY THREADS =====\n${safeJson(threadSignal)}`:''}\n\n===== ROLLING SUMMARY TAIL =====\n${clampText(incoming.rollingSummary||'아직 없음',900)}\n\n===== AUTHORITATIVE SAVE_STATE (ROUTED DETAIL) =====\n${safeJson(save)}\n\n===== TURN FLAGS =====\n${safeJson({input_mode:mode,adult_mode:Boolean(incoming.adultMode)})}\n\n===== AVAILABLE_CG_IDS =====\n${cg||'없음'}${softScheduleContext?`\n\n${softScheduleContext}`:''}`;
   const executionFacts=buildHardExecutionFacts({action,saveState:incoming.saveState||{},registry:routed.registry,mode}),reservedContext=`${executionFacts}${directorFactSignal?`\n\n===== RELEVANT ACTIVE FACT (DATA, NOT FICTION) =====\n${directorFactSignal}`:''}`;
   const actionFrame=(text)=>`===== USER ACTION (EXACT) =====\n${text}`,fixedSeparators=6,actionBlock=actionFrame(clampMiddleText(action,5200));
   const authorityBudget=Math.max(0,profile.inputChars-saveState.length-reservedContext.length-actionBlock.length-fixedSeparators),authorityTail=fitAuthorityTail({schedule,maxChars:authorityBudget,routine});

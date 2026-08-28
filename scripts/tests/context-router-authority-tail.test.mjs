@@ -6,7 +6,7 @@ import { composeRoutedInput, routeOpenAIParams } from '../../api/lib/context-rou
 
 const optionalContext=`===== AUTHORITATIVE SAVE_STATE (ROUTED) =====\n${'OPTIONAL_CONTEXT_'.repeat(1400)}`;
 const authorityTail=[
-  '===== RELEVANT SCHEDULE FACTS (AUTHORITATIVE) =====',
+  '===== IMMEDIATE EVENT FACTS (HARD DATA) =====',
   '{"due":[{"id":"SCHEDULE_SENTINEL","title":"반드시 보존"}]}',
 ].join('\n');
 const reservedContext='===== HARD EXECUTION FACTS (DATA, NOT FICTION) =====\n{"intent_kind":"travel","semantic_target":"도서관"}\nHARD_FACT_SENTINEL=KEEP';
@@ -18,7 +18,7 @@ assert.ok(text.length<optionalContext.length,'oversized optional context must be
 assert.match(text,/===== HARD EXECUTION FACTS \(DATA, NOT FICTION\) =====/);
 assert.match(text,/"intent_kind":"travel"/);
 assert.match(text,/HARD_FACT_SENTINEL=KEEP/,'hard execution facts must survive prefix pressure');
-assert.match(text,/===== RELEVANT SCHEDULE FACTS \(AUTHORITATIVE\) =====/);
+assert.match(text,/===== IMMEDIATE EVENT FACTS \(HARD DATA\) =====/);
 assert.match(text,/SCHEDULE_SENTINEL/,'authoritative schedule payload must survive prefix pressure');
 assert.ok(text.endsWith(actionBlock),'USER ACTION must remain the final authoritative turn instruction');
 
@@ -54,7 +54,7 @@ assert.match(routed.params.input,/AUTHORITATIVE SAVE_STATE \(ROUTED MINIMUM\)/);
 assert.match(routed.params.input,/SAVE_WORLD_SENTINEL/);
 assert.match(routed.params.input,/SAVE_PC_SENTINEL/);
 assert.match(routed.params.input,/HARD EXECUTION FACTS \(DATA, NOT FICTION\)/);
-assert.match(routed.params.input,/RELEVANT SCHEDULE FACTS \(AUTHORITATIVE\)/);
+assert.match(routed.params.input,/IMMEDIATE EVENT FACTS \(HARD DATA\)/);
 assert.match(routed.params.input,/SCHEDULE_SENTINEL/);
 assert.match(routed.params.input,/NOTE_SENTINEL/);
 assert.match(routed.params.input,/"commitment":"fixed class"/);
@@ -94,7 +94,7 @@ const denseSave={
 };
 const denseRouted=routeOpenAIParams({instructions,input:denseOriginalInput},{mode:'game',incoming:{action:denseAction,rollingSummary:'dense old '.repeat(1000),recentTurns:[],saveState:denseSave}});
 assert.ok(denseRouted.params.input.length<=9000,`dense routine authority input exceeded budget: ${denseRouted.params.input.length}`);
-assert.match(denseRouted.params.input,/RELEVANT SCHEDULE FACTS \(AUTHORITATIVE\)/);
+assert.match(denseRouted.params.input,/IMMEDIATE EVENT FACTS \(HARD DATA\)/);
 assert.match(denseRouted.params.input,/NOTE_DENSE_0/);
 assert.doesNotMatch(denseRouted.params.input,/STRONGER TURN HOOK|DETERMINISTIC SCENE NOVELTY|REPEAT_GUARD=required/);
 assert.match(denseRouted.params.input,/TURN_HOOK_DENSE_SENTINEL/);
@@ -110,7 +110,7 @@ const maximumAction=`${'최대 행동 압력 '.repeat(900)}`.slice(0,5200-maximu
 const maximumRouted=routeOpenAIParams({instructions,input:denseOriginalInput},{mode:'game',incoming:{action:maximumAction,rollingSummary:'dense old '.repeat(1000),recentTurns:[],saveState:denseSave}});
 assert.ok(maximumRouted.params.input.length<=9000,`maximum fixed authority input exceeded budget: ${maximumRouted.params.input.length}`);
 assert.match(maximumRouted.params.input,/HARD EXECUTION FACTS/);
-assert.match(maximumRouted.params.input,/RELEVANT SCHEDULE FACTS/);
+assert.match(maximumRouted.params.input,/IMMEDIATE EVENT FACTS/);
 assert.doesNotMatch(maximumRouted.params.input,/GM EVENT DIRECTOR|EVENT DIRECTOR V2\.1 \(ROUTED\)|STRONGER TURN HOOK/);
 assert.match(maximumRouted.params.input,/대도서관으로 간다\./);
 
@@ -120,7 +120,7 @@ assert.equal(adaptiveRouted.telemetry.adaptive_scale,.76,'pressure fixture must 
 assert.ok(adaptiveRouted.params.input.length<=6840,`adaptive routine input exceeded its 0.76 profile budget: ${adaptiveRouted.params.input.length}`);
 assert.match(adaptiveRouted.params.input,/AUTHORITATIVE SAVE_STATE \(ROUTED MINIMUM\)/);
 assert.match(adaptiveRouted.params.input,/HARD EXECUTION FACTS/);
-assert.match(adaptiveRouted.params.input,/RELEVANT SCHEDULE FACTS/);
+assert.match(adaptiveRouted.params.input,/IMMEDIATE EVENT FACTS/);
 assert.match(adaptiveRouted.params.input,/"id":"dense-0"/,'adaptive pressure must retain the first authoritative schedule occurrence');
 assert.match(adaptiveRouted.params.input,/최대 행동 압력/,'adaptive middle compaction must retain the beginning of USER ACTION');
 assert.match(adaptiveRouted.params.input,/대도서관으로 간다\./,'adaptive pressure must retain the committed USER ACTION predicate');
@@ -133,7 +133,7 @@ const scheduledRouted=routeOpenAIParams({instructions,input:denseOriginalInput},
 assert.equal(scheduledRouted.telemetry.profile,'scheduled-18k-v154');
 assert.equal(scheduledRouted.telemetry.adaptive_scale,.76,'scheduled fixture must exercise the minimum supported adaptive scale');
 assert.ok(scheduledRouted.params.input.length<=7220,`adaptive scheduled input exceeded its 0.76 profile budget: ${scheduledRouted.params.input.length}`);
-assert.match(scheduledRouted.params.input,/RELEVANT SCHEDULE FACTS \(AUTHORITATIVE\)/);
+assert.match(scheduledRouted.params.input,/IMMEDIATE EVENT FACTS \(HARD DATA\)/);
 assert.match(scheduledRouted.params.input,/"id":"mandatory-0"/,'adaptive scheduled pressure must retain the first mandatory occurrence');
 assert.match(scheduledRouted.params.input,/대도서관으로 간다\./,'adaptive scheduled pressure must retain the committed USER ACTION predicate');
 
