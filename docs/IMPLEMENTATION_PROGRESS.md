@@ -1,7 +1,7 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Narrative Phase 1 **FROZEN**. Phase 2 Implementation Pass is **COMPLETE** with `6 MERGED / 3 DEFERRED`; PR #81 closure is merged. Product completion is **STABILIZATION IN PROGRESS**: STAB-01 Ending/Fate Book is implemented locally from latest main, and STAB-02 Inheritance/Next Life remains ordered after STAB-01 human merge.
+Narrative Phase 1 **FROZEN**. Phase 2 Implementation Pass is **COMPLETE** and STAB-01 is merged. Product completion is **STABILIZATION IN PROGRESS**: PR #83/#84 are terminal BLOCKED and frozen, while STAB-BASE supplies only the bounded async run-ownership and paired run/Fate commit foundation required before a fresh Inheritance/Next Life design.
 
 ## Narrative Phase 1 FREEZE — Authoritative Closure
 - Verified main is `9f2274abeef7f34531c8d0240f66ed39293b9eef`, the human merge of PR #67 NPC Significance Evaluator V1 exact head `3293e1c11569e5531518ae7e05918a54693c2bb9`.
@@ -14,19 +14,18 @@ Narrative Phase 1 **FROZEN**. Phase 2 Implementation Pass is **COMPLETE** with `
 
 ## PHASE 2 STABILIZATION PASS — AUTHORITATIVE CURRENT STATE
 
-- PR #81 closure: **MERGED**. GitHub `merged=true`; merged head `901b091f596339ec997f78750045dfbcc2cb6a22` equals the reviewed/READY head. Merge commit/latest main `6438ae114b3b5432b4a581b4207ed3f760b18aa6`; parents `2af377878fe26e36f4b582f92c64d870ff2dda76` + exact head; main/reviewed merge tree `a258afc54c0dc723b467d856d46a09029a0cb6f0`.
-- PR #81 post-merge verification PASS: latest main fetched; behind 0/ahead 0; no conflict; clean worktree; exact merge parent/tree identity; full `scripts/lumensia-pr-check.mjs origin/main HEAD` PASS.
-- Phase state: Implementation Pass **COMPLETE**; product completion **STABILIZATION IN PROGRESS / NOT COMPLETE**. No additional Phase 2 feature PR is started.
-- STAB-01 is PR #82 on `codex/stab-01-ending-fate-book-runtime`, based directly on latest main `6438ae114b3b5432b4a581b4207ed3f760b18aa6`. Initial implementation `44a9f1cfc25f131c5ca429f9a7e5624fd867e8b5`; corrected implementation/review head `02e9ed9a8d1527e35f93c86ec825219aab7619f5`. No PR #79/#76 implementation, branch, commit, or cherry-pick was used.
-- Completed scope: canonical Ending Registry; General/Character/World/Dead Ending records; Failure/Dead Ending separation; current-turn terminal receipts; first-discovery reward ledger; repeat dedupe; Fate Book separate persistence and export; legacy embedded-ledger migration; stale import monotonic union; bounded context snapshot; canonical discovery/reward source for STAB-02.
-- Integrity guards: mode must be normal game; exact current-turn `ending:<id>` signal required; Dead Ending requires `death|catastrophe` plus `irreversible=true`; non-dead endings require `life_complete`; canonical NPC key validation; rewards are registry-derived and paid once; collection is not destructively capped.
-- Architecture: one canonical model call retained; no generic ending/quest engine, new model call, new parser/lifecycle, Korean wording regex, or deferred-branch correction. Fate Book is deliberately separate from replaceable run saves, while stale/legacy data is reconciled monotonically.
-- Tests PASS: `scripts/tests/fate-ending-runtime.test.mjs`; character/offline-cache regression; Fate Start, Origin, Background, Personal Story, Novel/UI; Context Router and authority-tail; CONTINUE/core; syntax/static; `git diff --check`; full `scripts/lumensia-pr-check.mjs origin/main HEAD`. Corrected implementation head Safety `33136589722`, Vercel `9mQhWrVCDQw1hzKfwnKknfGfxazf`, fresh exact-head P0=0/P1=0 comment `5447759111`, and official Merge Readiness PASS.
-- Initial review `5047465587` P1=2/P2=3 shared one incomplete terminal-receipt contract root. Correction `1/1` removes rejected terminal signals in direct/stable handlers, supplies canonical conditions to semantic judgment, fails closed on inherited registry properties, preserves the earliest known duplicate discovery, and freezes terminal narration in AUTO. Focused/full/hosted/fresh gates PASS. Scope expansion `NO`; old deferred branch touched `NO`; browser remains on the bounded fallback.
-- Deferred authority unchanged: PR #76/#79 frozen and not reusable; PR #66/#68/#69/#78 `STABILIZE LATER`; PR #72 `OBSOLETE / SUPERSEDED`; all untouched.
-- Non-gating `maintain-after-pr` failed only on an informational-comment GitHub integration 403 after a zero-error maintenance scan. Required Repository checks and official readiness PASS.
-- MERGE_GATE: corrected implementation head READY. Publish this final docs-only checkpoint, require its exact-head Safety/Vercel/fresh P0=0/P1=0, then human merge because protected runtime/API paths changed.
-- NEXT ACTION: human-merge PR #82 only at the final validated docs head; post-merge verify; then start STAB-02 from that new main on a separate branch.
+- PR #82 STAB-01 is **MERGED** from exact READY head `d589f7939a1296d966eeb46fc7c5174f8b9a00a2`; latest main is `89fbc5b94d74a3e1927615993e5c7da88b84a4ff`. Its Ending/Fate Book implementation is not reopened.
+- PR #83 (`f0bef9f59ef60274b170cc8bbae2a92c62bb60a7`) and PR #84 (`e83f6ec6c625b0ed78a1776f4cd069aa48e9ac47`) are **TERMINAL BLOCKED / FROZEN**. No correction, merge, rebase, cherry-pick, Preview mutation, code reuse, branch reuse, or stacking is allowed.
+- STAB-BASE branch `codex/stab-base-async-run-commit-boundary` was created directly and cleanly from latest main `89fbc5b94d74a3e1927615993e5c7da88b84a4ff`; published implementation checkpoint `b7f7d73bd69812c5830ce982865d0f114ae0b56a`. Only failure causes and invariants from #83/#84 were referenced.
+- Run ownership: direct and stable async turns capture `{runId, runEpoch}` at start and reject a late response before mutation if a creator/import/next-run replacement changed the active run. Run replacement uses one bounded helper that advances the epoch.
+- Commit boundary: Ending reconciliation is staged with the cloned run/Fate state; a run-specific two-key rollback journal writes Fate plus run together and restores storage and in-memory authorities on failure or startup recovery. This is not a generic transaction or lifecycle engine.
+- Migration: legacy embedded Fate data remains authoritative until the external canonical ledger write succeeds, then embedded data is deleted and the run is persisted. Failure before completion retains the embedded copy.
+- Loader: `LUMENSIA_FATE_ENDING_HANDLER_V1` is the canonical sync/async declaration-independent patch marker. Patch preparation fails visibly and cannot boot the unpatched `/api/chat` fallback; the stable path remains `/api/chat-router`.
+- Focused PASS: persistence failures on either paired key, interrupted recovery, old-run rejection, migration ordering, sync/async loader marker, router/fallback, Fate/Ending, free/paste/Fate Start, Origin/Background, CONTINUE/core, long USER ACTION/authority-tail/context-pressure, and offline cache.
+- Full PASS: syntax, `git diff --check`, and `node scripts/lumensia-pr-check.mjs`. No Inheritance/Next Life feature, generic meta-state engine, distributed ledger, CRDT, event sourcing, parser, model call, or Narrative behavior was added.
+- Browser/Preview remains bounded-unavailable without retry. Final code+docs head still requires Safety, Vercel, fresh exact-head P0=0/P1=0, base/merge/repository-integrity verification. Correction budget remains `0/1` used.
+- MERGE_GATE: pending hosted/fresh exact-head gates; protected runtime changes remain human-merge-only.
+- NEXT ACTION: publish the final STAB-BASE code+docs head as a new PR, run Safety/Vercel/fresh review, and either report its exact human-merge head or stop with `PHASE_2_STATUS: BLOCKED` if the user-defined structural stop rule is triggered.
 
 ## PHASE 2 FINAL INTEGRATION CLOSURE — SUPERSEDED PRE-STABILIZATION SNAPSHOT
 
@@ -729,7 +728,8 @@ Production baseline: main `8d378b532910dfecaf5226118bffabdddbe74289` via `script
 
 # NEXT ACTION — AUTHORITATIVE
 
-1. PR #81 closure is merged and post-merge verified at latest main `6438ae114b3b5432b4a581b4207ed3f760b18aa6` from exact reviewed head `901b091f596339ec997f78750045dfbcc2cb6a22`.
-2. Complete only PR #82's final docs-head Safety, Vercel, and fresh P0=0/P1=0; corrected implementation/review head is `02e9ed9a8d1527e35f93c86ec825219aab7619f5`, correction `1/1`.
-3. Require human merge of the final validated PR #82 head for protected runtime/API changes. Only after STAB-01 merge and post-merge verification, start STAB-02 from that new main on a separate branch.
-4. Do not modify, reuse, merge, close, cherry-pick, Preview-mutate, or stack on PR #76/#79. Keep PR #66/#68/#69/#78 and obsolete/superseded PR #72 untouched.
+1. Keep PR #83/#84 terminal BLOCKED and frozen at `f0bef9f59ef60274b170cc8bbae2a92c62bb60a7` / `e83f6ec6c625b0ed78a1776f4cd069aa48e9ac47`; do not modify, merge, rebase, cherry-pick, reuse, or stack them.
+2. Publish STAB-BASE from branch `codex/stab-base-async-run-commit-boundary`, based on latest main `89fbc5b94d74a3e1927615993e5c7da88b84a4ff`; implementation checkpoint `b7f7d73bd69812c5830ce982865d0f114ae0b56a`.
+3. Run final exact-head Safety, Vercel, fresh P0=0/P1=0 review, base/merge/conflict and remote/local tree checks. Use the single correction budget only for the same async ownership/commit-boundary root cause.
+4. If the gates pass, report the exact STAB-BASE head for human merge. If a new lifecycle/distributed/meta architecture or separate structural P1 is required, do not correct further and set `PHASE_2_STATUS: BLOCKED`.
+5. Keep PR #76/#79 and Phase 1 PR #66/#68/#69, Phase 2 PR #78, and obsolete/superseded PR #72 untouched. Browser/Preview remains on the bounded-unavailable fallback without retry.

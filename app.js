@@ -2,12 +2,14 @@ import { ASSETS } from './assets.js';
 import { migrateLegacyNpcKeys } from './save-migrations.js';
 import { createFreeCharacterCreation, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation } from './lib/fate-start.js';
 import { fateBookRuntimeSnapshot, normalizeFateBook, reconcileFateBooks } from './lib/fate-ending.js';
+import { captureRunOwnership, commitRunAndFate, isRunOwnershipCurrent, recoverPendingRunCommit, RUN_COMMIT_PENDING_KEY } from './lib/run-commit-boundary.js';
 import { createNovelPresentationState, novelSceneTitle, resetNovelPresentationState, shouldShowNovelPortrait } from './lib/novel-presentation.js';
 
 const APP_VERSION = '1.4.8';
 const SAVE_KEY = 'lumensia.save.v1';
 const SETTINGS_KEY = 'lumensia.settings.v1';
 const FATE_BOOK_KEY = 'lumensia.fate-book.v1';
+const RUN_COMMIT_KEYS = Object.freeze({saveKey:SAVE_KEY,fateBookKey:FATE_BOOK_KEY,pendingKey:RUN_COMMIT_PENDING_KEY});
 
 const $ = (id) => document.getElementById(id);
 const story = $('story');
@@ -174,20 +176,36 @@ const defaultSave = () => ({
   usage: { inputTokens: 0, outputTokens: 0, reasoningTokens: 0, cachedTokens: 0, cacheWriteTokens: 0, estimatedUsd: 0, lastTurnUsd: 0, lastCacheHitRate: 0, lastInputTokens: 0, lastOutputTokens: 0 },
 });
 
+recoverPendingRunCommit(localStorage,RUN_COMMIT_KEYS);
 const loadedRunSave = loadJson(SAVE_KEY) || defaultSave();
 let save = normalizeSave(loadedRunSave);
 let fateBook = reconcileFateBooks(loadJson(FATE_BOOK_KEY), loadedRunSave?.fateBook, { allowedCharacterKeys:Object.keys(ASSETS.characters || {}) });
-delete save.fateBook;
 let settings = { ...defaultSettings, ...(loadJson(SETTINGS_KEY) || {}) };
 let busy = false;
 let forceTerraOnce = false;
 let metaModeOnce = false;
+let activeRunEpoch = 0;
 
 function loadJson(key) { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } }
 function persist() { save.updatedAt = new Date().toISOString(); localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }
 function persistFateBook() { localStorage.setItem(FATE_BOOK_KEY, JSON.stringify(fateBook)); }
 function persistSettings() { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
-if (loadedRunSave?.fateBook) { persist(); persistFateBook(); }
+function replaceActiveRun(next){save=next;activeRunEpoch+=1;return save;}
+function captureActiveRunOwnership(){return captureRunOwnership(save,activeRunEpoch);}
+function isActiveRunOwner(owner){return isRunOwnershipCurrent(owner,save,activeRunEpoch);}
+function assertActiveRunOwner(owner){if(!isActiveRunOwner(owner))throw new Error('active run이 변경되어 이전 async 결과를 폐기함.');}
+function stageTurnCommit(owner){assertActiveRunOwner(owner);const stage={save,fateBook};save=structuredClone(save);fateBook=structuredClone(fateBook);return stage;}
+function rollbackTurnCommit(stage){if(!stage)return;save=stage.save;fateBook=stage.fateBook;}
+function commitTurnState(stage,owner){
+  assertActiveRunOwner(owner);save.updatedAt=new Date().toISOString();
+  try{commitRunAndFate(localStorage,RUN_COMMIT_KEYS,{owner,isOwnerCurrent:isActiveRunOwner,nextRun:save,nextFateBook:fateBook});}
+  catch(error){rollbackTurnCommit(stage);throw error;}
+}
+if (loadedRunSave?.fateBook) {
+  const embeddedFateBook=save.fateBook;
+  try{persistFateBook();delete save.fateBook;persist();}
+  catch(error){save.fateBook=embeddedFateBook;console.error('Legacy Fate Book migration rejected',error);}
+} else delete save.fateBook;
 function uniq(arr) { return [...new Set((arr || []).filter(Boolean))]; }
 function clamp(n, min, max) { return Math.min(max, Math.max(min, Number(n) || 0)); }
 
@@ -766,12 +784,12 @@ function compactState() {
   };
 }
 
+// LUMENSIA_FATE_ENDING_HANDLER_V1
 function applyFateEndingRuntime(packet = {}) {
   const accepted=Array.isArray(packet?.accepted_discoveries)?packet.accepted_discoveries:[];
   const repeated=Array.isArray(packet?.repeated_discoveries)?packet.repeated_discoveries:[];
   if(!accepted.length&&!repeated.length)return[];
   fateBook=reconcileFateBooks(fateBook,{discoveries:accepted},{allowedCharacterKeys:Object.keys(ASSETS.characters||{})});
-  persistFateBook();
   return [
     ...accepted.map((row)=>`운명록 최초 발견: ${row.title} (+${Number(row.reward||0)} 계승 원천)`),
     ...repeated.map((row)=>`운명록 재발견: ${row.title} (최초 보상 없음)`),
@@ -781,11 +799,13 @@ function applyFateEndingRuntime(packet = {}) {
 async function sendAction(action) {
   action = String(action || '').trim();
   if (!action || busy) return;
+  const runOwner=captureActiveRunOwnership();
   const inputMode = detectInputMode(action);
   const displayAction = action;
   const apiAction = inputMode === 'meta' ? (stripMetaPrefix(action) || '현재 게임 상태와 규칙을 점검해줘.') : action;
   busy = true; sendBtn.disabled = true; actionInput.disabled = true; choicesEl.classList.add('hidden');
   const loader = document.createElement('div'); loader.className = inputMode === 'meta' ? 'turn-card meta-turn' : 'turn-card'; loader.innerHTML = '<div class="loading-dots"><i></i><i></i><i></i></div>'; story.append(loader); scrollBottom();
+  let stagedTurn=null;
   try {
     refreshScheduleContext();
     const { accessToken, ...apiSettings } = settings;
@@ -828,6 +848,8 @@ async function sendAction(action) {
         );
       }
     }
+    assertActiveRunOwner(runOwner);
+    stagedTurn=stageTurnCommit(runOwner);
     loader.remove();
     const isMeta = inputMode === 'meta' || data.route?.input_mode === 'meta';
     let notices = [];
@@ -870,13 +892,14 @@ async function sendAction(action) {
     save.debug.lastRoute = data.route || null;
     save.debug.lastUsage = data.usage || null;
     save.debug.lastSchedule = save.scheduleContext;
-    persist();
+    commitTurnState(stagedTurn,runOwner);stagedTurn=null;
     const rendered = renderTurnRecord(record);
     updateStatus(data.route);
     renderInfo();
     actionInput.value = '';
     scrollToTurnStart(rendered?.card || rendered?.user);
   } catch (err) {
+    if(stagedTurn)rollbackTurnCommit(stagedTurn);
     loader.remove();
     const e = document.createElement('div');
     e.className = 'error-card';
@@ -1246,12 +1269,29 @@ $('pcCreatorClearBtn').addEventListener('click',()=>clearPcCreatorForm({keepPast
 $('pcPasteApplyBtn').addEventListener('click',applyPastedPcText);
 $('pcFreeModeBtn').addEventListener('click',()=>setPcCreationMode('free'));
 $('pcFateModeBtn').addEventListener('click',()=>setPcCreationMode('fate'));
-$('pcCreatorForm').addEventListener('submit',(e)=>{e.preventDefault();save=createNewSaveFromCreator();refreshScheduleContext();persist();$('pcCreatorDialog').close();renderAll();toast(save.creation.mode==='fate'?`${save.pc.name}의 운명 생성`:`${save.pc.name} 새 게임 생성`);});
+$('pcCreatorForm').addEventListener('submit',(e)=>{e.preventDefault();replaceActiveRun(createNewSaveFromCreator());refreshScheduleContext();persist();$('pcCreatorDialog').close();renderAll();toast(save.creation.mode==='fate'?`${save.pc.name}의 운명 생성`:`${save.pc.name} 새 게임 생성`);});
 
 function exportSave() {
   persist(); persistFateBook(); const bundle={format:'lumensia.save.bundle.v2',save,fateBook}; const blob = new Blob([JSON.stringify(bundle,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`lumensia-save-${save.world.date}-${save.world.time.replace(':','')}.json`; a.click(); URL.revokeObjectURL(a.href);
 }
-async function importSave(e) { const file=e.target.files?.[0]; if(!file)return; try { const parsed=JSON.parse(await file.text()); const importedSave=parsed?.format==='lumensia.save.bundle.v2'?parsed.save:parsed; if(!importedSave?.pc||!importedSave?.world)throw new Error('세이브 형식이 아님'); const importedBook=parsed?.format==='lumensia.save.bundle.v2'?parsed.fateBook:parsed?.fateBook; const importedRun={...importedSave}; delete importedRun.fateBook; save=normalizeSave(importedRun); fateBook=reconcileFateBooks(fateBook,importedBook,{allowedCharacterKeys:Object.keys(ASSETS.characters||{})}); persist(); persistFateBook(); renderAll(); toast('세이브 불러옴'); } catch(err){alert(`불러오기 실패: ${err.message}`);} e.target.value=''; }
+async function importSave(e) {
+  const file=e.target.files?.[0];if(!file)return;
+  try {
+    const parsed=JSON.parse(await file.text());
+    const importedSave=parsed?.format==='lumensia.save.bundle.v2'?parsed.save:parsed;
+    if(!importedSave?.pc||!importedSave?.world)throw new Error('세이브 형식이 아님');
+    const importedBook=parsed?.format==='lumensia.save.bundle.v2'?parsed.fateBook:parsed?.fateBook;
+    const importedRun={...importedSave};delete importedRun.fateBook;
+    const previous={save,fateBook,epoch:activeRunEpoch};
+    replaceActiveRun(normalizeSave(importedRun));
+    fateBook=reconcileFateBooks(fateBook,importedBook,{allowedCharacterKeys:Object.keys(ASSETS.characters||{})});
+    const owner=captureActiveRunOwnership();save.updatedAt=new Date().toISOString();
+    try{commitRunAndFate(localStorage,RUN_COMMIT_KEYS,{owner,isOwnerCurrent:isActiveRunOwner,nextRun:save,nextFateBook:fateBook});}
+    catch(error){save=previous.save;fateBook=previous.fateBook;activeRunEpoch=previous.epoch;throw error;}
+    renderAll();toast('세이브 불러옴');
+  } catch(err){alert(`불러오기 실패: ${err.message}`);}
+  e.target.value='';
+}
 function toast(text) { const d=document.createElement('div'); d.textContent=text; d.style.cssText='position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:99;background:#263449;padding:9px 14px;border-radius:999px'; document.body.append(d); setTimeout(()=>d.remove(),1300); }
 
 async function checkHealth() { try { const r=await fetch('/api/health'); const h=await r.json(); $('apiHealth').textContent=h.apiConfigured?`API 연결 준비됨 · ${h.luna} / ${h.terra}${h.accessTokenRequired ? ' · 접속 토큰 필요' : ''}`:'API 키 미설정. Vercel 환경변수 OPENAI_API_KEY를 추가하거나 데모 모드를 켜세요.'; } catch { $('apiHealth').textContent='API 상태를 확인할 수 없음.'; } }
