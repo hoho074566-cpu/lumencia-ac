@@ -37,7 +37,28 @@ Repository: `hoho074566-cpu/lumencia-ac`
 - These deferred blockers are explicitly **not** Narrative Phase 1 FREEZE blockers. They are separate stabilization candidates for Phase 2/backlog, to be reassessed after Phase 2 using actual-play impact. Phase 1 adds no further Narrative Engine feature, correction, edge-case task, or scope expansion.
 - **NEXT ACTION: Narrative Phase 2 시작.** Do not return to Phase 1 deferred items before starting Phase 2.
 
-## PHASE 2 PROGRESS — AUTHORITATIVE P2-PR09
+## PHASE 2 FINAL INTEGRATION CLOSURE — AUTHORITATIVE
+
+- `PHASE_2_IMPLEMENTATION_PASS`: **COMPLETE**. P2-PR01 through P2-PR09 are all terminal (`MERGED` or `DEFERRED`); no additional Phase 2 feature PR is started by this closure.
+- `PHASE_2_STATUS`: **STABILIZATION REQUIRED / NOT YET PHASE 2 COMPLETE**. The Completion Rule requires Character Creation → Origin → Background → Personal Story → Ending → Inheritance → Next Life to exist on actual main. Current main has no merged Ending/Fate Book or Inheritance/Next Life runtime because PR #79 and PR #76 remain unmerged.
+- Latest main: `2af377878fe26e36f4b582f92c64d870ff2dda76`, the human merge of PR #80 exact READY head `0a7683787d09dfc0473c31f9de635b8ea33ae332`. Merge parents are prior main `363d120ac5a52ffdc03797fc0baf3e317801e1c9` plus the exact READY head; merged/reviewed trees both equal `4d3e975c2e8f8ab40794b3be8cde207161cd245f`.
+- Terminal PR table: P2-PR01 **MERGED** (#71); P2-PR02 **MERGED** (#73); P2-PR03 **MERGED** (#74); P2-PR04 **MERGED** (#75); P2-PR05 **DEFERRED** (#76); P2-PR06 **MERGED** (#77); P2-PR07 **DEFERRED** (#78); P2-PR08 **DEFERRED** (#79); P2-PR09 **MERGED** (#80). Count: `6 MERGED / 3 DEFERRED`.
+- P2-PR09 post-merge verification PASS: PR #80 `merged=true`; exact merged head match; merge tree identity; current-main synchronization; focused Novel/UI, Fate/Origin/Background/Personal Story/NPC behavior, Living World/Event Consequence/World Result, Context Router/authority-tail, Scene Momentum/intent/Purpose/Exit/Turn Hook, CONTINUE/core suites; and full `scripts/lumensia-pr-check.mjs origin/main HEAD`.
+- P2-PR09 retained its consolidated AI-first Novel Narrative Contract and presentation-only UI polish. Narrative/style footprint remains `5,321 → 5,230`; no new Narrative Engine, parser, save root, lifecycle, or model call. Safety #559 run `33133175892` PASS; reviewed-head Vercel `E4WvXf1aJSr7jydvEd3c7X9vKUEq` PASS; merged-main Vercel `GNnBZX1g8HGSSAbE9SMxijZLE3qF` PASS; final exact-head review `5047172362` P0=0/P1=0. Correction budget remains `0/1`.
+- P2-PR09's five UI precision P2s remain non-blocking untouched backlog: hidden-route refresh on DEBUG re-enable, portrait refresh after the 80-record cap, participant-only title transitions, retained-title replay after truncated-history reload, and developer gating for separately enabled emotion diagnostics.
+- Final integration regression PASS for the merged path: Character Creation/Fate Start → Origin → Background → NPC/World Reaction → Personal Story → existing Living World/Event Consequence/World Result. Long USER ACTION, explicit user restrictions, completed-intent continuation, routine compression, world-native continuation, scene-first prose guidance, important-scene density guidance, player sovereignty, one-call routing, authority-tail, and context-pressure invariants PASS.
+- Final integration completeness FAIL only at the absent terminal-life stages: Ending/Dead Ending/Fate Book and Inheritance/Next Life are not present on main. This is not a newly introduced main regression or current save corruption; it is a required core-loop coverage gap before `PHASE 2 COMPLETE`.
+- Deferred classification:
+  - `MUST FIX`: P2-PR05 / PR #76 replacement-or-stabilization for a safe merged Inheritance + Next Life path; P2-PR08 / PR #79 replacement-or-stabilization for a safe merged Ending / Dead Ending / Fate Book path. Their existing deferred branches remain frozen and must not be corrected or reused by this closure.
+  - `STABILIZE LATER`: Phase 1 PR #66/#68/#69 and P2-PR07 PR #78. Current main's existing setup/hooks, relationships, knowledge, Living World, Event Consequence, and World Result foundations pass; these deferred enhancements are real but do not block the already-merged portion of the loop.
+  - `OBSOLETE / SUPERSEDED`: Narrative Flavor Baseline PR #72, superseded by P2-PR09's shorter consolidated contract that preserves authority-tail/context-pressure.
+- Browser remains on the established bounded-unavailable fallback. No repeated recovery attempt or Preview mutation occurred.
+- Repository integrity PASS: clean worktree before closure docs, main equals `origin/main`, behind 0, no conflict, exact merge parents/tree, full regression PASS, and merged-main Vercel PASS.
+- **NEXT ACTION:** stop Phase 2 feature discovery. Do not return to any deferred branch automatically. A separate user-authorized stabilization decision is required for the two MUST FIX core-loop gaps (#76 Inheritance/Next Life and #79 Ending/Fate Book); until safe replacements are merged and the final loop is rerun, report Implementation Pass COMPLETE but Phase 2 COMPLETE blocked.
+
+## PHASE 2 PROGRESS — SUPERSEDED P2-PR09 PRE-MERGE SNAPSHOT
+
+> The section below preserves the PR #80 pre-merge checkpoint only. Its status and NEXT ACTION are superseded by the authoritative final integration closure above.
 
 - Current main/base: `363d120ac5a52ffdc03797fc0baf3e317801e1c9` (human merge of PR #77 READY head `905e4a27eff56667dae14144fbcc3de27ea5e77b`); main tree `12ae972481250b3f5316704da4c9cb2201c2821e`.
 - Active branch: `codex/p2-pr09-novel-experience-ui-polish`, created cleanly and directly from current main. It is not stacked on PR #76/#78/#79 and imports none of their unmerged implementations.
