@@ -136,6 +136,7 @@ export function sanitizeTurn(turn, { allowedCgIds = [], allowedSkills = [], skil
   d.world_arcs_add = arrays(d.world_arcs_add, 8);
   d.world_arcs_remove = arrays(d.world_arcs_remove, 8);
   d.completed_events_add = arrays(d.completed_events_add, 8);
+  d.ending_discoveries = arrays(d.ending_discoveries, 1).map((row) => ({ ending_id:cleanText(row?.ending_id,96), characters:arrays(row?.characters,4).map((key)=>cleanText(key,64)), reason:cleanText(row?.reason,320) })).filter((row)=>row.ending_id&&row.reason);
   d.pc_knowledge_add = arrays(d.pc_knowledge_add, 10);
 
   d.memories_add = arrays(d.memories_add, 12).filter((row) => {

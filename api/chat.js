@@ -85,6 +85,7 @@ const GM_RULES = `너는 판타지 아카데미 장기 RPG 「루멘시아 아�
 13. choices는 PC의 선택이 필요한 자연스러운 지점에서만 정확히 3개를 제시하고, 아니면 빈 배열로 둔다. 추천 외 자유행동도 가능하다는 전제를 유지한다.
 13-1. choices는 이번 USER ACTION과 그 결과가 모두 끝난 뒤의 선택지다. 방금 완료된 이동·입장·정보 전달·상호작용을 그대로 다시 제안하지 말고 결과 위치와 상태에서 가능한 후속 행동을 제시한다. 단, 실패·저지된 시도의 재시도와 진행 중 전투의 반복 공격은 허용한다.
 14. state_delta에는 실제로 발생한 변화만 넣는다. 변하지 않은 수치·관계·아이템을 꾸며내지 않는다.
+14-1. ending_discoveries는 AUTHORITATIVE SAVE_STATE에 제공된 ELIGIBLE Ending을 이번 장면에서 실제로 종결했을 때만 정확한 ID 한 건을 기록한다. 일반 실패는 Fail Forward이며 Dead Ending이 아니다. 같은 Ending 반복 보상을 만들지 않는다.
 15. memories_add에는 다음 턴 이후에도 기억해야 할 구체적 정보만 넣는다. type은 fact/observer/belief/rumor/promise/deferred_hook/relationship/secret/event/obligation/knowledge 중 하나다.
 - fact: 실제 발생 사실.
 - observer: 누가 직접 목격/인지했는지.
@@ -1288,6 +1289,12 @@ const NpcStateUpdate = z.object({
   last_seen: z.string().max(160).nullable(),
 });
 
+const EndingDiscovery = z.object({
+  ending_id: z.string().min(2).max(96),
+  characters: z.array(z.string().min(1).max(64)).max(4),
+  reason: z.string().min(1).max(320),
+});
+
 
 const DirectorMeta = z.object({
   intervention: z.enum(['none','light','medium','scheduled','aftermath']),
@@ -1329,6 +1336,7 @@ const TurnSchema = z.object({
     active_events_add: z.array(z.string().min(1).max(240)).max(8),
     active_events_remove: z.array(z.string().min(1).max(240)).max(8),
     completed_events_add: z.array(z.string().min(1).max(240)).max(8),
+    ending_discoveries: z.array(EndingDiscovery).max(1),
     pc_knowledge_add: z.array(z.string().min(1).max(500)).max(10),
     memories_add: z.array(MemoryAdd).max(12),
     scheduled_events_add: z.array(ScheduledEventAdd).max(8),
@@ -1514,6 +1522,7 @@ function sanitizeTurn(turn, { allowedCgIds = [] } = {}) {
   d.active_events_add = arrays(d.active_events_add, 8);
   d.active_events_remove = arrays(d.active_events_remove, 8);
   d.completed_events_add = arrays(d.completed_events_add, 8);
+  d.ending_discoveries = arrays(d.ending_discoveries, 1).map((row) => ({ ending_id:String(row?.ending_id || '').slice(0,96), characters:arrays(row?.characters,4).map((key)=>String(key).slice(0,64)), reason:String(row?.reason || '').slice(0,320) })).filter((row)=>row.ending_id&&row.reason);
   d.pc_knowledge_add = arrays(d.pc_knowledge_add, 10);
   d.memories_add = arrays(d.memories_add, 12).map(row => ({
     ...row,
@@ -1666,7 +1675,7 @@ export default async function handler(req, res) {
         advance_minutes:0, new_location:null, pc_status:null, fatigue_delta:0, gold_delta:0,
         relationship_changes:[], npc_relationship_changes:[], faction_reputation_changes:[], intimacy_changes:[], stat_progress:[], skill_experience:[],
         items_add:[], items_remove:[], active_events_add:[], active_events_remove:[],
-        completed_events_add:[], pc_knowledge_add:[], memories_add:[],
+        completed_events_add:[], ending_discoveries:[], pc_knowledge_add:[], memories_add:[],
         scheduled_events_add:[], scheduled_events_complete:[], hooks_add:[], hooks_update:[],
         npc_state_updates:[],
       };
