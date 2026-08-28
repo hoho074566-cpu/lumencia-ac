@@ -159,6 +159,9 @@ h1 { margin: 2px 0 0; font-size: 20px; }
 .creation-mode-btn.active { border-color:rgba(217,184,108,.5); background:rgba(217,184,108,.13); color:#f6dfaa; }
 .creation-mode-fields { display:grid; gap:14px; }
 .fate-start-fields { padding:12px; border:1px solid rgba(217,184,108,.22); border-radius:14px; background:rgba(217,184,108,.045); }
+.inheritance-creator { display:grid; gap:10px; padding:11px; border:1px solid rgba(129,140,248,.3); border-radius:13px; background:rgba(79,70,229,.07); }
+.inheritance-creator .creator-note { background:rgba(99,102,241,.09); border-color:rgba(129,140,248,.28); }
+.inheritance-creator .field-help.warn { color:#fcd34d; }
 
 #pcCharacterSetting {
   min-height: 190px;

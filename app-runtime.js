@@ -788,8 +788,8 @@ async function boot() {
     );
     source = replaceOnce(
       source,
-      "import { createFreeCharacterCreation, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation } from './lib/fate-start.js';",
-      `import { createFreeCharacterCreation, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation } from '${location.origin}/lib/fate-start.js?v=156';`,
+      "import { createFreeCharacterCreation, fateOriginLockOptions, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation } from './lib/fate-start.js';",
+      `import { createFreeCharacterCreation, fateOriginLockOptions, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation } from '${location.origin}/lib/fate-start.js?v=156';`,
       'fate start import'
     );
     source = replaceOnce(
@@ -797,6 +797,12 @@ async function boot() {
       "import { fateBookRuntimeSnapshot, normalizeFateBook, reconcileFateBooks } from './lib/fate-ending.js';",
       `import { fateBookRuntimeSnapshot, normalizeFateBook, reconcileFateBooks } from '${location.origin}/lib/fate-ending.js?v=156';`,
       'fate ending import'
+    );
+    source = replaceOnce(
+      source,
+      "import { commitInheritancePurchase, inheritancePointSummary, normalizeInheritanceAllocation, quoteInheritanceAllocation, reconcileInheritanceStates } from './lib/fate-inheritance.js';",
+      `import { commitInheritancePurchase, inheritancePointSummary, normalizeInheritanceAllocation, quoteInheritanceAllocation, reconcileInheritanceStates } from '${location.origin}/lib/fate-inheritance.js?v=156';`,
+      'fate inheritance import'
     );
     source = replaceOnce(
       source,

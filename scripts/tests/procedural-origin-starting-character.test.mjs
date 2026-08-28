@@ -64,6 +64,7 @@ assert.match(app,/save\.creation\?\.mode==='fate'[\s\S]*fateOrigin\.originStory\
 assert.match(runtime,/generateFateStartingCharacter/,'blob runtime must rewrite the expanded Fate module import');
 assert.match(html,/구조 데이터에서 먼저 생성된다/,'creator must describe the data-first Origin contract');
 const fatePath=app.slice(app.indexOf("if($('pcCreationMode').value==='fate')"),app.indexOf('base.creation=createFreeCharacterCreation()'));
-assert.doesNotMatch(fatePath,/base\.(?:relationships|npcStates|memories|backgroundDigest)/,'P2-PR02 must not preimplement NPC/world background consequences');
+assert.doesNotMatch(fatePath,/base\.(?:npcStates|memories|backgroundDigest)/,'Fate creation must not invent general NPC/world background consequences');
+assert.match(fatePath,/base\.relationships=\{\.\.\.base\.relationships,\.\.\.generated\.initialRelationships\}/,'STAB-02 may apply only the explicitly purchased bounded Fate Affinity');
 
 console.log('procedural-origin-starting-character: PASS');

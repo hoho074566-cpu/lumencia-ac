@@ -148,7 +148,7 @@ assert.match(router,/AUTO에서는 회차를 종결하거나 Ending\/Dead Ending
 assert.match(app,/const FATE_BOOK_KEY = 'lumensia\.fate-book\.v1'/,'Fate Book must persist outside the replaceable run save');
 assert.match(app,/reconcileFateBooks\(loadJson\(FATE_BOOK_KEY\), loadedRunSave\?\.fateBook/,'a legacy embedded Fate Book must migrate into the independent ledger');
 assert.match(app,/delete save\.fateBook/,'the replaceable run save must not retain a parallel Fate Book root');
-assert.match(app,/format:'lumensia\.save\.bundle\.v2',save,fateBook/,'exports must include the persistent Fate Book');
+assert.match(app,/format:'lumensia\.save\.bundle\.v3',save,fateBook,inheritance:inheritanceState/,'exports must include the persistent Fate Book alongside the later monotonic inheritance ledger');
 assert.match(app,/fateBook=reconcileFateBooks\(fateBook,importedBook/,'imports must reconcile rather than replace the live Fate Book');
 assert.match(runtime,/fetch\('\/api\/chat-router'/,'deployed stable runtime must keep the canonical router');
 assert.match(runtime,/fateBook: fateBookRuntimeSnapshot/,'deployed stable runtime must send the bounded discovery ledger');
