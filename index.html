@@ -210,6 +210,55 @@
             </select>
           </label>
         </div>
+        <section class="inheritance-creator" aria-labelledby="inheritanceCreatorTitle">
+          <div id="inheritanceCreatorTitle" class="creator-section-title">다음 생 계승</div>
+          <div id="inheritancePointSummary" class="creator-note">운명록 보상을 확인하는 중…</div>
+          <div class="creator-section-title">스탯 보정 (각 0~2)</div>
+          <div class="talent-grid">
+            <label>신체<input id="inheritStatBody" type="number" min="0" max="2" value="0" /></label>
+            <label>마나<input id="inheritStatMana" type="number" min="0" max="2" value="0" /></label>
+            <label>지능<input id="inheritStatIntelligence" type="number" min="0" max="2" value="0" /></label>
+            <label>신성<input id="inheritStatDivinity" type="number" min="0" max="2" value="0" /></label>
+          </div>
+          <div class="creator-section-title">재능 보정 (각 0~2)</div>
+          <div class="talent-grid">
+            <label>🔮 魔<input id="inheritTalentMagic" type="number" min="0" max="2" value="0" /></label>
+            <label>⚔️ 武<input id="inheritTalentMartial" type="number" min="0" max="2" value="0" /></label>
+            <label>🌟 魂<input id="inheritTalentSoul" type="number" min="0" max="2" value="0" /></label>
+            <label>📘 智<input id="inheritTalentKnowledge" type="number" min="0" max="2" value="0" /></label>
+          </div>
+          <div class="creator-grid">
+            <label>시작 자원
+              <select id="inheritStartingResources">
+                <option value="0">사용 안 함</option><option value="1">1단계</option><option value="2">2단계</option><option value="3">3단계</option>
+              </select>
+            </label>
+            <label>Origin 추가 추첨
+              <select id="inheritOriginRerolls">
+                <option value="0">사용 안 함</option><option value="1">1회</option><option value="2">2회</option>
+              </select>
+            </label>
+            <label>Origin 후보 선택
+              <select id="inheritOriginDraw"><option value="0">기본 추첨</option></select>
+            </label>
+            <label>지역 고정
+              <select id="inheritOriginRegion"><option value="">고정 안 함</option></select>
+            </label>
+            <label>직업 고정
+              <select id="inheritOriginOccupation"><option value="">고정 안 함</option></select>
+            </label>
+            <label>Fate Affinity 대상
+              <select id="inheritAffinityNpc"><option value="">선택 안 함</option></select>
+            </label>
+            <label>Fate Affinity
+              <select id="inheritAffinityLevel">
+                <option value="0">사용 안 함</option><option value="1">1단계</option><option value="2">2단계</option>
+              </select>
+            </label>
+          </div>
+          <div id="inheritOriginPreview" class="field-help">성별·신분·학과를 선택하면 현재 후보를 미리 볼 수 있음.</div>
+          <div id="inheritanceCostSummary" class="field-help">사용 0 · Realm / Circle은 직접 구매할 수 없고 최종 능력으로 재계산됨.</div>
+        </section>
       </section>
       <div class="creator-actions">
         <button id="pcCreatorSubmit" type="submit" class="primary-btn">이 설정으로 새 게임</button>

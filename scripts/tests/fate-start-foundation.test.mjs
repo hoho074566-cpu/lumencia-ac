@@ -40,7 +40,7 @@ assert.match(html, /id="fateGender"[\s\S]*value="male">남성[\s\S]*value="femal
 assert.match(html, /id="fateSocialClass"[\s\S]*value="commoner">평민[\s\S]*value="fallen_noble">몰락귀족/);
 assert.match(app, /target\.replaceChildren\(\.\.\.\[\.\.\.source\.options\]\.map\(option=>option\.cloneNode\(true\)\)\)/, 'fate mode reuses the existing department options');
 assert.match(app, /creation: createFreeCharacterCreation\(\)/, 'new and legacy free saves own neutral creation state');
-assert.match(app, /next\.creation = normalizeCharacterCreation\(next\.creation\)/, 'load normalization preserves additive compatibility');
+assert.match(app, /next\.creation = normalizeCharacterCreation\(next\.creation,\{allowedNpcKeys:FATE_AFFINITY_KEYS\}\)/, 'load normalization preserves additive compatibility and the player-visible Fate Affinity boundary');
 assert.match(app, /if\(\$\('pcCreationMode'\)\.value==='fate'\)/, 'fate submit uses a separate bounded path');
 assert.match(runtime, /'fate start import'/, 'blob runtime rewrites the new module import to an origin URL');
 

@@ -35,6 +35,7 @@ export default async function handler(req, res) {
     npcCharacterBehavior: 'P2-PR06 semantic memory/judgment/goal/relationship behavior + belief persistence through existing memories',
     novelExperience: 'P2-PR09 consolidated AI-first novel narrative contract + presentation-only UI polish',
     fateEnding: 'STAB-01 canonical Ending Registry + current-turn terminal receipts + persistent first-discovery Fate Book ledger',
+    fateInheritance: 'STAB-02 monotonic inheritance ledger + bounded allocation + compatible Origin locks + final Realm/Circle evaluation',
     sceneNovelty: 'V1 bounded visible-term repetition tracking + change-first suppression',
     tokenBudget: { routine: 17000, routineSoftMax: 20000, scheduled: 18000, important: 20000, critical: 24000 },
   });
