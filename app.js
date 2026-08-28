@@ -41,6 +41,7 @@ const DIRECTOR_NPC_DEPT = {
   lena:'magic', sia:'magic', serena:'magic', chloe:'magic', elena:'magic', lucia:'magic', elise:'magic',
   mirabelle:'theology', aria:'theology', emily:'common'
 };
+const FATE_AFFINITY_ELIGIBLE_KEYS=Object.freeze(Object.keys(DIRECTOR_NPC_DEPT));
 function pcDirectorDept() {
   const d = String(save?.pc?.department || '');
   if (/기사/.test(d)) return 'knight';
@@ -1295,7 +1296,7 @@ function updateNextLifeQuote(){
   try{
     const rows=nextLifeAllocations();
     if(!rows.length){target.textContent='allocation을 하나 이상 선택해야 함.';return;}
-    const quote=quoteInheritanceAllocations(rows,{origin:nextLifePreviewCharacter.creation.fateStart.origin,originLocks:nextLifeOriginLocks(),allowedAffinityKeys:ALLOWED_CHARACTER_KEYS}),balance=inheritanceBalance(fateBook,inheritanceMeta);
+    const quote=quoteInheritanceAllocations(rows,{origin:nextLifePreviewCharacter.creation.fateStart.origin,originLocks:nextLifeOriginLocks(),allowedAffinityKeys:FATE_AFFINITY_ELIGIBLE_KEYS}),balance=inheritanceBalance(fateBook,inheritanceMeta);
     target.textContent=`비용 ${quote.cost} point · 현재 잔여 ${balance.available} · 확정 후 ${balance.available-quote.cost}`;
   }catch(error){target.textContent=`확정 불가: ${error.message}`;}
 }
@@ -1321,7 +1322,7 @@ function openNextLifeDialog(){
   const fate=save.creation?.mode==='fate'?save.creation.fateStart:null;
   $('nextGender').value=fate?.gender||'female';$('nextSocialClass').value=fate?.socialClass||'commoner';
   replaceSelectOptions($('nextDepartment'),FATE_START_DEPARTMENTS.map((value)=>({value,label:value})),{emptyLabel:''});$('nextDepartment').value=fate?.department||FATE_START_DEPARTMENTS[0];
-  replaceSelectOptions($('nextAffinity'),ALLOWED_CHARACTER_KEYS.map((key)=>({value:key,label:ASSETS.characters[key]?.name||key})));
+  replaceSelectOptions($('nextAffinity'),FATE_AFFINITY_ELIGIBLE_KEYS.map((key)=>({value:key,label:ASSETS.characters[key]?.name||key})));
   $('nextRegionLock').value='';$('nextOccupationLock').value='';
   syncNextLifeOriginOptions();
   for(const id of ['inheritStatBody','inheritStatMana','inheritStatIntelligence','inheritStatDivinity','inheritTalentMagic','inheritTalentMartial','inheritTalentSoul','inheritTalentKnowledge','inheritGold','inheritSupplies','inheritAffinityUnits'])$(id).value='0';
@@ -1332,7 +1333,7 @@ async function submitNextLife(){
   const request=nextLifeRequest(),sourceRunId=save.id,owner=captureActiveRunOwnership(),button=$('nextLifeSubmit');button.disabled=true;
   try{
     const result=await purchaseNextLifeSerialized({
-      withLock:(task)=>withMetaProgressionLock(task,{required:true}),sourceRunId,request,allowedAffinityKeys:ALLOWED_CHARACTER_KEYS,
+      withLock:(task)=>withMetaProgressionLock(task,{required:true}),sourceRunId,request,allowedAffinityKeys:FATE_AFFINITY_ELIGIBLE_KEYS,
       readCanonical:()=>{
         assertActiveRunOwner(owner);const persisted=readJsonStrict(SAVE_KEY);if(!persisted||String(persisted.id)!==String(sourceRunId))throw new Error('canonical active run이 변경되어 Next Life transaction을 폐기함.');
         const canonical=readCanonicalProgression();

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 import { applyEndingReceipts, inspectFateBook, normalizeFateBook } from '../../lib/fate-ending.js';
@@ -107,7 +108,25 @@ assert.equal(locked.nextRun.creation.fateStart.origin.regionKey,'north');assert.
 assert.throws(()=>prepareInheritanceNextLife({fateBook:affinityBook,inheritanceMeta:emptyInheritanceMeta(),sourceRun:source,nextRunBase:baseRun('bad-lock'),request:request({originLocks:{region:'north',occupation:'dockhand'},allocations:[{kind:'origin_lock',target:'region:north',units:1},{kind:'origin_lock',target:'occupation:dockhand',units:1}]}),allowedAffinityKeys:NPCS,now:at,receiptId:'purchase:bad-lock'}),/양립하지 않음/);
 assert.throws(()=>prepareInheritanceNextLife({fateBook:affinityBook,inheritanceMeta:emptyInheritanceMeta(),sourceRun:source,nextRunBase:baseRun('realm-buy'),request:request({allocations:[{kind:'realm',target:'circle',units:1}]}),allowedAffinityKeys:NPCS,now:at,receiptId:'purchase:realm'}),/직접 구매/);
 
-const app=readFileSync('app.js','utf8'),runtime=readFileSync('app-runtime.js','utf8'),worker=readFileSync('sw.js','utf8'),inheritanceSource=readFileSync('lib/fate-inheritance.js','utf8');
+const app=readFileSync('app.js','utf8'),runtime=readFileSync('app-runtime.js','utf8'),worker=readFileSync('sw.js','utf8'),chat=readFileSync('api/chat.js','utf8'),inheritanceSource=readFileSync('lib/fate-inheritance.js','utf8');
+const appBlobSha=createHash('sha1').update(`blob ${Buffer.byteLength(app)}\0`).update(app).digest('hex');
+const clientRosterBody=app.match(/const DIRECTOR_NPC_DEPT = \{([\s\S]*?)\n\};/)?.[1]||'';
+const clientRosterKeys=[...clientRosterBody.matchAll(/\b([a-z][a-z0-9_]*):'(?:knight|magic|theology|common)'/g)].map((row)=>row[1]);
+const serverRosterBody=chat.slice(chat.indexOf('const DIRECTOR_ROSTER = Object.freeze({'),chat.indexOf('// 강적/사도/천상사강/신격'));
+const serverRosterKeys=[...serverRosterBody.matchAll(/^\s{2}([a-z][a-z0-9_]*):/gm)].map((row)=>row[1]);
+const rotationLockedBody=chat.slice(chat.indexOf('const ROTATION_LOCKED = new Set(['),chat.indexOf(']);',chat.indexOf('const ROTATION_LOCKED = new Set([')));
+const rotationLockedKeys=[...rotationLockedBody.matchAll(/'([a-z][a-z0-9_]*)'/g)].map((row)=>row[1]);
+assert.equal(clientRosterKeys.length,16,'the existing client public gameplay roster must be present');
+assert.equal(serverRosterKeys.length,16,'the existing server public rotation roster must be present');
+assert.equal(rotationLockedKeys.length,16,'the existing rotation-locked boundary must be present');
+assert.deepEqual([...clientRosterKeys].sort(),[...serverRosterKeys].sort(),'Fate Affinity must reuse the existing public gameplay rotation roster');
+assert.ok(clientRosterKeys.includes('artemis')&&clientRosterKeys.includes('lillia'),'visible public NPCs must remain eligible for a new Fate Affinity purchase');
+for(const key of rotationLockedKeys)assert.ok(!clientRosterKeys.includes(key),`${key} must not be exposed as a new Fate Affinity purchase target`);
+assert.match(app,/const FATE_AFFINITY_ELIGIBLE_KEYS=Object\.freeze\(Object\.keys\(DIRECTOR_NPC_DEPT\)\);/,'asset availability must not define gameplay eligibility');
+assert.match(app,/FATE_AFFINITY_ELIGIBLE_KEYS\.map\(\(key\)=>\(\{value:key,label:ASSETS\.characters\[key\]/,'the selector must show only canonical public gameplay NPCs');
+assert.equal((app.match(/allowedAffinityKeys:FATE_AFFINITY_ELIGIBLE_KEYS/g)||[]).length,2,'quote and commit must enforce the same public gameplay eligibility');
+assert.doesNotMatch(app,/allowedAffinityKeys:ALLOWED_CHARACTER_KEYS/,'the full character/asset registry must not authorize new affinity purchases');
+assert.match(runtime,new RegExp(`const BASE_APP_SHA = '${appBlobSha}';`),'stable loader marker must identify the corrected canonical app blob');
 assert.match(app,/navigator\.locks\.request\(META_PROGRESSION_LOCK/,'same-origin purchases must use the canonical Web Lock');
 assert.match(app,/commitRunFateAndInheritance\(localStorage,RUN_COMMIT_KEYS/,'receipt, meta, and run benefit must share one rollback journal boundary');
 assert.match(app,/prepareCanonicalProgressionImport\([\s\S]*incomingInheritanceMeta:importedMeta/,'save import must use fail-closed progression validation');
