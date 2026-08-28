@@ -2,7 +2,7 @@ import { ASSETS } from './assets.js';
 import { migrateLegacyNpcKeys } from './save-migrations.js';
 import { createFreeCharacterCreation, fateOriginLockOptions, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation } from './lib/fate-start.js';
 import { fateBookRuntimeSnapshot, normalizeFateBook, reconcileFateBooks } from './lib/fate-ending.js';
-import { commitInheritancePurchase, FATE_AFFINITY_CANDIDATE_KEYS, inheritancePointSummary, normalizeInheritanceAllocation, quoteInheritanceAllocation, reconcileInheritanceStates } from './lib/fate-inheritance.js';
+import { commitInheritancePurchase, FATE_AFFINITY_CANDIDATE_KEYS, inheritancePointSummary, normalizeInheritanceAllocation, quoteInheritanceAllocation, reconcileInheritanceStates, serializeInheritancePurchase } from './lib/fate-inheritance.js';
 import { createNovelPresentationState, novelSceneTitle, resetNovelPresentationState, shouldShowNovelPortrait } from './lib/novel-presentation.js';
 
 const APP_VERSION = '1.4.8';
@@ -190,13 +190,17 @@ let busy = false;
 let forceTerraOnce = false;
 let metaModeOnce = false;
 let fateOriginPreviewSeed = '';
+let pcCreatorSubmitting = false;
 
 function loadJson(key) { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } }
 function persist() { save.updatedAt = new Date().toISOString(); localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }
 function persistFateBook() { localStorage.setItem(FATE_BOOK_KEY, JSON.stringify(fateBook)); }
-function persistInheritance() { inheritanceState=reconcileInheritanceStates(loadJson(FATE_INHERITANCE_KEY),inheritanceState,INHERITANCE_OPTIONS); localStorage.setItem(FATE_INHERITANCE_KEY, JSON.stringify(inheritanceState)); }
+function persistInheritance() {
+  const write=()=>{inheritanceState=reconcileInheritanceStates(loadJson(FATE_INHERITANCE_KEY),inheritanceState,INHERITANCE_OPTIONS);localStorage.setItem(FATE_INHERITANCE_KEY,JSON.stringify(inheritanceState));return inheritanceState;};
+  return navigator.locks?.request?serializeInheritancePurchase(navigator.locks,write):Promise.resolve(write());
+}
 function persistSettings() { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
-if (loadedRunSave?.fateBook || loadedRunSave?.inheritance) { persist(); persistFateBook(); persistInheritance(); }
+if (loadedRunSave?.fateBook || loadedRunSave?.inheritance) { persist(); persistFateBook(); void persistInheritance(); }
 function uniq(arr) { return [...new Set((arr || []).filter(Boolean))]; }
 function clamp(n, min, max) { return Math.min(max, Math.max(min, Number(n) || 0)); }
 
@@ -1253,20 +1257,20 @@ function openPcCreator() {
   setPcCreationMode('free');
   $('pcCreatorDialog').showModal();
 }
-function createNewSaveFromCreator() {
+function createNewSaveFromCreator({inheritanceLedger=inheritanceState}={}) {
   const base=defaultSave();
   if($('pcCreationMode').value==='fate') {
-    inheritanceState=reconcileInheritanceStates(loadJson(FATE_INHERITANCE_KEY),inheritanceState,INHERITANCE_OPTIONS);
     const allowedNpcKeys=FATE_AFFINITY_KEYS,allocation=readInheritanceAllocation();
-    const quote=quoteInheritanceAllocation(allocation,{allowedNpcKeys}),points=inheritancePointSummary(inheritanceState,fateBook,INHERITANCE_OPTIONS);
-    if(quote.cost>points.available)throw new Error(`계승 포인트 부족: 필요 ${quote.cost}, 사용 가능 ${points.available}`);
+    const quote=quoteInheritanceAllocation(allocation,{allowedNpcKeys});
+    const committed=commitInheritancePurchase(inheritanceLedger,{fateBook,allocation,lifeId:base.id,sourceRunId:save.id,allowedNpcKeys,allowedCharacterKeys:CHARACTER_KEYS});
+    const appliedAllocation=committed.purchase?.allocation||quote.allocation;
     const generated=generateFateStartingCharacter({
       gender:$('fateGender').value,
       socialClass:$('fateSocialClass').value,
       department:$('fateDepartment').value,
       seed:fateOriginPreviewSeed,
-      inheritance:allocation,
-      inheritancePurchase:{lifeId:base.id},
+      inheritance:appliedAllocation,
+      inheritancePurchase:{lifeId:committed.purchase?.lifeId||base.id},
       allowedNpcKeys,
     });
     const labels=fateStartLabels(generated.creation.fateStart);
@@ -1276,9 +1280,7 @@ function createNewSaveFromCreator() {
     const startRoute=generated.creation.fateStart.background.startingRoute;
     base.rollingSummary=`입학식 당일 08:40. ${base.pc.name}은(는) ${startRoute.arrivalFocus}에 도착했다. ${startRoute.eventMeaning}이며 첫 확인 지점은 ${startRoute.checkpoint}이다. 입학식 개막 전이다.`;
     const next=normalizeSave(base);
-    const committed=commitInheritancePurchase(inheritanceState,{fateBook,allocation,lifeId:base.id,sourceRunId:save.id,allowedNpcKeys,allowedCharacterKeys:CHARACTER_KEYS});
-    inheritanceState=committed.state;
-    return next;
+    return{save:next,inheritanceState:committed.state,purchase:committed.purchase};
   }
   base.creation=createFreeCharacterCreation();
   base.pc={...base.pc,
@@ -1292,7 +1294,56 @@ function createNewSaveFromCreator() {
     skills:parseSkills($('pcSkillsText').value), inventory:parseList($('pcInventoryText').value),
   };
   base.rollingSummary=`입학식 당일 08:40. ${base.pc.name}은(는) 루멘시아 아카데미 대강당 앞에 도착했으며 입학식 개막 전이다.`;
-  return normalizeSave(base);
+  return{save:normalizeSave(base),inheritanceState:inheritanceLedger,purchase:null};
+}
+
+function restoreLocalStorageValue(key,value){if(value===null)localStorage.removeItem(key);else localStorage.setItem(key,value);}
+
+function assertPersistedInheritanceBenefit(persistedState,nextSave,purchase){
+  const summary=inheritancePointSummary(persistedState,fateBook,INHERITANCE_OPTIONS);
+  if(summary.overspent>0||summary.spent>summary.earned)throw new Error('계승 원장 무결성 실패: 사용 포인트가 획득 포인트를 초과함.');
+  const benefitReceipt=nextSave.creation?.fateStart?.inheritance||null;
+  if(!purchase&&benefitReceipt)throw new Error('계승 영수증 없이 다음 생 혜택이 적용됨.');
+  if(!purchase)return;
+  const persistedPurchase=persistedState.purchases?.[purchase.lifeId];
+  if(!persistedPurchase||!benefitReceipt||benefitReceipt.lifeId!==purchase.lifeId||benefitReceipt.cost!==persistedPurchase.cost||JSON.stringify(benefitReceipt.allocation)!==JSON.stringify(persistedPurchase.allocation)){
+    throw new Error('계승 구매 영수증과 다음 생 혜택이 일치하지 않음.');
+  }
+}
+
+async function commitNewSaveFromCreator(){
+  if($('pcCreationMode').value!=='fate'){
+    const created=createNewSaveFromCreator();
+    save=created.save;refreshScheduleContext();persist();return save;
+  }
+  const requestedQuote=quoteInheritanceAllocation(readInheritanceAllocation(),{allowedNpcKeys:FATE_AFFINITY_KEYS});
+  if(requestedQuote.cost===0){
+    const created=createNewSaveFromCreator();
+    save=created.save;refreshScheduleContext();persist();return save;
+  }
+  return serializeInheritancePurchase(navigator.locks,()=>{
+    const previousSave=save,previousInheritance=inheritanceState,previousFateBook=fateBook;
+    const previousStoredSave=localStorage.getItem(SAVE_KEY),previousStoredInheritance=localStorage.getItem(FATE_INHERITANCE_KEY);
+    let wroteTransaction=false;
+    try{
+      fateBook=reconcileFateBooks(loadJson(FATE_BOOK_KEY),fateBook,{allowedCharacterKeys:CHARACTER_KEYS});
+      const latestInheritance=reconcileInheritanceStates(loadJson(FATE_INHERITANCE_KEY),inheritanceState,INHERITANCE_OPTIONS);
+      const created=createNewSaveFromCreator({inheritanceLedger:latestInheritance});
+      const summary=inheritancePointSummary(created.inheritanceState,fateBook,INHERITANCE_OPTIONS);
+      if(summary.overspent>0||summary.spent>summary.earned)throw new Error('계승 원장 무결성 실패: 사용 포인트가 획득 포인트를 초과함.');
+      inheritanceState=created.inheritanceState;save=created.save;refreshScheduleContext();
+      localStorage.setItem(FATE_INHERITANCE_KEY,JSON.stringify(inheritanceState));
+      wroteTransaction=true;persist();
+      const persistedState=reconcileInheritanceStates(loadJson(FATE_INHERITANCE_KEY),null,INHERITANCE_OPTIONS);
+      assertPersistedInheritanceBenefit(persistedState,save,created.purchase);
+      inheritanceState=persistedState;
+      return save;
+    }catch(error){
+      if(wroteTransaction){restoreLocalStorageValue(SAVE_KEY,previousStoredSave);restoreLocalStorageValue(FATE_INHERITANCE_KEY,previousStoredInheritance);}
+      save=previousSave;inheritanceState=previousInheritance;fateBook=previousFateBook;
+      throw error;
+    }
+  });
 }
 
 function renderDebug() {
@@ -1353,12 +1404,12 @@ $('fateSocialClass').addEventListener('change',()=>{syncInheritanceOriginOptions
 $('fateDepartment').addEventListener('change',renderInheritanceCreator);
 $('inheritOriginRegion').addEventListener('change',()=>{syncInheritanceOriginOptions();renderInheritanceCreator();});
 for(const id of INHERITANCE_INPUT_IDS)$(id)?.addEventListener('change',renderInheritanceCreator);
-$('pcCreatorForm').addEventListener('submit',(e)=>{e.preventDefault();try{save=createNewSaveFromCreator();refreshScheduleContext();persist();persistInheritance();$('pcCreatorDialog').close();renderAll();toast(save.creation.mode==='fate'?`${save.pc.name}의 다음 운명 시작`:`${save.pc.name} 새 게임 생성`);}catch(error){alert(error.message);}});
+$('pcCreatorForm').addEventListener('submit',async(e)=>{e.preventDefault();if(pcCreatorSubmitting)return;pcCreatorSubmitting=true;$('pcCreatorSubmit').disabled=true;try{await commitNewSaveFromCreator();$('pcCreatorDialog').close();renderAll();toast(save.creation.mode==='fate'?`${save.pc.name}의 다음 운명 시작`:`${save.pc.name} 새 게임 생성`);}catch(error){alert(error.message);}finally{pcCreatorSubmitting=false;$('pcCreatorSubmit').disabled=false;}});
 
-function exportSave() {
-  persist(); persistFateBook(); persistInheritance(); const bundle={format:'lumensia.save.bundle.v3',save,fateBook,inheritance:inheritanceState}; const blob = new Blob([JSON.stringify(bundle,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`lumensia-save-${save.world.date}-${save.world.time.replace(':','')}.json`; a.click(); URL.revokeObjectURL(a.href);
+async function exportSave() {
+  persist(); persistFateBook(); await persistInheritance(); const bundle={format:'lumensia.save.bundle.v3',save,fateBook,inheritance:inheritanceState}; const blob = new Blob([JSON.stringify(bundle,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`lumensia-save-${save.world.date}-${save.world.time.replace(':','')}.json`; a.click(); URL.revokeObjectURL(a.href);
 }
-async function importSave(e) { const file=e.target.files?.[0]; if(!file)return; try { const parsed=JSON.parse(await file.text()); const bundled=/^lumensia\.save\.bundle\.v[23]$/.test(parsed?.format); const importedSave=bundled?parsed.save:parsed; if(!importedSave?.pc||!importedSave?.world)throw new Error('세이브 형식이 아님'); const importedBook=bundled?parsed.fateBook:parsed?.fateBook; const importedInheritance=bundled?parsed.inheritance:parsed?.inheritance; const importedRun={...importedSave}; delete importedRun.fateBook; delete importedRun.inheritance; save=normalizeSave(importedRun); fateBook=reconcileFateBooks(fateBook,importedBook,{allowedCharacterKeys:CHARACTER_KEYS}); inheritanceState=reconcileInheritanceStates(inheritanceState,importedInheritance,INHERITANCE_OPTIONS); persist(); persistFateBook(); persistInheritance(); renderAll(); toast('세이브 불러옴'); } catch(err){alert(`불러오기 실패: ${err.message}`);} e.target.value=''; }
+async function importSave(e) { const file=e.target.files?.[0]; if(!file)return; try { const parsed=JSON.parse(await file.text()); const bundled=/^lumensia\.save\.bundle\.v[23]$/.test(parsed?.format); const importedSave=bundled?parsed.save:parsed; if(!importedSave?.pc||!importedSave?.world)throw new Error('세이브 형식이 아님'); const importedBook=bundled?parsed.fateBook:parsed?.fateBook; const importedInheritance=bundled?parsed.inheritance:parsed?.inheritance; const importedRun={...importedSave}; delete importedRun.fateBook; delete importedRun.inheritance; save=normalizeSave(importedRun); fateBook=reconcileFateBooks(fateBook,importedBook,{allowedCharacterKeys:CHARACTER_KEYS}); inheritanceState=reconcileInheritanceStates(inheritanceState,importedInheritance,INHERITANCE_OPTIONS); persist(); persistFateBook(); await persistInheritance(); renderAll(); toast('세이브 불러옴'); } catch(err){alert(`불러오기 실패: ${err.message}`);} e.target.value=''; }
 function toast(text) { const d=document.createElement('div'); d.textContent=text; d.style.cssText='position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:99;background:#263449;padding:9px 14px;border-radius:999px'; document.body.append(d); setTimeout(()=>d.remove(),1300); }
 
 async function checkHealth() { try { const r=await fetch('/api/health'); const h=await r.json(); $('apiHealth').textContent=h.apiConfigured?`API 연결 준비됨 · ${h.luna} / ${h.terra}${h.accessTokenRequired ? ' · 접속 토큰 필요' : ''}`:'API 키 미설정. Vercel 환경변수 OPENAI_API_KEY를 추가하거나 데모 모드를 켜세요.'; } catch { $('apiHealth').textContent='API 상태를 확인할 수 없음.'; } }

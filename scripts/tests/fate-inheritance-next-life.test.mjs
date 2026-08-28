@@ -13,6 +13,7 @@ import {
   normalizeInheritanceAllocation,
   quoteInheritanceAllocation,
   reconcileInheritanceStates,
+  serializeInheritancePurchase,
 } from '../../lib/fate-inheritance.js';
 import {
   createFreeCharacterCreation,
@@ -73,6 +74,58 @@ const historicalNpcState={version:1,purchases:{'old-life':{lifeId:'old-life',cos
 assert.equal(reconcileInheritanceStates(historicalNpcState,null,options).purchases['old-life'].cost,2,'a later registry change must not delete the cost of a historically valid purchase');
 assert.throws(()=>commitInheritancePurchase(null,{fateBook,allocation,lifeId:'__proto__',...options}),/유효한 Next Life/,'prototype keys must never enter the meta ledger');
 
+class InheritanceLockManager {
+  constructor(){this.tail=Promise.resolve();}
+  request(name,lockOptions,task){
+    assert.equal(name,'lumensia.inheritance.purchase.v1');
+    assert.deepEqual(lockOptions,{mode:'exclusive'});
+    const run=this.tail.then(task);
+    this.tail=run.catch(()=>{});
+    return run;
+  }
+}
+
+async function runConcurrentPurchases({book,purchaseAllocation,lifeIds}){
+  const locks=new InheritanceLockManager();
+  let storedState=null;
+  const benefits=[];
+  const request=(lifeId)=>serializeInheritancePurchase(locks,async()=>{
+    const latest=reconcileInheritanceStates(storedState,null,options);
+    await Promise.resolve();
+    const committed=commitInheritancePurchase(latest,{fateBook:book,allocation:purchaseAllocation,lifeId,...options});
+    const summary=inheritancePointSummary(committed.state,book,options);
+    assert.equal(summary.overspent,0);
+    assert.ok(summary.spent<=summary.earned);
+    storedState=committed.state;
+    if(committed.purchase)benefits.push({lifeId,allocation:committed.purchase.allocation});
+    return committed;
+  });
+  return{results:await Promise.allSettled(lifeIds.map(request)),state:storedState,benefits};
+}
+
+const onePurchaseBook=normalizeFateBook({discoveredIds:['general.honors']},{allowedCharacterKeys:characterKeys});
+const fourPointAllocation=normalizeInheritanceAllocation({stats:{body:1},startingResources:1},options);
+const contested=await runConcurrentPurchases({book:onePurchaseBook,purchaseAllocation:fourPointAllocation,lifeIds:['race-a','race-b']});
+assert.equal(contested.results.filter((row)=>row.status==='fulfilled').length,1,'same-balance concurrent purchases must serialize so only one can spend insufficient shared points');
+assert.equal(contested.results.filter((row)=>row.status==='rejected').length,1);
+assert.equal(contested.benefits.length,1,'a rejected concurrent purchase must receive no Next Life benefit');
+assert.equal(contested.state.purchaseOrder.length,1,'a rejected concurrent purchase must leave no receipt');
+assert.ok(inheritancePointSummary(contested.state,onePurchaseBook,options).spent<=onePurchaseBook.rewardTotal,'concurrent rejection must preserve spent <= earned');
+
+const twoPointAllocation=normalizeInheritanceAllocation({stats:{body:1}},options);
+const sufficient=await runConcurrentPurchases({book:onePurchaseBook,purchaseAllocation:twoPointAllocation,lifeIds:['enough-a','enough-b']});
+assert.equal(sufficient.results.every((row)=>row.status==='fulfilled'),true,'both serialized requests may succeed only when the shared balance covers both');
+assert.equal(sufficient.state.purchaseOrder.length,2);
+assert.equal(sufficient.benefits.length,2);
+for(const benefit of sufficient.benefits)assert.deepEqual(benefit.allocation,sufficient.state.purchases[benefit.lifeId].allocation,'persisted receipt and applied benefit must use the same allocation');
+assert.ok(inheritancePointSummary(sufficient.state,onePurchaseBook,options).spent<=onePurchaseBook.rewardTotal);
+
+const duplicate=await runConcurrentPurchases({book:onePurchaseBook,purchaseAllocation:twoPointAllocation,lifeIds:['same-life','same-life']});
+assert.equal(duplicate.results.every((row)=>row.status==='fulfilled'),true);
+assert.equal(duplicate.state.purchaseOrder.length,1,'the same serialized transaction receipt must remain idempotent');
+assert.equal(duplicate.results[1].value.reused,true);
+await assert.rejects(()=>serializeInheritancePurchase(null,()=>{}),/안전하게 직렬화/,'paid inheritance must fail closed without a cross-tab lock');
+
 const commonerOptions=fateOriginLockOptions({socialClass:'commoner'});
 assert.ok(commonerOptions.regions.some((row)=>row.key==='south'));
 assert.ok(commonerOptions.occupations.some((row)=>row.key==='dockhand'&&row.regionKey==='south'));
@@ -121,10 +174,14 @@ assert.match(app,/const FATE_INHERITANCE_KEY = 'lumensia\.inheritance\.v1'/,'inh
 assert.match(app,/reconcileInheritanceStates\(loadJson\(FATE_INHERITANCE_KEY\), loadedRunSave\?\.inheritance/,'legacy/stale embedded meta state must reconcile with the live ledger');
 assert.match(app,/format:'lumensia\.save\.bundle\.v3',save,fateBook,inheritance:inheritanceState/,'exports must carry both canonical meta ledgers');
 assert.match(app,/fateBook=reconcileFateBooks\(fateBook,importedBook[\s\S]*inheritanceState=reconcileInheritanceStates\(inheritanceState,importedInheritance/,'imports must reconcile Fate Book authority before inheritance spending');
-assert.match(app,/commitInheritancePurchase\(inheritanceState,\{fateBook,allocation,lifeId:base\.id/,'Fate Start must commit a bounded Next Life purchase');
-assert.match(app,/commitInheritancePurchase\(inheritanceState,\{fateBook,allocation,lifeId:base\.id,sourceRunId:save\.id,allowedNpcKeys,allowedCharacterKeys:CHARACTER_KEYS\}\)/,'purchase authority must retain every canonical Character Ending while affinity stays player-visible only');
-assert.match(app,/persistInheritance\(\) \{ inheritanceState=reconcileInheritanceStates\(loadJson\(FATE_INHERITANCE_KEY\),inheritanceState,INHERITANCE_OPTIONS\)/,'every write must merge the latest cross-tab ledger before persisting');
-assert.match(app,/inheritanceState=reconcileInheritanceStates\(loadJson\(FATE_INHERITANCE_KEY\),inheritanceState,INHERITANCE_OPTIONS\);[\s\S]*commitInheritancePurchase/,'Next Life must re-read cross-tab progression before validating its balance');
+assert.match(app,/serializeInheritancePurchase\(navigator\.locks,\(\)=>\{/,'the complete paid Next Life transaction must use one inheritance-only exclusive lock');
+assert.match(app,/requestedQuote\.cost===0[\s\S]*createNewSaveFromCreator\(\)[\s\S]*return serializeInheritancePurchase\(navigator\.locks/,'zero-cost Fate Start must remain available while paid inheritance fails closed without serialization');
+assert.match(app,/commitInheritancePurchase\(inheritanceLedger,\{fateBook,allocation,lifeId:base\.id/,'Fate Start must commit against the ledger loaded inside the exclusive transaction');
+assert.match(app,/commitInheritancePurchase\(inheritanceLedger,\{fateBook,allocation,lifeId:base\.id,sourceRunId:save\.id,allowedNpcKeys,allowedCharacterKeys:CHARACTER_KEYS\}\)/,'purchase authority must retain every canonical Character Ending while affinity stays player-visible only');
+assert.match(app,/function persistInheritance\(\) \{[\s\S]*serializeInheritancePurchase\(navigator\.locks,write\)/,'all supported-browser inheritance ledger writers must share the same exclusive lock');
+assert.match(app,/const write=\(\)=>\{inheritanceState=reconcileInheritanceStates\(loadJson\(FATE_INHERITANCE_KEY\),inheritanceState,INHERITANCE_OPTIONS\);localStorage\.setItem\(FATE_INHERITANCE_KEY,JSON\.stringify\(inheritanceState\)\)/,'every inheritance write must merge the latest cross-tab ledger before persisting');
+assert.match(app,/serializeInheritancePurchase\(navigator\.locks,[\s\S]*latestInheritance=reconcileInheritanceStates\(loadJson\(FATE_INHERITANCE_KEY\),inheritanceState,INHERITANCE_OPTIONS\)[\s\S]*createNewSaveFromCreator\(\{inheritanceLedger:latestInheritance\}\)/,'Next Life must re-read cross-tab progression inside the lock before validating its balance');
+assert.match(app,/localStorage\.setItem\(FATE_INHERITANCE_KEY,JSON\.stringify\(inheritanceState\)\);[\s\S]*persist\(\);[\s\S]*assertPersistedInheritanceBenefit/,'receipt persistence, run persistence, and benefit verification must remain inside the serialized callback');
 assert.match(app,/FATE_AFFINITY_KEYS\.map/,'the selector must use the explicit player-visible Fate Affinity allowlist');
 assert.match(app,/renderInheritanceOriginPreview[\s\S]*후보 \$\{draw\+1\}\/\$\{allocation\.originRerolls\+1\}/,'purchased rerolls must expose selectable deterministic candidates');
 assert.match(runtime,/fate inheritance import/,'the deployed runtime must rewrite the new module import');
