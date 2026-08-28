@@ -1,6 +1,7 @@
 import { ASSETS } from './assets.js';
 import { migrateLegacyNpcKeys } from './save-migrations.js';
 import { createFreeCharacterCreation, fateStartLabels, generateFateStartingCharacter, normalizeCharacterCreation } from './lib/fate-start.js';
+import { createNovelPresentationState, novelSceneTitle, resetNovelPresentationState, shouldShowNovelPortrait } from './lib/novel-presentation.js';
 
 const APP_VERSION = '1.4.8';
 const SAVE_KEY = 'lumensia.save.v1';
@@ -12,6 +13,7 @@ const choicesEl = $('choices');
 const actionForm = $('actionForm');
 const actionInput = $('actionInput');
 const sendBtn = $('sendBtn');
+const novelPresentation = createNovelPresentationState();
 
 const defaultSettings = {
   modelMode: 'auto',
@@ -387,6 +389,7 @@ function appendWelcome() {
 
 function renderAll() {
   story.innerHTML = '';
+  resetNovelPresentationState(novelPresentation);
   if (!save.renderedTurns?.length) appendWelcome();
   else save.renderedTurns.forEach(renderTurnRecord);
   updateStatus();
@@ -408,9 +411,12 @@ function renderTurnRecord(record) {
   card.className = record.meta ? 'turn-card meta-turn' : 'turn-card';
   const head = document.createElement('div');
   head.className = 'turn-head';
+  const turnIndex = Math.max(0, (save.renderedTurns || []).indexOf(record));
+  const displayTitle = novelSceneTitle(novelPresentation, record);
   const cachePct = Math.round(Number(record.usage?.cache_hit_rate || 0) * 100);
   const usageTag = record.usage && record.route?.tier !== 'demo' ? ` · $${Number(record.usage.estimated_usd || 0).toFixed(4)} · cache ${cachePct}%` : '';
-  head.innerHTML = `<span>${record.meta ? 'META · ' : ''}${escapeHtml(turn.scene_title || '장면')}</span><span>${escapeHtml(record.route?.tier || 'demo')}${usageTag}</span>`;
+  const technicalTag = settings.developerMode ? `<span>${escapeHtml(record.route?.tier || 'demo')}${usageTag}</span>` : '';
+  head.innerHTML = `<span>${record.meta ? 'META · ' : ''}${escapeHtml(displayTitle)}</span>${technicalTag}`;
   card.append(head);
 
   if (turn.cg_id && ASSETS.cg[turn.cg_id]) {
@@ -423,7 +429,7 @@ function renderTurnRecord(record) {
     if (item.kind === 'dialogue') {
       const d = document.createElement('div'); d.className = 'dialogue';
       const finalExpression = item.display_expression || item.expression || save.emotionStates?.[item.speaker_key]?.current || 'default';
-      if (item.speaker_key && (!shown.has(item.speaker_key) || shown.get(item.speaker_key) !== finalExpression)) {
+      if (item.speaker_key && (!shown.has(item.speaker_key) || shown.get(item.speaker_key) !== finalExpression) && shouldShowNovelPortrait(novelPresentation, { speakerKey:item.speaker_key, expression:finalExpression, emotionTransition:item.emotion_transition, turnIndex })) {
         d.append(createPortrait(item.speaker_key, finalExpression, item.speaker_name));
         shown.set(item.speaker_key, finalExpression);
       }
@@ -446,7 +452,7 @@ function renderTurnRecord(record) {
   for (const notice of record.notices || []) {
     const n = document.createElement('div'); n.className = 'progress-notice'; n.textContent = `✦ ${notice}`; card.append(n);
   }
-  if (record.usage?.cold_cache) {
+  if (settings.developerMode && record.usage?.cold_cache) {
     const n = document.createElement('div'); n.className = 'cache-notice';
     n.textContent = '첫 호출/캐시 만료 턴: 세계관 프롬프트 캐시를 새로 만드는 턴이라 비용이 평소보다 높을 수 있음.';
     card.append(n);
@@ -470,6 +476,11 @@ function renderChoices(choices) {
     return;
   }
 
+  const label = document.createElement('div');
+  label.className = 'suggested-actions-label';
+  label.textContent = 'Suggested Actions · 직접 입력 가능';
+  choicesEl.append(label);
+
   choices.forEach((choice, idx) => {
     const b = document.createElement('button');
     b.className = 'choice-btn';
@@ -488,8 +499,9 @@ function renderChoices(choices) {
 function updateStatus(route) {
   $('timeStatus').textContent = `D+${save.world.dayElapsed} · ${save.world.date} ${save.world.weekday} ${save.world.time}`;
   $('locationStatus').textContent = save.world.location;
-  if (route) $('routeStatus').textContent = `${route.input_mode === 'meta' ? 'META · ' : ''}${route.tier.toUpperCase()} · ${route.reasoning_effort}${route.reasoning_mode === 'pro' ? ' · PRO' : ''}`;
-  $('costStatus').textContent = `턴 $${Number(save.usage.lastTurnUsd || 0).toFixed(4)} / Σ$${Number(save.usage.estimatedUsd || 0).toFixed(3)}`;
+  if (settings.developerMode && route) $('routeStatus').textContent = `${route.input_mode === 'meta' ? 'META · ' : ''}${route.tier.toUpperCase()} · ${route.reasoning_effort}${route.reasoning_mode === 'pro' ? ' · PRO' : ''}`;
+  if (settings.developerMode) $('costStatus').textContent = `턴 $${Number(save.usage.lastTurnUsd || 0).toFixed(4)} / Σ$${Number(save.usage.estimatedUsd || 0).toFixed(3)}`;
+  updateDeveloperUi();
 }
 
 function renderInfo() {
@@ -505,6 +517,9 @@ function renderInfo() {
 출신: ${save.pc.origin || '-'} | 신분: ${save.pc.socialStatus || '-'} | 입학: ${save.pc.admission || '-'}${fateStory?`\n운명 배경:\n${fateStory}\n---------`:''}
 경지: ${save.pc.realm} | 소속: 루멘시아 아카데미\n---------\n직위: ${save.pc.department} | 상황: 🟢\n---------\n스킬: ${skills}\n---------\n스탯:\n${stats}\n---------\n🔮[魔] ${save.pc.talents.magic} | ⚔️[武] ${save.pc.talents.martial} | 🌟[魂] ${save.pc.talents.soul} | 📘[智] ${save.pc.talents.knowledge}\n---------\n상태: ${save.pc.status} | 피로 ${save.pc.fatigue}/100\n💼: ${(save.pc.inventory||[]).join(', ') || '-'} | 금화 ${save.pc.gold}G\n관계: ${rel}\n친밀도(성인모드): ${intimacy}\n---------\n진행 사건: ${save.activeEvents.join(', ') || '-'}\n토큰 누적: 입력 ${save.usage.inputTokens || 0} / 캐시 ${save.usage.cachedTokens || 0} / 출력 ${save.usage.outputTokens || 0} / 추론 ${save.usage.reasoningTokens || 0}\n직전 턴: 입력 ${save.usage.lastInputTokens || 0} / 출력 ${save.usage.lastOutputTokens || 0} / 캐시 적중 ${Math.round(Number(save.usage.lastCacheHitRate || 0)*100)}% / 비용 $${Number(save.usage.lastTurnUsd || 0).toFixed(4)}\n누적 API 비용(추정): $${Number(save.usage.estimatedUsd || 0).toFixed(4)}\n영구 타임라인: ${save.timeline?.length || 0}건 | NPC 감정상태: ${Object.keys(save.emotionStates || {}).length}명
 예약 일정: ${(save.scheduledEvents||[]).filter(x=>x.status!=='completed'&&x.status!=='cancelled').length}건 | 훅: ${(save.hooks||[]).filter(x=>!['resolved','expired'].includes(x.status)).length}건 | 기억: ${(save.memories?.global||[]).length + Object.values(save.memories?.npc||{}).reduce((n,x)=>n+(x?.length||0),0)}건`;
+  if (!settings.developerMode) {
+    $('infoContent').textContent = $('infoContent').textContent.split('\n').filter((line) => !['토큰 누적:', '직전 턴:', '누적 API 비용'].some((prefix) => line.startsWith(prefix))).join('\n');
+  }
 }
 
 function applyDelta(delta = {}) {
@@ -939,7 +954,11 @@ function ensureDynamicUi() {
 function updatePcUi() {
   actionInput.placeholder = `${save.pc.name || 'PC'}의 행동이나 대사를 직접 입력…`;
 }
-function updateDeveloperUi() { $('debugBtn')?.classList.toggle('hidden', !settings.developerMode); }
+function updateDeveloperUi() {
+  $('debugBtn')?.classList.toggle('hidden', !settings.developerMode);
+  $('routeStatus')?.classList.toggle('hidden', !settings.developerMode);
+  $('costStatus')?.classList.toggle('hidden', !settings.developerMode);
+}
 
 function parseSkills(text='') {
   const out = {};
@@ -1187,7 +1206,7 @@ $('importInput').addEventListener('change', importSave);
 
 for (const key of ['modelMode','reasoningEffort','proseLength']) { $(key).value = settings[key]; $(key).addEventListener('change', e => { settings[key] = e.target.value; persistSettings(); }); }
 $('accessToken').value = settings.accessToken || ''; $('accessToken').addEventListener('change', e => { settings.accessToken = e.target.value.trim(); persistSettings(); });
-for (const key of ['adultMode','proReasoning','demoMode','showEmotionDebug','developerMode']) { const el=$(key); if (!el) continue; el.checked = Boolean(settings[key]); el.addEventListener('change', e => { settings[key] = e.target.checked; persistSettings(); if(key==='developerMode') updateDeveloperUi(); }); }
+for (const key of ['adultMode','proReasoning','demoMode','showEmotionDebug','developerMode']) { const el=$(key); if (!el) continue; el.checked = Boolean(settings[key]); el.addEventListener('change', e => { settings[key] = e.target.checked; persistSettings(); if(key==='developerMode') { updateDeveloperUi(); renderAll(); } }); }
 $('assetTestBtn').addEventListener('click', testAssets);
 $('debugBtn').addEventListener('click',async()=>{
   renderDebug(); $('debugDialog').showModal();
