@@ -164,24 +164,20 @@ function route(action = '주변의 변화를 살펴본다.', savePatch = {}, mod
 }
 
 const routed = route();
-assert.equal(routed.telemetry.event_director_v2.result, 'WORLD_RESULT_SURFACE');
-assert.equal(routed.telemetry.event_director_v3.result, 'WORLD_RESULT_SURFACE');
-assert.equal(routed.telemetry.event_director_v3.version, '3.0');
-assert.equal(routed.telemetry.event_director_v3.weighted_core_version, '2.1');
-assert.equal(routed.telemetry.event_director_v2.occurrence_id, undefined, 'a surfaced fact must not start a new event occurrence');
-assert.ok(routed.telemetry.selected_npcs.includes('lena'), 'the selected result NPC canon must be routed');
-assert.match(routed.params.input, /EVENT DIRECTOR V3 — PUBLIC WORLD RESULT SURFACING/);
-assert.match(routed.params.input, /GUARDS=ONE_TRACE\|NO_OUTCOME_INVENTION\|NO_META_LOG\|NO_TELEPORT\|NO_PC_KNOWLEDGE\|NO_PC_CONTROL/);
-assert.match(routed.params.input, /PUBLIC_FACT=마법과 정오 연구회 일정 종료가 공개적으로 확인됨/);
-assert.match(routed.params.input, /TURN_PLAN=user-action>director-event/);
-assert.equal(routed.telemetry.scene_orchestration.secondary, 'director-event');
+assert.equal(routed.telemetry.event_director_v2, null);
+assert.equal(routed.telemetry.event_director_v3, null);
+assert.equal(routed.telemetry.scene_orchestration, null);
+assert.ok(routed.telemetry.selected_npcs.includes('lena'), 'a Named NPC attached to the current public fact receives a packet');
+assert.match(routed.params.input, /"kind":"public-world-result"/);
+assert.match(routed.params.input, /마법과 정오 연구회 일정 종료가 공개적으로 확인됨/);
+assert.doesNotMatch(routed.params.input, /EVENT DIRECTOR|GUARDS=|PUBLIC_FACT=|TURN_PLAN/);
 const pressureRouted = route(`주변의 변화를 자세히 살펴본다. ${'긴 맥락을 확인한다. '.repeat(300)}`, {
   routerFeedback: { routerVersion: '1.5.6-hf1', profile: 'routine-17k-v154', lastInputTokens: 99999 },
 });
 assert.equal(pressureRouted.telemetry.adaptive_scale, .76);
 assert.ok(pressureRouted.params.input.length <= 6840, `result surfacing exceeded the minimum routine budget: ${pressureRouted.params.input.length}`);
-assert.match(pressureRouted.params.input, /GUARDS=ONE_TRACE\|NO_OUTCOME_INVENTION\|NO_META_LOG\|NO_TELEPORT\|NO_PC_KNOWLEDGE\|NO_PC_CONTROL/, 'all result guards must survive minimum routing pressure');
-assert.match(pressureRouted.params.input, /PUBLIC_FACT=마법과 정오 연구회 일정 종료가 공개적으로 확인됨/, 'the exact confirmed fact must survive minimum routing pressure');
+assert.match(pressureRouted.params.input, /마법과 정오 연구회 일정 종료가 공개적으로 확인됨/, 'the exact confirmed fact must survive minimum routing pressure');
+assert.doesNotMatch(pressureRouted.params.input,/GUARDS=|TURN_PLAN|EVENT DIRECTOR/);
 
 assert.notEqual(route('그 제안을 받아들이면 어떻게 될까?').telemetry.event_director_v2?.result, 'WORLD_RESULT_SURFACE', 'direct questions keep answer-only sovereignty');
 assert.notEqual(route('상대를 공격한다.').telemetry.event_director_v2?.result, 'WORLD_RESULT_SURFACE', 'combat fixed flow stays ahead of result surfacing');
@@ -199,13 +195,14 @@ const goalPriority = route('주변의 변화를 살펴본다.', {
   sceneRuntime: { participants: ['artemis'], momentum: {} },
   npcInnerStates: { artemis: { active_goal: activeGoal } },
 });
-assert.equal(goalPriority.telemetry.event_director_v2.result, 'PRESENT_NPC_GOAL_TICK', 'an eligible present-NPC goal remains ahead of a background result');
+assert.equal(goalPriority.telemetry.event_director_v2, null);
+assert.match(goalPriority.params.input,/"current_goal":"PC의 훈련 태도를 직접 확인한다\."/);
 
 const [dueHook] = materializeDelayedConsequences({
   rows: [{ event_name: '교수 호출', target_bucket: 'active', delay_minutes: 10, reason: '공개 평가의 후속 확인', secret_level: 0 }],
   world: { date: '1285-03-01', time: '14:00' }, turnNumber: 8,
 });
-assert.equal(route('주변의 변화를 살펴본다.', { hooks: [dueHook] }).telemetry.event_director_v2.result, 'EVENT_CONSEQUENCE_DUE', 'a due causal consequence remains ahead of result surfacing');
+assert.ok(route('주변의 변화를 살펴본다.', { hooks: [dueHook] }).telemetry.hard_event_facts?.event_consequence_id, 'a due causal consequence remains a hard fact');
 assert.notEqual(route('', {}, 'auto').telemetry.event_director_v2?.result, 'WORLD_RESULT_SURFACE', 'AUTO keeps its existing fixed-flow guard');
 assert.notEqual(route('[LUMENSIA V1.5.6 CONTINUE]', {}, 'continue').telemetry.event_director_v2?.result, 'WORLD_RESULT_SURFACE', 'CONTINUE stays frozen');
 assert.notEqual(route('설정 질문', {}, 'meta').telemetry.event_director_v2?.result, 'WORLD_RESULT_SURFACE', 'META stays outside world mutation');
@@ -224,7 +221,7 @@ const adapter = readFileSync('api/chat-router.js', 'utf8');
 const health = readFileSync('api/health.js', 'utf8');
 assert.equal((adapter.match(/coreHandler\(/g) || []).length, 1, 'Event Director V3 must preserve one canonical core call');
 assert.match(adapter, /world_result_surface:worldResultSurface/, 'the checkpoint must stay under the existing sceneRuntime root');
-assert.match(adapter, /event_director_v3_enabled:true/);
+assert.match(adapter, /event_director_v3_enabled:false/);
 assert.match(health, /version: '0\.8\.7'/);
 assert.match(health, /eventDirector: 'V3 public world-result surfacing/);
 

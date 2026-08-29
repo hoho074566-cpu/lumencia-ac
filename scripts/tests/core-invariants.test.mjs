@@ -15,7 +15,7 @@ assert.match(chat, /prompt_cache_key\s*:/, 'prompt cache key is missing');
 assert.match(chat, /prompt_cache_retention:\s*['"]24h['"]/, 'prompt cache retention changed');
 assert.match(adapter, /if\(mode==='continue'\)\{[\s\S]*?lockContinueTurn\(data\.turn\)/, 'CONTINUE adapter freeze is missing');
 assert.match(adapter, /function lockContinueTurn\(turn\)[\s\S]*?state_delta\s*=\s*emptyStateDelta\(\)[\s\S]*?emotion_updates\s*=\s*\[\][\s\S]*?cg_id\s*=\s*null[\s\S]*?intervention:'none'/, 'CONTINUE state, emotion, CG, and Director freeze changed');
-assert.match(adapter, /pipeline:'continue-stable-v156',stages:1/, 'CONTINUE must retain its single-stage adapter pipeline');
+assert.match(adapter, /pipeline:incoming0\.qualityPipeline===false\?'single-writer-p3-pr01r2':'single-pass-p3-pr01r2',stages:1/, 'CONTINUE must retain the R2 single-Writer adapter pipeline');
 assert.equal((adapter.match(/coreHandler\(/g) || []).length, 1, 'stable adapter must keep one canonical coreHandler call site');
 
 const expectedBudgets = [

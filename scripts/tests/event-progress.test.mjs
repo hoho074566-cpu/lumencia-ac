@@ -134,7 +134,9 @@ assert.match(router,/if\(mode==='continue'\)[\s\S]*lockContinueTurn\(data\.turn\
 assert.equal((router.match(/await runCore\(/g)||[]).length,1,'adapter retains one canonical model-call site');
 
 const chat=readFileSync('api/chat.js','utf8');
-assert.match(chat,/eventProgress === null \? null : undefined/,'sanitization must not convert malformed metadata into terminal null');
+const turnSchemaSource=chat.slice(chat.indexOf('const TurnSchema'),chat.indexOf('// ===== END schema.js'));
+assert.doesNotMatch(turnSchemaSource,/event_progress:/,'internal event progress must not be requested from the Writer');
+assert.match(chat,/turn\.event_progress = null/,'server-owned compatibility output must neutralize Writer event authority');
 assert.match(chat,/\[PLAYER ACTION COMMIT\][\s\S]*C1\./,'PLAYER ACTION COMMIT remains authoritative');
 assert.match(chat,/store:\s*false/,'store:false remains enabled');
 assert.match(chat,/prompt_cache_key/,'prompt cache remains enabled');

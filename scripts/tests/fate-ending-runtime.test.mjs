@@ -129,7 +129,7 @@ const divider='='.repeat(20);
 const routed=routeOpenAIParams({
   instructions:`===== CHARACTER REGISTRY =====\nartemis=아르테미스\n===== WORLD CANON =====\n${divider}\nPUBLIC\n${divider}\nWorld.\n===== NPC CANON =====\n${divider}\n아르테미스\n${divider}\nNPC.\n===== NPC SPEECH =====\n${divider}\n아르테미스\n${divider}\nSpeech.\n===== OPTIONAL ADULT / INTIMACY SPEECH LAYER =====\nNone.\n===== PC SYSTEM =====\n${divider}\nPC\n${divider}\nSystem.`,
   input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}',
-},{incoming:{action:'마지막 학기를 마치고 졸업식을 끝까지 진행한다.',saveState:{id:'run-1',turnNumber:200,world:{date:'1288-02-20',time:'11:00',location:'졸업식장'},pc:{name:'테스트',department:'기사과'},sceneRuntime:{participants:['artemis']},scheduleContext:{due:[],upcoming:[]}},recentTurns:[]},mode:'game'});
+},{incoming:{action:'마지막 학기를 마치고 졸업식을 끝까지 진행한다.',saveState:{id:'run-1',turnNumber:200,world:{date:'1288-02-20',time:'11:00',location:'졸업식장'},pc:{name:'테스트',department:'기사과'},flags:{majorScene:true},sceneRuntime:{participants:['artemis']},scheduleContext:{due:[],upcoming:[]}},recentTurns:[]},mode:'game'});
 assert.match(routed.params.instructions,/FATE ENDING RUNTIME V1/,'normal routed gameplay must retain the canonical Ending contract');
 
 const app=readFileSync('app.js','utf8');

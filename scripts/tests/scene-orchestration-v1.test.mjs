@@ -212,9 +212,8 @@ assert.deepEqual(observed.observed_axes, ['location', 'time', 'relationship', 'g
 assert.deepEqual(observed.effect_axes, ['relationship', 'growth']);
 assert.equal(observed.actual_delta_score, 4);
 
-assert.match(contextRouter, /MULTI-SYSTEM SCENE ORCHESTRATION V1/, 'the cross-system plan must live in reserved routed context');
-assert.match(contextRouter, /sceneOrchestrationActionFrame\(orchestration\)/, 'the final action frame must repeat the compact arbitration result after lower-priority authority blocks');
-assert.match(contextRouter, /scene_orchestration:built\.orchestration/, 'route telemetry must expose the exact pre-response orchestration plan');
+assert.doesNotMatch(contextRouter.slice(contextRouter.indexOf('function buildInput')), /MULTI-SYSTEM SCENE ORCHESTRATION V1/, 'cross-system plans must not enter the Writer packet');
+assert.match(contextRouter, /scene_orchestration:null/, 'route telemetry must expose removal of Writer orchestration authority');
 assert.match(adapter, /deriveSceneOrchestrationState/, 'the stable adapter must persist bounded post-response orchestration evidence');
 assert.match(adapter, /orchestration:sceneOrchestration/, 'the compact orchestration state must remain inside the existing sceneRuntime root');
 assert.match(health, /sceneOrchestration:/, 'health must advertise the active cross-system arbitration layer');
@@ -248,7 +247,7 @@ Resolve.`;
 const routed = routeOpenAIParams(
   { instructions, input: '===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}' },
   { incoming: {
-    action: `연무장을 돌아다닌다. ${'긴 행동 '.repeat(1500)}`,
+    action: `연무장을 돌아다닌다. ${'긴 행동 '.repeat(1500)}`.slice(0,5000),
     saveState: {
       turnNumber: 8,
       world: { location: '연무장' },
@@ -262,10 +261,9 @@ const routed = routeOpenAIParams(
 );
 assert.equal(routed.telemetry.adaptive_scale, .76);
 assert.ok(routed.params.input.length <= 6840, `orchestration authority exceeded the adaptive routine budget: ${routed.params.input.length}`);
-assert.match(routed.params.input, /===== MULTI-SYSTEM SCENE ORCHESTRATION V1 =====/);
-assert.match(routed.params.input, /TURN_PLAN=user-action>present-npc-goal/);
-assert.equal(routed.telemetry.scene_orchestration.primary, 'user-action');
-assert.equal(routed.telemetry.scene_orchestration.secondary, 'present-npc-goal');
+assert.doesNotMatch(routed.params.input, /MULTI-SYSTEM SCENE ORCHESTRATION|TURN_PLAN|NEXT_ACTION/);
+assert.equal(routed.telemetry.scene_orchestration, null);
+assert.match(routed.params.input,/"current_goal":"신입생의 기본기를 확인한다"/,'the present Named NPC keeps a factual current goal without a prose plan');
 
 const routedNamedAppointment=routeOpenAIParams(
   {instructions,input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}'},
@@ -275,8 +273,8 @@ const routedNamedAppointment=routeOpenAIParams(
     recentTurns:[],
   },mode:'game'},
 );
-assert.equal(routedNamedAppointment.telemetry.scene_orchestration.secondary,'world-response','the routed orchestration plan must receive canonical labels parsed from the registry');
-assert.equal(routedNamedAppointment.telemetry.scene_orchestration.trigger_minutes,null,'the routed requested appointment must not become its own stop boundary');
+assert.equal(routedNamedAppointment.telemetry.scene_orchestration,null);
+assert.doesNotMatch(routedNamedAppointment.params.input,/TURN_PLAN|trigger_minutes|completion recipe/);
 
 const suppressedDirector = routeOpenAIParams(
   { instructions, input: `===== TURN OPTIONS =====
@@ -308,14 +306,10 @@ ROUTINE_STREAK=3 / EVENT_GAP=10 / CHOICE_GAP=3 / CROSS_DEPT_GAP=3
     recentTurns: [],
   }, mode: 'game' },
 );
-assert.equal(suppressedDirector.telemetry.event_director_v2.result, 'NPC_EVENT',
-  `the regression must contain a real competing Director cameo: ${JSON.stringify(suppressedDirector.telemetry.event_director_v2)}`);
-assert.equal(suppressedDirector.telemetry.scene_orchestration.secondary, 'active-event');
-assert.ok(suppressedDirector.telemetry.scene_orchestration.suppressed.includes('director-event'));
+assert.equal(suppressedDirector.telemetry.event_director_v2,null);
+assert.equal(suppressedDirector.telemetry.scene_orchestration,null);
 assert.ok(!suppressedDirector.telemetry.selected_npcs.includes('mirabelle'), 'a suppressed Director candidate must not displace active-event context selection');
-assert.match(suppressedDirector.params.input, /RESULT=SUPPRESSED_BY_SCENE_ORCHESTRATION/);
-assert.match(suppressedDirector.params.input, /BLOCK=director-event; EFFECT_ONLY/);
-assert.doesNotMatch(suppressedDirector.params.input, /SELECTED=mirabelle/,
+assert.doesNotMatch(suppressedDirector.params.input, /RESULT=|BLOCK=director-event|SELECTED=mirabelle/,
   'the lower-priority selected cameo must not remain as a contradictory routed instruction');
 
 const autoBoundaryRouted = routeOpenAIParams(
@@ -326,14 +320,14 @@ const autoBoundaryRouted = routeOpenAIParams(
     recentTurns: [],
   }, mode: 'auto' },
 );
-assert.equal(autoBoundaryRouted.telemetry.scene_orchestration.primary, 'player-boundary', 'AUTO must preserve an unanswered player boundary');
-assert.match(autoBoundaryRouted.params.input, /TURN_PLAN=player-boundary; ORDER=stop; MAX_DRIVERS=0/);
+assert.equal(autoBoundaryRouted.telemetry.scene_orchestration, null);
+assert.doesNotMatch(autoBoundaryRouted.params.input, /TURN_PLAN|ORDER=stop|MAX_DRIVERS/);
 
 const continueRouted = routeOpenAIParams(
   { instructions, input: '===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}' },
   { incoming: { action: '[LUMENSIA V1.5.6 CONTINUE]', saveState: { world: { location: '학생회실' }, pc: { name: '아리아' }, sceneRuntime: {} }, recentTurns: [] }, mode: 'continue' },
 );
-assert.equal(continueRouted.telemetry.scene_orchestration.primary, 'frozen', 'CONTINUE must route a frozen cross-system plan');
-assert.match(continueRouted.params.input, /TURN_PLAN=frozen; ORDER=freeze; MAX_DRIVERS=0/);
+assert.equal(continueRouted.telemetry.scene_orchestration, null);
+assert.doesNotMatch(continueRouted.params.input, /TURN_PLAN|ORDER=freeze|MAX_DRIVERS/);
 
 console.log('PASS Multi-System Scene Orchestration V1 priority, chaining, sovereignty, budget, persistence, and one-call regressions');

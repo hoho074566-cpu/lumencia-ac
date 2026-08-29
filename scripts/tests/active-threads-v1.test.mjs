@@ -129,7 +129,8 @@ guide=가이드
 `;
 const input = '===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}';
 const routed = routeOpenAIParams({ instructions, input }, { incoming: { action: '주변을 살펴본다.', saveState: save({ activeEvents: ['입학식 준비'] }), recentTurns: [] }, mode: 'game' });
-assert.match(routed.params.input, /===== ACTIVE THREADS V1 =====/, 'the derived view must reach the existing canonical model context');
+assert.doesNotMatch(routed.params.input, /===== ACTIVE THREADS V1 =====/, 'the full internal thread view must not become a prose plan');
+assert.match(routed.params.input, /"threads":\[\]/, 'only currently relevant thread facts may enter the Thin Scene Packet');
 assert.equal(routed.telemetry.active_threads_v1?.version, '1.0', 'router telemetry must expose the active-thread version');
 assert.equal(routed.telemetry.active_threads_v1?.count, 1, 'router telemetry must report the bounded thread count');
 

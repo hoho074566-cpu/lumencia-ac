@@ -122,9 +122,9 @@ const routed=routeOpenAIParams(
   {instructions,input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}'},
   {incoming:{action:'One과 Two의 대화를 지켜본다.',saveState:{turnNumber:10,world:{location:'academy'},sceneRuntime:{participants:['p1','p2']},npcInnerStates:{p1:{npc_relationships:{p2:{affinity:15,trust:-3,status:'경쟁',reason:'공개 대련',updated_turn:10,history:[{turn:10,reason:'공개 대련'}]},p3:{affinity:70,trust:70,status:'동맹',reason:'현재 무관',updated_turn:99,history:[]}}}}},recentTurns:[]},mode:'game'},
 );
-assert.match(routed.params.input,/"npc_relationships":\{"p2":\{"affinity":15,"trust":-3,"status":"경쟁"/,'bounded directional relationship state must reach the routed model context');
+assert.match(routed.params.input,/"relationships_to_present_characters":\{"p2":\{"affinity":15,"trust":-3,"status":"경쟁"/,'bounded directional relationship state must reach the selected character packet');
 assert.doesNotMatch(routed.params.input,/"p3":\{"affinity":70/,'relationship links to an unrouted NPC must not enter model context');
-assert.match(routed.params.instructions,/공동 장면에 있었다는 이유만으로 관계를 바꾸지 않는다/,'routed prompt must require causal evidence instead of co-presence');
+assert.doesNotMatch(routed.params.instructions,/공동 장면에 있었다는 이유만으로/,'relationship validation policy must not become prose choreography');
 
 const relationshipDelta=deriveSceneDelta({
   action:'둘의 대화를 지켜본다.',

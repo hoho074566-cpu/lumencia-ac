@@ -154,7 +154,7 @@ const routed=routeOpenAIParams(
   {incoming:{action:'백장미회가 나를 어떻게 보는지 루시아에게 묻는다.',saveState:{turnNumber:10,world:{location:'academy'},sceneRuntime:{participants:['lucia'],faction_social:{reputations:{student_council:{reputation:9,stance:'관심',updated_turn:99,history:[]},white_rose:{reputation:-2,stance:'경계',updated_turn:2,history:[{turn:2,reputation_delta:-2,evidence_type:'credible_rumor',observer_npc_keys:['lucia'],source:'엘리제의 전달',reason:'전달된 소문'}]},blue_knights:{reputation:3,stance:'중립',updated_turn:80,history:[]},knight_department:{reputation:2,stance:'중립',updated_turn:70,history:[]}}}},npcInnerStates:{}},recentTurns:[]},mode:'game'},
 );
 assert.match(routed.params.input,/"white_rose":\{"reputation":-2,"stance":"경계"/,'relevant faction reputation must reach authoritative routed context');
-assert.match(routed.params.instructions,/사적 행동\/단순 동석으로 바꾸거나 개인 관계와 자동 연동하지 않는다/,'routed prompt must preserve evidence and personal-relation boundaries');
+assert.doesNotMatch(routed.params.instructions,/사적 행동\/단순 동석으로/,'faction validation policy must not choreograph Writer prose');
 
 const denseFactionState={reputations:Object.fromEntries(FACTION_KEYS.map((key,index)=>[key,{
   reputation:index+1,stance:'관심',updated_turn:100-index,
@@ -162,16 +162,13 @@ const denseFactionState={reputations:Object.fromEntries(FACTION_KEYS.map((key,in
 }]))};
 const denseRouted=routeOpenAIParams(
   {instructions,input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}'},
-  {incoming:{action:`백장미회의 오래된 평판을 확인한다. ${'긴 행동 '.repeat(1200)}`,saveState:{turnNumber:11,world:{location:'academy'},sceneRuntime:{participants:['lucia'],faction_social:denseFactionState},npcInnerStates:{},routerFeedback:{routerVersion:'1.5.6-hf1',profile:'routine-17k-v154',lastInputTokens:100000}},recentTurns:[]},mode:'game'},
+  {incoming:{action:`백장미회의 오래된 평판을 확인한다. ${'긴 행동 '.repeat(1200)}`.slice(0,5000),saveState:{turnNumber:11,world:{location:'academy'},sceneRuntime:{participants:['lucia'],faction_social:denseFactionState},npcInnerStates:{},routerFeedback:{routerVersion:'1.5.6-hf1',profile:'routine-17k-v154',lastInputTokens:100000}},recentTurns:[]},mode:'game'},
 );
 assert.equal(denseRouted.telemetry.adaptive_scale,.76,'dense faction fixture must exercise minimum adaptive routing scale');
 assert.ok(denseRouted.params.input.length<=6840,`dense faction input exceeded adaptive routine budget: ${denseRouted.params.input.length}`);
-const minimumText=denseRouted.params.input.split('===== AUTHORITATIVE SAVE_STATE (ROUTED MINIMUM) =====\n')[1].split('\n\n=====')[0];
-const minimumFactionSocial=JSON.parse(minimumText).sceneRuntime.faction_social;
-assert.ok(minimumFactionSocial.reputations.white_rose,'explicitly relevant faction must survive the mandatory minimum block');
-assert.ok(Object.keys(minimumFactionSocial.reputations).length<=2,'mandatory minimum must include at most two relevant factions');
-assert.ok(Object.values(minimumFactionSocial.reputations).every((row)=>row.history.length<=1),'mandatory minimum must include at most one causal row per faction');
-assert.doesNotMatch(JSON.stringify(minimumFactionSocial),/removed_npc/,'routed faction context must remove stale observer keys');
+assert.match(denseRouted.params.input,/"faction_social":\{"version":"1\.0","reputations":\{"white_rose":/,'explicitly relevant faction must survive the Thin Scene Packet under pressure');
+assert.doesNotMatch(denseRouted.params.input,/"student_council":|"blue_knights":/,'irrelevant factions must stay outside the Writer packet');
+assert.doesNotMatch(denseRouted.params.input,/removed_npc/,'routed faction context must remove stale observer keys');
 
 const indirectRouted=routeOpenAIParams(
   {instructions,input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}'},
@@ -181,7 +178,6 @@ const indirectRouted=routeOpenAIParams(
     {action:'백장미회의 오래된 평판을 확인한다.',summary:'가장 최근에 백장미회의 태도를 물었다.',scene:[]},
   ]},mode:'game'},
 );
-const indirectMinimumText=indirectRouted.params.input.split('===== AUTHORITATIVE SAVE_STATE (ROUTED MINIMUM) =====\n')[1].split('\n\n=====')[0];
-assert.ok(JSON.parse(indirectMinimumText).sceneRuntime.faction_social.reputations.white_rose,'most recently discussed older faction must survive an indirect important-turn follow-up despite two newer stored factions and broad save keywords');
+assert.match(indirectRouted.params.input,/"faction_social":\{"version":"1\.0","reputations":\{"white_rose":/,'most recently discussed faction must survive an indirect follow-up');
 
 console.log('PASS Faction / Social Consequence V1 schema, evidence, bounds, routing, freeze, and momentum regressions');

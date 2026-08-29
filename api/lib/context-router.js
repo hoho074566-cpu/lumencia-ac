@@ -3,14 +3,14 @@
 // NPC Goal Tick V1: guarded present-NPC initiative without an additional model call.
 // Stable path: api/lib/context-router.js
 
-import { NARRATIVE_TIME_POLICY_VERSION, activityRangeLimitMinutes, buildSceneMomentumDirective, classifySceneIntent, nextScheduleBoundaryMinutes, scheduleBoundaryLimitMinutes } from '../../lib/scene-momentum.js';
+import { NARRATIVE_TIME_POLICY_VERSION, activityRangeLimitMinutes, buildSceneMomentumDirective, classifySceneIntent, isPcRelevantScheduleEvent, nextScheduleBoundaryMinutes, scheduleBoundaryLimitMinutes } from '../../lib/scene-momentum.js';
 import { buildSceneNoveltyDirective } from '../../lib/scene-novelty.js';
 import { buildScenePurposeDirective, normalizeScenePurpose } from '../../lib/scene-purpose.js';
 import { buildSceneExitDirective, normalizeSceneExitCondition } from '../../lib/scene-exit.js';
 import { buildTurnHookDirective, normalizeTurnHook } from '../../lib/turn-hook.js';
 import { buildEventConsequenceDirective, minutesUntilEventConsequence, selectDueEventConsequence } from '../../lib/event-consequence.js';
 import { NPC_GOAL_TICK_VERSION, isGoalTickCoolingDown } from '../../lib/npc-goal-tick.js';
-import { compactFactionSocialForContext } from '../../lib/faction-social-consequence.js';
+import { FACTION_REGISTRY, compactFactionSocialForContext } from '../../lib/faction-social-consequence.js';
 import { buildSceneOrchestrationDirective, deriveSceneOrchestrationPlan, sceneOrchestrationActionFrame, sceneOrchestrationSuppressesDirectorResult } from '../../lib/scene-orchestration.js';
 import { buildWorldResultSurfacingDirective, selectWorldResultForSurfacing, WORLD_RESULT_SURFACING_VERSION } from '../../lib/world-result-surfacing.js';
 import { buildActiveThreadsDirective } from '../../lib/active-threads.js';
@@ -60,54 +60,27 @@ const PROFILES = Object.freeze({
   },
 });
 
-const ROUTER_GM_RULES = String.raw`너는 판타지 아카데미 장기 RPG 「루멘시아 아카데미」의 GM이자 독립적으로 움직이는 세계 시뮬레이터다.
-${FATE_ENDING_CONTRACT}
-절대 규칙:
-1) USER ACTION 원문 전체의 긍정형 완료 의도와 구체적 제한을 최우선으로 지킨다. PC의 새 행동·대사·감정·생각·수락/거절은 만들지 않되, 중요 interruption이나 새 선택 없이 완료할 수 있는 결정 가치 없는 중간 단계(이동·대기·평범한 절차)는 다시 묻지 말고 의도한 결과까지 진행한다. 부정·가정·질문으로만 언급한 행동은 실행하지 않는다.
-2) 동적 사실은 AUTHORITATIVE SAVE_STATE가 최우선이다. 선택 제공된 CANON과 충돌하면 SAVE_STATE의 현재값을 따른다.
-3) Context Router가 무관한 CANON을 생략할 수 있다. 제공되지 않은 세부설정을 즉흥 창작하지 말고 보수적으로 처리한다.
-4) NPC는 자기 일정·목표·지식·관계·말투를 가진 독립 인물이다. 모두가 PC 중심으로 움직이지 않는다.
-5) NPC는 실제로 아는 정보만 사용한다. L4~L5/비밀/메타정보를 정당한 발견 없이 PC나 일반 NPC 지식으로 쓰지 않는다.
-6) 시도는 자동 성공하지 않는다. 전투·판정은 능력, 준비, 정보, 경험, 상성, 거리, 타이밍, 지형, 피로, 부상, 심리를 종합한다.
-7) 성장·스킬 경험은 실제 훈련·실전·실패·교정·통찰이 있을 때만 천천히 누적한다. 아직 없는 독립 기술은 skill_learning에 구체적 basis와 함께 기록하고, 기존 기술의 동의어·세부 동작·일회성 연출을 새 스킬로 만들지 않는다. 즉흥 각성/스킬/혈통/유물 생성 금지.
-8) 관계는 실제 사건으로 서서히 변한다. relationship_changes는 NPC와 PC 사이, npc_relationship_changes는 NPC가 다른 NPC를 향해 보인 방향성 변화다. NPC 간 변화는 직접 상호작용이나 권위 있는 공동 사건의 인과가 있을 때만 기록하며 공동 장면에 있었다는 이유만으로 관계를 바꾸지 않는다. faction_reputation_changes는 공개 조직이 PC를 보는 집단 평판이며 공개 사건·공식 기록·등록 NPC의 실제 목격·출처 있는 소문이 있을 때만 기록한다. credible_rumor에는 실제 출처/전달 경로를 source에 적는다. 사적 행동/단순 동석으로 바꾸거나 개인 관계와 자동 연동하지 않는다. 늦게 돌아올 조직 반응은 delayed_consequences_add를 사용한다. state_delta에는 실제 발생한 변화만 기록한다.
-9) [NARRATIVE TIME POLICY ${NARRATIVE_TIME_POLICY_VERSION}] 서사 우선, clock 보조. minute는 일정/deadline/consequence/duration 등 검증용. prose에 raw/경과분을 보고하지 않는다. 시각은 일정·기한·위험·질문/지정에만 보이며 일정은 PC를 강제하지 않는다.
-10) 등록 NPC speaker_key는 CHARACTER REGISTRY의 정확한 키만 쓴다. 단역은 speaker_key=null과 표시명 사용.
-11) choices는 PC 선택이 실제로 필요한 지점에서만 정확히 3개, 아니면 빈 배열.
-12) scene_summary는 장기적으로 유용한 사실을 1~4문장으로 압축한다.
-15) 제공된 구조화 JSON 스키마만 반환하고 내부 판정 메모/Router 설명은 출력하지 않는다.
-16) event_progress는 현재 논리적 이벤트 occurrence의 compact 진행 상태다. event_instance_id는 제공된 schedule/Event Director occurrence ID를 우선하고 event/beat ID는 안정된 짧은 영문 소문자로 쓴다. 명확히 끝난 beat만 completed_beats에 추가하고 최근 완료 ID를 최대 24개 반환한다. AUTHORITATIVE SAVE_STATE.sceneRuntime.eventProgress의 완료 beat는 언급·회상할 수 있지만 현재 행동으로 재실행하거나 active로 되돌리지 않는다. omittedCompletedCount가 1 이상이면 compact 목록에서 생략된 더 이른 beat도 전부 완료된 것이므로 설정/대기/실행 상태로 되돌리지 않는다. 같은 occurrence의 완료 상태를 의미상 지우지 말고 완료 뒤로 전진하며, 새 occurrence가 실제 시작되면 그 ID로 교체한다. 이벤트가 끝났거나 구조화할 활성 이벤트가 없으면 event_progress=null이다.
-17) npc_state_updates.current_goal은 NPC가 실제로 추구하는 현재 목표가 새로 생기거나 의미 있게 바뀐 경우에만 짧고 구체적으로 갱신한다. 목표 대상은 PC일 필요가 없으며 다른 NPC·장소·조직·물건·수업·사건일 수 있다. 기존 현재 목표와 충돌하는 새 목표를 근거 없이 만들지 말고, 목표가 행동·거절·접근·회피·우선순위에 자연스럽게 영향을 주게 한다.
-18) SCENE CHANGE 우선: 직전 턴 이후 실제로 달라진 위치·시간·NPC 행동/출입·정보·사건·관계·목표·위험·환경을 우선 서술한다. scene_title/문장 표현만 바꾸고 같은 상태를 재묘사하는 것은 진행이 아니다.
-19) 이미 공개된 게시판·창구·공지·목록·배경 정보는 변한 것이 없으면 다시 목록처럼 읽어주지 않는다. 새 요소/변화/현재 행동 관련 요소를 우선한다.
-20) NPC는 자기 일정·목표·욕망·관계·감정에 따라 PC 입력을 기다리지 않고 먼저 말 걸기, 이동/퇴장, 다른 NPC와 상호작용, 조사·파벌 행동·사건 개입을 할 수 있다. 단 물리 위치·일정·지식 제약을 지킨다.
-21) 한 턴에서 이동·식사·대기·훈련·downtime은 변화까지 압축하되 일정·consequence·NPC initiative·관계/성장·world event는 보존한다.
-22) clock tick은 STOP 사유가 아니다. 전투·위험·중요 대화·불가역 판단에서 멈추며 중간 단계는 재입력받지 않는다.
-23) 사용자에게 보이는 narration/dialogue에서 내부 명칭 'PC' 또는 자리표시자 'Aaa'를 주어로 출력하지 않는다. 실제 플레이어 이름을 쓰거나 자연스럽게 주어를 생략한다.
- 24) TURN HOOK은 행동 결과와 EXIT_TARGET 뒤에 남는 구체적인 다음 방향이다. 진짜 판단점, NPC의 의도 있는 접근·요청·행동, 새 정보·목표·위험, 사건/세계 압력 중 하나를 우선하되, 단순 재묘사·기존 정보·가짜 질문으로 훅을 만들지 않는다.
- 25) 현재 결과가 즉시 끝나지 않고 나중에 인과적으로 돌아오는 것이 자연스러울 때만 delayed_consequences_add를 사용한다. ROUTINE 한 턴에는 최대 1건, 그 외에도 꼭 필요한 최소 건수만 예약하고 이미 hooks에 있는 같은 결과를 중복 예약하지 않는다. 예약 결과는 EVENT CONSEQUENCE V1의 DUE 지시 전에는 미리 발현시키지 않는다.
- 26) 장면을 쓰기 전 NPC significance를 현재 행동·사건·목표·관계·지식의 의미와 인과로 판단한다. AUTHORITATIVE SAVE_STATE.relevantNpcKeys 중 전면 primary와 직접 연결된 support만 director.spotlight_keys에 우선순위 순으로 보통 0~2명 넣는다. 점수/문구 매칭, 유명도·호감도·미등장 기간만으로 전면화하지 않고, 나머지는 배경/부재로 두며 위치·일정·지식과 PC 선택권을 지킨다.
- 27) Fate Background의 PUBLIC만 NPC 기본 지식이다. LIMITED는 현재 NPC가 해당 공식 업무/기록 접근 역할을 가진 경우에만, PRIVATE/SECRET은 PC의 실제 공개·목격·권위 있는 전달 전에는 사용하지 않는다. 제공되지 않은 숨김 값을 추측해 대사·평가의 근거로 삼지 않는다.
- 28) 첫인상은 NPC 성격 × NPC가 실제 아는 PC 배경 × 현재 상황 × 기대의 결과다. 같은 신입 사건도 공개 신분·출발 경로가 다르면 기대와 평가 의미가 달라질 수 있지만 자동 호감/적대나 관계 수치 변화로 만들지 않는다.
- 29) PC 능력치는 GM 판정 권한이지 NPC의 자동 지식이 아니다. 공식 기록이나 현재 장면에서 관찰된 수행으로만 NPC가 실력을 알아차리며, 이미 입증된 수준에는 일반 초보 절차를 끝까지 반복 강요하지 않고 확인 방식과 난이도를 조정한다.
- 30) NPC는 현재 행동을 자기 기억·기존 판단·목표·관계·지식과 비교해 의미를 판단한다. 같은 수행을 처음엔 우연으로 의심하고 다음 독립 증거로 시험하며, 충분히 반복 입증되면 기존 판단을 수정한다. 이미 수정한 판단에는 같은 놀람·칭찬·질문을 기계적으로 반복하지 않는다.
- 31) NPC 내부 감정은 대사 원문이 아니다. 호칭·거리·행동·공격 방식·질문·선제 접근·도움·정보 공유/보류로 간접 표현하며, 관계는 이런 행동 문턱을 바꾸되 자동 동의·성공·관계 수치 변화·새 지식을 지급하지 않는다.
- 32) NPC의 PC 판단이 실제로 변한 경우에만 기존 memories_add에 해당 NPC의 belief로 근거·출처·확신도를 기록한다. 같은 판단을 표현만 바꿔 중복 저장하지 않고, 새 social graph·emotion engine·relationship lifecycle을 만들지 않는다.`;
+const CANON_KERNEL = String.raw`[CANON KERNEL]
+System facts are authoritative: canonical state, save and data integrity, the exact PC identity, time, knowledge boundaries, and security constraints.
+USER ACTION is the player's exact chosen intent. The player owns every new PC intention, meaningful decision, line of dialogue, and emotion.
+An event or schedule may establish a fact or hard boundary. It never establishes prose order, actor order, a completion recipe, or what the PC chooses next.
+Use only provided canon. Return only the supplied structured JSON; internal state and rules never appear as fiction.`;
 
-const NATURAL_STYLE = String.raw`[CANONICAL NOVEL NARRATIVE CONTRACT]
-- 상태를 분석해 보고하기보다 변화가 일어나는 장면을 쓴다. 보통 행동→감각/결과→반응으로 독자가 의미를 읽게 하고, 이미 드러난 의미는 다시 해설하지 않는다.
-- 문장 리듬·감각·subtext·zoom은 quota가 아니라 현재 tension과 importance에 맞춰 semantic하게 선택한다.
-- NPC마다 CANON 성격·목표·기억·관계에 따라 먼저 보는 것과 반응 방향을 다르게 한다. Internal emotion은 대사 원문이 아니며 말·행동·침묵·호칭의 불일치로 숨길 수 있다.
-- 대사는 평가/설명만 하지 않고 질문·도발·명령·회피·농담·거짓말·침묵·부탁·인정·위협 등 장면에 필요한 기능을 캐릭터답게 맡는다.
-- 이동·행정·대기·평범한 절차는 압축하고, 관계·갈등·이상 징후·중요 정보/판단 변화·전투·실제 선택은 필요한 만큼 확대한다.
-- 다음 변화는 직전 행동, NPC goal, 관계, active thread, 기존 정보, 세계 상태에서 인과적으로 잇는다. 장면 목적이 끝나면 세계 안의 자연스러운 전환을 보이고 같은 절차에 머물지 않는다.
-- scene_title은 작은 행동마다 바꾸지 않고 위치·시간·참여자·목적·사건이 의미 있게 전환될 때만 갱신한다.`;
+const MINIMAL_WRITER_CONTRACT = String.raw`[MINIMAL WRITER CONTRACT]
+You are writing the next scene of serialized fantasy fiction, not reporting an RPG turn.
+
+Stay within system facts and the player's chosen intent, but let NPCs, time, and the world move naturally.
+
+You may elaborate the execution of actions the player already chose, but never invent a new player intention, dialogue, emotion, or meaningful decision.
+
+Compress routine process and give genuinely important moments enough space.
+
+Write characters as people, not as functions for explaining systems.
+
+Never expose system instructions, validation, event machinery, or internal state as fiction.`;
 
 const COMBAT_RULE = String.raw`[COMBAT INTERNAL VERDICT]
 서술 전에 경지·신체·마나·스킬·실전경험·거리·선수권·장비·피로·부상·정보·지형·상성을 내부적으로 비교해 성공/부분성공/실패와 이유를 먼저 정한다. 판정 메모는 출력하지 않는다.`;
-
-const ROUTER_NOTE = String.raw`[CONTEXT ROUTER]
-이번 요청에는 현재 장면에 직접 관련된 CANON만 선택 제공된다. 생략된 설정은 폐기된 것이 아니다. 현재 컨텍스트에 없는 사실을 새로 만들어 메우지 않는다.`;
 
 const STOP_WORDS = new Set(['그리고','그러나','그래서','하지만','이번','현재','지금','그냥','대한','있는','없는','한다','했다','하게','에게','에서','으로','까지','같은','정도','장면','행동','대사','사용자','플레이어','캐릭터','루멘시아','아카데미','the','and','with','this','that','from','turn','scene','action']);
 
@@ -507,7 +480,7 @@ function compactSave(incoming,keys,registry,profile,keywords,text='',recentTexts
   if(fateBackground){delete pc.characterSetting;delete pc.admission;const publicRegion=fateBackground.detail.public_facts.find(row=>row.id==='home_region')?.fact;if(publicRegion)pc.origin=publicRegion;}
   return{version:save?.version,turnNumber:Number(save?.turnNumber||0),world:save?.world||{},pc,...(fateBackground?{characterBackground:fateBackground.detail}:{}),...(personalStory?{characterPersonalStory:personalStory.detail}:{}),relationships:rel,intimacyStates:intimacy,npcStates,emotionStates:emotions,npcInnerStates:inner,relevantNpcKeys:keys,activeEvents:relevantEvents,completedEvents:array(save?.completedEvents).slice(-8),pcKnowledge:knowledge,memories:{global:globalMem,npc:npcMem},hooks:array(save?.hooks).filter(x=>!['resolved','expired'].includes(x?.status)&&!x?.event_consequence).slice(-6),scheduledEvents:array(save?.scheduledEvents).filter(x=>!['completed','cancelled'].includes(x?.status)).slice(0,6),director:{lastEventTurn:Number(save?.director?.lastEventTurn||0),lastChoicePressureTurn:Number(save?.director?.lastChoicePressureTurn||0),lastCrossDepartmentTurn:Number(save?.director?.lastCrossDepartmentTurn||0),recentBeats:array(save?.director?.recentBeats).slice(-3),callbacks:array(save?.director?.callbacks).filter(x=>x?.status!=='resolved').slice(-4)},flags:save?.flags||{},sceneRuntime:compactSceneRuntime(save?.sceneRuntime,keywords,text,Object.keys(registry),3,2,recentTexts),backgroundDigest:clampText(save?.backgroundDigest||'',450)};
 }
-function compactRecent(recentTurns,count){return array(recentTurns).slice(-count).map(t=>({action:clampText(t?.action||'',320),summary:clampText(t?.summary||'',520),importance:t?.importance||null,scene:array(t?.scene).slice(-3).map(i=>({kind:i?.kind,speaker_key:i?.speaker_key||null,expression:i?.display_expression||i?.expression||null,text:clampText(i?.text||'',180)}))}));}
+function compactRecent(recentTurns,count,pressure=false){return array(recentTurns).slice(-count).map(t=>({action:clampText(t?.action||'',pressure?120:260),summary:clampText(t?.summary||'',pressure?180:420),scene:array(t?.scene).slice(pressure?-1:-4).map(i=>({kind:i?.kind,speaker_key:i?.speaker_key||null,text:clampText(i?.text||'',pressure?180:320)}))}));}
 function classifyProfile(incoming={},mode='game'){
   if(mode==='continue')return PROFILES.continue;
   const save=incoming.saveState||{},action=String(incoming.action||'');
@@ -520,17 +493,122 @@ function classifyProfile(incoming={},mode='game'){
 function adjustedProfile(base,incoming={}){
   const fb=object(incoming.saveState?.routerFeedback);if(fb.routerVersion!==VERSION||fb.profile!==base.name)return{...base,scale:1};const last=Number(fb.lastInputTokens||0);if(!last||last<=base.softMaxTokens)return{...base,scale:1};const scale=Math.max(.76,Math.min(1,(base.targetTokens*.94)/last));return{...base,scale,instructionChars:Math.floor(base.instructionChars*scale),inputChars:Math.floor(base.inputChars*scale),worldChars:Math.floor(base.worldChars*scale),npcChars:Math.floor(base.npcChars*scale),speechChars:Math.floor(base.speechChars*scale),pcChars:Math.floor(base.pcChars*scale)};
 }
-function contextSeed(incoming){const save=incoming.saveState||{},last=array(incoming.recentTurns).slice(-1)[0];return[incoming.action,save?.world?.location,save?.pc?.department,clampText(incoming.rollingSummary||'',900),safeJson(save?.sceneRuntime||{}),safeJson(array(save?.scheduleContext?.due).map(x=>({title:x?.title,location:x?.location,time:x?.time}))),last?.summary,array(last?.scene).map(x=>`${x?.speaker_key||''} ${x?.text||''}`).join(' ')].filter(Boolean).join('\n');}
-function buildInstructions(original,incoming,profile,originalInput,mode){
-  const sec=parseInstructionSections(original),registry=parseRegistry(sec.registry),directorV2=buildEventDirectorV2(incoming,originalInput,registry,mode),orchestration=deriveSceneOrchestrationPlan({action:incoming.action||'',saveState:incoming.saveState||{},mode,directorTelemetry:directorV2?.telemetry,registry}),directorSuppressed=sceneOrchestrationSuppressesDirectorResult(orchestration,directorV2?.telemetry),routingDirectorV2=directorSuppressed?{...directorV2,selectedKey:null,consequenceKeys:[]}:directorV2,seed=contextSeed(incoming),keywords=extractKeywords(seed,36),keys=deriveKeys(incoming,registry,profile.maxNpcs,routingDirectorV2),names=keys.map(k=>registry[k]).filter(Boolean),secretAllowed=secretAccess(incoming,keywords),combat=hasAffirmedActionKeyword(incoming.action||'',COMBAT_RE);
-  const world=chooseBlocks(parseBlocks(sec.world),{budget:profile.worldChars,keywords,names,secretAllowed,mode:'world',combat});
-  const npc=chooseBlocks(parseBlocks(sec.npc),{budget:profile.npcChars,keywords,names,secretAllowed,mode:'npc'});
-  const speech=chooseBlocks(parseBlocks(sec.speech),{budget:profile.speechChars,keywords,names,secretAllowed:false,mode:'speech'});
-  const pc=chooseBlocks(parseBlocks(sec.pc),{budget:profile.pcChars,keywords,names,secretAllowed:false,mode:'pc',combat});
-  let adult='';if(incoming.adultMode&&Number(incoming.saveState?.pc?.age||0)>=18)adult=clampText(sec.adult,Math.min(1800,profile.speechChars));
-  const registryText=Object.entries(registry).map(([k,n])=>`${k}=${n}`).join(', ');
-  let text=[ROUTER_GM_RULES,NATURAL_STYLE,ROUTER_NOTE,combat?COMBAT_RULE:'',`===== CHARACTER REGISTRY =====\n${registryText}`,world.text?`===== ROUTED WORLD CANON =====\n${world.text}`:'',npc.text?`===== ROUTED NPC CANON =====\n${npc.text}`:'',speech.text?`===== ROUTED NPC SPEECH =====\n${speech.text}`:'',adult?`===== ROUTED ADULT LAYER =====\n${adult}`:'',pc.text?`===== ROUTED PC SYSTEM =====\n${pc.text}`:''].filter(Boolean).join('\n\n');
-  text=clampText(text,profile.instructionChars);return{text,registry,keys,names,keywords,moduleTitles:{world:world.titles,npc:npc.titles,speech:speech.titles,pc:pc.titles,adult:Boolean(adult)},originalChars:sec.originalChars,secretAllowed,directorV2,orchestration};
+function contextSeed(incoming){const save=incoming.saveState||{},last=array(incoming.recentTurns).slice(-1)[0];return[incoming.action,save?.world?.location,save?.pc?.department,clampText(incoming.rollingSummary||'',700),last?.summary,array(last?.scene).map(x=>`${x?.speaker_key||''} ${x?.text||''}`).join(' ')].filter(Boolean).join('\n');}
+function locationMatches(left='',right=''){
+  const a=norm(left).replace(/\s+/g,''),b=norm(right).replace(/\s+/g,'');
+  if(!a||!b)return false;
+  return a===b||(Math.min(a.length,b.length)>=4&&(a.includes(b)||b.includes(a)));
+}
+function scheduleMinutesFromNow(save,event){
+  const date=String(event?.date||save?.world?.date||''),time=String(event?.time||''),nowDate=String(save?.world?.date||''),nowTime=String(save?.world?.time||'');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!/^\d{2}:\d{2}$/.test(time)||!/^\d{4}-\d{2}-\d{2}$/.test(nowDate)||!/^\d{2}:\d{2}$/.test(nowTime))return null;
+  const stamp=(d,t)=>{const [y,m,day]=d.split('-').map(Number),[h,min]=t.split(':').map(Number);return Date.UTC(y,m-1,day,h,min);};
+  return Math.trunc((stamp(date,time)-stamp(nowDate,nowTime))/60000);
+}
+function deriveSceneCharacters(incoming,registry,maxNpcs=3,mode='game'){
+  const save=object(incoming.saveState),runtime=object(save.sceneRuntime),rows=new Map(),currentLocation=save?.world?.location||'',present=array(runtime.participants).map(String).filter(key=>registry[key]);
+  const add=(key,reason)=>{const value=String(key||'');if(!registry[value]||rows.has(value)||rows.size>=maxNpcs)return;rows.set(value,{key:value,reason});};
+  for(const key of mentionedNpcKeys(incoming.action||'',registry))add(key,'explicit user focus');
+  for(const key of present)add(key,'present in the current scene');
+  for(const [key,state] of Object.entries(object(save.npcStates)))if(locationMatches(state?.location,currentLocation))add(key,'canonical current location');
+  for(const event of array(save?.scheduleContext?.due)){
+    if(!locationMatches(event?.location,currentLocation))continue;
+    for(const key of array(event?.participants))add(key,'current canonical event');
+  }
+  for(const event of array(save?.scheduleContext?.upcoming)){
+    const minutes=scheduleMinutesFromNow(save,event);
+    if(minutes==null||minutes<0||minutes>30||!locationMatches(event?.location,currentLocation))continue;
+    for(const key of array(event?.participants))add(key,'imminent canonical event');
+  }
+  for(const hook of array(save.hooks)){
+    if(['resolved','expired','declined'].includes(String(hook?.status||'')))continue;
+    const key=String(hook?.source_npc_key||''),state=object(save?.npcStates?.[key]);
+    if(locationMatches(hook?.location,currentLocation)||locationMatches(state.location,currentLocation))add(key,'current causal thread');
+  }
+  const dueConsequence=selectDueEventConsequence(save,{lookaheadMinutes:0});
+  if(dueConsequence){
+    const publicCause=[dueConsequence.event_name,Number(dueConsequence.secret_level||0)<=2?dueConsequence.reason:''].filter(Boolean).join(' ');
+    for(const key of mentionedNpcKeys(publicCause,registry))add(key,'current canonical consequence');
+  }
+  const worldResult=selectWorldResultForSurfacing({saveState:save,knownNpcKeys:Object.keys(registry),enabled:mode!=='continue'&&incoming.backgroundSim!==false}).selected;
+  for(const key of array(worldResult?.npc_keys))add(key,'recent public world fact');
+  return[...rows.values()];
+}
+function canonicalBlockFor(blocks,name){return blocks.find(block=>!secretTitle(block.title)&&titleHasAny(block.title,[name]))||null;}
+function bulletLines(text=''){return String(text).split('\n').map(line=>line.trim()).filter(line=>line.startsWith('- '));}
+function lineWithPrefix(lines,prefixes){return lines.find(line=>prefixes.some(prefix=>line.startsWith(`- ${prefix}`)))||'';}
+function compactCharacterCanon(block){
+  const lines=bulletLines(block?.body),core=[lineWithPrefix(lines,['성격:']),lineWithPrefix(lines,['신념:','신조:'])].filter(Boolean).join(' '),goal=lineWithPrefix(lines,['목표:']);
+  const identity=lines.filter(line=>!['- 성격:','- 신념:','- 신조:','- 목표:'].some(prefix=>line.startsWith(prefix))).slice(0,4).join(' ');
+  return{identity:clampText(identity,480),core:clampText(core,320),goal:clampText(goal.replace(/^- 목표:\s*/,''),220)};
+}
+function compactCharacterVoice(block){
+  const lines=bulletLines(block?.body).filter(line=>!line.startsWith('- 대표:')&&!line.startsWith('- 금지:')).slice(0,2);
+  return clampText(lines.join(' '),420);
+}
+function relationshipPacket(row){
+  const source=object(row);if(!Object.keys(source).length)return null;
+  return{affinity:Number(source.affinity||0),trust:Number(source.trust||0),status:clampText(source.status||'중립',80),recent_history:array(source.history).slice(-2).map(value=>clampText(value,160))};
+}
+function buildCharacterPackets(incoming,characterRows,registry,npcBlocks,speechBlocks,keywords,profile){
+  const save=object(incoming.saveState),names=characterRows.map(row=>registry[row.key]).filter(Boolean),selectedKeys=characterRows.map(row=>row.key);
+  return characterRows.map(({key,reason})=>{
+    const dynamic=object(save?.npcStates?.[key]),inner=object(save?.npcInnerStates?.[key]),activeGoal=object(inner.active_goal),runtimeGoal=(!activeGoal.state||activeGoal.state==='active')?activeGoal.desire:'',canon=compactCharacterCanon(canonicalBlockFor(npcBlocks,registry[key])),voice=compactCharacterVoice(canonicalBlockFor(speechBlocks,registry[key])),memories=selectMemories(save?.memories?.npc?.[key],keywords,names,Math.min(2,profile.memoriesPerNpc)),npcRelationships=compactNpcRelationships(inner.npc_relationships,selectedKeys,registry,key);
+    return{key,name:registry[key],reason_relevant:reason,identity:canon.identity,voice,core_personality_value:canon.core,current_goal:clampText(runtimeGoal||(!activeGoal.state?dynamic.current_goal:'')||canon.goal||'',220)||null,relationship_to_pc:relationshipPacket(save?.relationships?.[key]),...(Object.keys(npcRelationships).length?{relationships_to_present_characters:npcRelationships}:{}),immediately_relevant_memory:memories,current_state:{location:clampText(dynamic.location||'',120)||null,status:clampText(dynamic.status||dynamic.state||'',160)||null}};
+  });
+}
+function publicBackgroundFacts(creation,pc){
+  const model=compactFateBackgroundForModel(creation,pc);if(!model)return null;
+  return array(model?.detail?.public_facts).map(row=>({label:clampText(row?.label||'',60),fact:clampText(row?.fact||'',220)})).filter(row=>row.fact).slice(0,6);
+}
+function compactPcFacts(pc={},action='',pressure=false){
+  const source=object(pc),skills=Object.fromEntries(Object.entries(selectRelevantGrowthEntries(compactSkills(source.skills),action,pressure?2:14)).map(([key,row])=>[key,{grade:row.grade}])),traits=compactAbilityMap(source.traits,!pressure,action),authorities=compactAbilityMap(source.authorities,!pressure,action);
+  const skillCandidates=compactMandatorySkillCandidates(source.skillCandidates),awakeningCandidates=compactMandatoryAwakeningCandidates(source.awakeningCandidates),facts={name:clampText(source.name||'',80),age:Number(source.age||0)||null,gender:clampText(source.gender||'',40)||null,department:clampText(source.department||'',100)||null,origin:clampText(source.origin||'',120)||null,social_status:clampText(source.socialStatus||'',100)||null,realm:clampText(source.realm||'',100)||null,status:clampText(source.status||'',160)||null,talents:compactTalents(source.talents),skills,skill_candidates:Object.fromEntries(Object.entries(skillCandidates).slice(0,pressure?1:8)),traits:Object.fromEntries(Object.entries(traits).slice(0,pressure?2:8)),authorities:Object.fromEntries(Object.entries(authorities).slice(0,pressure?2:8)),awakening_candidates:{trait:Object.fromEntries(Object.entries(awakeningCandidates.trait).slice(0,pressure?1:4)),authority:Object.fromEntries(Object.entries(awakeningCandidates.authority).slice(0,pressure?1:4))}};
+  if(!pressure){facts.character_setting=clampText(source.characterSetting||'',600)||null;facts.stats=object(source.stats);facts.inventory=array(source.inventory).slice(0,8);}
+  return facts;
+}
+function compactClockFacts(saveState={}){
+  const save=object(saveState),rows=[],seen=new Set();
+  for(const [state,source] of [['current',array(save?.scheduleContext?.due)],['future',array(save?.scheduleContext?.upcoming)]])for(const event of source){
+    if(rows.length>=2)break;
+    const id=String(event?.id||`${event?.date||''}:${event?.time||''}:${event?.title||''}`);if(seen.has(id))continue;
+    const locationRelevant=locationMatches(event?.location,save?.world?.location),pcRelevant=isPcRelevantScheduleEvent(save,event);
+    if(!locationRelevant&&!pcRelevant)continue;
+    seen.add(id);rows.push({date:event?.date||save?.world?.date||null,time:event?.time||null,title:clampText(event?.title||'',120),location:clampText(event?.location||'',120)||null,state,minutes_from_now:scheduleMinutesFromNow(save,event)});
+  }
+  return rows;
+}
+function relevantThreadFacts(saveState={},keywords=[],characterRows=[]){
+  const save=object(saveState),keys=new Set(characterRows.map(row=>row.key)),rows=[],relevant=(text='')=>{const value=norm(text);return keywords.some(key=>key.length>=2&&value.includes(key));};
+  for(const hook of array(save.hooks)){
+    if(rows.length>=3||['resolved','expired','declined'].includes(String(hook?.status||'')))continue;
+    const fact=clampText(hook?.title||hook?.note||'',220),sourceKey=String(hook?.source_npc_key||'');
+    if(!fact||(!keys.has(sourceKey)&&!locationMatches(hook?.location,save?.world?.location)&&!relevant(fact)))continue;
+    rows.push({kind:'thread',id:clampText(hook?.id||'',100)||null,fact,status:clampText(hook?.status||'open',40),source_npc_key:keys.has(sourceKey)?sourceKey:null});
+  }
+  const due=selectDueEventConsequence(save,{lookaheadMinutes:0});
+  if(due)rows.unshift({kind:'due-consequence',id:clampText(due.id||'',100),fact:clampText(due.event_name||'',220),...(Number(due.secret_level||0)<=2&&due.reason?{reason:clampText(due.reason,240)}:{})});
+  return rows.slice(0,3);
+}
+function relevantWorldResultFact(saveState={},registry={},enabled=true){
+  if(!enabled)return null;
+  const selected=selectWorldResultForSurfacing({saveState:saveState,knownNpcKeys:Object.keys(registry),enabled:true}).selected;
+  return selected?{kind:'public-world-result',id:clampText(selected.world_result_id||'',120),source_at:selected.source_at||null,fact:clampText(selected.fact||'',260),npc_keys:array(selected.npc_keys).slice(0,2)}:null;
+}
+function relevantFactionFacts(saveState={},action='',recent=[],pressure=false,registeredNpcKeys=[]){
+  const source=object(saveState?.sceneRuntime?.faction_social),contexts=[action,...array(recent).flatMap(turn=>[turn?.action,turn?.summary])].map(value=>norm(value)),relevantKeys=new Set();
+  for(const [key,row] of Object.entries(FACTION_REGISTRY))if([key,row.name,...array(row.aliases)].some(alias=>contexts.some(text=>text.includes(norm(alias)))))relevantKeys.add(key);
+  if(!relevantKeys.size)return null;
+  const compact=compactFactionSocialForContext(source,{text:action,recentTexts:contexts.slice(1),keywords:[],maxFactions:pressure?1:2,historyLimit:pressure?1:2,registeredNpcKeys});
+  compact.reputations=Object.fromEntries(Object.entries(object(compact.reputations)).filter(([key])=>relevantKeys.has(key)));
+  return Object.keys(compact.reputations).length?compact:null;
+}
+function buildInstructions(original,incoming,profile,_originalInput='',mode='game'){
+  const sec=parseInstructionSections(original),registry=parseRegistry(sec.registry),seed=contextSeed(incoming),keywords=extractKeywords(seed,36),characterRows=deriveSceneCharacters(incoming,registry,3,mode),keys=characterRows.map(row=>row.key),names=keys.map(key=>registry[key]).filter(Boolean),secretAllowed=secretAccess(incoming,keywords),combat=hasAffirmedActionKeyword(incoming.action||'',COMBAT_RE),world=chooseBlocks(parseBlocks(sec.world),{budget:Math.min(profile.worldChars,combat?3600:2600),keywords,names,secretAllowed,mode:'world',combat}),npcBlocks=parseBlocks(sec.npc),speechBlocks=parseBlocks(sec.speech),adult=incoming.adultMode&&Number(incoming.saveState?.pc?.age||0)>=18?clampText(sec.adult,900):'',ending=profile.name.includes('critical')||incoming.saveState?.flags?.majorScene?FATE_ENDING_CONTRACT:'';
+  const registryText=keys.map(key=>`${key}=${registry[key]}`).join(', ')||'none';
+  let text=[CANON_KERNEL,MINIMAL_WRITER_CONTRACT,ending,combat?COMBAT_RULE:'',`===== RELEVANT NAMED CHARACTER KEYS =====\n${registryText}`,world.text?`===== IMMEDIATELY RELEVANT CANON FACTS =====\n${world.text}`:'',adult?`===== RELEVANT ADULT CANON =====\n${adult}`:''].filter(Boolean).join('\n\n');
+  text=clampText(text,profile.instructionChars);
+  return{text,registry,keys,names,keywords,characterRows,npcBlocks,speechBlocks,moduleTitles:{world:world.titles,npc:keys.map(key=>registry[key]),speech:keys.map(key=>registry[key]),pc:[],adult:Boolean(adult)},originalChars:sec.originalChars,secretAllowed};
 }
 function cleanDirector(originalInput,limit){
   let d=sectionBetween(originalInput,'===== GM EVENT DIRECTOR (SERVER GUIDANCE) =====','===== SCHEDULE ENGINE (AUTHORITATIVE) =====');
@@ -550,34 +628,12 @@ export function composeRoutedInput({saveState='',optionalContext='',reservedCont
   return [save,head,reserved,tail,action].filter(Boolean).join('\n\n');
 }
 function buildInput(incoming,originalInput,profile,routed,mode='game'){
-  const action=String(incoming.action||'');
-  const recent=compactRecent(incoming.recentTurns,profile.recentTurns),recentFactionTexts=recent.map((turn)=>`${turn.action||''} ${turn.summary||''} ${array(turn.scene).map((item)=>item.text||'').join(' ')}`);
-  const routine=profile.name.includes('routine'),registeredNpcKeys=Object.keys(routed.registry),save=compactSave(incoming,routed.keys,routed.registry,profile,routed.keywords,action,recentFactionTexts),opts=clampText(sectionBetween(originalInput,'===== TURN OPTIONS =====','===== AUTHORITATIVE SAVE_STATE ====='),700),schedule=compactSchedule(incoming.saveState||{},routed.keys),runtime={npcInnerStates:Object.fromEntries(routed.keys.filter(k=>incoming.saveState?.npcInnerStates?.[k]).map(k=>[k,compactInnerNpc(incoming.saveState.npcInnerStates[k])])),sceneRuntime:compactSceneRuntime(incoming.saveState?.sceneRuntime,routed.keywords,action,registeredNpcKeys,3,2,recentFactionTexts),backgroundDigest:clampText(incoming.saveState?.backgroundDigest||'',350)},cg=array(incoming.availableCgIds).slice(0,60).join(', '),momentumDirective=clampText(buildSceneMomentumDirective({action,saveState:incoming.saveState||{},registry:routed.registry}),2800),noveltyDirective=clampText(buildSceneNoveltyDirective({action,saveState:incoming.saveState||{},recentTurns:incoming.recentTurns}),900),purposeDirective=clampText(buildScenePurposeDirective({action,saveState:incoming.saveState||{}}),1400),exitDirective=clampText(buildSceneExitDirective({action,saveState:incoming.saveState||{}}),1600),turnHookDirective=clampText(buildTurnHookDirective({action,saveState:incoming.saveState||{}}),900),activeThreads=buildActiveThreadsDirective({action,saveState:incoming.saveState||{},mode,limit:6,maxChars:1150}),activeThreadsDirective=activeThreads.directive;
-  const orchestration=routed.orchestration||deriveSceneOrchestrationPlan({action,saveState:incoming.saveState||{},mode,directorTelemetry:routed.directorV2?.telemetry,registry:routed.registry});
-  const npcSignificance=deriveNpcSignificanceBoundary({candidateKeys:routed.keys,registry:routed.registry,mode,orchestration});
-  const npcCharacterBehavior=compactNpcCharacterBehavior({saveState:incoming.saveState||{},candidateKeys:routed.keys,registry:routed.registry,mode,significanceBoundary:npcSignificance,maxNpcs:4,memoryLimit:3});
-  const npcCharacterBehaviorDirective=buildNpcCharacterBehaviorDirective({context:npcCharacterBehavior,maxChars:2800});
-  const directorSuppressed=sceneOrchestrationSuppressesDirectorResult(orchestration,routed.directorV2?.telemetry);
-  const director=directorSuppressed?'':cleanDirector(originalInput,routine?400:900);
-  const directorV2=directorSuppressed?'[EVENT DIRECTOR V2.1]\nRESULT=SUPPRESSED_BY_SCENE_ORCHESTRATION\nSELECTED NPC/후보 지시는 무효다. PRIMARY/SECONDARY만 진행하라.':clampText(routed.directorV2?.directive||'',routine?600:1000);
-  const consequenceDirective=directorSuppressed?'':clampText(routed.directorV2?.consequenceDirective||'',1050);
-  const orchestrationDirective=clampText(buildSceneOrchestrationDirective({plan:orchestration}),1200);
-  const fateBackground=compactFateBackgroundForModel(incoming.saveState?.creation,incoming.saveState?.pc),fateBackgroundDirective=clampText(buildFateBackgroundDirective({creation:incoming.saveState?.creation,pc:incoming.saveState?.pc}),1800),personalStory=compactFatePersonalStoryForModel(incoming.saveState?.creation,{existingHooks:incoming.saveState?.hooks}),personalStoryDirective=clampText(buildFatePersonalStoryDirective({creation:incoming.saveState?.creation,existingHooks:incoming.saveState?.hooks}),1800);
-  const world=object(save.world),pc=object(save.pc),scene=object(save.sceneRuntime);
-  const momentum=object(scene.momentum),eventProgress=object(scene.eventProgress),turnHook=normalizeTurnHook(scene.turn_hook);
-  const essentialFactionSocial=compactFactionSocialForContext(incoming.saveState?.sceneRuntime?.faction_social,{text:action,recentTexts:recentFactionTexts,keywords:routed.keywords,maxFactions:2,historyLimit:1,registeredNpcKeys});
-  const essentialTalents=compactTalents(pc.talents),essentialTraits=compactAbilityMap(pc.traits,false,action),essentialAuthorities=compactAbilityMap(pc.authorities,false,action),essentialAwakening=compactMandatoryAwakeningCandidates(pc.awakeningCandidates);
-  const essentialPc=pressureBoundEssentialPc({name:clampText(pc.name||'',80),department:clampText(pc.department||'',100),status:clampText(pc.status||'',160),skills:Object.fromEntries(Object.entries(compactSkills(pc.skills)).map(([key,row])=>[key,{grade:row.grade}])),skillCandidates:compactMandatorySkillCandidates(pc.skillCandidates),...(Object.keys(essentialTalents).length?{talents:essentialTalents}:{}),...(Object.keys(essentialTraits).length?{traits:essentialTraits}:{}),...(Object.keys(essentialAuthorities).length?{authorities:essentialAuthorities}:{}),...(Object.values(essentialAwakening).some((bucket)=>Object.keys(bucket).length)?{awakeningCandidates:essentialAwakening}:{})},action);
-  const essentialSave={version:save.version,turnNumber:save.turnNumber,world:{date:world.date||null,...(world.weekday?{weekday:world.weekday}:{}),time:world.time||null,location:clampText(world.location||'',140)},pc:essentialPc,...(fateBackground?{characterBackground:fateBackground.essential}:{}),...(personalStory?{characterPersonalStory:personalStory.essential}:{}),relevantNpcKeys:array(save.relevantNpcKeys).slice(0,4),npcStates:Object.fromEntries(Object.entries(object(save.npcStates)).slice(0,4).map(([key,row])=>[key,{location:clampText(row?.location||'',100),status:clampText(row?.status||row?.state||'',120)}])),sceneRuntime:{participants:array(scene.participants).slice(0,6),purpose:normalizeScenePurpose(scene.purpose),exit_condition:normalizeSceneExitCondition(scene.exit_condition),turn_hook:turnHook?{kind:turnHook.kind,status:turnHook.status,anchor:clampText(turnHook.anchor,140)}:null,momentum:{stall_streak:Number(momentum.stall_streak||0),last_intent:clampText(momentum.last_intent||'',60)},...(scene.timed_action?{timed_action:scene.timed_action}:{}),eventProgress:scene.eventProgress==null?null:{eventInstanceId:clampText(eventProgress.eventInstanceId||'',100),activeBeat:clampText(eventProgress.activeBeat||'',100)},faction_social:Object.keys(essentialFactionSocial.reputations).length?essentialFactionSocial:null}};
-  const saveState=`===== AUTHORITATIVE SAVE_STATE (ROUTED MINIMUM) =====\n${safeJson(essentialSave)}`;
-  const optionalContext=`${npcCharacterBehaviorDirective?`===== CHARACTER-DRIVEN NPC BEHAVIOR V1 =====\n${npcCharacterBehaviorDirective}\n\n`:''}===== ACTIVE THREADS V1 =====\n${activeThreadsDirective}${fateBackgroundDirective?`\n\n===== FATE BACKGROUND PERSISTENCE V1 =====\n${fateBackgroundDirective}`:''}${personalStoryDirective?`\n\n===== PERSONAL STORY HOOKS V1 =====\n${personalStoryDirective}`:''}\n\n===== TURN OPTIONS =====\n${opts}\n\n===== AUTHORITATIVE SAVE_STATE (ROUTED DETAIL) =====\n${safeJson(save)}\n\n===== ROLLING SUMMARY TAIL =====\n${clampText(incoming.rollingSummary||'아직 없음',1500)}\n\n===== RECENT TURNS =====\n${safeJson(recent)}\n\n===== CURRENT NPC/SCENE RUNTIME =====\n${clampText(runtime,1800)}\n\n===== AVAILABLE_CG_IDS =====\n${cg||'없음'}`;
-  const reservedContext=`===== MULTI-SYSTEM SCENE ORCHESTRATION V1 =====\n${orchestrationDirective}\n\n===== SCENE MOMENTUM HF1 =====\n${momentumDirective}${noveltyDirective?`\n\n===== DETERMINISTIC SCENE NOVELTY V1 =====\n${noveltyDirective}`:''}\n\n===== SCENE PURPOSE V1 =====\n${purposeDirective}\n\n===== EXPLICIT SCENE EXIT CONDITION V1 =====\n${exitDirective}\n\n===== STRONGER TURN HOOK V1 =====\n${turnHookDirective}${consequenceDirective?`\n\n===== EVENT CONSEQUENCE V1 =====\n${consequenceDirective}`:''}`;
-  const actionFrame=(text)=>`===== USER ACTION =====\n${text}\n\n${sceneOrchestrationActionFrame(orchestration)}\nUSER ACTION의 의미 목표를 압축 완료하고 새 PC 선택 없이 EXIT_TARGET 뒤의 첫 판단점에서 멈춰라. ROUTINE은 변화 중심, 주요 NPC 감정 태그·강도·근거를 일치시켜라.`,fixedSeparators=6,emptyActionFrame=actionFrame(''),scheduledProfile=profile.name.includes('scheduled'),baseAuthorityBudget=routine||scheduledProfile?900:180,desiredAuthorityBudget=baseAuthorityBudget+(noveltyDirective?Math.max(900,noveltyDirective.length):0),continueProfile=profile.name.includes('continue');
-  const actionTextBudget=continueProfile?5200:Math.max(0,Math.min(5200,profile.inputChars-saveState.length-reservedContext.length-emptyActionFrame.length-fixedSeparators-desiredAuthorityBudget));
-  const actionBlock=actionFrame(clampMiddleText(action,actionTextBudget));
-  const authorityBudget=Math.max(0,profile.inputChars-saveState.length-reservedContext.length-actionBlock.length-fixedSeparators);
-  const authorityTail=fitAuthorityTail({director,directorV2,schedule,maxChars:authorityBudget,routine});
-  return{text:composeRoutedInput({saveState,optionalContext,reservedContext,authorityTail,actionBlock,inputChars:profile.inputChars}),orchestration,activeThreads,npcSignificance,npcCharacterBehavior,personalStory};
+  const action=String(incoming.action||''),save=object(incoming.saveState),pressure=action.length>3600||Number(profile.scale||1)<1,recent=compactRecent(incoming.recentTurns,pressure?1:profile.recentTurns,pressure),characterPackets=buildCharacterPackets(incoming,routed.characterRows,routed.registry,routed.npcBlocks,routed.speechBlocks,routed.keywords,profile),clockFacts=compactClockFacts(save),worldResultFact=relevantWorldResultFact(save,routed.registry,mode!=='continue'&&incoming.backgroundSim!==false),threadFacts=[...relevantThreadFacts(save,routed.keywords,routed.characterRows),...(worldResultFact?[worldResultFact]:[])].slice(0,3),factionFacts=relevantFactionFacts(save,action,recent,pressure,Object.keys(routed.registry)),dueConsequence=selectDueEventConsequence(save,{lookaheadMinutes:0}),hardEventFacts=dueConsequence?{event_consequence_id:String(dueConsequence.id||''),event_consequence_npc_keys:mentionedNpcKeys([dueConsequence.event_name,Number(dueConsequence.secret_level||0)<=2?dueConsequence.reason:''].filter(Boolean).join(' '),routed.registry).slice(0,2)}:null,names=routed.names,globalMemory=selectMemories(save?.memories?.global,routed.keywords,names,pressure?1:4),pcKnowledge=selectMemories(array(save?.pcKnowledge).map(value=>typeof value==='string'?{fact:value,importance:2}:value),routed.keywords,names,pressure?1:4).map(value=>value?.fact||value),background=publicBackgroundFacts(save.creation,save.pc),pcFacts=compactPcFacts(save.pc,action,pressure),lastTurn=recent.at(-1),activeThreads=buildActiveThreadsDirective({action,saveState:save,mode,limit:6,maxChars:1150}),npcSignificance=deriveNpcSignificanceBoundary({candidateKeys:routed.keys,registry:routed.registry,mode,orchestration:null}),npcCharacterBehavior=compactNpcCharacterBehavior({saveState:save,candidateKeys:routed.keys,registry:routed.registry,mode,significanceBoundary:npcSignificance,maxNpcs:3,memoryLimit:2}),personalStory=compactFatePersonalStoryForModel(save.creation,{existingHooks:save.hooks});
+  if(background)delete pcFacts.character_setting;
+  const hardPacket={version:'thin-scene-packet-r2',pc_identity:{canonical_key:'pc',canonical_name:pcFacts.name},current_scene:{date:save?.world?.date||null,weekday:save?.world?.weekday||null,time:save?.world?.time||null,location:clampText(save?.world?.location||'',140),immediate_physical_situation:{recent_summary:clampText(lastTurn?.summary||incoming.rollingSummary||'',pressure?180:420),visible_beats:array(lastTurn?.scene).slice(pressure?-1:-4)}},hard_facts:{pc:pcFacts,...(background?{public_background:background}:{}),...(factionFacts?{faction_social:factionFacts}:{})},future_time_facts:clockFacts};
+  const optionalPacket={relevant_characters:characterPackets,relevant_memory_consequence_thread:{global_memory:globalMemory,pc_knowledge:pcKnowledge,threads:threadFacts},recent_meaningful_beats:recent,available_cg_ids:array(incoming.availableCgIds).slice(0,40),mode};
+  const hardBlock=`===== THIN SCENE PACKET — CURRENT FACTS =====\n${safeJson(hardPacket)}`,optionalContext=`===== THIN SCENE PACKET — RELEVANT CONTEXT =====\n${safeJson(optionalPacket)}`,actionBlock=`===== USER ACTION — EXACT ORIGINAL TEXT =====\n${action}`;
+  return{text:composeRoutedInput({saveState:hardBlock,optionalContext,actionBlock,inputChars:profile.inputChars}),orchestration:null,activeThreads,npcSignificance,npcCharacterBehavior,personalStory,hardEventFacts,packet:{hard:hardPacket,optional:optionalPacket}};
 }
 
 export function routeOpenAIParams(params,{incoming={},mode='game'}={}){
@@ -586,8 +642,7 @@ export function routeOpenAIParams(params,{incoming={},mode='game'}={}){
   const required=['===== CHARACTER REGISTRY =====','===== WORLD CANON =====','===== NPC CANON =====','===== NPC SPEECH =====','===== PC SYSTEM ====='];
   if(!required.every(m=>originalInstructions.includes(m)))return{params,telemetry:{routerVersion:VERSION,enabled:false,profile:'fallback-full',target_input_tokens:null,soft_max_tokens:null,selected_npcs:[],reason:'core prompt markers changed',original_chars:originalInstructions.length+originalInput.length,routed_chars:originalInstructions.length+originalInput.length}};
   const routed=buildInstructions(originalInstructions,incoming,profile,originalInput,mode);if(!Object.keys(routed.registry||{}).length)return{params,telemetry:{routerVersion:VERSION,enabled:false,profile:'fallback-full',target_input_tokens:null,soft_max_tokens:null,selected_npcs:[],reason:'registry parse failed',original_chars:originalInstructions.length+originalInput.length,routed_chars:originalInstructions.length+originalInput.length}};
-  const built=buildInput(incoming,originalInput,profile,routed,mode),newParams={...params,instructions:routed.text,input:built.text,prompt_cache_key:process.env.OPENAI_PROMPT_CACHE_KEY||'lumensia-stable-context-router-v156-hf1',prompt_cache_retention:'24h'},originalChars=originalInstructions.length+originalInput.length,routedChars=routed.text.length+built.text.length;
-  const eventDirectorTelemetry=routed.directorV2?.telemetry||null;
-  return{params:newParams,telemetry:{routerVersion:VERSION,enabled:true,profile:profile.name,target_input_tokens:profile.targetTokens,soft_max_tokens:profile.softMaxTokens,adaptive_scale:Number((profile.scale||1).toFixed(3)),instructions_chars:routed.text.length,input_chars:built.text.length,routed_chars:routedChars,original_chars:originalChars,char_reduction_ratio:originalChars>0?Number((1-routedChars/originalChars).toFixed(4)):0,selected_npcs:routed.keys,selected_npc_names:routed.names,canon_modules:routed.moduleTitles,recent_turns:profile.recentTurns,secret_allowed:routed.secretAllowed,event_director_v2:eventDirectorTelemetry,event_director_v3:eventDirectorTelemetry?{...eventDirectorTelemetry,version:DIRECTOR_V3_VERSION,weighted_core_version:DIRECTOR_V2_VERSION}:null,scene_orchestration:built.orchestration,npc_significance_v1:built.npcSignificance,npc_character_behavior_v1:{version:built.npcCharacterBehavior.version,mode:built.npcCharacterBehavior.mode,npc_keys:built.npcCharacterBehavior.npc_keys,profile_count:built.npcCharacterBehavior.profiles.length,evidence_count:built.npcCharacterBehavior.evidence_count,source:built.npcCharacterBehavior.source},active_threads_v1:{version:built.activeThreads.version,mode:built.activeThreads.mode,count:built.activeThreads.threads.length,visible_count:built.activeThreads.visible_threads,top_id:built.activeThreads.threads[0]?.id||null,sources:[...new Set(built.activeThreads.threads.map((thread)=>thread.source))]},...(built.personalStory?{personal_story_v1:{version:built.personalStory.version,candidate_count:built.personalStory.candidateCount}}:{})}};
+  const built=buildInput(incoming,originalInput,profile,routed,mode),newParams={...params,instructions:routed.text,input:built.text,prompt_cache_key:process.env.OPENAI_PROMPT_CACHE_KEY||'lumensia-p3-pr01r2-thin-scene-packet',prompt_cache_retention:'24h'},originalChars=originalInstructions.length+originalInput.length,routedChars=routed.text.length+built.text.length;
+  return{params:newParams,telemetry:{routerVersion:VERSION,enabled:true,profile:profile.name,packet_version:'thin-scene-packet-r2',target_input_tokens:profile.targetTokens,soft_max_tokens:profile.softMaxTokens,adaptive_scale:Number((profile.scale||1).toFixed(3)),instructions_chars:routed.text.length,input_chars:built.text.length,routed_chars:routedChars,original_chars:originalChars,char_reduction_ratio:originalChars>0?Number((1-routedChars/originalChars).toFixed(4)):0,selected_npcs:routed.keys,selected_npc_names:routed.names,character_packet_count:routed.keys.length,canon_modules:routed.moduleTitles,recent_turns:profile.recentTurns,secret_allowed:routed.secretAllowed,event_director_v2:null,event_director_v3:null,hard_event_facts:built.hardEventFacts,scene_orchestration:null,writer_authority_removed:['event-director','schedule-procedure','event-checkpoint','participant-queue','next-action','scene-orchestration','scene-momentum','scene-purpose','scene-exit','turn-hook','active-thread-directive','generic-role-actor'],suggested_actions:false,npc_significance_v1:built.npcSignificance,npc_character_behavior_v1:{version:built.npcCharacterBehavior.version,mode:built.npcCharacterBehavior.mode,npc_keys:built.npcCharacterBehavior.npc_keys,profile_count:built.npcCharacterBehavior.profiles.length,evidence_count:built.npcCharacterBehavior.evidence_count,source:built.npcCharacterBehavior.source},active_threads_v1:{version:built.activeThreads.version,mode:built.activeThreads.mode,count:built.activeThreads.threads.length,visible_count:built.activeThreads.visible_threads,top_id:built.activeThreads.threads[0]?.id||null,sources:[...new Set(built.activeThreads.threads.map((thread)=>thread.source))]},...(built.personalStory?{personal_story_v1:{version:built.personalStory.version,candidate_count:built.personalStory.candidateCount}}:{})}};
 }
 export function routerVersion(){return VERSION;}
