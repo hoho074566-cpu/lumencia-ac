@@ -1,7 +1,20 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Narrative Phase 1 **FROZEN**. `PHASE_2_IMPLEMENTATION_PASS: COMPLETE` and `PHASE_2_STATUS: COMPLETE`. STAB-01, STAB-BASE, and fresh STAB-02R are merged, and the final latest-main life-loop integration passes. No new Phase 2 feature discovery or implementation is allowed; the next task is **Prepare LUMENSIA PHASE 3 planning / handover** without starting Phase 3 implementation.
+Narrative Phase 1 is **FROZEN** and Phase 2 is **COMPLETE**. The current candidate is **P3-PR01R2 AI-FIRST WRITER RUNTIME REBUILD** on Draft PR #90. Its automated implementation gates pass, but product status remains **CORE ACCEPTANCE FAIL / HUMAN QUALITATIVE REVIEW PENDING**. Do not merge and do not start P3-PR02.
+
+## P3-PR01R2 AI-FIRST WRITER RUNTIME REBUILD — CURRENT CANDIDATE
+
+- Base/latest main: `6f1f45a644e2ece54a74577ce8a39afe4859e686`; branch: `codex/p3-pr01r2-ai-first-writer-rebuild`; Draft PR: #90; published code checkpoint: `0ef45036a94cf9088d4ff40b28cd7f5017813c2e`.
+- PR #88 and PR #89 remain frozen open Draft failures. No commit or implementation from either failed experiment was cherry-picked or reused.
+- Writer path: `CANON KERNEL -> THIN SCENE PACKET -> ONE AI WRITER -> HARD-INVARIANT VALIDATION -> RENDER`.
+- Writer-visible inputs: exact `USER ACTION`; current canonical time/location/immediate situation/recent meaningful beats; only immediately required hard facts; 0-3 causally relevant Named NPC packets; currently relevant memory/consequence/thread; minimal factual future-time constraints; minimal Writer Contract.
+- Hidden from Writer: event steps/checkpoints, participant queues, completion recipes, procedural next actions, schedule preparation/filler, Director/Turn Hook/Scene Exit/Reaction Field choreography, generic role-actor pressure, event-derived Suggested Actions, and automatic control-return pressure. Internal canonical state remains intact.
+- Suggested Actions are OFF (`choices=[]`). The existing arbitrary ordered scene beat stream is retained; neutral server-owned compatibility receipts preserve persistence and renderer contracts.
+- Static Writer guidance footprint: `8,743 -> 1,605` characters (`-81.6%`). New engine: NO. New model call: NO. Reference content in runtime: NO.
+- Focused R2/hard-invariant tests and the full repository blocking regression pass, including long USER ACTION, authority-tail, context-pressure, one canonical model call, save/state, time, event, character, Fate/Ending/Inheritance, and architecture checks.
+- Human qualitative gate remains FAIL until the user explicitly approves the exact Preview acceptance set. PR #90 stays Draft/unmerged; P3-PR02 is forbidden.
+- NEXT ACTION: exact Preview human comparison. Do not convert qualitative acceptance into an automated PASS.
 
 ## Narrative Phase 1 FREEZE — Authoritative Closure
 - Verified main is `9f2274abeef7f34531c8d0240f66ed39293b9eef`, the human merge of PR #67 NPC Significance Evaluator V1 exact head `3293e1c11569e5531518ae7e05918a54693c2bb9`.

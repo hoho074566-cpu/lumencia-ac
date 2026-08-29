@@ -27,6 +27,21 @@ Repository: `hoho074566-cpu/lumencia-ac`
 
 ---
 
+# P3-PR01R2 AI-FIRST WRITER RUNTIME REBUILD — CURRENT CANDIDATE
+
+- Repository truth was refetched on 2026-08-29. Base/latest main is `6f1f45a644e2ece54a74577ce8a39afe4859e686`.
+- PR #88 remains an open Draft **CORE ACCEPTANCE FAIL / ARCHITECTURE EXPERIMENT / DO NOT MERGE**. PR #89 remains an open Draft **CORE ACCEPTANCE FAIL / FAILED R1 RESET / DO NOT MERGE**. Neither branch, commit history, nor implementation was reused or cherry-picked.
+- Fresh branch `codex/p3-pr01r2-ai-first-writer-rebuild` and Draft PR #90 were created directly from latest main. Published code checkpoint is `0ef45036a94cf9088d4ff40b28cd7f5017813c2e`.
+- Production narrative flow is now `CANON KERNEL -> THIN SCENE PACKET -> ONE AI WRITER -> HARD-INVARIANT VALIDATION -> RENDER`. The Writer no longer receives event checkpoints, procedure order, participant queues, completion recipes, procedural next actions, Director/Turn Hook/Scene Exit/Reaction Field choreography, generic role-actor instructions, or automatic choice-return pressure.
+- Thin Scene Packet authority is limited to exact `USER ACTION`, current time/location/immediate situation/recent meaningful beats, immediately required hard facts, 0-3 causally relevant Named NPC packets, currently relevant memory/consequence/thread, and minimal factual future-time constraints. Internal event/schedule state remains canonical but does not become a prose plan.
+- Suggested Actions are disabled (`choices=[]`) for qualitative acceptance. The existing ordered scene beat stream is retained because it already permits any narration/dialogue ordering and count; server-owned neutral compatibility receipts preserve save/renderer integrity without restoring Writer authority.
+- Static Writer guidance footprint is `8,743 -> 1,605` characters (`-7,138`, `-81.6%`). No Narrative Engine, intent state machine, actor rotation, prose scorer, semantic style validator, Korean wording regex, quota, save root, or model call was added. Original reference text, character names, and scene sequences are absent from runtime.
+- Focused R2, long USER ACTION, authority-tail, context-pressure, one canonical model call, hard-state, identity, event, NPC, time, save, Fate/Ending/Inheritance, security architecture, and full `scripts/lumensia-pr-check.mjs origin/main HEAD` regression pass locally.
+- Product status remains **P3-PR01R2 CORE ACCEPTANCE FAIL / HUMAN QUALITATIVE REVIEW PENDING**. Automated tests cannot approve prose quality. PR #90 stays Draft and unmerged; P3-PR02 remains forbidden.
+- **NEXT ACTION:** wait for the user's exact Preview comparison across the required Scene set. Do not merge, start P3-PR02, re-enable Suggested Actions, or start another correction loop without an explicit human verdict.
+
+---
+
 # 0. NARRATIVE PHASE 1 FREEZE — AUTHORITATIVE CURRENT STATE
 
 - Narrative Phase 1 is **FROZEN** on verified main `9f2274abeef7f34531c8d0240f66ed39293b9eef`. PR #67 NPC Significance Evaluator V1 was human-merged from exact head `3293e1c11569e5531518ae7e05918a54693c2bb9` and is present in that main merge.
