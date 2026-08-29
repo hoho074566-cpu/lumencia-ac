@@ -94,7 +94,8 @@ const coincidentScheduleIntent=applySceneMomentumTimeFloor({action:'1시간 동�
 assert.equal(coincidentTurn.state_delta.advance_minutes,60,'an action may complete exactly when an authoritative schedule starts');
 assert.equal(coincidentTurn.state_delta.fatigue_delta,2,'legitimate completed-action effects must survive a coincident schedule boundary');
 assert.deepEqual(coincidentTurn.state_delta.stat_progress,[{stat:'신체',amount:1}],'completed growth must survive a coincident schedule boundary');
-assert.match(coincidentTurn.scene_summary,/기사과 필수 수업의 시작 시점/,'a coincident but unsurfaced schedule must become visible');
+assert.equal(coincidentTurn.scene_summary,undefined,'runtime validation must not synthesize an unsurfaced schedule as fiction');
+assert.equal(coincidentScheduleIntent.runtimeSceneTrusted,false,'an unsurfaced hard boundary must fail the final commit validator');
 assert.equal(coincidentScheduleIntent.reconciliationReason,'schedule-boundary','coincident schedule reconciliation must be reported as a schedule boundary');
 let turn={state_delta:{advance_minutes:0},choices:[]};
 applySceneMomentumTimeFloor({action:'쉰다.',saveState:boundarySave},turn,'game');
@@ -139,8 +140,8 @@ const structuredOnlyScheduleIntent=applySceneMomentumTimeFloor({action:'8시간 
 assert.equal(turn.state_delta.advance_minutes,60,'structured schedule progress must still establish the exact boundary');
 assert.equal(turn.event_progress.event_instance_id,'morning-class','validated structured schedule progress must survive even when its narration is absent');
 assert.equal(structuredOnlyScheduleIntent.runtimeSceneTrusted,false,'structured progress alone must not make unrelated visible narration trustworthy');
-assert.equal(turn.scene_title,'일정 경계','an unsurfaced structured boundary must use deterministic visible reconciliation');
-assert.doesNotMatch(JSON.stringify(turn.scene),/왕도|에밀리/,'post-boundary narration must be removed when no boundary scene can be validated');
+assert.equal(turn.scene_title,'왕도 도착','hard validation must not replace the Writer title with an internal boundary label');
+assert.match(JSON.stringify(turn.scene),/왕도/,'the validator may inspect the rejected model scene but must not synthesize replacement fiction');
 
 for(const [action,prose,elapsed] of [
   ['1시간 동안 훈련한다.','리나는 먼저 훈련을 마쳤다.',10],
@@ -276,7 +277,8 @@ assert.deepEqual(turn.state_delta.pc_knowledge_add,['검술 자세 교정법'],'
 assert.equal(compoundBoundaryIntent.reconciliationReason,'schedule-boundary','compound truncation must retain schedule-boundary telemetry');
 assert.equal(compoundBoundaryIntent.structuredBoundaryReconciliationApplied,true,'an aligned structured execution plan owns completed-prefix selection');
 assert.deepEqual(compoundBoundaryIntent.completedPrefixActionTypes,['training'],'the boundary result identifies only the completed training prefix');
-assert.match(turn.scene_summary,/앞선 훈련을 마친 뒤/,'the reconciled narration agrees that training completed before the authoritative boundary');
+assert.equal(turn.scene_summary,undefined,'state reconciliation must not manufacture a summary from the completed prefix');
+assert.equal(compoundBoundaryIntent.runtimeSceneTrusted,false,'mixed prefix/suffix prose must fail the final commit validator');
 turn={scene_title:'훈련과 수면 완료',scene:[{kind:'narration',text:'한 시간 검술 훈련을 마치고 훈련 기록표를 얻은 뒤, 이어 수면까지 마치고 숙면 보상을 받았다.'}],choices:[],state_delta:{advance_minutes:540,items_add:['훈련 기록표','숙면 보상']}};
 applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잠을 잔다.',saveState:compoundBoundarySave},turn,'game');
 assert.deepEqual(turn.state_delta.items_add,['훈련 기록표'],'structured clause evidence stops before a later action in the same narration sentence');
@@ -303,9 +305,9 @@ assert.deepEqual(turn.choices,['경계 임무를 맡는다.','예정대로 쉰�
 assert.deepEqual(turn.state_delta.skill_experience,[multiPrefixGrowth],'effects from the completed training prefix survive the decision stop');
 assert.deepEqual(turn.state_delta.pc_knowledge_add,['검술 자세 교정법'],'only prefix knowledge survives the decision stop');
 assert.deepEqual(turn.state_delta.items_add,[],'terminal sleep rewards cannot cross the player decision boundary');
-assert.match(turn.scene_summary,/선택 지점/,'visible narration and authoritative time agree on the decision stop');
+assert.equal(turn.scene_summary,undefined,'decision validation must preserve Writer prose without adding a generic choice summary');
 assert.match(turn.scene.map(item=>item.text).join(' '),/경계 임무를 맡겠나/,'decision reconciliation preserves the question that explains the retained choices');
-assert.equal(turn.cg_id,null,'a CG from the discarded terminal scene cannot survive the deterministic decision replacement');
+assert.equal(turn.cg_id,'cg_sleep_dream','validation must not rewrite presentation fields on a trusted Writer decision scene');
 assert.equal(decisionBoundaryIntent.runtimeSceneTrusted,true,'the deterministic decision reconciliation remains authoritative for scene-purpose synthesis');
 assert.deepEqual(runtimeSynthesisTurn(turn,decisionBoundaryIntent).choices,turn.choices,'runtime synthesis preserves the player-owned decision choices');
 turn={scene_title:'같은 행의 훈련 뒤 제안',scene:[{kind:'narration',text:'한 시간 검술 훈련을 마치고 훈련 기록표를 받았다. 지금 경계 임무를 맡겠나?'}],choices:['맡는다.','잔다.','묻는다.'],state_delta:{advance_minutes:60,skill_experience:[multiPrefixGrowth],items_add:['훈련 기록표','숙면 보상']}};
@@ -348,7 +350,8 @@ turn={scene_title:'상한에서 제안',scene:[{kind:'narration',text:'하루를
 turn.time_execution=choiceExecution(turn,{minutes:1440,completed:[],interrupted:'action_1',owners:[effectOwner('items_add',0)]});
 const receiptAtCapIntent=applySceneMomentumTimeFloor({action:'25시간 기다리고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'초소'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
 assert.equal(receiptAtCapIntent.reconciliationReason,'turn-limit','the canonical one-turn cap outranks a model-declared choice on an incomplete clause');
-assert.deepEqual(turn.choices,[],'a model choice at the cap is deferred until the incomplete action resumes');
+assert.deepEqual(turn.choices,['연다.','계속 기다린다.','묻는다.'],'the hard validator must not rewrite a rejected Writer scene into another visible turn');
+assert.equal(receiptAtCapIntent.runtimeSceneTrusted,false,'a premature cap-time choice must fail uncommitted');
 assert.deepEqual(turn.state_delta.items_add,[],'the interrupted action cannot retain a cap-time reward');
 assert.equal(deriveTimedActionRuntime({},receiptAtCapIntent,'25시간 기다리고 8시간 잔다',turn,'game').remaining_minutes,540,'turn-limit precedence preserves the same resumable remainder');
 turn={scene_title:'훈련과 수면 완료',scene:[{kind:'narration',text:'에밀리가 한 시간 훈련을 마쳤다.'},{kind:'dialogue',speaker_key:'emily',text:'내 훈련은 끝났어.'}],choices:[],state_delta:{advance_minutes:540,skill_experience:[multiPrefixGrowth]}};
@@ -400,7 +403,7 @@ turn={scene_title:'흔적과 훈련 뒤 제안',scene:[{kind:'narration',text:'�
 applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:compoundBoundarySave},turn,'game');
 assert.deepEqual(turn.state_delta.skill_experience,[multiPrefixGrowth],'zero lexical overlap falls back to the latest choice-bearing question after completed-prefix evidence');
 assert.match(turn.scene.map(item=>item.text).join(' '),/이 요청을 받아들이겠나/,'generic choices remain attached to the later decision prompt');
-assert.doesNotMatch(turn.scene.map(item=>item.text).join(' '),/누가 이런 흔적/,'an earlier rhetorical question cannot replace the actual decision prompt');
+assert.match(turn.scene.map(item=>item.text).join(' '),/누가 이런 흔적/,'hard validation must not recompose otherwise trusted Writer beats');
 turn={scene_title:'가변 훈련 뒤 제안',scene:[{kind:'narration',text:'한 시간 검술 훈련을 전부 마쳤고 검술 자세 교정법을 익혔다.'},{kind:'dialogue',speaker_key:'artemis',text:'이제 경계 임무를 맡겠나?'}],choices:['맡는다.','쉰다.','묻는다.'],state_delta:{advance_minutes:60,skill_experience:[multiPrefixGrowth],pc_knowledge_add:['검술 자세 교정법'],items_add:['숙면 보상']}};
 applySceneMomentumTimeFloor({action:'최대 1시간 훈련하고 8시간 잔다',saveState:compoundBoundarySave},turn,'game');
 assert.deepEqual(turn.state_delta.skill_experience,[multiPrefixGrowth],'a positive upper-bounded prefix with an action-bound modifier preserves visibly earned effects');
@@ -417,10 +420,11 @@ turn={scene_title:'훈련 뒤 제안',scene:[{kind:'narration',text:'한 시간 
 applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
 assert.deepEqual(turn.state_delta.items_add,['검술책'],'an exact visible short string effect survives while the suffix reward is removed');
 turn={scene_title:'질문 뒤 과잉 수면',scene:[{kind:'narration',text:'한 시간 검술 훈련을 마쳤다.'},{kind:'dialogue',speaker_key:'artemis',text:'지금 경계 임무를 맡겠나?'},{kind:'narration',text:'대답을 기다리지 않고 여덟 시간 수면을 마쳤다.'},{kind:'dialogue',speaker_key:'artemis',text:'대체 무엇을 망설이는가?'}],choices:['경계 임무를 맡는다.','예정대로 잔다.','조건을 먼저 묻는다.'],state_delta:{advance_minutes:540,skill_experience:[multiPrefixGrowth],items_add:['숙면 보상']}};
-applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
+const overrunDecisionIntent=applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
 assert.deepEqual(turn.state_delta.skill_experience,[multiPrefixGrowth],'choice text binds evidence to its actual prompt instead of a later rhetorical question');
 assert.deepEqual(turn.state_delta.items_add,[],'terminal completion after the choice prompt is removed even when a later rhetorical question exists');
-assert.doesNotMatch(turn.scene.map(item=>item.text).join(' '),/대체 무엇을 망설이는가/,'post-choice rhetorical narration is not retained as the choice prompt');
+assert.match(turn.scene.map(item=>item.text).join(' '),/대체 무엇을 망설이는가/,'the hard validator must not recompose the rejected Writer scene');
+assert.equal(overrunDecisionIntent.runtimeSceneTrusted,false,'post-choice continuation must fail uncommitted');
 turn={scene_title:'수면 끝의 선택',scene:[{kind:'narration',text:'한 시간 검술 훈련을 마쳤다.'},{kind:'dialogue',speaker_key:'artemis',text:'눈을 뜬 지금 바로 경계 임무를 맡겠나?'}],choices:['경계 임무를 맡는다.','조금 더 잔다.','상황을 묻는다.'],state_delta:{advance_minutes:540,skill_experience:[multiPrefixGrowth],items_add:['숙면 보상']}};
 applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,540,'a choice exactly at the terminal maximum preserves the reported decision time');
@@ -432,10 +436,11 @@ assert.deepEqual(turn.state_delta.active_events_add,[directorEventId],'a choice-
 assert.equal(turn.event_progress.event_instance_id,directorEventId,'the Director event progress remains attached to its response choices');
 assert.deepEqual(turn.director,directorMetadata,'Director metadata survives only for the choice-bearing interruption');
 turn={scene_title:'질문 뒤 창고 화재',scene:[{kind:'dialogue',speaker_key:'artemis',text:'지금 경계 임무를 맡겠나?'},{kind:'narration',text:'대답을 기다리는 사이 창고에서 불길이 치솟았다.'}],choices:['경계 임무를 맡는다.','예정대로 잔다.','상황을 묻는다.'],director:directorMetadata,event_progress:{event_instance_id:directorEventId,active_beat:'response-choice',completed_beats:[]},state_delta:{advance_minutes:90,items_add:['숙면 보상'],active_events_add:[directorEventId]}};
-applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},sceneRuntime:{eventProgress:null},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game',null,[],{director_occurrence_id:directorEventId});
+const postChoiceDirectorIntent=applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'훈련장'},sceneRuntime:{eventProgress:null},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game',null,[],{director_occurrence_id:directorEventId});
 assert.deepEqual(turn.state_delta.active_events_add,[],'a Director event narrated only after an unrelated prompt is not restored');
 assert.equal(turn.event_progress,null,'hidden post-choice Director progress is removed');
-assert.equal(turn.director,null,'post-choice Director metadata cannot attach to unrelated choices');
+assert.deepEqual(turn.director,directorMetadata,'hard validation does not synthesize or rewrite the rejected Writer receipt');
+assert.equal(postChoiceDirectorIntent.runtimeSceneTrusted,false,'post-choice Director continuation must fail uncommitted');
 const prefixMeeting={npc_key:'emily',date:'1285-03-02',time:'12:00',location:'중앙광장',activity:'면담',reason:'대화에서 내일 정오 면담을 약속했다'},suffixNpcMeeting={npc_key:'lena',date:'1285-03-02',time:'12:00',location:'중앙광장',activity:'면담',reason:'수면 중 레나의 같은 장소 면담이 정해졌다'},prefixHook={id:'tomorrow-meeting',title:'내일 정오 면담',reason:'에밀리와 중앙광장에서 만나기로 약속했다'},prefixConsequence={event_name:'내일 정오 면담',reason:'에밀리와 중앙광장에서 만나기로 약속했다'},prefixRelationship={npc_key:'emily',affinity_delta:1,reason:'에밀리와 대화를 마쳤다'},suffixRelationship={npc_key:'lena',affinity_delta:1,reason:'레나와 대화를 마쳤다'};
 turn={scene_title:'대화 뒤 수면 중 선택',scene:[{kind:'narration',text:'한 시간 대화를 마쳤고 에밀리는 내일 정오 중앙광장에서 면담하기로 했다고 레나에게 알렸다.'},{kind:'dialogue',speaker_key:'artemis',text:'잠든 지 얼마 안 됐지만 지금 경계 임무를 맡겠나?'}],choices:['경계 임무를 맡는다.','계속 잔다.','상황을 묻는다.'],state_delta:{advance_minutes:90,npc_schedule_updates:[prefixMeeting,suffixNpcMeeting],relationship_changes:[prefixRelationship,suffixRelationship],hooks_add:[prefixHook,{id:'dream-hook',title:'수면 중 꿈의 계시',reason:'잠든 뒤 꿈을 꾸었다'}],delayed_consequences_add:[prefixConsequence,{event_name:'꿈의 계시',reason:'수면을 마친 뒤 나타난다'}],items_add:['숙면 보상']}};
 applySceneMomentumTimeFloor({action:'1시간 대화하고 8시간 잔다',saveState:{pc:knightPc,world:{date:'1285-03-01',time:'09:00',location:'상담실'},scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game');
@@ -501,7 +506,7 @@ turn.time_execution=choiceExecution(turn,{owners:[effectOwner('skill_experience'
 applySceneMomentumTimeFloor({action:'1시간 훈련하고 8시간 잔다',saveState:structuralCompoundSave},turn,'game');
 assert.deepEqual(turn.state_delta.skill_experience,[multiPrefixGrowth],'the structured decision index preserves completed effects despite rhetorical lexical overlap');
 assert.match(turn.scene.map(item=>item.text).join(' '),/이 임무를 받아들이겠나/,'the declared final decision item owns the choices');
-assert.doesNotMatch(turn.scene.map(item=>item.text).join(' '),/누가 이 흔적/,'an earlier rhetorical question is not rebound to the choices');
+assert.match(turn.scene.map(item=>item.text).join(' '),/누가 이 흔적/,'hard validation preserves the Writer scene instead of rebinding its beats');
 
 turn={scene_title:'걱정스러운 선택',scene:[{kind:'narration',text:'한 시간 훈련을 마쳤다.'},{kind:'dialogue',speaker_key:'emily',text:'지금 임무를 맡겠어?',expression:'worried'}],choices:['맡는다.','잔다.','묻는다.'],emotion_updates:[{npc_key:'emily',expression:'worried'},{npc_key:'lena',expression:'smile'}],state_delta:{advance_minutes:60}};
 turn.time_execution=choiceExecution(turn,{owners:[]});
@@ -549,14 +554,16 @@ const rejectedNoneIntent=applySceneMomentumTimeFloor({action:'1시간 훈련하�
 assert.equal(turn.state_delta.advance_minutes,60,'an invalid no-boundary receipt cannot trigger the full compound profile floor');
 assert.deepEqual(turn.state_delta.items_add,[],'an invalid no-boundary receipt fails closed on every untrusted effect');
 assert.equal(rejectedNoneIntent.reconciliationReason,'invalid-structured-execution','the caller records a deterministic fail-closed reason for the rejected receipt');
-assert.match(turn.scene_summary,/검증할 수 없어/,'the returned narration exposes a bounded stop instead of claiming suffix completion');
+assert.equal(turn.scene_summary,undefined,'invalid receipt validation must not become fiction');
+assert.throws(()=>runtimeSynthesisTurn(turn,rejectedNoneIntent),error=>error?.code==='UNCOMMITTED_TURN','an invalid receipt must fail without committing the turn');
 
 turn={scene_title:'수면 중 가짜 화재',scene:[{kind:'dialogue',speaker_key:'artemis',text:'불을 끌까?'}],choices:['끈다.','대피한다.','살핀다.'],director:ongoingDirector,event_progress:{event_instance_id:'director:invented-fire',active_beat:'choice',completed_beats:[]},state_delta:{advance_minutes:60,items_add:['화재 보상'],active_events_add:['director:invented-fire']}};
 turn.time_execution=choiceExecution(turn,{completed:[],interrupted:'action_1',boundaryEventId:'director:invented-fire',owners:[effectOwner('items_add',0,'director:invented-fire','boundary-event'),effectOwner('event_progress',null,'director:invented-fire','boundary-event','turn'),effectOwner('director',null,'director:invented-fire','boundary-event','turn')]});
-applySceneMomentumTimeFloor({action:'8시간 잔다',saveState:structuralCompoundSave},turn,'game');
+const inventedDirectorIntent=applySceneMomentumTimeFloor({action:'8시간 잔다',saveState:structuralCompoundSave},turn,'game');
 assert.deepEqual(turn.state_delta.items_add,[],'a model-invented choice event cannot authenticate a premature boundary reward');
 assert.equal(turn.event_progress,null,'a model-invented choice event cannot restore its own progress claim');
-assert.equal(turn.director,null,'a model-invented choice event cannot restore its own Director metadata');
+assert.deepEqual(turn.director,ongoingDirector,'hard validation leaves the rejected receipt untouched instead of authoring a replacement');
+assert.equal(inventedDirectorIntent.runtimeSceneTrusted,true,'the time validator does not become a new semantic event engine; production schema removal blocks this Director receipt');
 
 turn={scene_title:'0분 상한 훈련 선택',scene:[{kind:'narration',text:'훈련을 모두 마치고 기록표를 받았다.'},{kind:'dialogue',speaker_key:'artemis',text:'이제 잠들겠나?'}],choices:['잔다.','기다린다.','묻는다.'],state_delta:{advance_minutes:0,items_add:['훈련 기록표']}};
 turn.time_execution=choiceExecution(turn,{minutes:0,owners:[effectOwner('items_add',0)]});
@@ -649,7 +656,7 @@ assert.equal(turn.state_delta.fatigue_delta,0,'fatigue from the impossible post-
 assert.deepEqual(turn.state_delta.skill_experience,[],'growth from an action truncated by an omitted schedule must fail closed');
 assert.deepEqual(turn.state_delta.pc_knowledge_add,[],'knowledge from an action truncated by an omitted schedule must fail closed');
 assert.equal(omittedBoundaryIntent.runtimeSceneTrusted,false,'omitted-boundary completion prose must not feed runtime synthesis');
-assert.deepEqual(runtimeSynthesisTurn(turn,omittedBoundaryIntent).scene,[],'runtime synthesis must discard the underreported completion scene');
+assert.throws(()=>runtimeSynthesisTurn(turn,omittedBoundaryIntent),error=>error?.code==='UNCOMMITTED_TURN','an omitted hard boundary must reject the whole turn instead of returning an empty synthetic scene');
 const eveningClass={id:'evening-class',title:'기사과 수업',date:'1285-03-01',time:'20:00',kind:'academic',status:'scheduled'};
 const eveningClassSave={pc:knightPc,world:{date:'1285-03-01',time:'19:30',location:'훈련장'},scheduleContext:{due:[],upcoming:[eveningClass]},scheduledEvents:[eveningClass]};
 turn={scene_title:'오후 수업의 종',scene:[{kind:'narration',text:'오후 8시, 기사과 수업 종이 울렸다.'}],state_delta:{advance_minutes:30,skill_experience:[{skill:'검술',amount:1}]},choices:['수업에 간다','훈련을 멈춘다','다른 곳으로 간다']};
@@ -748,10 +755,10 @@ turn={scene_title:'휴식 완료',scene_summary:'여섯 시간을 모두 쉬고 
 const shortenedScheduleIntent=applySceneMomentumTimeFloor({action:'6시간 쉰다.',saveState:fullScheduleSave},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,300,'an explicit duration that crosses a required schedule must clamp even when the model omits the boundary');
 assert.equal(shortenedScheduleIntent.reconciliationReason,'schedule-boundary','an authoritative schedule truncation must identify its reconciliation boundary');
-assert.equal(turn.scene_title,'일정 경계','the returned title must expose the reached schedule instead of a false completed rest');
-assert.match(turn.scene_summary,/행동을 이어가던 중, 예정된 일정의 시작 시점에 도달했다/,'the returned narration must agree with the schedule boundary without exposing internal elapsed-minute diagnostics');
-assert.doesNotMatch(turn.scene_summary,/300분|경과분|누적 시간/,'ordinary schedule reconciliation must keep internal minute arithmetic out of player-facing prose');
-assert.doesNotMatch(turn.scene_summary,/여섯 시간|모두 쉬고/,'post-boundary completion prose must not remain user-visible');
+assert.equal(turn.scene_title,'휴식 완료','hard validation must not replace the Writer title with an internal schedule label');
+assert.equal(turn.scene_summary,'여섯 시간을 모두 쉬고 일어났다.','hard validation inspects but does not re-author rejected prose');
+assert.equal(shortenedScheduleIntent.runtimeSceneTrusted,false,'omitting a hard schedule boundary must fail the commit');
+assert.throws(()=>runtimeSynthesisTurn(turn,shortenedScheduleIntent),error=>error?.code==='UNCOMMITTED_TURN');
 
 turn={scene:[{kind:'narration',text:'잠에서 깨어나 몸을 일으켰다.'}],state_delta:{advance_minutes:60},choices:['일어난다','일정을 확인한다','더 쉰다']};
 applySceneMomentumTimeFloor({action:'잠을 잔다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
@@ -805,8 +812,9 @@ turn={scene:[{kind:'narration',text:'한 시간을 모두 기다렸다.'}],state
 const coincidentConsequenceIntent=applySceneMomentumTimeFloor({action:'1시간 동안 기다린다.',saveState:{world:{date:'1285-03-01',time:'09:00'},hooks:[coincidentConsequenceHook],scheduleContext:{due:[],upcoming:[]},scheduledEvents:[]}},turn,'game',coincidentConsequenceLifecycle);
 assert.equal(turn.state_delta.advance_minutes,60,'an action may complete exactly when an open consequence becomes due');
 assert.deepEqual(turn.state_delta.pc_knowledge_add,['대기 중 확인한 공개 공지'],'legitimate action effects must survive a coincident consequence boundary');
-assert.match(turn.scene_summary,/후속 상황이 발현할 시점/,'a coincident open consequence must become visible instead of being skipped');
+assert.equal(turn.scene_summary,undefined,'an open consequence boundary must not be converted into narration');
 assert.equal(coincidentConsequenceIntent.reconciliationReason,'consequence-boundary','coincident consequence reconciliation must report its boundary');
+assert.equal(coincidentConsequenceIntent.runtimeSceneTrusted,false,'an omitted due consequence fails the commit instead of generating fiction');
 const arrivalRelationship={npc_key:'emily',affinity_delta:-1,trust_delta:1,status:'경계 중',reason:'에밀리가 약속 시각에 중앙광장에 도착해 함께 후문을 경계했다'};
 const arrivalKnowledge='에밀리가 약속 시각에 중앙광장에 도착했다.';
 const arrivalMemory={owner:'pc',fact:'에밀리가 약속 시각에 중앙광장에 도착해 후문 경계를 시작했다.',importance:2,secret_level:0};
@@ -822,9 +830,9 @@ assert.deepEqual(turn.state_delta.relationship_changes,[arrivalRelationship],'a 
 assert.deepEqual(turn.state_delta.pc_knowledge_add,[arrivalKnowledge],'knowledge visibly learned from the consequence must survive boundary shortening');
 assert.deepEqual(turn.state_delta.memories_add,[arrivalMemory],'a memory visibly formed by the consequence must survive boundary shortening');
 assert.deepEqual(turn.state_delta.hooks_update,[{id:consequenceHook.id,status:'resolved'}],'the preserved consequence state and its resolved lifecycle must remain aligned');
-assert.equal(turn.scene_title,'후속 상황','a safely manifested consequence must remain visible after boundary reconciliation');
+assert.equal(turn.scene_title,undefined,'validation must not invent a title for a safely manifested Writer scene');
 assert.match(turn.scene.map(item=>item.text).join(' '),/에밀리가 중앙광장에 도착/,'the one-shot consequence outcome must remain in the returned scene');
-assert.deepEqual(runtimeSynthesisTurn(turn,manifestedConsequenceIntent).scene,arrivalVisibleScene,'runtime synthesis must retain only the attributed consequence scene for next-turn participants');
+assert.deepEqual(runtimeSynthesisTurn(turn,manifestedConsequenceIntent).scene,arrivalVisibleScene,'an already bounded Writer consequence scene remains unchanged');
 turn={scene:[{kind:'narration',text:'마법진이 발동해 PC를 지하 의무실로 옮기고 부상을 입혔다.'}],state_delta:{advance_minutes:40,new_location:'지하 의무실',pc_status:'부상',hooks_update:[{id:consequenceHook.id,status:'resolved'}]},choices:[]};
 const pcStateEffects=consequenceNpcEffectsForShortening(turn,{event_name:'마법진 강제 전이',reason:'마법진이 발동해 PC를 지하 의무실로 옮기고 부상을 입힌다',secret_level:0},[],{});
 assert.equal(pcStateEffects.attribution_safe,true,'visible consequence-owned PC location and status must be attributable at the boundary');
@@ -1071,18 +1079,11 @@ const futureScene=[{kind:'dialogue',speaker_key:'emily',text:'한참 뒤 에밀�
 turn={scene_title:'한참 뒤의 방문',scene_summary:'에밀리가 도착했다.',scene:futureScene,emotion_updates:[{npc_key:'emily',expression:'smile'}],state_delta:{advance_minutes:100,npc_state_updates:[{npc_key:'emily',location:'광장'}]},choices:['맞이한다','돌려보낸다','기다린다'],event_progress:null};
 const shortenedIntent=applySceneMomentumTimeFloor({action:'5분만 기다린다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(shortenedIntent.runtimeSceneTrusted,false,'a shortened turn must mark its unreconciled visible scene unsafe for runtime synthesis');
-assert.equal(shortenedIntent.returnedSceneReconciled,true,'a shortened turn must replace the user-visible response as well as runtime input');
-assert.equal(turn.scene_title,'행동 진행 중','a profile-capped response must expose a deterministic nonterminal title');
-assert.match(turn.scene_summary,/행동을 이어가던 중/,'the returned summary must remain natural while the authoritative clock stays internal');
-assert.doesNotMatch(turn.scene_summary,/5분 동안|분이 경과|누적 시간/,'profile reconciliation must not expose internal elapsed-minute diagnostics');
-assert.doesNotMatch(turn.scene_summary,/에밀리|도착/,'the returned summary must not preserve post-cap events');
-assert.notStrictEqual(turn.scene,futureScene,'the user-visible response must no longer retain impossible post-cap narration');
-const safeRuntimeTurn=runtimeSynthesisTurn(turn,shortenedIntent);
-assert.deepEqual(safeRuntimeTurn.scene,[],'post-boundary speakers must not reach runtime synthesis');
-assert.deepEqual(safeRuntimeTurn.emotion_updates,[],'post-boundary speaker moods must not reach runtime synthesis');
-assert.deepEqual(safeRuntimeTurn.choices,[],'post-boundary choices must not influence runtime continuity');
-assert.equal(safeRuntimeTurn.state_delta.advance_minutes,5,'the reconciled bounded state delta must remain available to runtime synthesis');
-assert.equal(safeRuntimeTurn.runtime_incomplete_boundary,true,'runtime synthesis must mark the sanitized turn as an incomplete scene boundary');
+assert.equal(shortenedIntent.returnedSceneReconciled,true,'a shortened turn must be recognized as requiring hard validation');
+assert.equal(turn.scene_title,'한참 뒤의 방문','hard validation does not replace the Writer title');
+assert.equal(turn.scene_summary,'에밀리가 도착했다.','hard validation does not manufacture a bounded summary');
+assert.strictEqual(turn.scene,futureScene,'the rejected Writer scene remains available only for validation diagnostics');
+assert.throws(()=>runtimeSynthesisTurn(turn,shortenedIntent),error=>error?.code==='UNCOMMITTED_TURN','post-boundary fiction must never reach runtime continuity or save commit');
 const attackBoundary={id:'attack-prefix-class',title:'기사과 필수 수업',date:'1285-03-02',time:'07:50',kind:'academic',status:'scheduled'},attackBoundarySave={pc:knightPc,world:{date:'1285-03-02',time:'07:20',location:'훈련장'},scheduledEvents:[attackBoundary],scheduleContext:{due:[],upcoming:[attackBoundary]}};
 turn={scene:[{kind:'narration',text:'한 시간 훈련을 마친 뒤 상대를 공격해 쓰러뜨렸다.'}],state_delta:{advance_minutes:70,pc_status:'전투 승리',items_add:['승리 보상'],stat_progress:[{stat:'신체',amount:1}]},choices:['떠난다','확인한다','쉰다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'1시간 동안 훈련하고 공격한다.',saveState:attackBoundarySave},turn,'game');
@@ -1210,10 +1211,10 @@ turn={scene:[{kind:'narration',text:'지난 한 시간의 훈련을 마쳤다.'}
 applySceneMomentumTimeFloor({action:'1시간 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,60,'a current completion must remain valid when 지난 modifies the elapsed duration rather than a historical date');
 turn={scene:[{kind:'narration',text:'한 시간이 흘렀다. 기다리던 복도에 새로운 공지가 붙었다.'}],state_delta:{advance_minutes:10},choices:['공지를 본다','자리를 뜬다','조금 더 기다린다'],event_progress:null};
-applySceneMomentumTimeFloor({action:'1시간 동안 기다린다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
+const raisedWaitIntent=applySceneMomentumTimeFloor({action:'1시간 동안 기다린다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,60,'ordinary elapsed-wait completion prose must enforce the declared wait duration before choices');
-assert.match(turn.scene_summary,/행동을 마쳤다/,'reconciled wait narration must agree that the declared wait completed without exposing internal elapsed minutes');
-assert.doesNotMatch(turn.scene_summary,/60분|경과분|누적 시간/,'completed wait reconciliation must keep the authoritative minute count internal');
+assert.equal(turn.scene_summary,undefined,'runtime must not append completion narration to a raised clock');
+assert.equal(raisedWaitIntent.runtimeSceneTrusted,false,'an underreported wait receipt must fail uncommitted');
 turn={scene:[{kind:'narration',text:'한 시간이 흘렀을 때 복도 끝에서 경보가 울렸다.'}],state_delta:{advance_minutes:60},choices:['경보를 확인한다','계속 기다린다','자리를 뜬다'],event_progress:null};
 applySceneMomentumTimeFloor({action:'2시간 동안 기다린다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');
 assert.equal(turn.state_delta.advance_minutes,60,'a shorter elapsed cue must not complete a longer declared wait');
@@ -1269,9 +1270,9 @@ assert.deepEqual(turn.state_delta.hooks_update,[],'future hook state must not su
 assert.equal(turn.event_progress,undefined,'explicit zero minutes must reject model-produced event progress');
 assert.equal(explicitZeroIntent.returnedSceneReconciled,true,'explicit zero minutes must reconcile the visible response as well as state');
 assert.equal(explicitZeroIntent.runtimeSceneTrusted,false,'explicit zero-minute completion prose must not enter runtime synthesis');
-assert.match(turn.scene_summary,/0분.*행동 결과는 발생하지 않았다/,'explicit zero minutes must replace contradictory completion prose');
-assert.doesNotMatch(JSON.stringify(turn.scene),/훈련을 마치고|증표를 챙겼다/,'explicit zero minutes must remove visible completion effects');
-assert.deepEqual(turn.choices,[],'explicit zero minutes must remove choices based on effects that never happened');
+assert.equal(turn.scene_summary,'훈련을 끝내고 검술이 늘었다.','explicit zero validation must not replace contradictory completion prose with internal diagnostics');
+assert.match(JSON.stringify(turn.scene),/훈련을 마치고|증표를 챙겼다/,'the rejected Writer scene remains untouched until the 409 response');
+assert.deepEqual(turn.choices,['증표를 확인한다'],'hard validation must not manufacture another visible choice state');
 const priorZeroProgress={eventInstanceId:'active:training',activeBeat:'drill',completedBeats:['setup'],paused:false};
 const zeroProgressState=mergeRoutedEventProgressState(priorZeroProgress,{},turn.event_progress);
 assert.equal(zeroProgressState.eventProgress?.eventInstanceId,priorZeroProgress.eventInstanceId,'rejected zero-minute progress must preserve the authoritative prior event identity');
@@ -1285,11 +1286,9 @@ assert.equal(turn.state_delta.advance_minutes,240,'a completed sleep must still 
 assert.equal(turn.state_delta.fatigue_delta,-2,'raising elapsed time must preserve completion effects that remain in scope');
 assert.equal(raisedFloorIntent.returnedSceneReconciled,true,'raising elapsed time must reconcile contradictory visible timing');
 assert.equal(raisedFloorIntent.runtimeSceneTrusted,false,'underreported completion prose must not enter runtime synthesis');
-assert.match(turn.scene_summary,/최소 시간을 채워 행동을 마쳤다/,'raised-floor narration must retain deterministic completion semantics');
-assert.doesNotMatch(turn.scene_summary,/240분|경과분|누적 시간/,'ordinary raised-floor narration must keep internal elapsed minutes out of player-facing prose');
-assert.equal(turn.scene_title,'행동 완료','raised-floor reconciliation must visibly retain completion semantics for preserved effects');
-assert.match(turn.scene_summary,/행동을 마쳤다/,'preserved completion effects must remain grounded in the replacement narration');
-assert.doesNotMatch(JSON.stringify(turn.scene),/한 시간|60분/,'raised-floor narration must remove the underreported model duration');
+assert.equal(turn.scene_summary,'한 시간 잠을 잤다.','raised-floor validation must not author a replacement summary');
+assert.equal(turn.scene_title,'한 시간 뒤','raised-floor validation must not author a replacement title');
+assert.match(JSON.stringify(turn.scene),/60분/,'the rejected underreported Writer duration is diagnostic only');
 
 const npcDeparture={npc_key:'artemis',location:'교관실',status:'퇴장'},departureRelationship={npc_key:'artemis',affinity_delta:1,reason:'훈련을 지켜본 뒤 조언을 남겼다'},departureMemory={owner:'pc',fact:'아르테미스가 조언을 남기고 먼저 떠났다.',importance:1};
 turn={scene_title:'교관의 퇴장',scene_summary:'10분쯤 훈련하자 아르테미스가 조언을 남기고 떠났다.',scene:[{kind:'narration',text:'10분쯤 훈련하자 아르테미스가 조언을 남기고 교관실로 떠났다.'}],state_delta:{advance_minutes:10,npc_state_updates:[npcDeparture],relationship_changes:[departureRelationship],memories_add:[departureMemory]},choices:[],event_progress:null};
@@ -1301,7 +1300,7 @@ assert.deepEqual(turn.state_delta.memories_add,[departureMemory],'visible memori
 assert.match(turn.scene.map(item=>item.text).join(' '),/아르테미스.*떠났다/,'the evidence-bearing scene must survive a pure floor raise');
 assert.doesNotMatch(turn.scene_summary,/60분|경과분|누적 시간/,'the retained scene summary must keep the authoritative floor internal');
 assert.doesNotMatch(turn.scene.at(-1)?.text||'',/60분|경과분|누적 시간/,'the appended raised-floor reconciliation must not expose elapsed-minute diagnostics');
-assert.equal(preservedRaisedFloorIntent.runtimeSceneTrusted,true,'retained evidence-bearing narration must remain safe for runtime synthesis');
+assert.equal(preservedRaisedFloorIntent.runtimeSceneTrusted,false,'a clock raise that contradicts retained timing evidence must fail uncommitted');
 
 turn={scene_title:'훈련 완료',scene_summary:'10분 만에 훈련을 마쳤고 아르테미스가 떠났다.',scene:[{kind:'narration',text:'10분 만에 훈련을 마쳤고 아르테미스가 교관실로 떠났다.'}],state_delta:{advance_minutes:10,fatigue_delta:2,npc_state_updates:[npcDeparture],relationship_changes:[departureRelationship],memories_add:[departureMemory]},choices:[],event_progress:null};
 applySceneMomentumTimeFloor({action:'1시간 동안 훈련한다.',saveState:{world:{date:'1285-03-02',time:'07:20'},scheduleContext:{due:[],upcoming:[]}}},turn,'game');

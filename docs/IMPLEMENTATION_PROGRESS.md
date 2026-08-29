@@ -1,7 +1,23 @@
 # Lumensia Implementation Progress
 
 ## Current Phase
-Narrative Phase 1 **FROZEN**. `PHASE_2_IMPLEMENTATION_PASS: COMPLETE` and `PHASE_2_STATUS: COMPLETE`. STAB-01, STAB-BASE, and fresh STAB-02R are merged, and the final latest-main life-loop integration passes. No new Phase 2 feature discovery or implementation is allowed; the next task is **Prepare LUMENSIA PHASE 3 planning / handover** without starting Phase 3 implementation.
+`P3-PR01R — AI-FIRST NARRATIVE RUNTIME RESET` is in fresh Draft implementation and **HUMAN QUALITY ACCEPTANCE PENDING**. PR #88 is frozen as `CORE ACCEPTANCE FAIL / ARCHITECTURE EXPERIMENT / DO NOT MERGE`; P3-PR02 and every merge remain forbidden.
+
+## P3-PR01R — CURRENT IMPLEMENTATION CHECKPOINT
+
+- Refetched base: latest main `6f1f45a644e2ece54a74577ce8a39afe4859e686`.
+- Frozen failed experiment: PR #88 exact reset head `baca3c6c6e2aaf770daeafd71b567ffcef4ff51f`, Open/Draft/Unmerged. No cherry-pick or branch reuse.
+- Fresh branch: `codex/p3-pr01r-ai-first-runtime-reset`, directly from latest main. PR #89 is Open/Draft/Unmerged; initial published implementation head `332d29fab2ed1ba34897fccfc22fdc2cb169004c`.
+- Architecture: Canon kernel -> thin scene packet -> one AI Writer -> hard-invariant validation -> render.
+- Reset implemented: no Writer-facing Director/orchestration/hook/exit/schedule choreography/event checkpoint/participant queue/procedural next action/generic role assignment/static PC template. Exact USER ACTION remains last and unmodified.
+- Character packet contains only causally relevant canonical named characters, current goal/relationship/relevant memory, with no-character as a valid output state. Routine generic dialogue is not required.
+- Structured scene container stays flexible. Writer schema removes `director`, `event_progress`, delayed-consequence queue creation, and future NPC Goal V2 control fields; factual state/time receipts remain.
+- Invalid boundary/state reconciliation fails `409 UNCOMMITTED_TURN`; runtime no longer turns validation/event/time internals into fiction. No second model call or rewrite pass exists.
+- PC identity: Writer canonical name and mobile placeholder both derive from `save.pc.name`; static `카일`/`Aaa` PC canon is excluded.
+- Tests: all 72 `scripts/tests/*.test.mjs` PASS locally. Focus includes sign-only vs broad intent, named/no-NPC, schedule as fact only, exact 5,000-char USER ACTION, authority tail, context pressure, schema removal, identity source, hard-validator fail-closed, flexible scene order, and one canonical model call.
+- Local gates: all 72 deterministic test files and full `node scripts/lumensia-pr-check.mjs origin/main HEAD` PASS on the committed implementation tree.
+- Gates pending: hosted Safety, Vercel, Exact Preview A–M, and explicit human qualitative PASS.
+- NEXT ACTION: publish this docs checkpoint, record its exact head/Preview, run hosted gates, provide every Preview URL immediately, then await human qualitative acceptance. Never merge; never start P3-PR02.
 
 ## Narrative Phase 1 FREEZE — Authoritative Closure
 - Verified main is `9f2274abeef7f34531c8d0240f66ed39293b9eef`, the human merge of PR #67 NPC Significance Evaluator V1 exact head `3293e1c11569e5531518ae7e05918a54693c2bb9`.

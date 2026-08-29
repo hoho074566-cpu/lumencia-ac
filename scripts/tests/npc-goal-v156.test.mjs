@@ -17,11 +17,11 @@ const object=(v)=>v&&typeof v==='object'&&!Array.isArray(v)?v:{};
 const clampText=(v,max=1200)=>typeof v==='string'?v.slice(0,max):JSON.stringify(v??'').slice(0,max);
 const {goalRuntimeFor}=makeLifecycle(array,object,clampText,{anastasia:'아나스타샤',isabel:'이사벨'});
 
-const schemaStart=source.indexOf('function goalV2FieldSchema(){');
+const schemaStart=source.indexOf('function timeExecutionFieldSchema(){');
 const schemaEnd=source.indexOf('function installResponsesRouter()');
 assert.ok(schemaStart>=0&&schemaEnd>schemaStart,'Goal V2 structured-format source markers missing');
 const schemaSource=source.slice(schemaStart,schemaEnd);
-const makeSchema=new Function(`const GOAL_V2_RULES='[NPC GOAL V2]';const TIME_EXECUTION_RULES='[TPP PHASE 3]';${schemaSource};return {patchGoalV2StructuredFormat};`);
+const makeSchema=new Function(`const TIME_EXECUTION_RULES='[TPP PHASE 3]';${schemaSource};return {patchGoalV2StructuredFormat};`);
 const {patchGoalV2StructuredFormat}=makeSchema();
 
 const key='anastasia';
@@ -142,17 +142,16 @@ test('mere dialogue/no goal evidence never changes goal progress',()=>{
   assert.equal(result.goal.last_progress_reason,'이전 진전');
 });
 
-test('structured format exposes and preserves Goal V2 fields through the legacy parser',()=>{
+test('structured format keeps future NPC goal controls out of the Writer schema',()=>{
   const format={
     schema:{type:'object',properties:{state_delta:{type:'object',properties:{npc_state_updates:{type:'array',items:{type:'object',properties:{npc_key:{type:'string'},current_goal:{anyOf:[{type:'string'},{type:'null'}]}},required:['npc_key','current_goal'],additionalProperties:false}}}}}},
     $parseRaw:(content)=>{const raw=JSON.parse(content);return{state_delta:{npc_state_updates:raw.state_delta.npc_state_updates.map(r=>({npc_key:r.npc_key,current_goal:r.current_goal}))}};},
   };
   const patched=patchGoalV2StructuredFormat({instructions:'base',text:{format}});
   const item=patched.text.format.schema.properties.state_delta.properties.npc_state_updates.items;
-  for(const field of ['goal_progress_delta','goal_state','goal_reason','goal_next_action','goal_replace'])assert.ok(item.properties[field]);
+  for(const field of ['goal_progress_delta','goal_state','goal_reason','goal_next_action','goal_replace'])assert.equal(item.properties[field],undefined);
   const parsed=patched.text.format.$parseRaw(JSON.stringify({state_delta:{npc_state_updates:[{npc_key:key,current_goal:'목표',goal_progress_delta:12,goal_state:'active',goal_reason:'증거',goal_next_action:'다음 행동',goal_replace:false}]}}));
-  assert.equal(parsed.state_delta.npc_state_updates[0].goal_progress_delta,12);
-  assert.equal(parsed.state_delta.npc_state_updates[0].goal_reason,'증거');
-  assert.equal(parsed.state_delta.npc_state_updates[0].goal_replace,false);
-  assert.match(patched.instructions,/NPC GOAL V2/);
+  assert.equal(parsed.state_delta.npc_state_updates[0].current_goal,'목표');
+  assert.equal(parsed.state_delta.npc_state_updates[0].goal_progress_delta,undefined);
+  assert.doesNotMatch(patched.instructions,/NPC GOAL V2/);
 });

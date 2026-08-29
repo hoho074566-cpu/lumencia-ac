@@ -1,8 +1,25 @@
 # LUMENSIA — CURRENT INTEGRATED DEVELOPMENT HANDOVER
 
-작성 기준: 2026-08-28
+작성 기준: 2026-08-29
 프로젝트: 긴빠이 프로젝트 / Lumensia Academy  
 Repository: `hoho074566-cpu/lumencia-ac`
+
+## P3-PR01R — AI-FIRST NARRATIVE RUNTIME RESET (CURRENT AUTHORITY)
+
+- Latest main/base was refetched and verified at `6f1f45a644e2ece54a74577ce8a39afe4859e686` before implementation.
+- PR #88 Novel Director V2 remains **OPEN / DRAFT / UNMERGED / CORE ACCEPTANCE FAIL / ARCHITECTURE EXPERIMENT / DO NOT MERGE**. Its exact head at reset was `baca3c6c6e2aaf770daeafd71b567ffcef4ff51f`; no commit was cherry-picked, and its close/merge state must not be changed without human direction.
+- Fresh branch: `codex/p3-pr01r-ai-first-runtime-reset`, created directly from latest main. New PR #89 is **OPEN / DRAFT / UNMERGED**; initial published implementation head is `332d29fab2ed1ba34897fccfc22fdc2cb169004c`.
+- Writer path is reset to `SYSTEM/CANON KERNEL -> THIN SCENE PACKET -> ONE AI WRITER -> HARD-INVARIANT VALIDATION -> RENDER`.
+- Writer input is limited to exact USER ACTION at the final authority tail, immediately relevant hard canon, current scene/recent beats, causally relevant named-character packets, relevant memory/consequence/thread facts, and a minimal Writer contract. Schedule is only a bounded clock fact. Event checkpoints, participant queues, completion recipes, next-action guidance, scene orchestration, hooks/exits, generic role actors, and static PC examples are not routed.
+- Writer structured schema no longer requests `director`, `event_progress`, delayed-consequence planning, or NPC `goal_next_action` controls. `scene[]` remains a flexible ordered presentation container; `time_execution` and `state_delta` remain after-scene factual receipts.
+- Runtime boundary correction no longer writes replacement narration, generic choice summaries, schedule labels, or consequence prose. A scene that cannot satisfy hard runtime invariants fails `409 UNCOMMITTED_TURN`, so no invalid turn reaches save commit. Already bounded Writer-origin scenes remain unchanged.
+- PC identity authority is one save source: thin packet `pc_identity.canonical_name = save.pc.name`, mobile placeholder uses `save.pc.name`, and the former static example identities `카일` / `Aaa` are absent from Writer context.
+- Local deterministic status: all 72 repository test files PASS, including exact 5,000-character USER ACTION, authority tail, context pressure, sign-only/broad-intent separation, named/no-NPC routing, schema control removal, flexible scene order, one canonical model call, and fail-uncommitted validation. Full `node scripts/lumensia-pr-check.mjs origin/main HEAD` PASS on the committed implementation tree.
+- `P3-PR01R` remains **HUMAN QUALITY ACCEPTANCE PENDING**. Automated success never marks it complete. Required Exact Preview A–M, Safety, Vercel, and human qualitative PASS are still gates.
+- MERGE is forbidden. P3-PR02 is forbidden until explicit human P3-PR01R acceptance.
+- NEXT ACTION: publish this docs checkpoint to PR #89, verify exact-head Safety/Vercel, send every Preview URL to the user immediately, and wait for the user's qualitative verdict while continuing non-merge verification.
+
+> All earlier Phase 3 / PR #88 NEXT ACTION text below is historical wherever it conflicts with this section.
 
 > 이 문서는 새 프로젝트 시작 문서가 아니다. HANDOVER 1(2026-08-19) → HANDOVER 2(2026-08-22) → HANDOVER 3(2026-08-23) → V1.5.5 NPC Motivation / Relationship Reason → V1.5.6 NPC Goal V2 → Scene Momentum Recovery HF1의 연속선이다.
 >

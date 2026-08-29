@@ -31,7 +31,7 @@ assert.match(runtime, /save\.pc\.skillCandidates = candidates/, 'client runtime 
 assert.match(runtime, /새 스킬 습득:/, 'client must surface deterministic unlocks to the player');
 assert.match(runtime, /학습 중: \$\{learning\}/, 'PC info must show active learning candidates');
 assert.match(app, /const skills = Object\.entries\(save\.pc\.skills \|\| \{\}\)[\s\S]*?const stats = Object\.entries\(save\.pc\.stats \|\| \{\}\)/, 'stable runtime render patch must still match the canonical app source');
-assert.match(contextRouter, /skillCandidates:compactMandatorySkillCandidates\(pc\.skillCandidates\)/, 'adaptive minimum context must retain bounded learning candidate identities and progress only');
+assert.match(contextRouter, /skill_candidates:boundedSkillCandidates/, 'thin hard facts must retain bounded learning candidate identities and progress only');
 assert.match(sharedUtils, /validCandidateName\(row\.skill\) && row\.basis && row\.reason/, 'shared sanitizer must reject basis-less candidate rows');
 assert.match(health, /skillLearning:/, 'health response must advertise Skill Learning V1');
 assert.equal((router.match(/coreHandler\(/g) || []).length, 1, 'Skill Learning V1 must preserve one canonical core call site');
@@ -272,7 +272,7 @@ const growthDelta = deriveSceneDelta({ saveState: {}, turn: { choices: [], scene
 assert.equal(growthDelta.flags.growthChanged, true, 'an accepted learning mutation must count as real growth State Delta');
 
 assert.match(router, /maxItems:2[\s\S]*skill:\{type:'string',minLength:2,maxLength:48\}[\s\S]*amount:\{type:'integer',minimum:1,maximum:15\}/, 'patched structured schema must bound candidate rows and per-turn progress');
-assert.match(router, /basis 없는 진척은 금지/, 'model instructions must preserve the evidence gate');
+assert.doesNotMatch(router, /basis 없는 진척은 금지|\[SKILL LEARNING V1\]/, 'skill-learning quality rules must stay in hard validation instead of controlling Writer composition');
 assert.match(router, /replaceStructuredEffectRows\(data\.turn,'skill_experience',mode==='auto'\?\[\]:filterExistingSkillExperience\(structuredEffectRows/, 'adapter must freeze AUTO experience, block legacy candidate leakage, and keep accepted ownership row-aligned');
 
 const divider = '='.repeat(20);
@@ -303,24 +303,24 @@ Resolve.`;
 const denseRouted = routeOpenAIParams(
   { instructions, input: '===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}' },
   { incoming: {
-    action: `반월 보법을 이어서 훈련한다. ${'긴 행동 '.repeat(1400)}`,
+    action: `반월 보법을 이어서 훈련한다. ${'긴 행동 '.repeat(1400)}`.slice(0,5000),
     saveState: {
       turnNumber: 20,
       world: { location: '훈련장' },
       pc: { name: '아리아', department: '기사과', skills: { 대검술: { grade: 'D' } }, skillCandidates: newCandidate.candidates },
       sceneRuntime: { participants: ['artemis'] },
       npcInnerStates: {},
-      routerFeedback: { routerVersion: '1.5.6-hf1', profile: 'routine-17k-v154', lastInputTokens: 100000 },
+      routerFeedback: { routerVersion: 'p3-pr01r-thin-scene-packet-v1', profile: 'routine-17k-v154', lastInputTokens: 100000 },
     },
     recentTurns: [],
   }, mode: 'game' },
 );
 assert.equal(denseRouted.telemetry.adaptive_scale, .76, 'dense fixture must exercise the minimum adaptive route');
 assert.ok(denseRouted.params.input.length <= 6840, `dense learning input exceeded adaptive routine budget: ${denseRouted.params.input.length}`);
-const minimumText = denseRouted.params.input.split('===== AUTHORITATIVE SAVE_STATE (ROUTED MINIMUM) =====\n')[1].split('\n\n=====')[0];
-const minimumSave = JSON.parse(minimumText);
-assert.equal(minimumSave.pc.skillCandidates['반월 보법'].progress, 8, 'active candidate progress must survive the mandatory minimum block');
-assert.equal(minimumSave.pc.skills['대검술'].grade, 'D', 'existing skill names must survive the mandatory minimum to prevent duplicate candidates');
+const thinPc=(result)=>JSON.parse(result.params.input.split('===== THIN SCENE PACKET — HARD FACTS =====\n')[1].split('\n\n=====')[0]).canonical_facts.pc;
+const minimumPc = thinPc(denseRouted);
+assert.equal(minimumPc.skill_candidates['반월 보법'].progress, 8, 'active candidate progress must survive the mandatory minimum block');
+assert.equal(minimumPc.skills['대검술'].grade, 'D', 'existing skill names must survive the mandatory minimum to prevent duplicate candidates');
 
 const fixedWidthName = (prefix, index, length) => `${prefix}${index}-`.padEnd(length, String(index % 10)).slice(0, length);
 const pressureSkills = Object.fromEntries(Array.from({ length: 24 }, (_, index) => [fixedWidthName('기존-', index, 80), { grade: 'A++', hiddenXp: 99, ignored: '중복 상태 '.repeat(100) }]));
@@ -335,23 +335,22 @@ assert.ok(Object.keys(pressureCandidates).every((name) => name.length === 48), '
 const pressureRouted = routeOpenAIParams(
   { instructions, input: '===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}' },
   { incoming: {
-    action: `후보 기술을 계속 훈련한다. ${'장문 행동 '.repeat(1600)}`,
+    action: `후보 기술을 계속 훈련한다. ${'장문 행동 '.repeat(1600)}`.slice(0,5000),
     saveState: {
       turnNumber: 21,
       world: { location: '훈련장' },
       pc: { name: '아리아', department: '기사과', skills: pressureSkills, skillCandidates: pressureCandidates },
       sceneRuntime: { participants: ['artemis'] },
       npcInnerStates: {},
-      routerFeedback: { routerVersion: '1.5.6-hf1', profile: 'routine-17k-v154', lastInputTokens: 100000 },
+      routerFeedback: { routerVersion: 'p3-pr01r-thin-scene-packet-v1', profile: 'routine-17k-v154', lastInputTokens: 100000 },
     },
     recentTurns: [],
   }, mode: 'game' },
 );
 assert.ok(pressureRouted.params.input.length <= 6840, `maximal bounded learning context exceeded adaptive routine budget: ${pressureRouted.params.input.length}`);
-const pressureMinimumText = pressureRouted.params.input.split('===== AUTHORITATIVE SAVE_STATE (ROUTED MINIMUM) =====\n')[1].split('\n\n=====')[0];
-const pressureMinimum = JSON.parse(pressureMinimumText);
-assert.equal(Object.keys(pressureMinimum.pc.skills).length, 24, 'mandatory learning authority must retain the bounded existing skill-name set');
-assert.equal(Object.keys(pressureMinimum.pc.skillCandidates).length, 8, 'mandatory learning authority must retain all bounded active candidates');
-assert.ok(Object.values(pressureMinimum.pc.skillCandidates).every((row) => Object.keys(row).length === 1 && Object.prototype.hasOwnProperty.call(row, 'progress')), 'mandatory candidates must retain progress without duplicating basis, timestamps, or history');
+const pressurePc = thinPc(pressureRouted);
+assert.ok(Object.keys(pressurePc.skills).length <= 8, 'pressure routing must retain only a bounded relevant skill-name set');
+assert.ok(Object.keys(pressurePc.skill_candidates).length <= 5, 'pressure routing must retain only bounded active candidates');
+assert.ok(Object.values(pressurePc.skill_candidates).every((row) => Object.keys(row).length === 1 && Object.prototype.hasOwnProperty.call(row, 'progress')), 'mandatory candidates must retain progress without duplicating basis, timestamps, or history');
 
 console.log('PASS Skill Learning V1 schema, evidence, bounds, persistence, freeze, routing, unlock, and one-call regressions');

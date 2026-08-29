@@ -630,7 +630,7 @@ const routerSource = readFileSync(new URL('../../api/chat-router.js', import.met
 const healthSource = readFileSync(new URL('../../api/health.js', import.meta.url), 'utf8');
 const schemaSource = readFileSync(new URL('../../api/lib/schema.js', import.meta.url), 'utf8');
 assert.match(routerSource, /deriveCombatGrowthState/);
-assert.match(routerSource, /\[COMBAT GROWTH V2\]/, 'the single canonical request must receive the growth contract');
+assert.doesNotMatch(routerSource, /\[COMBAT GROWTH V2\]/, 'combat quality rules must stay in hard post-generation validation instead of controlling Writer composition');
 assert.match(routerSource, /state_delta\.stat_progress=\[\];data\.turn\.state_delta\.skill_experience=\[\]/, 'META must clear both legacy growth arrays');
 assert.match(routerSource, /growthAllowed=mode==='game'&&!zeroElapsedIntent/, 'AUTO and every frozen mode must fail closed');
 assert.match(routerSource, /replaceStructuredEffectRows\(data\.turn,'stat_progress',combatGrowthState\.accepted_stat_progress\).*replaceStructuredEffectRows\(data\.turn,'skill_experience',combatGrowthState\.accepted_skill_experience\)/s, 'only accepted rows may reach the stable runtime while structural ownership stays row-aligned');

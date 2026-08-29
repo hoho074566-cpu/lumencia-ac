@@ -132,12 +132,13 @@ test('router reserves a due consequence as fixed flow and a direct player questi
   const routed=routeOpenAIParams({instructions,input},{mode:'game',incoming:{action:'돌아다닌다.',saveState,recentTurns:[]}});
   assert.equal(routed.telemetry.event_director_v2.result,'EVENT_CONSEQUENCE_DUE');
   assert.equal(routed.telemetry.event_director_v2.event_consequence_id,hook.id);
-  assert.match(routed.params.input,/===== EVENT CONSEQUENCE V1 =====/);
-  assert.match(routed.params.input,/이전 행동\/세계 변화에서 예약된 인과 결과/);
+  assert.match(routed.params.input,/"kind":"due-consequence"/);
+  assert.match(routed.params.input,/"fact":"교수 호출"/);
+  assert.doesNotMatch(routed.params.input,/EVENT CONSEQUENCE V1|ORDER=|GUARDS=/,'only the due fact may reach the Writer');
 
   const question=routeOpenAIParams({instructions,input},{mode:'game',incoming:{action:'지금 밖으로 나갈까?',saveState,recentTurns:[]}});
   assert.notEqual(question.telemetry.event_director_v2.result,'EVENT_CONSEQUENCE_DUE');
-  assert.doesNotMatch(question.params.input,/===== EVENT CONSEQUENCE V1 =====/);
+  assert.doesNotMatch(question.params.input,/"kind":"due-consequence"|EVENT CONSEQUENCE V1/);
 });
 
 test('a due consequence routes canon for a named public NPC', () => {
@@ -156,13 +157,15 @@ test('an explicit wait routes to its consequence boundary and an earlier fixed s
   const waiting=routeOpenAIParams({instructions,input},{mode:'game',incoming:{action:'40분 기다린다.',saveState:waitingSave,recentTurns:[]}});
   assert.equal(waiting.telemetry.event_director_v2.result,'EVENT_CONSEQUENCE_DUE');
   assert.equal(waiting.telemetry.event_director_v2.event_consequence_trigger_minutes,20);
-  assert.match(waiting.params.input,/TRIGGER_IN=20min/);
+  assert.match(waiting.params.input,/"kind":"reachable-consequence"/);
+  assert.match(waiting.params.input,/"due_at":"1285-03-01T09:40"/);
+  assert.doesNotMatch(waiting.params.input,/TRIGGER_IN|ORDER=USER_ACTION_FIRST/);
 
   const zeroRangeSave={...waitingSave,world:{...waitingSave.world,time:'09:35'}};
   const zeroRange=routeOpenAIParams({instructions,input},{mode:'game',incoming:{action:'0분에서 10분 동안 기다린다.',saveState:zeroRangeSave,recentTurns:[]}});
   assert.equal(zeroRange.telemetry.event_director_v2.result,'EVENT_CONSEQUENCE_DUE','a consequence inside a zero-minimum positive range must route before the model call');
   assert.equal(zeroRange.telemetry.event_director_v2.event_consequence_trigger_minutes,5,'zero-minimum range lookahead must retain the positive upper endpoint');
-  assert.match(zeroRange.params.input,/TRIGGER_IN=5min/,'the routed consequence must preserve its exact trigger inside the zero-minimum range');
+  assert.match(zeroRange.params.input,/"due_at":"1285-03-01T09:40"/,'the factual due time must survive without a prose-order directive');
 
   for(const action of ['검술을 훈련한다.','기초 수업에 참석한다.']){
     const timed=routeOpenAIParams({instructions,input},{mode:'game',incoming:{action,saveState:waitingSave,recentTurns:[]}});
@@ -200,11 +203,11 @@ test('an explicit wait routes to its consequence boundary and an earlier fixed s
 test('due-result authority survives the minimum adaptive routine input budget', () => {
   const hook=makeHook();
   const action=`상황을 길게 검토한다. ${'세부 맥락을 확인한다. '.repeat(320)} 마지막으로 돌아다닌다.`;
-  const saveState={turnNumber:8,world:{date:'1285-03-01',time:'09:40',location:'중앙광장'},pc:{name:'아리아'},hooks:[hook],sceneRuntime:{participants:[],momentum:{}},scheduleContext:{due:[],upcoming:[]},director:{},routerFeedback:{routerVersion:'1.5.6-hf1',profile:'routine-17k-v154',lastInputTokens:99999}};
+  const saveState={turnNumber:8,world:{date:'1285-03-01',time:'09:40',location:'중앙광장'},pc:{name:'아리아'},hooks:[hook],sceneRuntime:{participants:[],momentum:{}},scheduleContext:{due:[],upcoming:[]},director:{},routerFeedback:{routerVersion:'p3-pr01r-thin-scene-packet-v1',profile:'routine-17k-v154',lastInputTokens:99999}};
   const routed=routeOpenAIParams({instructions,input},{mode:'game',incoming:{action,saveState,recentTurns:[]}});
   assert.equal(routed.telemetry.adaptive_scale,.76);
   assert.ok(routed.params.input.length<=6840,`adaptive due-result input exceeded 6840 chars: ${routed.params.input.length}`);
-  assert.match(routed.params.input,/===== EVENT CONSEQUENCE V1 =====/);
+  assert.match(routed.params.input,/"kind":"due-consequence"/);
   assert.match(routed.params.input,new RegExp(hook.id.replace(':','\\:')));
   assert.match(routed.params.input,/마지막으로 돌아다닌다\./);
 });

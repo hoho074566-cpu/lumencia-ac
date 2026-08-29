@@ -169,19 +169,18 @@ assert.equal(routed.telemetry.event_director_v3.result, 'WORLD_RESULT_SURFACE');
 assert.equal(routed.telemetry.event_director_v3.version, '3.0');
 assert.equal(routed.telemetry.event_director_v3.weighted_core_version, '2.1');
 assert.equal(routed.telemetry.event_director_v2.occurrence_id, undefined, 'a surfaced fact must not start a new event occurrence');
-assert.ok(routed.telemetry.selected_npcs.includes('lena'), 'the selected result NPC canon must be routed');
-assert.match(routed.params.input, /EVENT DIRECTOR V3 — PUBLIC WORLD RESULT SURFACING/);
-assert.match(routed.params.input, /GUARDS=ONE_TRACE\|NO_OUTCOME_INVENTION\|NO_META_LOG\|NO_TELEPORT\|NO_PC_KNOWLEDGE\|NO_PC_CONTROL/);
-assert.match(routed.params.input, /PUBLIC_FACT=마법과 정오 연구회 일정 종료가 공개적으로 확인됨/);
-assert.match(routed.params.input, /TURN_PLAN=user-action>director-event/);
+assert.ok(!routed.telemetry.selected_npcs.includes('lena'), 'a public result must not assign its possible carrier as the Writer actor');
+assert.match(routed.params.input, /"kind":"public-world-result"/);
+assert.match(routed.params.input, /"fact":"마법과 정오 연구회 일정 종료가 공개적으로 확인됨"/);
+assert.doesNotMatch(routed.params.input, /EVENT DIRECTOR V3|GUARDS=|PUBLIC_FACT=|TURN_PLAN=/,'only the confirmed fact may reach the Writer');
 assert.equal(routed.telemetry.scene_orchestration.secondary, 'director-event');
 const pressureRouted = route(`주변의 변화를 자세히 살펴본다. ${'긴 맥락을 확인한다. '.repeat(300)}`, {
-  routerFeedback: { routerVersion: '1.5.6-hf1', profile: 'routine-17k-v154', lastInputTokens: 99999 },
+  routerFeedback: { routerVersion: 'p3-pr01r-thin-scene-packet-v1', profile: 'routine-17k-v154', lastInputTokens: 99999 },
 });
 assert.equal(pressureRouted.telemetry.adaptive_scale, .76);
 assert.ok(pressureRouted.params.input.length <= 6840, `result surfacing exceeded the minimum routine budget: ${pressureRouted.params.input.length}`);
-assert.match(pressureRouted.params.input, /GUARDS=ONE_TRACE\|NO_OUTCOME_INVENTION\|NO_META_LOG\|NO_TELEPORT\|NO_PC_KNOWLEDGE\|NO_PC_CONTROL/, 'all result guards must survive minimum routing pressure');
-assert.match(pressureRouted.params.input, /PUBLIC_FACT=마법과 정오 연구회 일정 종료가 공개적으로 확인됨/, 'the exact confirmed fact must survive minimum routing pressure');
+assert.doesNotMatch(pressureRouted.params.input, /GUARDS=|PUBLIC_FACT=|EVENT DIRECTOR/,'result choreography must stay internal under pressure');
+assert.match(pressureRouted.params.input, /마법과 정오 연구회 일정 종료가 공개적으로 확인됨/, 'the exact confirmed fact must survive minimum routing pressure');
 
 assert.notEqual(route('그 제안을 받아들이면 어떻게 될까?').telemetry.event_director_v2?.result, 'WORLD_RESULT_SURFACE', 'direct questions keep answer-only sovereignty');
 assert.notEqual(route('상대를 공격한다.').telemetry.event_director_v2?.result, 'WORLD_RESULT_SURFACE', 'combat fixed flow stays ahead of result surfacing');
