@@ -8,14 +8,14 @@ import OpenAI from 'openai';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import coreHandler, { CHARACTER_REGISTRY } from './chat.js';
 import { routeOpenAIParams, routerVersion, array, object, clampText } from './lib/context-router.js';
-import { actualScheduledEntrants, freshChoices, reconcileParticipants } from '../lib/scene-continuity.js';
+import { actualScheduledEntrants, reconcileParticipants } from '../lib/scene-continuity.js';
 import { ADAPTIVE_TIME_SCALE_VERSION, SCENE_MOMENTUM_VERSION, classifySceneIntent, deriveSceneDelta, isPcRelevantScheduleEvent, nextScheduleBoundaryMinutes, updateSceneMomentum } from '../lib/scene-momentum.js';
 import { TIME_PLAN_PARSER_VERSION, isAdditiveAdverbialStem, parseTimePlan, summarizeTimePlan } from '../lib/time-plan-parser.js';
 import { projectStructuredOwnedEffects, rebaseStructuredEffectOwners, replaceStructuredEffectRows, structuredEffectRows, validateStructuredTimeExecution } from '../lib/time-plan-reconciliation.js';
 import { SCENE_NOVELTY_VERSION, deriveSceneNovelty } from '../lib/scene-novelty.js';
 import { deriveScenePurpose } from '../lib/scene-purpose.js';
 import { deriveSceneExitCondition, evaluateSceneExitCondition } from '../lib/scene-exit.js';
-import { deriveTurnHook, filterTurnHookChoices } from '../lib/turn-hook.js';
+import { deriveTurnHook } from '../lib/turn-hook.js';
 import { compactEventProgress, mergeContinuationEventProgressState, mergeRoutedEventProgressState, occurrenceIdFromStartEvidence, promotePausedEventProgress, scheduledIdsDueByTurnEnd, unscheduledPausedIdsForResume } from '../lib/event-progress.js';
 import { findEventConsequence, minutesUntilEventConsequence, reconcileEventConsequenceLifecycle } from '../lib/event-consequence.js';
 import { deriveGoalTickState } from '../lib/npc-goal-tick.js';
@@ -61,6 +61,10 @@ choices가 있으면 실제 선택 질문을 scene의 마지막 항목에 두고
 state_delta의 각 array 원소와 숫자가 아닌 scalar에는 effect_owners 한 개를 둔다. scope=state_delta, field는 실제 필드명, array는 effect_index, scalar는 null이다. fatigue_delta/gold_delta는 합계 소유자를 쓰지 말고 scalar_contributions에 action/event별 실제 기여량을 각각 보고하며, 기여량 합계는 state_delta 값과 정확히 같아야 한다. 완료한 사용자 action에서 생긴 효과는 owner_kind=clause/owner_id=action_N이다. 일정·인과·Director 경계 자체의 효과는 owner_kind=boundary-event와 실제 boundary_event_id를 쓴다. 서로 다른 action의 효과를 한 array row에 섞지 않는다.
 1440분 턴 상한에서 아직 plan이 끝나지 않았다면 boundary_kind=turn-limit가 다른 choice보다 우선한다. choices는 다음 턴으로 미루고 남은 action을 완료했다고 보고하지 않는다.
 event_progress나 director가 실제 선택 경계 사건에 속하면 scope=turn, field=event_progress 또는 director, effect_index=null, owner_kind=boundary-event로 귀속한다. 서술 표현을 근거로 미래 action 효과를 앞선 action에 귀속하지 않는다.`;
+
+const STATE_RECEIPT_CONTRACT = String.raw`[HARD STATE RECEIPTS]
+Structured state fields are factual receipts after the Scene, never a prose plan. Record only changes the Scene actually established; otherwise use empty arrays, null, or zero.
+time_execution may report only execution inside the exact USER ACTION. A meaningful choice boundary may identify the Scene beat that created it, but Suggested Actions remain disabled and choices must be empty.`;
 
 const SKILL_LEARNING_RULES = String.raw`[SKILL LEARNING V1]
 skill_learning은 PC에게 아직 없는 독립적이고 반복 사용 가능한 기술을 실제 훈련·수업·교정·실전 통찰로 배우는 경우에만 쓴다. 기존 기술의 동의어·세부 동작·일회성 연출·단순 사용을 새 기술로 만들지 않는다. skill에는 짧고 일관된 기술명, amount에는 한 턴 1~15의 보수적 진척, basis에는 이번 턴에 실제로 관찰 가능한 훈련법·교정·실전 근거, reason에는 진척 원인을 쓴다. basis 없는 진척은 금지한다. 이미 pc.skills에 있는 기술은 skill_experience만 사용하고, 기존 pc.skillCandidates의 같은 기술은 저장된 정확한 이름을 유지한다. 한 턴에 최대 2개만 보고하며 META·AUTO·CONTINUE에서는 성장시키지 않는다.`;
@@ -168,24 +172,13 @@ function extendGoalV2JsonSchema(schema){
   let changed=false;
   const visit=(node)=>{
     if(!node||typeof node!=='object')return;
-    const rows=node?.properties?.npc_state_updates;
-    const item=rows?.items;
-    if(item?.properties?.npc_key&&item?.properties?.current_goal){
-      Object.assign(item.properties,goalV2FieldSchema());
-      item.required=[...new Set([...(Array.isArray(item.required)?item.required:[]),'goal_progress_delta','goal_state','goal_reason','goal_next_action','goal_replace'])];
-      changed=true;
-    }
     const stateDelta=node?.properties?.state_delta;
     if(stateDelta?.properties?.advance_minutes&&node?.properties?.scene&&node?.properties?.choices&&!node.properties.time_execution){
       node.properties.time_execution=timeExecutionFieldSchema();
       node.required=[...new Set([...(Array.isArray(node.required)?node.required:[]),'time_execution'])];
       changed=true;
     }
-    if(stateDelta?.properties?.hooks_add&&!stateDelta.properties.delayed_consequences_add){
-      stateDelta.properties.delayed_consequences_add=delayedConsequenceFieldSchema();
-      stateDelta.required=[...new Set([...(Array.isArray(stateDelta.required)?stateDelta.required:[]),'delayed_consequences_add'])];
-      changed=true;
-    }
+    if(stateDelta?.properties?.advance_minutes&&node?.properties?.choices&&node.properties.choices.maxItems!==0){node.properties.choices.maxItems=0;changed=true;}
     if(stateDelta?.properties?.skill_experience&&!stateDelta.properties.skill_learning){
       stateDelta.properties.skill_learning=skillLearningFieldSchema();
       stateDelta.required=[...new Set([...(Array.isArray(stateDelta.required)?stateDelta.required:[]),'skill_learning'])];
@@ -211,22 +204,6 @@ function extendGoalV2JsonSchema(schema){
 }
 function mergeRawGoalV2Fields(parsed,raw){
   if(parsed&&typeof parsed==='object'&&raw?.time_execution&&typeof raw.time_execution==='object')parsed.time_execution=raw.time_execution;
-  const parsedRows=parsed?.state_delta?.npc_state_updates;
-  const rawRows=raw?.state_delta?.npc_state_updates;
-  if(Array.isArray(parsedRows)&&Array.isArray(rawRows)){
-    const limit=Math.min(parsedRows.length,rawRows.length);
-    for(let i=0;i<limit;i++){
-      const row=parsedRows[i];
-      const source=rawRows[i];
-      if(!row||typeof row!=='object'||!source||typeof source!=='object')continue;
-      if(String(row.npc_key||'')!==String(source.npc_key||''))continue;
-      for(const field of ['goal_progress_delta','goal_state','goal_reason','goal_next_action','goal_replace']){
-        if(Object.prototype.hasOwnProperty.call(source,field))row[field]=source[field];
-      }
-    }
-  }
-  const rawConsequences=raw?.state_delta?.delayed_consequences_add;
-  if(parsed?.state_delta&&Array.isArray(rawConsequences))parsed.state_delta.delayed_consequences_add=rawConsequences.slice(0,6);
   const rawSkillLearning=raw?.state_delta?.skill_learning;
   if(parsed?.state_delta&&Array.isArray(rawSkillLearning))parsed.state_delta.skill_learning=rawSkillLearning.slice(0,2);
   const rawAwakeningProgress=raw?.state_delta?.awakening_progress;
@@ -253,10 +230,7 @@ function patchGoalV2StructuredFormat(params){
       try{return mergeRawGoalV2Fields(parsed,JSON.parse(content));}catch{return parsed;}
     };
   }
-  const combatGrowthRules=typeof COMBAT_GROWTH_RULES==='string'?`\n\n${COMBAT_GROWTH_RULES}`:'';
-  const skillLearningRules=typeof SKILL_LEARNING_RULES==='string'?`\n\n${SKILL_LEARNING_RULES}`:'';
-  const awakeningTalentRules=typeof AWAKENING_TALENT_RULES==='string'?`\n\n${AWAKENING_TALENT_RULES}`:'';
-  return {...params,instructions:`${String(params.instructions||'')}\n\n${GOAL_V2_RULES}\n\n${TIME_EXECUTION_RULES}${combatGrowthRules}${skillLearningRules}${awakeningTalentRules}`,text:{...(params.text||{}),format:patchedFormat}};
+  return {...params,instructions:`${String(params.instructions||'')}\n\n${STATE_RECEIPT_CONTRACT}`,text:{...(params.text||{}),format:patchedFormat}};
 }
 
 function installResponsesRouter() {
@@ -763,32 +737,18 @@ function deriveTimedActionRuntime(previousRuntime={},intent={},action='',turn={}
 }
 function runtimeSynthesisTurn(turn,intent={}){
   if(intent?.runtimeSceneTrusted!==false)return turn;
-  const trustedConsequenceScene=array(intent?.runtimeTrustedConsequenceScene).filter(item=>String(item?.text||'').trim());
-  return{...object(turn),scene:trustedConsequenceScene,scene_title:'',scene_summary:'',choices:[],emotion_updates:[],director:null,runtime_incomplete_boundary:true};
+  const error=new Error('생성된 Scene과 hard runtime invariant가 일치하지 않아 이 턴을 저장하지 않았습니다.');
+  error.status=409;error.code='UNCOMMITTED_TURN';error.details={reason:String(intent?.reconciliationReason||'runtime-scene-untrusted')};
+  throw error;
 }
 function reconcileReturnedTimedTurn(turn,{reason='profile-cap',elapsed=0,boundaryTitle='',completedPrefixActionTypes=[],decisionPromptText=''}={}){
-  if(!turn||typeof turn!=='object')return false;
-  const minutes=Math.max(0,Math.trunc(Number(elapsed)||0)),labels={training:'훈련','class-attendance':'수업',meal:'식사',dialogue:'대화',sleep:'수면',rest:'휴식',wait:'대기',travel:'이동'},completed=[...new Set(array(completedPrefixActionTypes).map(value=>labels[value]).filter(Boolean))],completedLabel=completed.length?completed.length===1?completed[0]:`${completed.slice(0,-1).join('·')}과 ${completed.at(-1)}`:'',prefix=completedLabel?`앞선 ${completedLabel}을 마친 뒤, `:minutes>0?'행동을 이어가던 중, ':'행동을 시작하려던 순간, ';
-  const completedAtRaisedFloor=reason==='profile-floor',scheduleLabel=String(boundaryTitle||'예정된 일정').trim()||'예정된 일정',detail=reason==='schedule-boundary'?`${scheduleLabel}의 시작 시점에 도달했다.`:reason==='consequence-boundary'?'후속 상황이 발현할 시점에 도달했다.':reason==='decision-boundary'?'플레이어의 판단이 필요한 선택 지점에 도달했다.':reason==='turn-limit'?'한 턴의 진행 한계에 도달했다.':reason==='explicit-zero'?'요청한 지속시간이 0분이므로 행동 결과는 발생하지 않았다.':reason==='invalid-structured-execution'?'구조화된 실행 결과를 검증할 수 없어 반환된 시점에서 진행을 중단했다.':completedAtRaisedFloor?'요청한 행동이 완료될 수 있는 최소 시간을 채워 행동을 마쳤다.':'요청한 시간 범위의 끝에 도달했다.';
-  const text=`${prefix}${detail}${completedAtRaisedFloor?'':' 그 이후 과정은 아직 확정되지 않았다.'}`;
-  turn.scene_title=reason==='schedule-boundary'?'일정 경계':reason==='consequence-boundary'?'후속 상황 경계':reason==='decision-boundary'?'선택 지점':reason==='turn-limit'?'진행 중':['explicit-zero','invalid-structured-execution'].includes(reason)?'행동 보류':completedAtRaisedFloor?'행동 완료':'행동 진행 중';
-  const preservedChoices=reason==='decision-boundary'?array(turn.choices).slice(0,3):[],decisionCandidates=reason==='decision-boundary'?array(turn.scene).filter(item=>String(item?.text||'').trim()):[],prompt=String(decisionPromptText||'').trim(),promptRows=prompt?decisionCandidates.filter(item=>String(item?.text||'').includes(prompt)).map(item=>({...object(item),text:prompt})):[],questionRows=decisionCandidates.filter(item=>/[?？]/.test(String(item?.text||''))),decisionRows=(promptRows.length?promptRows:questionRows.length?questionRows:decisionCandidates.filter(item=>String(item?.kind||'')==='dialogue')).slice(-2);
-  const decisionSpeakerKeys=new Set(decisionRows.map(item=>String(item?.speaker_key||'').trim()).filter(Boolean)),retainedEmotionUpdates=reason==='decision-boundary'?array(turn.emotion_updates).filter(row=>decisionSpeakerKeys.has(String(row?.npc_key||row?.key||row?.speaker_key||'').trim())):[];
-  turn.scene_summary=text;turn.scene=[{kind:'narration',text},...decisionRows];turn.choices=preservedChoices;turn.emotion_updates=retainedEmotionUpdates;turn.cg_id=null;turn.director=null;
-  return true;
+  return false;
 }
 function reconcileReturnedRaisedFloorContinuation(turn){
-  if(!turn||typeof turn!=='object')return false;
-  const text='기존에 드러난 변화 뒤에도 요청한 행동을 이어 최소 진행 시간을 채웠다.';
-  turn.scene_title='행동 완료';turn.scene_summary='요청한 행동의 진행과 그 사이 발생한 변화가 함께 반영되었다.';turn.scene=[...array(turn.scene),{kind:'narration',text}];
-  return true;
+  return false;
 }
 function reconcileReturnedConsequenceTurn(turn,{elapsed=0,scene=[]}={}){
-  if(!turn||typeof turn!=='object')return false;
-  const minutes=Math.max(0,Math.trunc(Number(elapsed)||0)),rows=array(scene).filter(item=>String(item?.text||'').trim()).slice(0,4),boundaryText='행동을 이어가던 중 후속 상황이 발현했다.';
-  if(!rows.length)return reconcileReturnedTimedTurn(turn,{reason:'consequence-boundary',elapsed:minutes});
-  turn.scene_title='후속 상황';turn.scene_summary=boundaryText;turn.scene=[{kind:'narration',text:boundaryText},...rows];turn.choices=[];turn.emotion_updates=[];turn.director=null;
-  return true;
+  return false;
 }
 function uniqText(rows,limit=4){return [...new Set(array(rows).map(x=>clampText(x,140).trim()).filter(Boolean))].slice(-limit);}
 function tinyHash(text=''){let h=0x811c9dc5;for(const ch of String(text)){h^=ch.charCodeAt(0);h=Math.imul(h,0x01000193);}return(h>>>0).toString(16).padStart(8,'0');}
@@ -1066,10 +1026,10 @@ export default async function handler(req,res){
     const data=result.data;if(!data?.turn)throw new Error('코어 API 응답에 turn이 없습니다.');
     rebaseStructuredEffectOwners(data.turn);
     let telemetry=result.telemetry||{routerVersion:routerVersion(),enabled:false,profile:'unknown'};telemetry={...telemetry,actual_input_tokens:Number(data?.usage?.input_tokens||0),actual_output_tokens:Number(data?.usage?.output_tokens||0)};if(Number(telemetry.soft_max_tokens||0)>0)telemetry.budget_status=telemetry.actual_input_tokens<=telemetry.soft_max_tokens?'OK':'OVER';
-    if(mode==='continue'){lockContinueTurn(data.turn);data.fate_ending={version:1,accepted_discoveries:[],repeated_discoveries:[],reward_total:Number(incoming0.fateBook?.rewardTotal||0)};applyExtendedExpressions(data.turn,incoming0.saveState||{});const npcSignificance=routedNpcSignificance(data.turn,telemetry,mode);data.runtime_state=consumeContinuationRuntime({...incoming,saveState:object(incoming0.saveState)},data.turn);data.background_digest=String(incoming.saveState?.backgroundDigest||'').slice(-1800);const pipeline={pipeline:'continue-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,event_director_v3:telemetry?.event_director_v3||null,event_director_v3_enabled:true,world_result_surface:data.runtime_state.scene_runtime?.world_result_surface||null,world_result_surfacing_v1:true,adaptive_time_scale_version:ADAPTIVE_TIME_SCALE_VERSION,adaptive_time_scale_v2:true,scene_novelty:data.runtime_state.scene_runtime?.novelty||null,scene_novelty_v1:true,scene_purpose:data.runtime_state.scene_runtime?.purpose||null,scene_purpose_v1:true,scene_exit_condition:data.runtime_state.scene_runtime?.exit_condition||null,scene_exit_condition_v1:true,turn_hook:data.runtime_state.scene_runtime?.turn_hook||null,turn_hook_v1:true,scene_orchestration:data.runtime_state.scene_runtime?.orchestration||telemetry?.scene_orchestration||null,scene_orchestration_v1:true,npc_significance:npcSignificance,npc_significance_v1:true,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true,faction_social_v1:true,combat_growth_v2:true,skill_learning_v1:true,awakening_talent_v1:true,fate_ending_v1:true};data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);}
-    if(mode==='meta'){data.turn.ending_receipts=[];data.fate_ending={version:1,accepted_discoveries:[],repeated_discoveries:[],reward_total:Number(incoming0.fateBook?.rewardTotal||0)};if(data.turn?.state_delta){data.turn.state_delta.stat_progress=[];data.turn.state_delta.skill_experience=[];data.turn.state_delta.skill_learning=[];data.turn.state_delta.awakening_progress=[];data.turn.state_delta.talent_evolution=[];}const npcSignificance=routedNpcSignificance(data.turn,telemetry,mode);const pipeline={pipeline:'meta-full-stable-v156',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,event_director_v3:telemetry?.event_director_v3||null,event_director_v3_enabled:true,world_result_surface:null,world_result_surfacing_v1:true,adaptive_time_scale_version:ADAPTIVE_TIME_SCALE_VERSION,adaptive_time_scale_v2:true,scene_orchestration:telemetry?.scene_orchestration||null,scene_orchestration_v1:true,npc_significance:npcSignificance,npc_significance_v1:true,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true,faction_social_v1:true,combat_growth_v2:true,skill_learning_v1:true,awakening_talent_v1:true,fate_ending_v1:true};data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);}
+    if(mode==='continue'){lockContinueTurn(data.turn);data.fate_ending={version:1,accepted_discoveries:[],repeated_discoveries:[],reward_total:Number(incoming0.fateBook?.rewardTotal||0)};applyExtendedExpressions(data.turn,incoming0.saveState||{});const npcSignificance=routedNpcSignificance(data.turn,telemetry,mode);data.runtime_state=consumeContinuationRuntime({...incoming,saveState:object(incoming0.saveState)},data.turn);data.background_digest=String(incoming.saveState?.backgroundDigest||'').slice(-1800);const pipeline={pipeline:'continue-p3-pr01r2',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:null,event_director_v3:null,event_director_v3_enabled:false,world_result_surface:data.runtime_state.scene_runtime?.world_result_surface||null,world_result_surfacing_v1:true,adaptive_time_scale_version:ADAPTIVE_TIME_SCALE_VERSION,adaptive_time_scale_v2:true,scene_novelty:data.runtime_state.scene_runtime?.novelty||null,scene_novelty_v1:true,scene_purpose:data.runtime_state.scene_runtime?.purpose||null,scene_purpose_v1:true,scene_exit_condition:data.runtime_state.scene_runtime?.exit_condition||null,scene_exit_condition_v1:true,turn_hook:data.runtime_state.scene_runtime?.turn_hook||null,turn_hook_v1:true,scene_orchestration:data.runtime_state.scene_runtime?.orchestration||null,scene_orchestration_v1:true,npc_significance:npcSignificance,npc_significance_v1:true,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true,faction_social_v1:true,combat_growth_v2:true,skill_learning_v1:true,awakening_talent_v1:true,fate_ending_v1:true};data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);}
+    if(mode==='meta'){data.turn.ending_receipts=[];data.fate_ending={version:1,accepted_discoveries:[],repeated_discoveries:[],reward_total:Number(incoming0.fateBook?.rewardTotal||0)};if(data.turn?.state_delta){data.turn.state_delta.stat_progress=[];data.turn.state_delta.skill_experience=[];data.turn.state_delta.skill_learning=[];data.turn.state_delta.awakening_progress=[];data.turn.state_delta.talent_evolution=[];}const npcSignificance=routedNpcSignificance(data.turn,telemetry,mode);const pipeline={pipeline:'meta-full-p3-pr01r2',stages:1,qa_result:'SKIP',rewrite_applied:false,background_sim:false,context_router:telemetry,event_director_v2:null,event_director_v3:null,event_director_v3_enabled:false,world_result_surface:null,world_result_surfacing_v1:true,adaptive_time_scale_version:ADAPTIVE_TIME_SCALE_VERSION,adaptive_time_scale_v2:true,scene_orchestration:null,scene_orchestration_v1:true,npc_significance:npcSignificance,npc_significance_v1:true,npc_motivation_v1:true,npc_goal_v2:true,relationship_reason_v1:true,faction_social_v1:true,combat_growth_v2:true,skill_learning_v1:true,awakening_talent_v1:true,fate_ending_v1:true};data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);}
     applyExtendedExpressions(data.turn,incoming0.saveState||{});
-    data.turn.choices=filterTurnHookChoices(incoming.action,{...data.turn,choices:freshChoices(incoming.action,data.turn)});
+    data.turn.choices=[];
     const growthIntent=classifySceneIntent(incoming0.action||'',{location:incoming.saveState?.world?.location||'',currentTime:incoming.saveState?.world?.time||'',currentDate:incoming.saveState?.world?.date||'',currentWeekday:incoming.saveState?.world?.weekday||'',actorName:incoming.saveState?.pc?.name||'',resumeTimedAction:incoming.saveState?.sceneRuntime?.timed_action}),zeroElapsedRange=array(growthIntent.explicitDurationRangeMinutes).length===2&&growthIntent.explicitDurationRangeMinutes.every(value=>Number(value)===0),zeroElapsedIntent=mode==='game'&&(growthIntent.explicitDurationMinutes===0||zeroElapsedRange)&&Number(growthIntent.minAdvanceMinutes||0)<=0,growthAllowed=mode==='game'&&!zeroElapsedIntent,growthValidationScene=data.turn?.scene;
     if(data.turn?.state_delta)replaceStructuredEffectRows(data.turn,'skill_experience',mode==='auto'?[]:filterExistingSkillExperience(structuredEffectRows(data.turn,'skill_experience'),incoming0.saveState?.pc?.skills));
     const combatGrowthState=deriveCombatGrowthState({
@@ -1110,9 +1070,9 @@ export default async function handler(req,res){
       replaceStructuredEffectRows(data.turn,'awakening_progress',awakeningTalentState.accepted_awakening_changes);
       replaceStructuredEffectRows(data.turn,'talent_evolution',awakeningTalentState.accepted_talent_evolution);
     }
-    const consequenceId=String(telemetry?.event_director_v2?.event_consequence_id||'');
+    const consequenceId=String(telemetry?.hard_event_facts?.event_consequence_id||'');
     const selectedConsequence=findEventConsequence(incoming.saveState,consequenceId);
-    const {visible_scene:consequenceVisibleScene,...consequenceEffects}=consequenceNpcEffectsForShortening(data.turn,selectedConsequence,telemetry?.event_director_v2?.event_consequence_npc_keys),consequenceLifecycleBase=reconcileEventConsequenceLifecycle({saveState:incoming.saveState,turn:data.turn,selectedConsequence});
+    const {visible_scene:consequenceVisibleScene,...consequenceEffects}=consequenceNpcEffectsForShortening(data.turn,selectedConsequence,telemetry?.hard_event_facts?.event_consequence_npc_keys),consequenceLifecycleBase=reconcileEventConsequenceLifecycle({saveState:incoming.saveState,turn:data.turn,selectedConsequence});
     const consequenceLifecycle={...consequenceLifecycleBase,...consequenceEffects};
     const sceneIntent=applySceneMomentumTimeFloor({...incoming0,saveState:incoming.saveState,action:incoming0.action||''},data.turn,mode,consequenceLifecycle,consequenceVisibleScene,{director_occurrence_id:telemetry?.event_director_v2?.occurrence_id,choice_event_ids:resumableIds});
     let timePlan;try{timePlan=parseTimePlan(incoming0.action||'',{location:incoming.saveState?.world?.location||'',currentTime:incoming.saveState?.world?.time||'',currentDate:incoming.saveState?.world?.date||'',currentWeekday:incoming.saveState?.world?.weekday||'',actorName:incoming.saveState?.pc?.name||''});}catch{timePlan={version:TIME_PLAN_PARSER_VERSION,mode:'shadow',clauses:[],diagnostics:['shadow-parser-error']};}const timePlanTelemetry=summarizeTimePlan(timePlan,sceneIntent);
@@ -1146,7 +1106,7 @@ export default async function handler(req,res){
     const combatGrowthTelemetry=compactCombatGrowthTelemetry(persistedCombatGrowthState);
     const skillLearningTelemetry=compactSkillLearningTelemetry(persistedSkillLearningState);
     const awakeningTalentTelemetry=compactAwakeningTalentTelemetry(persistedAwakeningTalentState);
-    const pipeline={pipeline:incoming0.qualityPipeline===false?'single-writer-stable-v156-hf1':'single-pass-q3-stable-v156-hf1',stages:1,qa_result:incoming0.qualityPipeline===false?'SKIP':'LOCAL_GUARD',rewrite_applied:false,background_sim:false,background_local:incoming0.backgroundSim!==false,offscreen_progression:offscreenProgression.telemetry,offscreen_progression_v2:true,living_world_v1:true,combat_engine:isCombatLike(incoming.action),combat_growth:combatGrowthTelemetry,combat_growth_v2:true,runtime_synthesized:true,continuation_beats:array(sceneRuntime.remaining_beats).length,context_router:telemetry,event_director_v2:telemetry?.event_director_v2||null,event_director_v3:telemetry?.event_director_v3||null,event_director_v3_enabled:true,world_result_surface:sceneRuntime.world_result_surface||null,world_result_surfacing_v1:true,adaptive_time_scale_version:ADAPTIVE_TIME_SCALE_VERSION,adaptive_time_scale_v2:true,time_plan_parser:timePlanTelemetry,time_plan_parser_v1:true,scene_momentum:sceneMomentum,scene_momentum_v1:true,scene_novelty:sceneNovelty,scene_novelty_v1:true,scene_purpose:sceneRuntime.purpose||null,scene_purpose_v1:true,scene_exit_condition:sceneRuntime.exit_condition||null,scene_exit_condition_v1:true,turn_hook:sceneRuntime.turn_hook||null,turn_hook_v1:true,scene_orchestration:sceneRuntime.orchestration||null,scene_orchestration_v1:true,npc_significance:npcSignificance,npc_significance_v1:true,event_consequence:consequenceLifecycle,event_consequence_v1:true,npc_motivation_v1:true,npc_goal_v2:true,npc_goal_tick:sceneRuntime.goal_tick||null,npc_goal_tick_v1:true,relationship_reason_v1:true,faction_social:factionSocialTelemetry,faction_social_v1:true,skill_learning:skillLearningTelemetry,skill_learning_v1:true,awakening_talent:awakeningTalentTelemetry,awakening_talent_v1:true,note:'V1.5.6 Scene Momentum Recovery HF1 keeps one core model call while restoring semantic action compression, deterministic State Delta/stall tracking, NPC initiative, downtime skip, and meaningful stop points. Adaptive Time Scale V2 gives dialogue, meals, training, classes, sleep, and distance-sensitive travel bounded natural time guides while preserving schedule boundaries and freeze paths. Time Plan Parser Phase 1 records a structured shadow plan for comparison while legacy execution remains authoritative. Living World V1 records bounded public off-screen schedule starts and propagates only explicitly confirmed completions to absent known NPC state and the background digest. Event Director V3 surfaces at most one confirmed public world result through a plausible in-scene channel without inventing outcomes or bypassing player/event/schedule authority. Multi-System Scene Orchestration V1 selects one primary driver and at most one causal secondary response while treating relationship, faction, growth, off-screen, and novelty systems as effects. NPC Significance Evaluator V1 lets the canonical model choose up to one foreground primary and one causal support from routed candidates while deterministic code enforces only hard bounds. Combat Growth V2 accepts only PC-attributed, evidence-backed stat and existing-skill adaptation, applies grade-aware caps, and freezes META/AUTO/CONTINUE. Skill Learning V1 persists bounded candidates; Awakening / Talent Evolution V1 keeps rare growth behind milestone and mythic-source gates.'};
+    const pipeline={pipeline:incoming0.qualityPipeline===false?'single-writer-p3-pr01r2':'single-pass-p3-pr01r2',stages:1,qa_result:incoming0.qualityPipeline===false?'SKIP':'LOCAL_GUARD',rewrite_applied:false,background_sim:false,background_local:incoming0.backgroundSim!==false,offscreen_progression:offscreenProgression.telemetry,offscreen_progression_v2:true,living_world_v1:true,combat_engine:isCombatLike(incoming.action),combat_growth:combatGrowthTelemetry,combat_growth_v2:true,runtime_synthesized:false,continuation_beats:array(sceneRuntime.remaining_beats).length,context_router:telemetry,event_director_v2:null,event_director_v3:null,event_director_v3_enabled:false,world_result_surface:sceneRuntime.world_result_surface||null,world_result_surfacing_v1:true,adaptive_time_scale_version:ADAPTIVE_TIME_SCALE_VERSION,adaptive_time_scale_v2:true,time_plan_parser:timePlanTelemetry,time_plan_parser_v1:true,scene_momentum:sceneMomentum,scene_momentum_v1:true,scene_novelty:sceneNovelty,scene_novelty_v1:true,scene_purpose:sceneRuntime.purpose||null,scene_purpose_v1:true,scene_exit_condition:sceneRuntime.exit_condition||null,scene_exit_condition_v1:true,turn_hook:sceneRuntime.turn_hook||null,turn_hook_v1:true,scene_orchestration:sceneRuntime.orchestration||null,scene_orchestration_v1:true,npc_significance:npcSignificance,npc_significance_v1:true,event_consequence:consequenceLifecycle,event_consequence_v1:true,npc_motivation_v1:true,npc_goal_v2:true,npc_goal_tick:sceneRuntime.goal_tick||null,npc_goal_tick_v1:true,relationship_reason_v1:true,faction_social:factionSocialTelemetry,faction_social_v1:true,skill_learning:skillLearningTelemetry,skill_learning_v1:true,awakening_talent:awakeningTalentTelemetry,awakening_talent_v1:true,note:'P3-PR01R2 uses one AI Writer with a thin factual Scene packet. Narrative Director, event procedure, schedule choreography, hooks, exits, and Suggested Actions remain outside Writer authority; runtime code validates hard state only and never synthesizes replacement fiction.'};
     data.pipeline=pipeline;setAdapterRoute(data,mode,pipeline,telemetry);return res.status(200).json(data);
   }catch(error){console.error('[V1.5.6]',error);return res.status(Number.isInteger(error?.status)?error.status:500).json({error:error?.message||String(error),code:error?.code||'STABLE_ROUTER_V156_ERROR',server_version:ADAPTER_VERSION});}
 }

@@ -118,12 +118,11 @@ const routed = routeOpenAIParams(
 assert.equal(routed.telemetry.npc_character_behavior_v1.version, NPC_CHARACTER_BEHAVIOR_VERSION);
 assert.equal(routed.telemetry.npc_character_behavior_v1.mode, 'semantic');
 assert.ok(routed.telemetry.npc_character_behavior_v1.npc_keys.includes('artemis'));
-assert.equal(routed.telemetry.npc_character_behavior_v1.evidence_count, 3);
-assert.match(routed.params.instructions, /NPC는 현재 행동을 자기 기억·기존 판단·목표·관계·지식과 비교/);
-assert.match(routed.params.instructions, /NPC 내부 감정은 대사 원문이 아니다/);
-assert.match(routed.params.input, /===== CHARACTER-DRIVEN NPC BEHAVIOR V1 =====/);
+assert.equal(routed.telemetry.npc_character_behavior_v1.evidence_count, 2);
+assert.doesNotMatch(routed.params.instructions, /NPC는 현재 행동을 자기 기억·기존 판단/);
+assert.doesNotMatch(routed.params.input, /===== CHARACTER-DRIVEN NPC BEHAVIOR V1 =====/);
 assert.match(routed.params.input, /세 번째 훈련에서 다른 검으로도 원리를 적용/);
-assert.match(routed.params.input, /state_delta\.memories_add/);
+assert.match(routed.params.input, /"immediately_relevant_memory":\[/);
 assert.ok(routed.params.input.length <= 9000, `P2-PR06 exceeded the routine input budget: ${routed.params.input.length}`);
 
 const moduleSource = readFileSync('lib/npc-character-behavior.js', 'utf8');

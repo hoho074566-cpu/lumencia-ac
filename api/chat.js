@@ -1314,17 +1314,11 @@ const EndingReceipt = z.object({
 });
 
 const TurnSchema = z.object({
-  director: DirectorMeta,
   scene_title: z.string().min(1).max(120),
   importance: Importance,
   scene: z.array(SceneItem).min(1).max(18),
   cg_id: z.string().max(120).nullable(),
-  choices: z.array(z.string().min(1).max(240)).max(3),
-  event_progress: z.object({
-    event_instance_id: z.string().min(1).max(80),
-    active_beat: z.string().min(1).max(80).nullable(),
-    completed_beats: z.array(z.string().min(1).max(80)).max(24),
-  }).nullable(),
+  choices: z.array(z.string()).max(0),
   ending_receipts: z.array(EndingReceipt).max(4),
   state_delta: z.object({
     advance_minutes: z.number().int().min(0).max(1440),
@@ -1444,31 +1438,12 @@ const arrays = (value, max) => Array.isArray(value) ? value.slice(0, max) : [];
 
 function sanitizeTurn(turn, { allowedCgIds = [] } = {}) {
   if (!turn || typeof turn !== 'object') throw new Error('모델 응답이 비어 있습니다.');
-  const dm = turn.director || {};
-  const allowedIntervention = new Set(['none','light','medium','scheduled','aftermath']);
-  const allowedBeat = new Set(['routine','encounter','friction','choice','payoff_opportunity','payoff','aftermath','scheduled','investigation','combat']);
-  const allowedEventKind = new Set(['none','social','academic','rumor','request','rivalry','investigation','politics','comedy','relationship','combat','world']);
-  const allowedCallbackPhase = new Set(['none','friction','pressure','payoff_opportunity','payoff','aftermath']);
   turn.director = {
-    intervention: allowedIntervention.has(dm?.intervention) ? dm.intervention : 'light',
-    beat: allowedBeat.has(dm?.beat) ? dm.beat : (turn.importance === 'routine' ? 'routine' : 'encounter'),
-    event_kind: allowedEventKind.has(dm?.event_kind) ? dm.event_kind : 'none',
-    spotlight_keys: arrays(dm?.spotlight_keys,4).filter(key=>REGISTERED_SPEAKER_KEYS.has(key)),
-    callback_key: String(dm?.callback_key || '').slice(0,80) || null,
-    callback_phase: allowedCallbackPhase.has(dm?.callback_phase) ? dm.callback_phase : 'none',
-    callback_note: String(dm?.callback_note || '').slice(0,280) || null,
-    reason: String(dm?.reason || '장면 흐름 유지').slice(0,280),
+    intervention:'none', beat:turn.importance === 'routine' ? 'routine' : 'encounter', event_kind:'none',
+    spotlight_keys:[], callback_key:null, callback_phase:'none', callback_note:null, reason:'server-owned neutral receipt',
   };
-  turn.choices = arrays(turn.choices, 3);
-  const eventProgress = turn.event_progress;
-  const eventId = String(eventProgress?.event_instance_id || '').trim();
-  const safeEventId = /^[a-z0-9][a-z0-9._:#-]{0,79}$/i.test(eventId) ? eventId.toLowerCase() : '';
-  const beatId = String(eventProgress?.active_beat || '').trim();
-  turn.event_progress = safeEventId ? {
-    event_instance_id:safeEventId,
-    active_beat:/^[a-z0-9][a-z0-9._:#-]{0,79}$/i.test(beatId) ? beatId.toLowerCase() : null,
-    completed_beats:[...new Set(arrays(eventProgress?.completed_beats,24).map(String).map(x=>x.trim().toLowerCase()).filter(x=>/^[a-z0-9][a-z0-9._:#-]{0,79}$/i.test(x)))],
-  } : eventProgress === null ? null : undefined;
+  turn.choices = [];
+  turn.event_progress = null;
   turn.ending_receipts = arrays(turn.ending_receipts,4).map((row)=>({
     ending_id:String(row?.ending_id||'').trim().slice(0,120),
     terminal_outcome:['life_complete','death','catastrophe'].includes(row?.terminal_outcome)?row.terminal_outcome:'life_complete',

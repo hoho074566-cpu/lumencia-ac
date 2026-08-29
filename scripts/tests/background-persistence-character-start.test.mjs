@@ -68,16 +68,16 @@ const route=(generated)=>routeOpenAIParams(
 const commonerRoute=route(commoner),nobleRoute=route(noble);
 for(const [r,generated] of [[commonerRoute,commoner],[nobleRoute,noble]]){
   const background=generated.creation.fateStart.background;
-  assert.match(r.params.input,/===== FATE BACKGROUND PERSISTENCE V1 =====/,'character-dependent background directive must reach normal gameplay');
-  assert.match(r.params.instructions,/PUBLIC만 NPC 기본 지식/,'visibility authority must be a routed GM rule');
-  assert.match(r.params.instructions,/NPC 성격 × NPC가 실제 아는 PC 배경 × 현재 상황 × 기대/,'first-impression calculation contract is missing');
-  assert.match(r.params.instructions,/일반 초보 절차를 끝까지 반복 강요하지 않고/,'strength-aware evaluation contract is missing');
+  assert.doesNotMatch(r.params.input,/===== FATE BACKGROUND PERSISTENCE V1 =====/,'background state must not become a Writer directive');
+  assert.match(r.params.input,/"public_background":\[/,'bounded public background facts must reach normal gameplay');
+  assert.match(r.params.instructions,/knowledge boundaries/,'knowledge visibility remains a hard Canon Kernel boundary');
+  assert.doesNotMatch(r.params.instructions,/NPC 성격 ×|first-impression|일반 초보 절차/,'background facts must not become a scene recipe');
   for(const hidden of background.facts.filter(row=>['PRIVATE','SECRET'].includes(row.visibility)))assert.equal(r.params.input.includes(hidden.fact),false,`${hidden.visibility} background leaked into routed gameplay`);
   assert.equal(r.params.input.includes(generated.pc.characterSetting),false,'full Origin Story must not bypass background visibility through PC state');
   assert.ok(r.params.input.length<=9000,`background routing exceeded the stable routine budget: ${r.params.input.length}`);
 }
-assert.equal(commonerRoute.params.input.includes(commoner.creation.fateStart.background.startingRoute.eventMeaning),true);
-assert.equal(nobleRoute.params.input.includes(noble.creation.fateStart.background.startingRoute.eventMeaning),true);
+assert.equal(commonerRoute.params.input.includes(commoner.creation.fateStart.background.startingRoute.eventMeaning),false,'starting-route event interpretation must remain internal');
+assert.equal(nobleRoute.params.input.includes(noble.creation.fateStart.background.startingRoute.eventMeaning),false,'starting-route event interpretation must remain internal');
 assert.notEqual(commonerRoute.params.input,nobleRoute.params.input,'same event must receive character-dependent context');
 
 const app=readFileSync('app.js','utf8');

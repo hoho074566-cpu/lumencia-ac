@@ -94,8 +94,8 @@ const routed=routeOpenAIParams(
   {instructions,input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}'},
   {incoming:{action:'북부에서 온 학생과 고향 이야기를 나눈다.',saveState:{...baseSave,sceneRuntime:{participants:['guide']}},recentTurns:[]},mode:'game'},
 );
-assert.match(routed.params.input,/===== PERSONAL STORY HOOKS V1 =====/,'personal story candidates must reach normal gameplay context');
-assert.match(routed.params.input,/PC_ORIGIN_PLOT/,'the routed context must preserve all three story-layer contracts');
+assert.doesNotMatch(routed.params.input,/===== PERSONAL STORY HOOKS V1 =====|PC_ORIGIN_PLOT/,'dormant candidates must remain internal instead of becoming a prose plan');
+assert.match(routed.params.input,/"public_background":\[/,'only public canonical origin facts may enter the Thin Scene Packet');
 assert.equal(routed.telemetry.personal_story_v1?.candidate_count,3,'router telemetry must expose only the bounded candidate count');
 for(const hidden of commoner.creation.fateStart.personalStory.hooks.filter((row)=>['PRIVATE','SECRET'].includes(row.visibility))){
   assert.equal(routed.params.input.includes(hidden.premise),false,'hidden Origin information leaked through personal-story routing');
