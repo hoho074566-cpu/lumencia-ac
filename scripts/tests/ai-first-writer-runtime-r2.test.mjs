@@ -72,6 +72,18 @@ function route(action, saveState=baseSave, recentTurns=[]) {
   return routeOpenAIParams({ instructions, input:coreInput }, { incoming:{ action, saveState, recentTurns, rollingSummary:'대강당 앞에 도착했다.' }, mode:'game' });
 }
 
+assert.throws(
+  () => routeOpenAIParams({ instructions:'legacy Writer prompt without canonical markers', input:coreInput }, { incoming:{ action:'문을 연다.', saveState:baseSave, recentTurns:[] }, mode:'game' }),
+  error => error?.statusCode===409&&error?.code==='WRITER_CONTEXT_UNAVAILABLE'&&error?.reason==='core prompt markers changed',
+  'a broken Thin Scene Packet route must fail closed instead of restoring the legacy full Writer prompt',
+);
+
+assert.throws(
+  () => routeOpenAIParams({ instructions:instructions.replace('emily=에밀리, lena=레나, lillia=릴리아',''), input:coreInput }, { incoming:{ action:'문을 연다.', saveState:baseSave, recentTurns:[] }, mode:'game' }),
+  error => error?.statusCode===409&&error?.code==='WRITER_CONTEXT_UNAVAILABLE'&&error?.reason==='registry parse failed',
+  'an empty canonical character registry must fail closed before the model call',
+);
+
 const opening = route('대강당 안으로 들어간다.');
 assert.equal(opening.telemetry.packet_version, 'thin-scene-packet-r2');
 assert.deepEqual(opening.telemetry.selected_npcs, ['emily','lena'], 'imminent same-place canonical actors must receive character packets');
