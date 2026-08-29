@@ -7,18 +7,10 @@ const chat = readFileSync('api/chat-router.js','utf8');
 const health = readFileSync('api/health.js','utf8');
 const runtime = readFileSync('app-runtime.js','utf8');
 
-assert.match(context,/buildSceneMomentumDirective/);
-assert.match(context,/buildScenePurposeDirective/);
-assert.match(context,/buildSceneExitDirective/);
-assert.match(context,/buildTurnHookDirective/);
-assert.match(context,/SCENE MOMENTUM HF1/);
-assert.match(context,/SCENE PURPOSE V1/);
-assert.match(context,/EXPLICIT SCENE EXIT CONDITION V1/);
-assert.match(context,/STRONGER TURN HOOK V1/);
-assert.match(context,/EVENT CONSEQUENCE V1/);
-assert.doesNotMatch(context,/위 행동까지만 처리하고 PC의 다음 행동을 정하지 마라/);
-assert.match(context,/결정 가치 없는 중간 단계/);
-assert.match(context,/SCENE CHANGE 우선/);
+assert.doesNotMatch(context,/buildSceneMomentumDirective|buildScenePurposeDirective|buildSceneExitDirective|buildTurnHookDirective/);
+assert.doesNotMatch(context,/===== SCENE MOMENTUM|===== SCENE PURPOSE|===== EXPLICIT SCENE EXIT|===== STRONGER TURN HOOK/);
+assert.match(context,/MINIMAL WRITER CONTRACT/);
+assert.match(context,/never establishes paragraph order, actor order, a completion recipe/);
 assert.match(context,/momentum_stall_streak/);
 assert.match(context,/momentum-recovery/);
 assert.match(context,/NO_EVENT/,'momentum must retain a no-event outcome');
@@ -67,7 +59,8 @@ for(const marker of ['persistedCombatGrowthState=deriveCombatGrowthState','persi
 assert.match(chat,/growthValidationScene=data\.turn\?\.scene[\s\S]*persistedCombatGrowthState=deriveCombatGrowthState\([^\n]*scene:growthValidationScene[^\n]*allowProgress:growthAllowed/,'a shortened turn must retain prevalidated prefix combat growth using the original evidence scene');
 assert.match(chat,/data\.turn\.state_delta\.skill_learning!==skillLearningState\.accepted_changes[\s\S]*persistedSkillLearningState=deriveSkillLearningState\([^\n]*scene:growthValidationScene[^\n]*allowProgress:growthAllowed/,'a shortened turn must rebuild the persisted skill-learning packet from its prevalidated final subset');
 assert.match(chat,/data\.turn\.state_delta\.awakening_progress!==awakeningTalentState\.accepted_awakening_changes[\s\S]*persistedAwakeningTalentState=deriveAwakeningTalentState\([^\n]*scene:growthValidationScene[^\n]*allowProgress:growthAllowed/,'a shortened turn must rebuild awakening and talent persistence from its prevalidated final subset');
-assert.match(chat,/runtimeTrustedConsequenceScene[\s\S]*trustedConsequenceScene=array\(intent\?\.runtimeTrustedConsequenceScene\)/,'runtime synthesis must retain attributed consequence arrivals while discarding untrusted boundary prose');
+assert.match(chat,/function runtimeSynthesisTurn[\s\S]*runtimeSceneTrusted!==false[\s\S]*UNCOMMITTED_TURN/,'an untrusted runtime boundary must fail uncommitted instead of synthesizing internal state as fiction');
+assert.doesNotMatch(chat,/trustedConsequenceScene=array\(intent\?\.runtimeTrustedConsequenceScene\)|플레이어의 판단이 필요한 선택 지점|후속 상황이 발현했다/,'the runtime must not manufacture replacement prose from event or validation state');
 assert.match(chat,/runtime_state=\{[^\n]*skill_learning:persistedSkillLearningState,awakening_talent:persistedAwakeningTalentState/,'the client must receive only the post-reconciliation growth packets');
 
 assert.match(health,/version: '0\.8\.7'/);

@@ -77,14 +77,13 @@ const legacyGoal = route('기다린다.', {
   },
 });
 const legacyDirector = legacyGoal.telemetry.event_director_v2;
-assert.equal(legacyGoal.telemetry.routerVersion, '1.5.6-hf1', 'Scene Momentum HF1 must advertise the current routed context version');
+assert.equal(legacyGoal.telemetry.routerVersion, 'p3-pr01r-thin-scene-packet-v1', 'thin scene packet router version must be explicit');
 assert.equal(legacyDirector?.version, '2.1', 'Event Director must report V2.1');
 assert.ok(legacyDirector?.goal_signals?.p2, 'legacy npcStates.current_goal must feed goal weighting');
 assert.equal(legacyDirector.goal_signals.p2.source, 'npc-state-current_goal', 'legacy current_goal source must be visible');
 assert.ok(legacyDirector.goal_signals.p2.multiplier > 1, 'active goal should positively weight an otherwise eligible candidate');
 assert.ok(legacyDirector.weights.p2 > legacyDirector.weights.p1, 'equal baseline candidates should diverge when p2 has a goal');
-assert.match(legacyGoal.params.instructions, /npc_state_updates\.current_goal/, 'routed contract must define meaningful current_goal updates');
-assert.match(legacyGoal.params.instructions, /목표가 행동·거절·접근·회피·우선순위/, 'goal-to-behavior rule is missing');
+assert.doesNotMatch(legacyGoal.params.instructions, /npc_state_updates\.current_goal|목표가 행동·거절·접근·회피·우선순위/, 'goal receipt mechanics must not expand the minimal Writer contract');
 
 const structuredGoalState = {
   npcInnerStates: {
@@ -151,8 +150,8 @@ const presentGoalPriority = route('10분 기다린다.', {
 assert.equal(presentGoalPriority.telemetry.event_director_v2.result, 'PRESENT_NPC_GOAL_PRIORITY', 'a present NPC with a feasible PC goal must beat a new random cameo under stall pressure');
 assert.equal(presentGoalPriority.telemetry.event_director_v2.selected_key, 'p1', 'the fixed-flow telemetry must identify the present initiative owner');
 assert.equal(presentGoalPriority.telemetry.event_director_v2.occurrence_id, undefined, 'present initiative must not invent a new Director occurrence');
-assert.match(presentGoalPriority.params.input, /PRESENT_NPC=p1\(One\)/, 'the routed prompt must reserve the present NPC initiative owner');
-assert.match(presentGoalPriority.params.input, /PC의 실력을 직접 확인한다\./, 'the already-authoritative goal must reach the fixed-flow directive');
+assert.doesNotMatch(presentGoalPriority.params.input, /PRESENT_NPC=|NEXT_ACTION=|ORDER=/, 'present-goal control metadata must stay internal');
+assert.match(presentGoalPriority.params.input, /"goal":"PC의 실력을 직접 확인한다\."/, 'the current character goal may remain a factual signal');
 const stalledQuestion = route('지금 몇 시야?', {
   sceneRuntime: { participants:['p1'], momentum:{ stall_streak:2, pressure:'required', recent_deltas:[] } },
   npcInnerStates: {
@@ -160,7 +159,7 @@ const stalledQuestion = route('지금 몇 시야?', {
   },
 });
 assert.notEqual(stalledQuestion.telemetry.event_director_v2.result, 'PRESENT_NPC_GOAL_PRIORITY', 'question sovereignty must suppress present-goal stall recovery');
-assert.match(stalledQuestion.params.input, /INTENT=decision-sensitive/, 'the stalled-question fixture must use the authoritative decision-sensitive classification');
+assert.doesNotMatch(stalledQuestion.params.input, /INTENT=decision-sensitive|PRESENT_NPC=/, 'intent classification must stay internal');
 for (const [action, intent] of [
   ['도서관에 간다.', 'travel'],
   ['게시판을 확인한다.', 'observe'],
@@ -173,7 +172,7 @@ for (const [action, intent] of [
     },
   });
   assert.notEqual(committedAction.telemetry.event_director_v2.result, 'PRESENT_NPC_GOAL_PRIORITY', `${intent} must remain ahead of present-goal stall recovery`);
-  assert.match(committedAction.params.input, new RegExp(`INTENT=${intent}`), `${action} must retain its authoritative ${intent} classification`);
+  assert.doesNotMatch(committedAction.params.input, /INTENT=|TURN_PLAN=/, `${action} must not receive a prose execution classification`);
 }
 const scheduledPresentGoal = routeOpenAIParams(
   { instructions, input:directorInput.replace('INTERVENTION: medium', 'INTERVENTION: scheduled') },

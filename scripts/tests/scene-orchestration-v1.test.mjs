@@ -212,8 +212,7 @@ assert.deepEqual(observed.observed_axes, ['location', 'time', 'relationship', 'g
 assert.deepEqual(observed.effect_axes, ['relationship', 'growth']);
 assert.equal(observed.actual_delta_score, 4);
 
-assert.match(contextRouter, /MULTI-SYSTEM SCENE ORCHESTRATION V1/, 'the cross-system plan must live in reserved routed context');
-assert.match(contextRouter, /sceneOrchestrationActionFrame\(orchestration\)/, 'the final action frame must repeat the compact arbitration result after lower-priority authority blocks');
+assert.doesNotMatch(contextRouter, /MULTI-SYSTEM SCENE ORCHESTRATION V1|sceneOrchestrationActionFrame\(orchestration\)/, 'cross-system arbitration must stay out of Writer context');
 assert.match(contextRouter, /scene_orchestration:built\.orchestration/, 'route telemetry must expose the exact pre-response orchestration plan');
 assert.match(adapter, /deriveSceneOrchestrationState/, 'the stable adapter must persist bounded post-response orchestration evidence');
 assert.match(adapter, /orchestration:sceneOrchestration/, 'the compact orchestration state must remain inside the existing sceneRuntime root');
@@ -248,22 +247,22 @@ Resolve.`;
 const routed = routeOpenAIParams(
   { instructions, input: '===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}' },
   { incoming: {
-    action: `연무장을 돌아다닌다. ${'긴 행동 '.repeat(1500)}`,
+    action: `연무장을 돌아다닌다. ${'긴 행동 '.repeat(1500)}`.slice(0,5000),
     saveState: {
       turnNumber: 8,
       world: { location: '연무장' },
       pc: { name: '아리아', department: '기사과', skills: {}, skillCandidates: {} },
       sceneRuntime: { participants: ['artemis'] },
       npcInnerStates: { artemis: { active_goal: { id: 'inspect', desire: '신입생의 기본기를 확인한다', priority: 5, urgency: 4, state: 'active', target_type: 'pc' } } },
-      routerFeedback: { routerVersion: '1.5.6-hf1', profile: 'routine-17k-v154', lastInputTokens: 100000 },
+      routerFeedback: { routerVersion: 'p3-pr01r-thin-scene-packet-v1', profile: 'routine-17k-v154', lastInputTokens: 100000 },
     },
     recentTurns: [],
   }, mode: 'game' },
 );
 assert.equal(routed.telemetry.adaptive_scale, .76);
 assert.ok(routed.params.input.length <= 6840, `orchestration authority exceeded the adaptive routine budget: ${routed.params.input.length}`);
-assert.match(routed.params.input, /===== MULTI-SYSTEM SCENE ORCHESTRATION V1 =====/);
-assert.match(routed.params.input, /TURN_PLAN=user-action>present-npc-goal/);
+assert.doesNotMatch(routed.params.input, /MULTI-SYSTEM SCENE ORCHESTRATION|TURN_PLAN=/);
+assert.match(routed.params.input, /"goal":"신입생의 기본기를 확인한다"/,'current named-character goal remains a factual character signal');
 assert.equal(routed.telemetry.scene_orchestration.primary, 'user-action');
 assert.equal(routed.telemetry.scene_orchestration.secondary, 'present-npc-goal');
 
@@ -313,8 +312,7 @@ assert.equal(suppressedDirector.telemetry.event_director_v2.result, 'NPC_EVENT',
 assert.equal(suppressedDirector.telemetry.scene_orchestration.secondary, 'active-event');
 assert.ok(suppressedDirector.telemetry.scene_orchestration.suppressed.includes('director-event'));
 assert.ok(!suppressedDirector.telemetry.selected_npcs.includes('mirabelle'), 'a suppressed Director candidate must not displace active-event context selection');
-assert.match(suppressedDirector.params.input, /RESULT=SUPPRESSED_BY_SCENE_ORCHESTRATION/);
-assert.match(suppressedDirector.params.input, /BLOCK=director-event; EFFECT_ONLY/);
+assert.doesNotMatch(suppressedDirector.params.input, /RESULT=SUPPRESSED_BY_SCENE_ORCHESTRATION|BLOCK=director-event|TURN_PLAN=/);
 assert.doesNotMatch(suppressedDirector.params.input, /SELECTED=mirabelle/,
   'the lower-priority selected cameo must not remain as a contradictory routed instruction');
 
@@ -327,13 +325,13 @@ const autoBoundaryRouted = routeOpenAIParams(
   }, mode: 'auto' },
 );
 assert.equal(autoBoundaryRouted.telemetry.scene_orchestration.primary, 'player-boundary', 'AUTO must preserve an unanswered player boundary');
-assert.match(autoBoundaryRouted.params.input, /TURN_PLAN=player-boundary; ORDER=stop; MAX_DRIVERS=0/);
+assert.doesNotMatch(autoBoundaryRouted.params.input, /TURN_PLAN=|ORDER=stop|MAX_DRIVERS/);
 
 const continueRouted = routeOpenAIParams(
   { instructions, input: '===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}' },
   { incoming: { action: '[LUMENSIA V1.5.6 CONTINUE]', saveState: { world: { location: '학생회실' }, pc: { name: '아리아' }, sceneRuntime: {} }, recentTurns: [] }, mode: 'continue' },
 );
 assert.equal(continueRouted.telemetry.scene_orchestration.primary, 'frozen', 'CONTINUE must route a frozen cross-system plan');
-assert.match(continueRouted.params.input, /TURN_PLAN=frozen; ORDER=freeze; MAX_DRIVERS=0/);
+assert.doesNotMatch(continueRouted.params.input, /TURN_PLAN=|ORDER=freeze|MAX_DRIVERS/);
 
 console.log('PASS Multi-System Scene Orchestration V1 priority, chaining, sovereignty, budget, persistence, and one-call regressions');

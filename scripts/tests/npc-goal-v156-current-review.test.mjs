@@ -18,11 +18,11 @@ const object=(v)=>v&&typeof v==='object'&&!Array.isArray(v)?v:{};
 const clampText=(v,max=1200)=>typeof v==='string'?v.slice(0,max):JSON.stringify(v??'').slice(0,max);
 const {goalRuntimeFor}=makeLifecycle(array,object,clampText,{anastasia:'아나스타샤',isabel:'이사벨'});
 
-const schemaStart=source.indexOf('function goalV2FieldSchema(){');
+const schemaStart=source.indexOf('function timeExecutionFieldSchema(){');
 const schemaEnd=source.indexOf('function installResponsesRouter()');
 assert.ok(schemaStart>=0&&schemaEnd>schemaStart,'Goal V2 structured-format source markers missing');
 const schemaSource=source.slice(schemaStart,schemaEnd);
-const makeSchema=new Function('structuredEffectRows',`const GOAL_V2_RULES='[NPC GOAL V2]';const TIME_EXECUTION_RULES='[TPP PHASE 3]';${schemaSource};return {patchGoalV2StructuredFormat};`);
+const makeSchema=new Function('structuredEffectRows',`const TIME_EXECUTION_RULES='[TPP PHASE 3]';${schemaSource};return {patchGoalV2StructuredFormat};`);
 const {patchGoalV2StructuredFormat}=makeSchema(structuredEffectRows);
 
 const key='anastasia';
@@ -33,7 +33,7 @@ function incoming(old={},patch={}){
   return {saveState:{turnNumber:10,pc:{name:'Aaa'},world:{location:'academy'},npcStates:{[key]:{current_goal:old?.active_goal?.desire||''}},npcInnerStates:{[key]:old},scheduleContext:{due:[]},hooks:[],...patch}};
 }
 
-test('duplicate npc_state_updates stay row-aligned after legacy parsing',()=>{
+test('thin Writer schema strips internal Goal V2 control fields',()=>{
   const format={
     schema:{type:'object',properties:{state_delta:{type:'object',properties:{npc_state_updates:{type:'array',items:{type:'object',properties:{npc_key:{type:'string'},current_goal:{anyOf:[{type:'string'},{type:'null'}]}},required:['npc_key','current_goal'],additionalProperties:false}}}}}},
     $parseRaw:(content)=>{const raw=JSON.parse(content);return{state_delta:{npc_state_updates:raw.state_delta.npc_state_updates.map(r=>({npc_key:r.npc_key,current_goal:r.current_goal}))}};},
@@ -45,17 +45,12 @@ test('duplicate npc_state_updates stay row-aligned after legacy parsing',()=>{
   ]}};
   const parsed=patched.text.format.$parseRaw(JSON.stringify(raw));
   assert.equal(parsed.state_delta.npc_state_updates[0].current_goal,'첫 목표');
-  assert.equal(parsed.state_delta.npc_state_updates[0].goal_progress_delta,5);
-  assert.equal(parsed.state_delta.npc_state_updates[0].goal_reason,'첫 근거');
-  assert.equal(parsed.state_delta.npc_state_updates[0].goal_replace,false);
   assert.equal(parsed.state_delta.npc_state_updates[1].current_goal,'둘째 목표');
-  assert.equal(parsed.state_delta.npc_state_updates[1].goal_progress_delta,-7);
-  assert.equal(parsed.state_delta.npc_state_updates[1].goal_reason,'둘째 근거');
-  assert.equal(parsed.state_delta.npc_state_updates[1].goal_replace,true);
-  assert.equal(parsed.state_delta.npc_state_updates[1][Symbol.for('lumensia.time.effect.source')],1,'the parser carries the exact raw row index through core sanitization');
+  for(const row of parsed.state_delta.npc_state_updates)for(const field of ['goal_progress_delta','goal_state','goal_reason','goal_next_action','goal_replace'])assert.equal(row[field],undefined);
+  assert.equal(parsed.state_delta.npc_state_updates[1][Symbol.for('lumensia.time.effect.source')],undefined,'stripped future-control rows must not retain hidden Writer ownership metadata');
 });
 
-test('legacy structured output preserves the Event Consequence queue field added by the adapter',()=>{
+test('thin Writer schema does not request a future Event Consequence queue',()=>{
   const format={
     schema:{type:'object',properties:{state_delta:{type:'object',properties:{
       hooks_add:{type:'array',items:{type:'object'}},
@@ -64,11 +59,11 @@ test('legacy structured output preserves the Event Consequence queue field added
     $parseRaw:(content)=>{const raw=JSON.parse(content);return{state_delta:{hooks_add:raw.state_delta.hooks_add,npc_state_updates:raw.state_delta.npc_state_updates.map(r=>({npc_key:r.npc_key,current_goal:r.current_goal}))}};},
   };
   const patched=patchGoalV2StructuredFormat({instructions:'base',text:{format}});
-  assert.ok(patched.text.format.schema.properties.state_delta.properties.delayed_consequences_add);
-  assert.ok(patched.text.format.schema.properties.state_delta.required.includes('delayed_consequences_add'));
+  assert.equal(patched.text.format.schema.properties.state_delta.properties.delayed_consequences_add,undefined);
+  assert.ok(!patched.text.format.schema.properties.state_delta.required.includes('delayed_consequences_add'));
   const consequence={event_name:'교수 호출',target_bucket:'active',delay_minutes:30,reason:'결투 여파',secret_level:0};
   const raw={state_delta:{hooks_add:[],npc_state_updates:[],delayed_consequences_add:[consequence]}};
-  assert.deepEqual(JSON.parse(JSON.stringify(patched.text.format.$parseRaw(JSON.stringify(raw)).state_delta.delayed_consequences_add)),[consequence]);
+  assert.equal(patched.text.format.$parseRaw(JSON.stringify(raw)).state_delta.delayed_consequences_add,undefined);
 });
 
 test('structured format requires and preserves the TPP execution ownership receipt',()=>{
@@ -76,16 +71,21 @@ test('structured format requires and preserves the TPP execution ownership recei
     schema:{
       type:'object',
       properties:{
+        director:{type:'object'},
+        event_progress:{anyOf:[{type:'object'},{type:'null'}]},
         scene:{type:'array',items:{type:'object'}},
         choices:{type:'array',items:{type:'string'}},
         state_delta:{type:'object',properties:{advance_minutes:{type:'integer'},npc_state_updates:{type:'array',items:{type:'object',properties:{npc_key:{type:'string'},current_goal:{anyOf:[{type:'string'},{type:'null'}]}},required:['npc_key','current_goal'],additionalProperties:false}}}},
       },
-      required:['scene','choices','state_delta'],
+      required:['director','event_progress','scene','choices','state_delta'],
       additionalProperties:false,
     },
     $parseRaw:(content)=>{const raw=JSON.parse(content);return{scene:raw.scene,choices:raw.choices,state_delta:raw.state_delta};},
   };
   const patched=patchGoalV2StructuredFormat({instructions:'base',text:{format}}),receipt={version:'1.0',plan_used:true,boundary_kind:'choice',boundary_minutes:60,completed_clause_ids:['action_1'],interrupted_clause_id:'action_2',decision_scene_index:0,boundary_event_id:null,effect_owners:[],scalar_contributions:[]};
+  assert.equal(patched.text.format.schema.properties.director,undefined,'the Writer schema must not request a Director plan');
+  assert.equal(patched.text.format.schema.properties.event_progress,undefined,'the Writer schema must not request event checkpoint progression');
+  assert.ok(!patched.text.format.schema.required.includes('director')&&!patched.text.format.schema.required.includes('event_progress'));
   assert.ok(patched.text.format.schema.properties.time_execution,'the canonical response schema contains the ownership receipt');
   assert.ok(patched.text.format.schema.required.includes('time_execution'),'strict output requires the ownership receipt on every turn');
   const parsed=patched.text.format.$parseRaw(JSON.stringify({scene:[{kind:'narration',text:'선택한다.'}],choices:['계속'],state_delta:{advance_minutes:60,npc_state_updates:[]},time_execution:receipt}));

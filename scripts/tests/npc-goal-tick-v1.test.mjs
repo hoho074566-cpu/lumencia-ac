@@ -61,19 +61,15 @@ function route(action='주변을 살펴본다.',patch={},director=baseDirector,m
 const proactive=route();
 assert.equal(proactive.telemetry.event_director_v2.result,'PRESENT_NPC_GOAL_TICK','a high-drive present goal must tick without waiting for a scene stall');
 assert.equal(proactive.telemetry.event_director_v2.selected_key,'p1');
-assert.match(proactive.params.input,/MODE=goal-tick/);
-assert.match(proactive.params.input,/USER ACTION을 의미 목표까지 먼저 완료한 뒤/,'Goal Tick must not preempt the declared player action');
-assert.match(proactive.params.input,/NEXT_ACTION=평가 결과를 먼저 묻는다/,'the bounded next action must reach the selected Goal Tick directive');
-assert.match(proactive.params.input,/선택만으로 목표 진척을 만들지 말고/,'selection alone must not synthesize progress');
-assert.match(proactive.params.input,/PC의 행동·대사·감정·중요 선택을 대신 결정하지 마라/,'player sovereignty must survive the routine authority budget');
+assert.doesNotMatch(proactive.params.input,/MODE=goal-tick|NEXT_ACTION=|ORDER=USER_ACTION_FIRST|GUARDS=/,'Goal Tick interpretation and next action must remain internal');
+assert.match(proactive.params.input,/"goal":"PC에게 실기 평가 결과를 직접 확인한다\."/,'the current named-character goal may remain a fact');
 
 const maximumGoal={...goal('g'.repeat(80)),desire:'긴 목표 설명 '.repeat(40),target_type:'pc',target_key:'t'.repeat(100),next_actions:['긴 다음 행동 '.repeat(35)]};
 const maximumGuarded=route('주변을 살펴본다.',{
   npcInnerStates:{p1:{active_goal:maximumGoal}},
-  routerFeedback:{routerVersion:'1.5.6-hf1',profile:'routine-17k-v154',lastInputTokens:26000},
+  routerFeedback:{routerVersion:'p3-pr01r-thin-scene-packet-v1',profile:'routine-17k-v154',lastInputTokens:26000},
 });
-assert.match(maximumGuarded.params.input,/ORDER=USER_ACTION_FIRST/,'action order must precede variable goal text at the minimum authority budget');
-assert.match(maximumGuarded.params.input,/GUARDS=NO_PC_CONTROL\|FEASIBLE_ONLY\|GOAL_PROGRESS_EVIDENCE_ONLY\|IMPOSSIBLE_TO_HOOK/,'all invariant Goal Tick guards must survive maximum-length goal fields');
+assert.doesNotMatch(maximumGuarded.params.input,/ORDER=USER_ACTION_FIRST|GUARDS=|NEXT_ACTION=/,'Goal Tick control metadata must stay internal under pressure');
 
 const lowDrive=route('주변을 살펴본다.',{npcInnerStates:{p1:{active_goal:goal('goal:p1:low',3,3)}}});
 assert.equal(lowDrive.telemetry.event_director_v2.result,'NO_RANDOM_EVENT_DUE','low-drive goals must still wait for ordinary momentum pressure');
@@ -176,8 +172,8 @@ assert.match(chatRouter,/goal_tick:goalTick/,'the stable runtime must persist th
 assert.match(chatRouter,/npc_goal_tick_v1:true/,'pipeline telemetry must advertise Goal Tick V1');
 
 const pressuredAction=`${'조용히 생각을 정리한다. '.repeat(220)} 주변을 살펴본다.`;
-const pressured=route(pressuredAction,{routerFeedback:{routerVersion:'1.5.6-hf1',profile:'routine-17k-v154',lastInputTokens:26000}});
-assert.match(pressured.params.input,/RESULT=PRESENT_NPC_GOAL_TICK/,'Goal Tick authority must survive the minimum adaptive routine budget');
-assert.match(pressured.params.input,/주변을 살펴본다\.[\s\S]*USER ACTION의 의미 목표/,'the committed ending of a long user action must remain authoritative');
+const pressured=route(pressuredAction,{routerFeedback:{routerVersion:'p3-pr01r-thin-scene-packet-v1',profile:'routine-17k-v154',lastInputTokens:26000}});
+assert.doesNotMatch(pressured.params.input,/RESULT=PRESENT_NPC_GOAL_TICK|NEXT_ACTION=/,'Goal Tick authority must remain internal');
+assert.ok(pressured.params.input.endsWith(pressuredAction),'the complete supported USER ACTION must remain authoritative');
 
 console.log('PASS NPC Goal Tick V1 guarded present-NPC initiative regressions');

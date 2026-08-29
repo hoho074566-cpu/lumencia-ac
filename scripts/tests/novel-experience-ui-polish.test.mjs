@@ -17,20 +17,16 @@ const health = readFileSync('api/health.js', 'utf8');
 
 assert.equal(NOVEL_PRESENTATION_VERSION, '1.0');
 
-const routerRules = context.match(/const ROUTER_GM_RULES = String\.raw`([\s\S]*?)`;/)?.[1] || '';
-const novelContract = context.match(/const NATURAL_STYLE = String\.raw`([\s\S]*?)`;/)?.[1] || '';
-assert.match(novelContract, /CANONICAL NOVEL NARRATIVE CONTRACT/);
-assert.match(novelContract, /행동→감각\/결과→반응/);
-assert.match(novelContract, /Internal emotion은 대사 원문이 아니/);
-assert.match(novelContract, /이동·행정·대기·평범한 절차는 압축/);
-assert.match(novelContract, /관계·갈등·이상 징후·중요 정보\/판단 변화·전투·실제 선택/);
-assert.match(novelContract, /직전 행동, NPC goal, 관계, active thread, 기존 정보, 세계 상태/);
-assert.match(novelContract, /scene_title은 작은 행동마다 바꾸지 않고/);
-assert.match(routerRules, /USER ACTION 원문 전체의 긍정형 완료 의도와 구체적 제한을 최우선/);
-assert.match(routerRules, /중요 interruption이나 새 선택 없이 완료할 수 있는 결정 가치 없는 중간 단계/);
-assert.match(routerRules, /다시 묻지 말고 의도한 결과까지 진행/);
-assert.match(routerRules, /부정·가정·질문으로만 언급한 행동은 실행하지 않는다/);
-assert.ok(routerRules.length + novelContract.length <= 5321, 'consolidated production narrative/style instructions must not exceed the pre-PR09 footprint');
+const canonKernel = context.match(/const CANON_KERNEL = String\.raw`([\s\S]*?)`;/)?.[1] || '';
+const novelContract = context.match(/const MINIMAL_WRITER_CONTRACT = String\.raw`([\s\S]*?)`;/)?.[1] || '';
+assert.match(novelContract, /MINIMAL WRITER CONTRACT/);
+assert.match(novelContract, /next scene of a serialized fantasy novel/);
+assert.match(novelContract, /Compress routine process/);
+assert.match(novelContract, /never invent a new player intention, dialogue, emotion, or decision/);
+assert.match(canonKernel, /player owns every new PC intention/);
+assert.match(canonKernel, /routine mechanics inside its semantic scope/);
+assert.match(canonKernel, /never establishes paragraph order, actor order, a completion recipe/);
+assert.ok(canonKernel.length + novelContract.length <= 1900, 'P3-PR01R production narrative contract must stay thin');
 assert.doesNotMatch(context, /generic prose scoring|sentence rhythm validator|sensory-detail quota|subtext parser/i);
 
 const presentation = createNovelPresentationState();

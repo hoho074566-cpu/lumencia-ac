@@ -206,7 +206,7 @@ assert.deepEqual(telemetry.evolved_talent_keys, ['martial']);
 assert.doesNotMatch(JSON.stringify(telemetry), /cause|reason|history|before|after|description|limitation/, 'telemetry must not duplicate authoritative causal or ability state');
 
 const routerSource = readFileSync(new URL('../../api/chat-router.js', import.meta.url), 'utf8');
-const structuredPatchMatch = routerSource.match(/const GOAL_V2_RULES = String\.raw`[\s\S]*?\n}\n\nfunction installResponsesRouter\(\)/);
+const structuredPatchMatch = routerSource.match(/const TIME_EXECUTION_RULES = String\.raw`[\s\S]*?\n}\n\nfunction installResponsesRouter\(\)/);
 assert.ok(structuredPatchMatch, 'structured schema patch must remain extractable without loading hosted dependencies');
 const structuredPatchSource = structuredPatchMatch[0].replace(/\n\nfunction installResponsesRouter\(\)[\s\S]*$/, '');
 const patchGoalV2StructuredFormat = Function(`${structuredPatchSource}; return patchGoalV2StructuredFormat;`)();
@@ -221,8 +221,7 @@ const baseSchema = {
 const patched = patchGoalV2StructuredFormat({ instructions:'core', text:{ format:{ schema:baseSchema } } });
 assert.equal(patched.text.format.schema.properties.state_delta.properties.awakening_progress.maxItems, 1, 'adapter schema must expose one bounded awakening row');
 assert.equal(patched.text.format.schema.properties.state_delta.properties.talent_evolution.items.properties.amount.maximum, 1, 'adapter schema must expose one-step talent evolution');
-assert.match(patched.instructions, /Trait은 100 진척과 서로 다른 이정표 3개/, 'adapter instructions must carry the milestone authority rule');
-assert.match(patched.instructions, /META·AUTO·CONTINUE에서는 두 필드를 모두 비운다/, 'adapter instructions must preserve all freeze modes');
+assert.doesNotMatch(patched.instructions, /AWAKENING \/ TALENT EVOLUTION|Trait은 100 진척|META·AUTO·CONTINUE에서는 두 필드/, 'growth validation rules must stay in the hard validator instead of controlling Writer composition');
 
 const divider = '='.repeat(20);
 const instructions = `===== CHARACTER REGISTRY =====
@@ -252,7 +251,7 @@ Resolve.`;
 const denseRouted = routeOpenAIParams(
   { instructions, input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}' },
   { incoming:{
-    action:`공명 감각의 징후를 확인한다. ${'긴 행동 '.repeat(1600)}`,
+    action:`공명 감각의 징후를 확인한다. ${'긴 행동 '.repeat(1600)}`.slice(0,5000),
     saveState:{
       turnNumber:20,
       world:{ location:'고대 유적' },
@@ -265,20 +264,20 @@ const denseRouted = routeOpenAIParams(
         awakeningCandidates:rareTrait.candidates,
       },
       sceneRuntime:{ participants:['artemis'] }, npcInnerStates:{},
-      routerFeedback:{ routerVersion:'1.5.6-hf1', profile:'routine-17k-v154', lastInputTokens:100000 },
+      routerFeedback:{ routerVersion:'p3-pr01r-thin-scene-packet-v1', profile:'routine-17k-v154', lastInputTokens:100000 },
     },
     recentTurns:[],
   }, mode:'game' },
 );
 assert.equal(denseRouted.telemetry.adaptive_scale, .76, 'dense fixture must exercise minimum adaptive routing');
 assert.ok(denseRouted.params.input.length <= 6840, `awakening authority exceeded adaptive routine budget: ${denseRouted.params.input.length}`);
-const minimumText = denseRouted.params.input.split('===== AUTHORITATIVE SAVE_STATE (ROUTED MINIMUM) =====\n')[1].split('\n\n=====')[0];
-const minimumSave = JSON.parse(minimumText);
-assert.equal(minimumSave.pc.talents.martial, 8, 'all four authoritative talent scores must survive the minimum route');
-assert.equal(minimumSave.pc.traits['사선감각'], true, 'existing Trait identity must survive the minimum route');
-assert.equal(minimumSave.pc.authorities['불변의서약'], true, 'existing Authority identity must survive the minimum route');
-assert.equal(minimumSave.pc.awakeningCandidates.trait['공명 감각'].progress, 8, 'awakening progress must survive the minimum route');
-assert.equal(minimumSave.pc.awakeningCandidates.trait['공명 감각'].milestones, 0, 'awakening milestone count must survive the minimum route');
+const thinHard=(result)=>JSON.parse(result.params.input.split('===== THIN SCENE PACKET — HARD FACTS =====\n')[1].split('\n\n=====')[0]);
+const minimumPc = thinHard(denseRouted).canonical_facts.pc;
+assert.equal(minimumPc.talents.martial, 8, 'all four authoritative talent scores must survive the minimum route');
+assert.equal(minimumPc.traits['사선감각'], true, 'existing Trait identity must survive the minimum route');
+assert.equal(minimumPc.authorities['불변의서약'], true, 'existing Authority identity must survive the minimum route');
+assert.equal(minimumPc.awakening_candidates.trait['공명 감각'].progress, 8, 'awakening progress must survive the minimum route');
+assert.equal(minimumPc.awakening_candidates.trait['공명 감각'].milestones, 0, 'awakening milestone count must survive the minimum route');
 
 const overflowTraits = Object.fromEntries(Array.from({ length:10 }, (_, index) => [`후순위 특성 ${index}`, { description:`특성 정의 ${index}`, limitation:`특성 제한 ${index}` }]));
 const overflowAuthorities = Object.fromEntries(Array.from({ length:10 }, (_, index) => [`후순위 권능 ${index}`, { description:`권능 정의 ${index}`, limitation:`권능 제한 ${index}` }]));
@@ -296,14 +295,11 @@ const relevantAbilityRoute = routeOpenAIParams(
     recentTurns:[],
   }, mode:'game' },
 );
-const relevantAbilityMinimum = JSON.parse(relevantAbilityRoute.params.input.split('===== AUTHORITATIVE SAVE_STATE (ROUTED MINIMUM) =====\n')[1].split('\n\n=====')[0]);
-const relevantAbilityDetail = JSON.parse(relevantAbilityRoute.params.input.split('===== AUTHORITATIVE SAVE_STATE (ROUTED DETAIL) =====\n')[1].split('\n\n===== ROLLING SUMMARY TAIL =====')[0]);
-assert.equal(relevantAbilityMinimum.pc.traits[directlyMentionedOverflowTrait], true, 'a directly invoked Trait beyond the first eight must survive minimum routing');
-assert.equal(relevantAbilityMinimum.pc.authorities[directlyMentionedOverflowAuthority], true, 'a directly invoked Authority beyond the first eight must survive minimum routing');
-assert.equal(relevantAbilityDetail.pc.traits[directlyMentionedOverflowTrait].description, '특성 정의 9', 'directly relevant Trait definition must survive detail routing');
-assert.equal(relevantAbilityDetail.pc.authorities[directlyMentionedOverflowAuthority].description, '권능 정의 9', 'directly relevant Authority definition must survive detail routing');
-assert.ok(Object.keys(relevantAbilityDetail.pc.traits).length <= 8, 'relevance selection must preserve the existing Trait bound');
-assert.ok(Object.keys(relevantAbilityDetail.pc.authorities).length <= 8, 'relevance selection must preserve the existing Authority bound');
+const relevantAbilityPc = thinHard(relevantAbilityRoute).canonical_facts.pc;
+assert.equal(relevantAbilityPc.traits[directlyMentionedOverflowTrait].description, '특성 정의 9', 'a directly invoked Trait beyond the first eight must survive thin routing');
+assert.equal(relevantAbilityPc.authorities[directlyMentionedOverflowAuthority].description, '권능 정의 9', 'a directly invoked Authority beyond the first eight must survive thin routing');
+assert.ok(Object.keys(relevantAbilityPc.traits).length <= 8, 'relevance selection must preserve the existing Trait bound');
+assert.ok(Object.keys(relevantAbilityPc.authorities).length <= 8, 'relevance selection must preserve the existing Authority bound');
 
 const fixedName = (prefix, index, length) => `${prefix}${index}-`.padEnd(length, String(index % 10)).slice(0, length);
 const maximalTraits = Object.fromEntries(Array.from({ length:8 }, (_, index) => [fixedName('Trait-', index, 64), { description:'설명 '.repeat(80), limitation:'조건과 대가 '.repeat(60) }]));
@@ -314,7 +310,7 @@ const directlyMentionedAwakening = Object.keys(maximalAwakening.authority).at(-1
 const maximalGrowthRoute = routeOpenAIParams(
   { instructions, input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}' },
   { incoming:{
-    action:`${directlyMentionedTrait} 및 ${directlyMentionedAwakening} 상태를 점검한다. ${'장문 행동 '.repeat(1600)}`,
+    action:`${directlyMentionedTrait} 및 ${directlyMentionedAwakening} 상태를 점검한다. ${'장문 행동 '.repeat(1600)}`.slice(0,5000),
     saveState:{
       turnNumber:30, world:{ location:'고대 유적' },
       pc:{
@@ -324,16 +320,15 @@ const maximalGrowthRoute = routeOpenAIParams(
         traits:maximalTraits, authorities:maximalAuthorities, awakeningCandidates:maximalAwakening,
       },
       sceneRuntime:{ participants:['artemis'] }, npcInnerStates:{},
-      routerFeedback:{ routerVersion:'1.5.6-hf1', profile:'routine-17k-v154', lastInputTokens:100000 },
+      routerFeedback:{ routerVersion:'p3-pr01r-thin-scene-packet-v1', profile:'routine-17k-v154', lastInputTokens:100000 },
     }, recentTurns:[],
   }, mode:'game' },
 );
 assert.ok(maximalGrowthRoute.params.input.length <= 6840, `maximal bounded growth authority exceeded adaptive routine budget: ${maximalGrowthRoute.params.input.length}`);
-const maximalMinimumText = maximalGrowthRoute.params.input.split('===== AUTHORITATIVE SAVE_STATE (ROUTED MINIMUM) =====\n')[1].split('\n\n=====')[0];
-const maximalMinimum = JSON.parse(maximalMinimumText);
-assert.equal(maximalMinimum.pc.growth_context_truncated, true, 'pathological combined growth pressure must be explicitly marked');
-assert.ok(Object.prototype.hasOwnProperty.call(maximalMinimum.pc.traits, directlyMentionedTrait), 'directly mentioned Trait must outrank unmentioned entries under pressure');
-assert.ok(Object.prototype.hasOwnProperty.call(maximalMinimum.pc.awakeningCandidates.authority, directlyMentionedAwakening), 'directly mentioned awakening candidate must survive pressure compaction');
+const maximalPc = thinHard(maximalGrowthRoute).canonical_facts.pc;
+assert.equal(maximalPc.growth_context_truncated, true, 'pathological combined growth pressure must be explicitly marked');
+assert.ok(Object.prototype.hasOwnProperty.call(maximalPc.traits, directlyMentionedTrait), 'directly mentioned Trait must outrank unmentioned entries under pressure');
+assert.ok(Object.prototype.hasOwnProperty.call(maximalPc.awakening_candidates.authority, directlyMentionedAwakening), 'directly mentioned awakening candidate must survive pressure compaction');
 
 const runtimeSource = readFileSync(new URL('../../app-runtime.js', import.meta.url), 'utf8');
 const healthSource = readFileSync(new URL('../../api/health.js', import.meta.url), 'utf8');

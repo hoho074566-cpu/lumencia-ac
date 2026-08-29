@@ -93,11 +93,9 @@ assert.equal(routed.telemetry.npc_significance_v1.version, NPC_SIGNIFICANCE_VERS
 assert.equal(routed.telemetry.npc_significance_v1.mode, 'semantic');
 assert.deepEqual(routed.telemetry.npc_significance_v1.eligible_keys, routed.telemetry.selected_npcs, 'the receipt boundary must use the same routed NPC authority');
 assert.ok(routed.telemetry.npc_significance_v1.eligible_keys.includes('emily'), 'direct player focus must remain eligible for model judgment');
-assert.match(routed.params.instructions, /NPC significance를 현재 행동·사건·목표·관계·지식의 의미와 인과로 판단/);
-assert.match(routed.params.instructions, /AUTHORITATIVE SAVE_STATE\.relevantNpcKeys 중 전면 primary와 직접 연결된 support/);
-assert.match(routed.params.instructions, /점수\/문구 매칭/);
-assert.match(routed.params.instructions, /위치·일정·지식과 PC 선택권을 지킨다/);
-assert.match(routed.params.input, /"relevantNpcKeys":\[[^\]]*"emily"/s, 'the semantic model rule must receive the same bounded candidates in authoritative routed state');
+assert.match(routed.params.instructions, /CAUSALLY RELEVANT CHARACTER REGISTRY/);
+assert.doesNotMatch(routed.params.instructions, /NPC significance|spotlight_keys|primary와 직접 연결된 support/,'significance machinery must stay internal');
+assert.match(routed.params.input, /"present_named_character_keys":\[[^\]]*"emily"/s, 'the thin packet must receive the same bounded current characters');
 assert.ok(routed.params.input.length <= 9000, `the semantic directive exceeded the stable routine input budget: ${routed.params.input.length}`);
 
 const autoBoundary = routeOpenAIParams(

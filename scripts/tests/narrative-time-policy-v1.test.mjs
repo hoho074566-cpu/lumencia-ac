@@ -50,20 +50,15 @@ ${divider}
 Resolve declared actions.`;
 const baseParams={instructions,input:'===== TURN OPTIONS =====\nnormal\n===== AUTHORITATIVE SAVE_STATE =====\n{}'};
 const routed=routeOpenAIParams(baseParams,{incoming:{action:'한 시간 훈련한다',saveState:{turnNumber:1,world:{date:'1285-03-01',time:'09:50',location:'훈련장'},scheduleContext:{due:[],upcoming:[{id:'class:10',title:'필수 수업',date:'1285-03-01',time:'10:00',importance:5}]}},recentTurns:[]},mode:'game'});
-assert.match(routed.params.instructions,/NARRATIVE TIME POLICY 1\.0.*서사 우선, clock 보조/,'Context Router must carry Narrative Time Policy inside the existing GM-rule budget');
-assert.match(routed.params.instructions,/minute는 일정\/deadline\/consequence\/duration 등 검증용/,'minute arithmetic remains deterministic internal authority');
-assert.match(routed.params.instructions,/prose에 raw\/경과분을 보고하지 않는다/,'ordinary prose must not expose raw elapsed-time diagnostics');
-assert.match(routed.params.instructions,/시각은 일정·기한·위험·질문\/지정에만 보이며/,'exact time remains available only when gameplay-relevant');
-assert.match(routed.params.instructions,/clock tick은 STOP 사유가 아니다/,'clock ticks cannot become player stop points');
-assert.match(routed.params.instructions,/downtime은 변화까지 압축/,'long durations must be compressed rather than minute-simulated');
-assert.match(routed.params.instructions,/일정·consequence·NPC initiative·관계\/성장·world event는 보존한다/,'compression cannot skip meaningful world changes');
-assert.match(routed.params.input,/SCHEDULE_BOUNDARY=10min/,'the existing hard-boundary instruction must remain in routed input');
+assert.match(routed.params.instructions,/Compress routine process and give meaningful moments enough space/,'the minimal Writer contract keeps semantic compression');
+assert.match(routed.params.input,/"time":"10:00","title":"필수 수업"/,'the clock reaches Writer only as a factual constraint');
+assert.doesNotMatch(routed.params.input,/NARRATIVE TIME POLICY|SCHEDULE_BOUNDARY|TIME_GUIDE|STOP 사유/,'time mechanics and prose choreography must stay internal');
 const continued=routeOpenAIParams(baseParams,{incoming:{action:'[LUMENSIA V1.5.6 CONTINUE]\n같은 순간을 이어 쓴다.',saveState:{},recentTurns:[]},mode:'continue'});
-assert.match(continued.params.instructions,/NARRATIVE TIME POLICY 1\.0/,'CONTINUE keeps the same compact narrative-time rule without a second policy section');
-assert.match(continued.params.input,/SCENE MOMENTUM V1 — CONTINUE HARD FREEZE/,'CONTINUE must freeze clock, schedule, consequence, and action progress through the existing authority tail');
+assert.match(continued.params.instructions,/MINIMAL WRITER CONTRACT/,'CONTINUE keeps the same thin Writer contract');
+assert.doesNotMatch(continued.params.input,/SCENE MOMENTUM V1 — CONTINUE HARD FREEZE/,'CONTINUE mechanics must stay internal');
 
 const policyLines=routed.params.instructions.split('\n').filter(line=>/^(?:9\)|21\)|22\))/.test(line));
-assert.equal(policyLines.length,3,'Narrative Time Policy must stay consolidated in the three pre-existing time/compression/STOP rules');
-assert.ok(policyLines.reduce((sum,line)=>sum+line.length,0)<=332,'Narrative Time Policy rules must not exceed the legacy rules they replace or displace routed canon/PC SYSTEM');
+assert.equal(policyLines.length,0,'legacy numbered time rules must not regrow inside the thin Writer contract');
+assert.ok(routed.params.instructions.length<7000,'thin instructions must remain bounded without a narrative-time checklist');
 
 console.log('PASS Narrative Time Policy V1 narrative-first prose, hard-boundary, compression, freeze, and one-call contract');
